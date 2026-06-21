@@ -1,8 +1,8 @@
-# financial_research_data_agent — 담당자 C
+# financial_research_data_agent
 
 ## 1. 담당 범위
 
-Agent B가 수집한 데이터를 전처리하고 Vector DB에 저장하며, 다른 Agent들이 공통으로 사용할 검색/조회 함수를 구현합니다.
+수집한 데이터를 전처리하고 Vector DB에 저장하며, 다른 Agent들이 공통으로 사용할 검색/조회 함수를 구현합니다.
 
 ```
 Agent B Storage

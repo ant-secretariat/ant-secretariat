@@ -199,7 +199,7 @@ result = get_report_chunks(
 
 **매크로 요약문**
 - `RawMacroInput`의 `summary_text` 필드는 매크로 숫자 데이터를 자연어로 변환해서 넘겨받아야 함
-- 변환 방식 추후 B와 협의 예정
+- 변환 방식 추후 협의 예정
 
 ---
 

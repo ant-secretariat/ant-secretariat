@@ -57,7 +57,7 @@ financial_research_data_agent/
 
 ## 4. 사전 준비
 
-이 코드는 (https://github.com/boogiewooki02/financial-research-agent)가 먼저 실행되어 있어야 합니다.
+이 코드는 (https://github.com/boogiewooki02/financial-research-agent) 가 먼저 실행되어 있어야 합니다.
 
 - DB 파일: `db/reports.db`
 - PDF 저장 경로: `storage/raw_report_pdfs/`
@@ -205,7 +205,7 @@ result = get_report_chunks(
 
 ## 9. 주의사항
 
-- `run_pipeline.py` 실행 전 반드시 (https://github.com/boogiewooki02/financial-research-agent)가 먼저 실행되어 있어야 합니다.
+- `run_pipeline.py` 실행 전 반드시 (https://github.com/boogiewooki02/financial-research-agent) 가 먼저 실행되어 있어야 합니다.
 - Upstage API 키가 없으면 Placeholder 임베딩으로 동작하며, `embedding_status = pending`으로 저장됩니다. API 키 발급 후 재실행하면 pending chunk가 자동 처리됩니다.
 - PDF가 스캔본이면 OCR이 필요할 수 있습니다. `pdf_processor.is_scanned_pdf()`로 감지 가능합니다.
 - `target_price_data`는 HTML에서 추출한 값을 그대로 사용합니다. PDF에서 별도 추출하지 않습니다.

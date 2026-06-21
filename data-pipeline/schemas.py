@@ -18,31 +18,33 @@ class RawReportInput:
 
 @dataclass
 class RawNewsInput:
-    """뉴스 원본 (추후 협의)"""
+    """뉴스 원본 — B DB news_metadata 기준"""
     news_id: str
     ticker: str
     company: str
     title: str
-    source: str
+    summary: str        # B DB: summary (본문 전문 없음, 요약본)
     published_at: str
-    url: str
-    content: str
-    collected_at: str
+    url: str            # B DB: original_url
+    source: str
+    provider: str
+    created_at: str
 
 
 @dataclass
 class RawDisclosureInput:
-    """공시 원본 (추후 협의)"""
+    """공시 원본 — B DB disclosure_metadata 기준"""
     disclosure_id: str
     ticker: str
     company: str
-    title: str
+    corp_code: str
+    report_name: str    # B DB: report_name (title 아님)
     disclosure_type: str
-    published_at: str
+    disclosed_at: str   # B DB: disclosed_at (published_at 아님)
+    receipt_no: str
+    url: str            # B DB: original_url
     source: str
-    url: str
-    content: str
-    collected_at: str
+    created_at: str
 
 
 @dataclass

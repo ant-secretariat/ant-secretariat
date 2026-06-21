@@ -38,7 +38,6 @@ class SQLiteDB(BaseRelationalDB):
             conn.executescript(schema_path.read_text(encoding="utf-8"))
         logger.info(f"SQLiteDB 초기화 완료: {self.db_path}")
 
-
     def insert_report_chunk_record(self, record: ReportChunkRecord) -> bool:
         try:
             with self._connect() as conn:
@@ -208,6 +207,45 @@ class SQLiteDB(BaseRelationalDB):
                 for row in rows
             ]
 
+    def get_news_to_process(self) -> list:
+        """news_metadata에서 전체 뉴스 조회 (B DB 컬럼 기준)"""
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT news_id, ticker, company, title, summary,
+                       published_at, original_url, source, provider, created_at
+                FROM news_metadata
+                ORDER BY published_at DESC
+                """,
+            ).fetchall()
+            return [dict(row) for row in rows]
+
+    def get_disclosures_to_process(self) -> list:
+        """disclosure_metadata에서 전체 공시 조회 (B DB 컬럼 기준)"""
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT disclosure_id, ticker, company, corp_code,
+                       report_name, disclosure_type, disclosed_at,
+                       receipt_no, original_url, source, created_at
+                FROM disclosure_metadata
+                ORDER BY disclosed_at DESC
+                """,
+            ).fetchall()
+            return [dict(row) for row in rows]
+
+    def get_macro_to_process(self) -> list:
+        """macro_data에서 전체 매크로 조회 (B DB 컬럼 기준)"""
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT indicator_id, indicator_name, date, value,
+                       unit, frequency, country, source
+                FROM macro_data
+                ORDER BY date DESC
+                """,
+            ).fetchall()
+            return [dict(row) for row in rows]
 
     def get_reports_to_process(self) -> list:
         with self._connect() as conn:
@@ -227,7 +265,6 @@ class SQLiteDB(BaseRelationalDB):
                 """,
             ).fetchall()
             return [dict(row) for row in rows]
-
 
     def get_target_price_by_report_id(self, report_id: str) -> Optional[dict]:
         with self._connect() as conn:

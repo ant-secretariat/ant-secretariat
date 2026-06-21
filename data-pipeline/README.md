@@ -167,13 +167,17 @@ result = search_documents(
     document_type="report",     # report / news / disclosure / macro_summary
     report_type="company_report",
     source="KIRS",
+    sector="반도체",             # 산업군
+    broker="삼성증권",           # 증권사명
+    topic="HBM",                # 주제/키워드
     top_k=5,
     embedding_model=embedding_model,
     vector_db=vector_db,
 )
 ```
 
-반환 형태: 추후 논의 예정 (임시)
+반환 형태: 추후 담당자 A와 확인 예정 (임시)
+
 ```json
 {
   "query": "HBM 수요 증가",

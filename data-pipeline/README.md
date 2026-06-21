@@ -47,7 +47,7 @@ financial_research_data_agent/
 ├── storage/
 │   ├── implementations.py          # ChromaDB / Upstage 임베딩 / SQLiteDB 구현체
 │   ├── sqlite_db.py                # SQLiteDB 구현체 (B의 reports.db 공유)
-│   └── schema_extension.sql        # C 담당 테이블 DDL (report_chunk_records)
+│   └── schema_extension.sql        # 테이블 DDL (report_chunk_records)
 │
 └── config/
     └── constants.py                # document_type_codes / report_type_codes
@@ -59,8 +59,8 @@ financial_research_data_agent/
 
 이 코드는 (https://github.com/boogiewooki02/financial-research-agent)가 먼저 실행되어 있어야 합니다.
 
-- B의 DB 파일: `db/reports.db`
-- B의 PDF 저장 경로: `storage/raw_report_pdfs/`
+- DB 파일: `db/reports.db`
+- PDF 저장 경로: `storage/raw_report_pdfs/`
 
 ---
 

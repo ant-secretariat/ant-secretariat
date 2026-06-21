@@ -108,10 +108,12 @@ pip install -r requirements.txt
 
 **API 키 없을 때 (Placeholder 임베딩)**
 
+```powershell
 python run_pipeline.py \
   --db-path ..\financial-research-agent\db\reports.db \
   --pdf-base-path ..\financial-research-agent
-  
+```
+
 **리포트만 처리 (API 키 있을 때)**
 
 ```powershell

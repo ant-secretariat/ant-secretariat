@@ -46,7 +46,7 @@ financial_research_data_agent/
 │
 ├── storage/
 │   ├── implementations.py          # ChromaDB / Upstage 임베딩 / SQLiteDB 구현체
-│   ├── sqlite_db.py                # SQLiteDB 구현체 (B의 reports.db 공유)
+│   ├── sqlite_db.py                # SQLiteDB 구현체 (reports.db 공유)
 │   └── schema_extension.sql        # 테이블 DDL (report_chunk_records)
 │
 └── config/

@@ -173,7 +173,7 @@ result = search_documents(
 )
 ```
 
-반환 형태:
+반환 형태: 추후 논의 예정 (임시)
 ```json
 {
   "query": "HBM 수요 증가",
@@ -210,7 +210,7 @@ result = get_report_chunks(
 )
 ```
 
-반환 형태:
+반환 형태: 추후 논의 예정 (임시)
 ```json
 {
   "report_id": "KIRS_005930_001",

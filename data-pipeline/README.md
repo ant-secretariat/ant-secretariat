@@ -41,8 +41,16 @@ financial_research_data_agent/
 │   └── text_processor.py           # 뉴스 / 공시 / 매크로 청킹
 │
 ├── functions/
-│   ├── search_documents.py         # 공통 함수 search_documents() 구현
-│   └── get_report_chunks.py        # 공통 함수 get_report_chunks() 구현
+│   ├── search_documents.py         # Vector DB 의미 기반 검색
+│   ├── get_report_chunks.py        # 특정 리포트 chunk 전체 조회
+│   ├── resolve_company.py          # 회사명 → ticker 변환
+│   ├── get_report_metadata.py      # 리포트 메타데이터 조회
+│   ├── get_target_prices.py        # 목표주가 / 투자의견 조회
+│   ├── get_price_data.py           # 주가 데이터 조회
+│   ├── get_macro_data.py           # 매크로 지표 조회
+│   ├── get_disclosure_data.py      # 공시 데이터 조회
+│   ├── get_available_data_status.py # 기업별 데이터 준비 여부 확인
+│   └── get_agent_context.py        # Agent별 필요 데이터 묶음 반환
 │
 ├── storage/
 │   ├── implementations.py          # ChromaDB / Upstage 임베딩 / SQLiteDB 구현체
@@ -150,7 +158,34 @@ python run_pipeline.py --db-path ... --pdf-base-path ... --report-id REPORT_ID
 
 ## 8. 공통 함수 사용법
 
-다른 Agent 개발자는 아래 두 함수를 import해서 사용합니다.
+다른 Agent 개발자는 아래 함수들을 import해서 사용합니다.
+
+> ⚠️ 반환 JSON 포맷은 추후 확인 예정 (현재 임시 버전)
+
+---
+
+### resolve_company()
+
+회사명/선택값을 ticker로 변환
+
+```python
+from functions.resolve_company import resolve_company
+
+result = resolve_company(company_input="삼성전자")
+```
+
+```json
+{
+  "ticker": "005930",
+  "company": "삼성전자",
+  "sector": "반도체",
+  "matched": true,
+  "match_status": "alias",
+  "match_confidence": 1.0
+}
+```
+
+---
 
 ### search_documents()
 
@@ -176,8 +211,6 @@ result = search_documents(
 )
 ```
 
-반환 형태: 추후 담당자 A와 확인 예정 (임시)
-
 ```json
 {
   "query": "HBM 수요 증가",
@@ -200,6 +233,8 @@ result = search_documents(
 }
 ```
 
+---
+
 ### get_report_chunks()
 
 특정 리포트의 chunk 전체를 순서대로 조회
@@ -214,7 +249,6 @@ result = get_report_chunks(
 )
 ```
 
-반환 형태: 추후 논의 예정 (임시)
 ```json
 {
   "report_id": "KIRS_005930_001",
@@ -230,6 +264,274 @@ result = get_report_chunks(
       "content": "첫 번째 chunk 본문"
     }
   ]
+}
+```
+
+---
+
+### get_report_metadata()
+
+리포트 목록과 메타데이터 조회
+
+```python
+from functions.get_report_metadata import get_report_metadata
+
+result = get_report_metadata(
+    ticker="005930",
+    date_from="2026-01-01",
+    date_to="2026-06-21",
+    report_type="company_report",
+    relational_db=db,
+)
+```
+
+```json
+{
+  "ticker": "005930",
+  "count": 3,
+  "reports": [
+    {
+      "report_id": "KIRS_005930_001",
+      "ticker": "005930",
+      "company": "삼성전자",
+      "title": "리포트 제목",
+      "source": "KIRS",
+      "author_org": "작성 기관",
+      "published_at": "2026-06-15",
+      "report_type": "company_report",
+      "original_url": "원문 URL"
+    }
+  ]
+}
+```
+
+---
+
+### get_target_prices()
+
+목표주가 및 투자의견 조회
+
+```python
+from functions.get_target_prices import get_target_prices
+
+result = get_target_prices(
+    ticker="005930",
+    date_from="2026-01-01",
+    date_to="2026-06-21",
+    report_type="company_report",
+    relational_db=db,
+)
+```
+
+```json
+{
+  "ticker": "005930",
+  "company": "삼성전자",
+  "target_prices": [
+    {
+      "report_id": "KIRS_005930_001",
+      "published_at": "2026-06-15",
+      "source": "KIRS",
+      "author_org": "작성 기관",
+      "title": "리포트 제목",
+      "target_price": 95000,
+      "investment_opinion": "매수",
+      "report_type": "company_report"
+    }
+  ],
+  "summary": {
+    "count": 1,
+    "avg_target_price": 95000,
+    "min_target_price": 95000,
+    "max_target_price": 95000
+  }
+}
+```
+
+---
+
+### get_price_data()
+
+주가, 거래량, 변동성 등 숫자 데이터 조회
+
+```python
+from functions.get_price_data import get_price_data
+
+result = get_price_data(
+    ticker="005930",
+    date_from="2026-01-01",
+    date_to="2026-06-21",
+    frequency="daily",
+    relational_db=db,
+)
+```
+
+```json
+{
+  "ticker": "005930",
+  "company": "삼성전자",
+  "frequency": "daily",
+  "filters": {
+    "date_from": "2026-01-01",
+    "date_to": "2026-06-21"
+  },
+  "latest": {
+    "price_date": "2026-06-21",
+    "current_price": 80000,
+    "market_cap": null,
+    "volatility_30d": 0.21
+  },
+  "prices": [
+    {
+      "price_date": "2026-06-21",
+      "open": 79000,
+      "high": 81000,
+      "low": 78500,
+      "close": 80000,
+      "volume": 12345678
+    }
+  ]
+}
+```
+
+---
+
+### get_macro_data()
+
+금리, 환율, CPI 등 매크로 숫자 데이터 조회
+
+```python
+from functions.get_macro_data import get_macro_data
+
+result = get_macro_data(
+    indicators=["BASE_RATE_KR", "USD_KRW"],
+    date_from="2026-01-01",
+    date_to="2026-06-21",
+    country="KR",
+    relational_db=db,
+)
+```
+
+```json
+{
+  "country": "KR",
+  "indicators": [
+    {
+      "indicator_id": "BASE_RATE_KR",
+      "indicator_name": "한국 기준금리",
+      "unit": "%",
+      "frequency": "monthly",
+      "records": [
+        {
+          "date": "2026-06-19",
+          "value": 2.75,
+          "source": "ECOS"
+        }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+### get_disclosure_data()
+
+공시 데이터 조회
+
+```python
+from functions.get_disclosure_data import get_disclosure_data
+
+result = get_disclosure_data(
+    ticker="005930",
+    date_from="2026-01-01",
+    date_to="2026-06-21",
+    disclosure_type="사업보고서",
+    relational_db=db,
+)
+```
+
+```json
+{
+  "ticker": "005930",
+  "company": "삼성전자",
+  "disclosures": [
+    {
+      "disclosure_id": "...",
+      "date": "2026-06-15",
+      "source": "OpenDART",
+      "title": "신규 시설투자 공시",
+      "disclosure_type": "investment",
+      "url": "공시 원문 URL"
+    }
+  ]
+}
+```
+
+---
+
+### get_available_data_status()
+
+해당 기업에 어떤 데이터가 있는지 확인 (실행 Agent 선택 전 데이터 준비 여부 확인)
+
+```python
+from functions.get_available_data_status import get_available_data_status
+
+result = get_available_data_status(
+    ticker="005930",
+    relational_db=db,
+    vector_db=vector_db,
+)
+```
+
+```json
+{
+  "ticker": "005930",
+  "available": {
+    "reports": true,
+    "news": true,
+    "disclosures": true,
+    "price_data": true,
+    "macro_data": true,
+    "target_price_data": false
+  },
+  "latest": {
+    "report_date": "2026-06-15",
+    "news_date": "2026-06-21",
+    "disclosure_date": "2026-06-19",
+    "price_date": "2026-06-21",
+    "macro_date": "2026-06-19"
+  }
+}
+```
+
+---
+
+### get_agent_context()
+
+특정 Agent에 필요한 데이터 묶음을 한 번에 반환
+
+```python
+from functions.get_agent_context import get_agent_context
+
+result = get_agent_context(
+    ticker="005930",
+    agent_type="trend_report",  # trend_report(D용) / debate(F용) / simulation(G용)
+    query="HBM 수요 전망",
+    relational_db=db,
+    embedding_model=embedding_model,
+    vector_db=vector_db,
+)
+```
+
+```json
+{
+  "ticker": "005930",
+  "agent_type": "trend_report",
+  "target_prices": { "...": "..." },
+  "price_data": { "...": "..." },
+  "macro_data": { "...": "..." },
+  "documents": { "...": "..." }
 }
 ```
 
@@ -251,11 +553,16 @@ result = get_report_chunks(
 - ECOS + Naver 기준 5개 지표 수집 완료
 - `summary_text` 미입력 시 자동으로 자연어 변환하여 임베딩
 
+**미수집 데이터**
+- `market_cap` (시가총액): 네이버 파이낸스 미제공 → KIS API 연동 시 수집 가능
+- `target_price_data`: 현재 비어있음
+- `disclosure_type`: 현재 빈값
+
 ---
 
 ## 10. 주의사항
 
-- `run_pipeline.py` 실행 전 반드시 B 크롤러(https://github.com/boogiewooki02/financial-research-agent)가 먼저 실행되어 있어야 합니다.
+- `run_pipeline.py` 실행 전 반드시 B (https://github.com/boogiewooki02/financial-research-agent)가 먼저 실행되어 있어야 합니다.
 - Upstage API 키가 없으면 Placeholder 임베딩으로 동작하며, `embedding_status = pending`으로 저장됩니다.
 - PDF가 스캔본이면 OCR이 필요할 수 있습니다. `pdf_processor.is_scanned_pdf()`로 감지 가능합니다.
 - `target_price_data`는 HTML에서 추출한 값을 그대로 사용합니다. PDF에서 별도 추출하지 않습니다.

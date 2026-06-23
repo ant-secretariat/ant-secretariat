@@ -2,14 +2,19 @@ from __future__ import annotations
 
 import unittest
 
-from collectors.disclosure_collector import DisclosureCollector
+from collectors.disclosure_collector import DisclosureCollector, _normalize_disclosure_type
 from collectors.macro_data_collector import (
     DEFAULT_ECOS_INDICATORS,
     EcosMacroProvider,
     MacroDataCollector,
     NaverMarketIndexProvider,
 )
-from collectors.news_collector import NewsCollector, _clean_html, _normalize_pub_date
+from collectors.news_collector import (
+    NewsCollector,
+    _clean_html,
+    _extract_article_text,
+    _normalize_pub_date,
+)
 from collectors.price_data_collector import NaverPriceProvider, PriceDataCollector
 from config.settings import Settings
 
@@ -93,6 +98,12 @@ class NewsCollectorTest(unittest.TestCase):
             )
         )
 
+    def test_extract_article_text_from_common_article_node(self) -> None:
+        body = " ".join(["삼성전자가 반도체 투자 계획을 발표했다."] * 20)
+        html = f"<html><body><article>{body}</article></body></html>"
+
+        self.assertIn("반도체 투자", _extract_article_text(html))
+
 
 class DisclosureCollectorTest(unittest.TestCase):
     def test_skip_without_dart_api_key(self) -> None:
@@ -101,6 +112,16 @@ class DisclosureCollectorTest(unittest.TestCase):
         ).collect_disclosure_data("005930", "삼성전자")
 
         self.assertEqual(rows, [])
+
+    def test_infer_disclosure_type_from_report_name(self) -> None:
+        self.assertEqual(
+            _normalize_disclosure_type("", "분기보고서 (2026.03)"),
+            "regular_report",
+        )
+        self.assertEqual(
+            _normalize_disclosure_type("", "기업설명회(IR) 개최"),
+            "ir",
+        )
 
 
 if __name__ == "__main__":

@@ -16,6 +16,7 @@ from crawler.kirs_research_crawler import KirsResearchCrawler
 from crawler.models import ReportMetadata
 from crawler.pdf_downloader import PdfDownloadError, PdfDownloader, is_pdf_content
 from crawler.pipeline import CollectionPipeline
+from crawler.target_price_extractor import extract_investment_opinion, extract_target_price
 from db.database import Database
 from db.repositories import ReportRepository
 
@@ -102,6 +103,13 @@ class DatabaseTest(unittest.TestCase):
                         "SELECT name FROM sqlite_master WHERE type = 'table'"
                     )
                 }
+                news_columns = {
+                    row["name"] for row in connection.execute("PRAGMA table_info(news_metadata)")
+                }
+                disclosure_columns = {
+                    row["name"]
+                    for row in connection.execute("PRAGMA table_info(disclosure_metadata)")
+                }
 
         self.assertIn("report_metadata", tables)
         self.assertIn("report_files", tables)
@@ -111,6 +119,9 @@ class DatabaseTest(unittest.TestCase):
         self.assertIn("news_metadata", tables)
         self.assertIn("disclosure_metadata", tables)
         self.assertIn("crawler_runs", tables)
+
+        self.assertIn("content", news_columns)
+        self.assertIn("content", disclosure_columns)
 
 
 class PdfDownloaderTest(unittest.TestCase):
@@ -258,6 +269,7 @@ class RepositoryTest(unittest.TestCase):
                         "company": "삼성전자",
                         "title": "뉴스",
                         "summary": "요약",
+                        "content": "뉴스 본문",
                         "published_at": "2026-06-18T00:00:00+00:00",
                         "original_url": "https://example.com/news",
                         "source": "NAVER_NEWS",
@@ -275,6 +287,7 @@ class RepositoryTest(unittest.TestCase):
                         "corp_code": "00126380",
                         "report_name": "공시",
                         "disclosure_type": "A",
+                        "content": "공시 본문",
                         "disclosed_at": "2026-06-18",
                         "receipt_no": "20260618000001",
                         "original_url": "https://dart.fss.or.kr",
@@ -293,6 +306,11 @@ class PdfUtilsTest(unittest.TestCase):
         self.assertTrue(is_pdf_content("text/plain", b"%PDF-1.7"))
         self.assertTrue(is_pdf_content("application/pdf", b"not-pdf"))
         self.assertFalse(is_pdf_content("text/html", b"<html>"))
+
+    def test_target_price_text_extraction(self) -> None:
+        text = "투자의견 Buy를 유지하며 목표주가: 95,000원을 제시한다."
+        self.assertEqual(extract_target_price(text), 95000)
+        self.assertEqual(extract_investment_opinion(text), "Buy")
 
 
 class CollectionScopeTest(unittest.TestCase):

@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import io
 import logging
+import re
 import zipfile
 from datetime import date, datetime, timedelta, timezone
 from xml.etree import ElementTree
@@ -86,7 +87,18 @@ class DartDisclosureProvider:
             response = client.get("https://opendart.fss.or.kr/api/list.json", params=params)
             response.raise_for_status()
 
-        payload = response.json()
+            payload = response.json()
+            rows = self._build_rows(client, payload, ticker, company, corp_code)
+        return rows
+
+    def _build_rows(
+        self,
+        client: httpx.Client,
+        payload: dict,
+        ticker: str,
+        company: str,
+        corp_code: str,
+    ) -> list[dict]:
         if payload.get("status") not in {"000", "013"}:
             raise RuntimeError(f"OpenDART list API error: {payload.get('status')} {payload.get('message')}")
         rows: list[dict] = []
@@ -94,6 +106,11 @@ class DartDisclosureProvider:
             disclosed_at = _normalize_dart_date(item.get("rcept_dt", ""))
             receipt_no = item.get("rcept_no", "")
             report_name = item.get("report_nm", "")
+            disclosure_type = _normalize_disclosure_type(
+                item.get("pblntf_ty", "") or item.get("pblntf_detail_ty", ""),
+                report_name,
+            )
+            content = self._fetch_document_content(client, receipt_no)
             disclosure_id = hashlib.sha256(
                 f"{ticker}|{receipt_no}|{report_name}".encode("utf-8")
             ).hexdigest()[:24]
@@ -104,7 +121,8 @@ class DartDisclosureProvider:
                     "company": company,
                     "corp_code": corp_code,
                     "report_name": report_name,
-                    "disclosure_type": item.get("pblntf_ty", ""),
+                    "disclosure_type": disclosure_type,
+                    "content": content,
                     "disclosed_at": disclosed_at,
                     "receipt_no": receipt_no,
                     "original_url": f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={receipt_no}",
@@ -113,6 +131,23 @@ class DartDisclosureProvider:
                 }
             )
         return rows
+
+    def _fetch_document_content(self, client: httpx.Client, receipt_no: str) -> str:
+        if not receipt_no:
+            return ""
+        try:
+            response = client.get(
+                "https://opendart.fss.or.kr/api/document.xml",
+                params={
+                    "crtfc_key": self.settings.dart_api_key,
+                    "rcept_no": receipt_no,
+                },
+            )
+            response.raise_for_status()
+        except httpx.HTTPError as exc:
+            logger.debug("DART 공시 본문 수집 실패: receipt_no=%s error=%s", receipt_no, exc)
+            return ""
+        return _extract_document_text(response.content)
 
     @staticmethod
     def fetch_corp_code_map(settings: Settings) -> dict[str, str]:
@@ -151,6 +186,74 @@ def _normalize_dart_date(value: str) -> str:
     if not value:
         return ""
     return datetime.strptime(value, "%Y%m%d").date().isoformat()
+
+
+def _normalize_disclosure_type(value: str, report_name: str) -> str:
+    value = (value or "").strip()
+    if value:
+        return value
+
+    name = report_name.replace(" ", "")
+    if any(keyword in name for keyword in ("사업보고서", "반기보고서", "분기보고서")):
+        return "regular_report"
+    if any(keyword in name for keyword in ("주요사항보고서", "주요경영사항")):
+        return "major_event"
+    if any(keyword in name for keyword in ("증권신고서", "투자설명서", "발행실적보고서")):
+        return "securities_issuance"
+    if any(keyword in name for keyword in ("대량보유", "임원ㆍ주요주주", "임원·주요주주")):
+        return "equity_ownership"
+    if any(keyword in name for keyword in ("감사보고서", "연결감사보고서")):
+        return "audit_report"
+    if any(keyword in name for keyword in ("기업설명회", "IR", "실적발표")):
+        return "ir"
+    if any(keyword in name for keyword in ("공정거래", "대규모기업집단")):
+        return "fair_trade"
+    if any(keyword in name for keyword in ("조회공시", "수시공시", "거래소")):
+        return "exchange_disclosure"
+    return "other"
+
+
+def _extract_document_text(content: bytes) -> str:
+    raw = _read_dart_document_payload(content)
+    if not raw:
+        return ""
+    text = _decode_document(raw)
+    if _looks_like_dart_error(text):
+        return ""
+    return _normalize_document_text(text)
+
+
+def _decode_document(raw: bytes) -> str:
+    for encoding in ("utf-8", "cp949", "euc-kr"):
+        try:
+            return raw.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return raw.decode("utf-8", errors="ignore")
+
+
+def _read_dart_document_payload(content: bytes) -> bytes:
+    if zipfile.is_zipfile(io.BytesIO(content)):
+        with zipfile.ZipFile(io.BytesIO(content)) as archive:
+            for name in archive.namelist():
+                if name.lower().endswith((".xml", ".html", ".htm", ".txt")):
+                    return archive.read(name)
+            if archive.namelist():
+                return archive.read(archive.namelist()[0])
+        return b""
+    return content
+
+
+def _looks_like_dart_error(text: str) -> bool:
+    return "<status>" in text and "<message>" in text and "<document>" not in text
+
+
+def _normalize_document_text(value: str) -> str:
+    value = re.sub(r"<!\[CDATA\[(.*?)\]\]>", r"\1", value, flags=re.DOTALL)
+    value = re.sub(r"<[^>]+>", " ", value)
+    value = value.replace("&nbsp;", " ")
+    value = value.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
+    return " ".join(value.split())
 
 
 def _utc_now() -> str:

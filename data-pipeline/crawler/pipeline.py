@@ -18,6 +18,7 @@ from crawler.kirs_research_crawler import KirsResearchCrawler
 from crawler.models import ReportMetadata
 from crawler.naver_research_crawler import NaverResearchCrawler
 from crawler.pdf_downloader import PdfDownloader
+from crawler.target_price_extractor import extract_target_price_fields
 from db.database import Database
 from db.repositories import NumericDataRepository, ReportRepository, RunRepository
 
@@ -159,15 +160,22 @@ class CollectionPipeline:
         report.company = resolved["company"]
         report.report_type = normalize_report_type(report.report_type, report.title)
         self.reports.upsert_report(report, "discovered")
-        if self.reports.insert_target_price_if_present(report):
-            counts["target_rows"] += 1
 
         if not report.pdf_url:
+            if self.reports.insert_target_price_if_present(report):
+                counts["target_rows"] += 1
             self.reports.update_report_status(report.report_id, "no_pdf_url")
             return
 
         duplicate = self.reports.find_by_pdf_url(report.pdf_url)
         if duplicate is not None:
+            previous_target_rows = counts["target_rows"]
+            self._fill_target_price_from_existing_file(report, duplicate, counts)
+            if (
+                counts["target_rows"] == previous_target_rows
+                and self.reports.insert_target_price_if_present(report)
+            ):
+                counts["target_rows"] += 1
             self.reports.update_report_status(
                 report.report_id,
                 "duplicate",
@@ -182,6 +190,7 @@ class CollectionPipeline:
             result = downloader.download_to_temp(report.pdf_url, final_path)
             hash_duplicate = self.reports.find_by_sha256(result.pdf_hash)
             if hash_duplicate is not None:
+                self._fill_target_price_from_pdf(report, Path(result.temp_path), counts)
                 Path(result.temp_path).unlink(missing_ok=True)
                 self.reports.update_report_status(
                     report.report_id,
@@ -193,6 +202,7 @@ class CollectionPipeline:
                 return
 
             downloader.commit(result.temp_path, final_path)
+            self._fill_target_price_from_pdf(report, final_path, counts)
             stored_path = self._stored_path(final_path)
             self.reports.insert_report_file(report, result, stored_path)
             self.reports.update_report_status(report.report_id, "success", file_path=stored_path)
@@ -206,6 +216,37 @@ class CollectionPipeline:
             )
             counts["failed"] += 1
             logger.exception("PDF 처리 실패: report_id=%s error=%s", report.report_id, exc)
+
+    def _fill_target_price_from_pdf(
+        self,
+        report: ReportMetadata,
+        pdf_path: Path,
+        counts: dict[str, int],
+    ) -> None:
+        if report.target_price is not None and report.investment_opinion:
+            return
+        target_price, investment_opinion = extract_target_price_fields(pdf_path)
+        if report.target_price is None:
+            report.target_price = target_price
+        if not report.investment_opinion:
+            report.investment_opinion = investment_opinion
+        if self.reports.insert_target_price_if_present(report):
+            counts["target_rows"] += 1
+
+    def _fill_target_price_from_existing_file(
+        self,
+        report: ReportMetadata,
+        duplicate: dict,
+        counts: dict[str, int],
+    ) -> None:
+        file_path = duplicate.get("file_path", "")
+        if not file_path:
+            return
+        pdf_path = Path(file_path)
+        if not pdf_path.is_absolute():
+            pdf_path = PROJECT_ROOT / pdf_path
+        if pdf_path.exists():
+            self._fill_target_price_from_pdf(report, pdf_path, counts)
 
     def _collect_numeric_data(self, counts: dict[str, int]) -> None:
         if self.settings.include_price_data:

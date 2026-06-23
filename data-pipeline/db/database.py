@@ -42,6 +42,18 @@ class Database:
                 "disclosure_rows_count",
                 "INTEGER NOT NULL DEFAULT 0",
             )
+            self._ensure_column(
+                connection,
+                "news_metadata",
+                "content",
+                "TEXT NOT NULL DEFAULT ''",
+            )
+            self._ensure_column(
+                connection,
+                "disclosure_metadata",
+                "content",
+                "TEXT NOT NULL DEFAULT ''",
+            )
 
     @staticmethod
     def _ensure_column(

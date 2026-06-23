@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 
 import httpx
+from bs4 import BeautifulSoup
 
 from config.settings import SETTINGS, Settings
 from crawler.http import create_ssl_context
@@ -73,14 +74,34 @@ class NaverNewsProvider:
             )
             response.raise_for_status()
 
+            rows = self._build_rows(
+                client,
+                response.json().get("items", []),
+                ticker,
+                company,
+                date_from,
+                date_to,
+            )
+        return rows
+
+    def _build_rows(
+        self,
+        client: httpx.Client,
+        items: list[dict],
+        ticker: str,
+        company: str,
+        date_from: str | None,
+        date_to: str | None,
+    ) -> list[dict]:
         rows: list[dict] = []
-        for item in response.json().get("items", []):
+        for item in items:
             published_at = _normalize_pub_date(item.get("pubDate", ""))
             if not _in_range(published_at, date_from, date_to):
                 continue
             original_url = item.get("originallink") or item.get("link") or ""
             title = _clean_html(item.get("title", ""))
             summary = _clean_html(item.get("description", ""))
+            content = self._fetch_article_content(client, original_url)
             news_id = hashlib.sha256(
                 f"{ticker}|{published_at}|{title}|{original_url}".encode("utf-8")
             ).hexdigest()[:24]
@@ -91,6 +112,7 @@ class NaverNewsProvider:
                     "company": company,
                     "title": title,
                     "summary": summary,
+                    "content": content,
                     "published_at": published_at,
                     "original_url": original_url,
                     "source": self.source,
@@ -100,9 +122,57 @@ class NaverNewsProvider:
             )
         return rows
 
+    def _fetch_article_content(self, client: httpx.Client, url: str) -> str:
+        if not url:
+            return ""
+        try:
+            response = client.get(url)
+            response.raise_for_status()
+        except httpx.HTTPError as exc:
+            logger.debug("뉴스 본문 수집 실패: url=%s error=%s", url, exc)
+            return ""
+        return _extract_article_text(response.text)
+
 
 def _clean_html(value: str) -> str:
     return html.unescape(value).replace("<b>", "").replace("</b>", "").strip()
+
+
+def _extract_article_text(raw_html: str) -> str:
+    soup = BeautifulSoup(raw_html, "html.parser")
+    for tag in soup(["script", "style", "noscript", "iframe", "svg"]):
+        tag.decompose()
+
+    selectors = [
+        "article",
+        "#dic_area",
+        "#articeBody",
+        "#articleBody",
+        "#articleBodyContents",
+        "#newsct_article",
+        ".article_body",
+        ".article-body",
+        ".news_end",
+        ".news_view",
+        ".view_text",
+        ".article-view-content-div",
+    ]
+    for selector in selectors:
+        node = soup.select_one(selector)
+        text = _normalize_text(node.get_text(" ", strip=True)) if node else ""
+        if len(text) >= 200:
+            return text
+
+    paragraphs = [
+        _normalize_text(paragraph.get_text(" ", strip=True))
+        for paragraph in soup.find_all("p")
+    ]
+    text = _normalize_text(" ".join(paragraph for paragraph in paragraphs if paragraph))
+    return text if len(text) >= 200 else ""
+
+
+def _normalize_text(value: str) -> str:
+    return " ".join(html.unescape(value).split())
 
 
 def _normalize_pub_date(value: str) -> str:

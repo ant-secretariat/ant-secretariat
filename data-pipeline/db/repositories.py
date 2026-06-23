@@ -142,11 +142,6 @@ class ReportRepository:
     def insert_target_price_if_present(self, report: ReportMetadata) -> bool:
         if report.target_price is None and not report.investment_opinion:
             return False
-        target_price_id = hashlib.sha256(
-            f"{report.report_id}|{report.target_price}|{report.investment_opinion}".encode(
-                "utf-8"
-            )
-        ).hexdigest()[:24]
         with self.database.connect() as connection:
             connection.execute(
                 """
@@ -157,7 +152,7 @@ class ReportRepository:
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    target_price_id,
+                    report.report_id,
                     report.report_id,
                     report.ticker,
                     report.company,
@@ -214,10 +209,10 @@ class NumericDataRepository:
             connection.executemany(
                 """
                 INSERT OR REPLACE INTO news_metadata (
-                    news_id, ticker, company, title, summary, published_at,
+                    news_id, ticker, company, title, summary, content, published_at,
                     original_url, source, provider, created_at
                 ) VALUES (
-                    :news_id, :ticker, :company, :title, :summary, :published_at,
+                    :news_id, :ticker, :company, :title, :summary, :content, :published_at,
                     :original_url, :source, :provider, :created_at
                 )
                 """,
@@ -231,11 +226,11 @@ class NumericDataRepository:
                 """
                 INSERT OR REPLACE INTO disclosure_metadata (
                     disclosure_id, ticker, company, corp_code, report_name,
-                    disclosure_type, disclosed_at, receipt_no, original_url,
+                    disclosure_type, content, disclosed_at, receipt_no, original_url,
                     source, created_at
                 ) VALUES (
                     :disclosure_id, :ticker, :company, :corp_code, :report_name,
-                    :disclosure_type, :disclosed_at, :receipt_no, :original_url,
+                    :disclosure_type, :content, :disclosed_at, :receipt_no, :original_url,
                     :source, :created_at
                 )
                 """,

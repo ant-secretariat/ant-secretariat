@@ -1,3 +1,4 @@
+import re
 from typing import List
 from schemas import (
     RawNewsInput,
@@ -7,71 +8,148 @@ from schemas import (
     VectorChunkMetadata,
 )
 
+MAX_CHUNK_LENGTH = 1500
+MIN_CHUNK_LENGTH = 50
+
+
+def _chunk_text(text: str, base_id: str, metadata_kwargs: dict) -> List[VectorChunk]:
+    """
+    문단 단위 청킹 (리포트와 동일한 로직)
+    1. \\n\\n 기준으로 문단 분할
+    2. 문단이 MAX_CHUNK_LENGTH 초과 시 문장 단위로 재분할
+    """
+    chunks = []
+    chunk_index = 0
+    paragraphs = re.split(r'\n\s*\n', text)
+
+    for para in paragraphs:
+        para = para.strip()
+        if not para:
+            continue
+
+        if len(para) <= MAX_CHUNK_LENGTH:
+            if len(para) >= MIN_CHUNK_LENGTH:
+                chunk_id = f"{base_id}_chunk_{chunk_index:03d}"
+                chunks.append(VectorChunk(
+                    id=chunk_id,
+                    content=para,
+                    metadata=VectorChunkMetadata(
+                        chunk_id=chunk_id,
+                        **metadata_kwargs,
+                    ),
+                ))
+                chunk_index += 1
+        else:
+            sentences = re.split(r'(?<=[.!?。])\s+', para)
+            current = ""
+
+            for sentence in sentences:
+                if len(current) + len(sentence) <= MAX_CHUNK_LENGTH:
+                    current += (" " if current else "") + sentence
+                else:
+                    if len(current) >= MIN_CHUNK_LENGTH:
+                        chunk_id = f"{base_id}_chunk_{chunk_index:03d}"
+                        chunks.append(VectorChunk(
+                            id=chunk_id,
+                            content=current.strip(),
+                            metadata=VectorChunkMetadata(
+                                chunk_id=chunk_id,
+                                **metadata_kwargs,
+                            ),
+                        ))
+                        chunk_index += 1
+                    current = sentence
+
+            if len(current) >= MIN_CHUNK_LENGTH:
+                chunk_id = f"{base_id}_chunk_{chunk_index:03d}"
+                chunks.append(VectorChunk(
+                    id=chunk_id,
+                    content=current.strip(),
+                    metadata=VectorChunkMetadata(
+                        chunk_id=chunk_id,
+                        **metadata_kwargs,
+                    ),
+                ))
+                chunk_index += 1
+
+    return chunks
+
 
 class NewsProcessor:
 
-    MIN_LENGTH = 50
-
     def process(self, news: RawNewsInput) -> List[VectorChunk]:
-        chunk_id = f"news_{news.news_id}"
-        # B DB에는 본문 전문 없음 — summary를 본문으로 사용
-        text = (news.title + "\n" + news.summary).strip()
+        # 본문 있으면 본문 사용, 없으면 summary 사용
+        body = news.content if news.content and news.content.strip() else news.summary
+        text = (news.title + "\n\n" + body).strip()
 
-        if len(text) < self.MIN_LENGTH:
+        if len(text) < MIN_CHUNK_LENGTH:
             return []
 
-        return [VectorChunk(
-            id=chunk_id,
-            content=text,
-            metadata=VectorChunkMetadata(
-                chunk_id=chunk_id,
-                ticker=news.ticker,
-                company=news.company,
-                date=news.published_at[:10],
-                source=news.source,
-                document_type="news",
-                report_type=None,
-                title=news.title,
-                author_org=None,
-                page_start=None,
-                page_end=None,
-                url=news.url,
-            ),
-        )]
+        metadata_kwargs = dict(
+            ticker=news.ticker,
+            company=news.company,
+            date=news.published_at[:10],
+            source=news.source,
+            document_type="news",
+            report_type=None,
+            title=news.title,
+            author_org=None,
+            page_start=None,
+            page_end=None,
+            url=news.url,
+        )
+
+        return _chunk_text(text, f"news_{news.news_id}", metadata_kwargs)
 
 
 class DisclosureProcessor:
 
-    # 공시는 B DB에 본문이 없어 제목(report_name)만 저장됨
-    # 제목 단독으로도 저장되도록 MIN_LENGTH를 낮게 설정
-    MIN_LENGTH = 5
-
     def process(self, disclosure: RawDisclosureInput) -> List[VectorChunk]:
-        chunk_id = f"disclosure_{disclosure.disclosure_id}"
-        # B DB에는 본문 없음 — report_name(제목)만 사용
-        text = disclosure.report_name.strip()
+        # 본문 있으면 제목 + 본문, 없으면 제목만
+        if disclosure.content and disclosure.content.strip():
+            text = (disclosure.report_name + "\n\n" + disclosure.content).strip()
+        else:
+            text = disclosure.report_name.strip()
 
-        if len(text) < self.MIN_LENGTH:
+        if len(text) < MIN_CHUNK_LENGTH:
+            # 제목만 있는 경우 MIN_LENGTH 완화
+            if len(text) >= 5:
+                chunk_id = f"disclosure_{disclosure.disclosure_id}_chunk_000"
+                return [VectorChunk(
+                    id=chunk_id,
+                    content=text,
+                    metadata=VectorChunkMetadata(
+                        chunk_id=chunk_id,
+                        ticker=disclosure.ticker,
+                        company=disclosure.company,
+                        date=disclosure.disclosed_at[:10],
+                        source=disclosure.source,
+                        document_type="disclosure",
+                        report_type=None,
+                        title=disclosure.report_name,
+                        author_org=None,
+                        page_start=None,
+                        page_end=None,
+                        url=disclosure.url,
+                    ),
+                )]
             return []
 
-        return [VectorChunk(
-            id=chunk_id,
-            content=text,
-            metadata=VectorChunkMetadata(
-                chunk_id=chunk_id,
-                ticker=disclosure.ticker,
-                company=disclosure.company,
-                date=disclosure.disclosed_at[:10],  # disclosed_at 사용
-                source=disclosure.source,
-                document_type="disclosure",
-                report_type=None,
-                title=disclosure.report_name,
-                author_org=None,
-                page_start=None,
-                page_end=None,
-                url=disclosure.url,
-            ),
-        )]
+        metadata_kwargs = dict(
+            ticker=disclosure.ticker,
+            company=disclosure.company,
+            date=disclosure.disclosed_at[:10],
+            source=disclosure.source,
+            document_type="disclosure",
+            report_type=None,
+            title=disclosure.report_name,
+            author_org=None,
+            page_start=None,
+            page_end=None,
+            url=disclosure.url,
+        )
+
+        return _chunk_text(text, f"disclosure_{disclosure.disclosure_id}", metadata_kwargs)
 
 
 class MacroSummaryProcessor:
@@ -88,15 +166,15 @@ class MacroSummaryProcessor:
             content=content,
             metadata=VectorChunkMetadata(
                 chunk_id=chunk_id,
-                ticker="",  
+                ticker="",
                 company="",
                 date=macro.date,
-                source=macro.source, 
+                source=macro.source,
                 document_type="macro_summary",
                 report_type=None,
                 title=f"{macro.indicator_name} ({macro.date})",
                 author_org=None,
-                page_start=None, 
+                page_start=None,
                 page_end=None,
                 url="",
             ),

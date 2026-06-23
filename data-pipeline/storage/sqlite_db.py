@@ -212,7 +212,7 @@ class SQLiteDB(BaseRelationalDB):
         with self._connect() as conn:
             rows = conn.execute(
                 """
-                SELECT news_id, ticker, company, title, summary,
+                SELECT news_id, ticker, company, title, summary, content,
                        published_at, original_url, source, provider, created_at
                 FROM news_metadata
                 ORDER BY published_at DESC
@@ -227,7 +227,7 @@ class SQLiteDB(BaseRelationalDB):
                 """
                 SELECT disclosure_id, ticker, company, corp_code,
                        report_name, disclosure_type, disclosed_at,
-                       receipt_no, original_url, source, created_at
+                       receipt_no, original_url, source, content, created_at
                 FROM disclosure_metadata
                 ORDER BY disclosed_at DESC
                 """,

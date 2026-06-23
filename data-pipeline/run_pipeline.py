@@ -130,6 +130,7 @@ def main():
                 company=     row["company"],
                 title=       row["title"],
                 summary=     row["summary"],
+                content=     row["content"] or "",   # 추가
                 published_at=row["published_at"],
                 url=         row["original_url"],
                 source=      row["source"],
@@ -160,6 +161,7 @@ def main():
                 receipt_no=     row["receipt_no"],
                 url=            row["original_url"],
                 source=         row["source"],
+                content=        row["content"] or "",   # 추가
                 created_at=     row["created_at"],
             )
             result = pipeline.process_disclosure(raw_disc)

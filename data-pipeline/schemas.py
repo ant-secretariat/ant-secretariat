@@ -23,7 +23,8 @@ class RawNewsInput:
     ticker: str
     company: str
     title: str
-    summary: str        # B DB: summary (본문 전문 없음, 요약본)
+    summary: str        # B DB: summary (요약본)
+    content: str        # B DB: content (본문 전문)
     published_at: str
     url: str            # B DB: original_url
     source: str
@@ -44,6 +45,7 @@ class RawDisclosureInput:
     receipt_no: str
     url: str            # B DB: original_url
     source: str
+    content: str        # B DB: content (본문)
     created_at: str
 
 

@@ -2,6 +2,9 @@ import argparse
 import logging
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from storage.sqlite_db import SQLiteDB
 from storage.implementations import (
@@ -9,6 +12,7 @@ from storage.implementations import (
     PlaceholderVectorDB,
     UpstageEmbeddingModel,
     ChromaVectorDB,
+    PineconeVectorDB,
 )
 from pipeline import DataPipeline
 from schemas import RawReportInput, RawNewsInput, RawDisclosureInput, RawMacroInput
@@ -38,6 +42,14 @@ def main():
         "--chroma-dir", default="chroma_db",
         help="ChromaDB 저장 경로 (기본값: chroma_db)"
     )
+    parser.add_argument(
+        "--pinecone-api-key", default=None,
+        help="Pinecone API 키"
+    )
+    parser.add_argument(
+        "--pinecone-index", default=None,
+        help="Pinecone 인덱스 이름"
+    )
     parser.add_argument("--report-id", default=None, help="특정 리포트 ID만 처리")
     parser.add_argument("--dry-run", action="store_true",
                         help="DB 저장 없이 청킹 결과만 출력")
@@ -59,8 +71,17 @@ def main():
         embedding_model = PlaceholderEmbeddingModel()
 
     # ── Vector DB 선택 ──
+    pinecone_api_key = args.pinecone_api_key or os.environ.get("PINECONE_API_KEY")
+    pinecone_index = args.pinecone_index or os.environ.get("PINECONE_INDEX")
+
     if args.dry_run:
         vector_db = PlaceholderVectorDB()
+    elif pinecone_api_key and pinecone_index:
+        logger.info(f"Pinecone 사용: {pinecone_index}")
+        vector_db = PineconeVectorDB(
+            api_key=pinecone_api_key,
+            index_name=pinecone_index,
+        )
     else:
         logger.info(f"ChromaDB 사용: {args.chroma_dir}")
         vector_db = ChromaVectorDB(persist_directory=args.chroma_dir)
@@ -130,7 +151,7 @@ def main():
                 company=     row["company"],
                 title=       row["title"],
                 summary=     row["summary"],
-                content=     row["content"] or "",   # 추가
+                content=     row["content"] or "",
                 published_at=row["published_at"],
                 url=         row["original_url"],
                 source=      row["source"],
@@ -161,7 +182,7 @@ def main():
                 receipt_no=     row["receipt_no"],
                 url=            row["original_url"],
                 source=         row["source"],
-                content=        row["content"] or "",   # 추가
+                content=        row["content"] or "",
                 created_at=     row["created_at"],
             )
             result = pipeline.process_disclosure(raw_disc)

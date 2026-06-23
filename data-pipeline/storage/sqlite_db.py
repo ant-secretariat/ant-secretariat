@@ -256,7 +256,7 @@ class SQLiteDB(BaseRelationalDB):
                        r.report_type, r.original_url, r.pdf_url,
                        r.file_path
                 FROM report_metadata r
-                WHERE r.status = 'success'
+                WHERE r.status IN ('success', 'duplicate')
                   AND r.file_path != ''
                   AND r.report_id NOT IN (
                       SELECT DISTINCT report_id FROM report_chunk_records

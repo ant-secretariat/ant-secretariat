@@ -1,5 +1,3 @@
-# financial_research_data_agent
-
 ## 1. 담당 범위
 
 수집한 데이터를 전처리하고 Vector DB에 저장하며, 다른 Agent들이 공통으로 사용할 검색/조회 함수를 구현합니다.
@@ -21,7 +19,7 @@ Agent B Storage
 
 ## 2. 사용 기술
 
-- **Vector DB**: ChromaDB (로컬 파일 기반, API 키 불필요)
+- **Vector DB**: Pinecone (클라우드 기반, API 키 필요)
 - **임베딩 모델**: Upstage `solar-embedding-1-large-passage` (4096차원)
 
 ---
@@ -53,7 +51,7 @@ financial_research_data_agent/
 │   └── get_agent_context.py        # Agent별 필요 데이터 묶음 반환
 │
 ├── storage/
-│   ├── implementations.py          # ChromaDB / Upstage 임베딩 / SQLiteDB 구현체
+│   ├── implementations.py          # Pinecone / Upstage 임베딩 / SQLiteDB 구현체
 │   ├── sqlite_db.py                # SQLiteDB 구현체 (reports.db 공유)
 │   └── schema_extension.sql        # 테이블 DDL (report_chunk_records)
 │
@@ -70,7 +68,7 @@ financial_research_data_agent/
 - **최대 길이**: 1500자
 - **최소 길이**: 50자 (미만 시 제외)
 - **fallback**: 문단이 너무 길면 문장 단위로 재분할
-- **결과**: 20개 리포트 → 512개 청크 (4개 기업: 삼성전자, SK하이닉스, 현대차, NAVER)
+- **결과**: 19개 리포트 → 512개 청크 (4개 기업: 삼성전자, SK하이닉스, 현대차, NAVER)
 
 ### 뉴스
 - **방식**: 문단 단위 청킹 (`\n\n` 기준), 문단이 1500자 초과 시 문장 단위로 재분할
@@ -112,6 +110,14 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
+`.env` 파일 생성 (루트 폴더에):
+
+```
+UPSTAGE_API_KEY=your_upstage_key
+PINECONE_API_KEY=your_pinecone_key
+PINECONE_INDEX=financial-research-data-agent
+```
+
 ---
 
 ## 7. 실행 방법
@@ -119,28 +125,29 @@ pip install -r requirements.txt
 **API 키 없을 때 (Placeholder 임베딩)**
 
 ```powershell
-python run_pipeline.py \
-  --db-path ..\financial-research-agent\db\reports.db \
+python run_pipeline.py `
+  --db-path ..\financial-research-agent\db\reports.db `
   --pdf-base-path ..\financial-research-agent
 ```
 
 **리포트만 처리 (API 키 있을 때)**
 
 ```powershell
-python run_pipeline.py \
-  --db-path ..\financial-research-agent\db\reports.db \
-  --pdf-base-path ..\financial-research-agent \
-  --upstage-api-key YOUR_API_KEY
+python run_pipeline.py `
+  --db-path ..\financial-research-agent\db\reports.db `
+  --pdf-base-path ..\financial-research-agent `
+  --pinecone-index financial-research-data-agent
 ```
 
 **뉴스/공시/매크로 포함 전체 처리**
 
 ```powershell
-python run_pipeline.py \
-  --db-path ..\financial-research-agent\db\reports.db \
-  --upstage-api-key YOUR_API_KEY \
-  --include-news-data \
-  --include-disclosure-data \
+python run_pipeline.py `
+  --db-path ..\financial-research-agent\db\reports.db `
+  --pdf-base-path ..\financial-research-agent `
+  --pinecone-index financial-research-data-agent `
+  --include-news-data `
+  --include-disclosure-data `
   --include-macro-data
 ```
 
@@ -162,7 +169,7 @@ python run_pipeline.py --db-path ... --pdf-base-path ... --report-id REPORT_ID
 
 다른 Agent 개발자는 아래 함수들을 import해서 사용합니다.
 
-> ⚠️ 반환 JSON 포맷은 추후 확인 예정 (현재 임시 버전)
+> ⚠️ 반환 JSON 포맷은 추후 담당자 A와 확인 예정 (현재 임시 버전)
 
 ---
 
@@ -546,26 +553,25 @@ result = get_agent_context(
 - 나머지 3개 기업(삼양식품, HYBE, LG에너지솔루션)은 네이버 증권/KIRS에 리포트 없음 (데이터 소스 한계)
 
 **뉴스/공시**
-- Naver Search API 기반 뉴스 수집 완료 (210건)
-- OpenDART API 기반 공시 수집 완료 (84건)
-- 뉴스는 본문 전문 없이 요약본(summary)만 임베딩됨
-- 공시는 본문 없이 제목(report_name)만 임베딩됨
+- Naver Search API 기반 뉴스 수집 완료 (210건, 438개 청크)
+- OpenDART API 기반 공시 수집 완료 (84건, 146개 청크)
+- 뉴스는 210건 중 177건 본문 포함, 나머지 33건은 요약본(summary)만 임베딩됨
+- 공시는 74건 전체 본문 포함되어 임베딩됨
 
 **매크로**
 - ECOS + Naver 기준 5개 지표 수집 완료
 - `summary_text` 미입력 시 자동으로 자연어 변환하여 임베딩
 
 **미수집 데이터**
-- `market_cap` (시가총액): 네이버 파이낸스 미제공 → KIS API 연동 시 수집 가능
-- `target_price_data`: 현재 비어있음
-- `disclosure_type`: 현재 빈값
-
+- `market_cap` (시가총액): `price_data` 미수집 → KIS API 연동 시 수집 가능
+- `target_price_data`: 13건 수집 완료
+- `disclosure_type`: 74건 전체 값 있음
 ---
 
 ## 10. 주의사항
 
 - `run_pipeline.py` 실행 전 반드시 (https://github.com/boogiewooki02/financial-research-agent)가 먼저 실행되어 있어야 합니다.
+- Upstage API 키와 Pinecone API 키는 `.env` 파일에 저장하며 git에 포함되지 않습니다.
 - Upstage API 키가 없으면 Placeholder 임베딩으로 동작하며, `embedding_status = pending`으로 저장됩니다.
 - PDF가 스캔본이면 OCR이 필요할 수 있습니다. `pdf_processor.is_scanned_pdf()`로 감지 가능합니다.
-- `target_price_data`는 HTML에서 추출한 값을 그대로 사용합니다. PDF에서 별도 추출하지 않습니다.
-- `chroma_db` 폴더는 런타임 산출물로 git에 포함되지 않습니다. 각 팀원이 파이프라인 실행 시 로컬에 생성됩니다.
+- `target_price_data`는 HTML에서 추출한 목표주가/투자의견을 저장합니다. (13건 수집 완료)

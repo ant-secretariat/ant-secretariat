@@ -25,7 +25,7 @@ def get_disclosure_data(
     query = """
         SELECT disclosure_id, ticker, company, corp_code,
                report_name, disclosure_type, disclosed_at,
-               receipt_no, original_url, source
+               receipt_no, original_url, source, content
         FROM disclosure_metadata
         WHERE ticker = ?
     """
@@ -58,6 +58,7 @@ def get_disclosure_data(
                 "source":          d["source"],
                 "title":           d["report_name"],
                 "disclosure_type": d["disclosure_type"],
+                "summary":         d["content"] or "",
                 "url":             d["original_url"],
             }
             for d in disclosures

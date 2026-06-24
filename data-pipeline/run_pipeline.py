@@ -11,7 +11,6 @@ from storage.implementations import (
     PlaceholderEmbeddingModel,
     PlaceholderVectorDB,
     UpstageEmbeddingModel,
-    ChromaVectorDB,
     PineconeVectorDB,
 )
 from pipeline import DataPipeline
@@ -37,10 +36,6 @@ def main():
     parser.add_argument(
         "--upstage-api-key", default=None,
         help="Upstage API 키. 없으면 Placeholder 임베딩 사용"
-    )
-    parser.add_argument(
-        "--chroma-dir", default="chroma_db",
-        help="ChromaDB 저장 경로 (기본값: chroma_db)"
     )
     parser.add_argument(
         "--pinecone-api-key", default=None,
@@ -83,8 +78,7 @@ def main():
             index_name=pinecone_index,
         )
     else:
-        logger.info(f"ChromaDB 사용: {args.chroma_dir}")
-        vector_db = ChromaVectorDB(persist_directory=args.chroma_dir)
+        raise ValueError("Pinecone API 키와 인덱스 이름이 필요합니다. .env 파일을 확인해주세요.")
 
     # ── DB 연결 ──
     db = SQLiteDB(db_path=args.db_path)

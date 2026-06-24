@@ -43,7 +43,7 @@ financial_research_data_agent/
 │   ├── get_report_chunks.py        # 특정 리포트 chunk 전체 조회
 │   ├── resolve_company.py          # 회사명 → ticker 변환
 │   ├── get_report_metadata.py      # 리포트 메타데이터 조회
-│   ├── get_target_prices.py        # 목표주가 / 투자의견 조회
+│   ├── get_target_price_data.py    # 목표주가 / 투자의견 조회
 │   ├── get_price_data.py           # 주가 데이터 조회
 │   ├── get_macro_data.py           # 매크로 지표 조회
 │   ├── get_disclosure_data.py      # 공시 데이터 조회
@@ -72,7 +72,7 @@ financial_research_data_agent/
 
 ### 뉴스
 - **방식**: 문단 단위 청킹 (`\n\n` 기준), 문단이 1500자 초과 시 문장 단위로 재분할
-- **본문 처리**: 본문 있으면 title + content 사용, 없으면 title + summary 사용
+- **본문 처리**: title + summary + content 순으로 합쳐서 임베딩 (summary/content 없으면 생략)
 - **최대 길이**: 1500자
 - **최소 길이**: 50자
 - **결과**: 438개 청크
@@ -169,8 +169,6 @@ python run_pipeline.py --db-path ... --pdf-base-path ... --report-id REPORT_ID
 
 다른 Agent 개발자는 아래 함수들을 import해서 사용합니다.
 
-> ⚠️ 반환 JSON 포맷은 추후 담당자 A와 확인 예정 (현재 임시 버전)
-
 ---
 
 ### resolve_company()
@@ -226,7 +224,7 @@ result = search_documents(
   "ticker": "005930",
   "results": [
     {
-      "chunk_id": "...",
+      "chunk_id": "KIRS_005930_001_chunk_001",
       "ticker": "005930",
       "company": "삼성전자",
       "date": "2026-06-15",
@@ -266,11 +264,18 @@ result = get_report_chunks(
   "title": "리포트 제목",
   "chunks": [
     {
-      "chunk_id": "...",
+      "chunk_id": "KIRS_005930_001_chunk_001",
       "chunk_index": 1,
       "page_start": 1,
       "page_end": 1,
       "content": "첫 번째 chunk 본문"
+    },
+    {
+      "chunk_id": "KIRS_005930_001_chunk_002",
+      "chunk_index": 2,
+      "page_start": 2,
+      "page_end": 2,
+      "content": "두 번째 chunk 본문"
     }
   ]
 }
@@ -316,14 +321,14 @@ result = get_report_metadata(
 
 ---
 
-### get_target_prices()
+### get_target_price_data()
 
 목표주가 및 투자의견 조회
 
 ```python
-from functions.get_target_prices import get_target_prices
+from functions.get_target_price_data import get_target_price_data
 
-result = get_target_prices(
+result = get_target_price_data(
     ticker="005930",
     date_from="2026-01-01",
     date_to="2026-06-21",
@@ -370,7 +375,6 @@ result = get_price_data(
     ticker="005930",
     date_from="2026-01-01",
     date_to="2026-06-21",
-    frequency="daily",
     relational_db=db,
 )
 ```
@@ -416,7 +420,6 @@ result = get_macro_data(
     indicators=["BASE_RATE_KR", "USD_KRW"],
     date_from="2026-01-01",
     date_to="2026-06-21",
-    country="KR",
     relational_db=db,
 )
 ```
@@ -466,11 +469,12 @@ result = get_disclosure_data(
   "company": "삼성전자",
   "disclosures": [
     {
-      "disclosure_id": "...",
+      "disclosure_id": "DART_005930_20260615_001",
       "date": "2026-06-15",
       "source": "OpenDART",
       "title": "신규 시설투자 공시",
       "disclosure_type": "investment",
+      "summary": "고대역폭 메모리 생산설비 증설을 위한 투자 결정",
       "url": "공시 원문 URL"
     }
   ]
@@ -496,13 +500,14 @@ result = get_available_data_status(
 ```json
 {
   "ticker": "005930",
+  "company": "삼성전자",
   "available": {
     "reports": true,
     "news": true,
     "disclosures": true,
     "price_data": true,
     "macro_data": true,
-    "target_price_data": false
+    "target_price_data": true
   },
   "latest": {
     "report_date": "2026-06-15",
@@ -566,6 +571,7 @@ result = get_agent_context(
 - `market_cap` (시가총액): `price_data` 미수집 → KIS API 연동 시 수집 가능
 - `target_price_data`: 13건 수집 완료
 - `disclosure_type`: 74건 전체 값 있음
+
 ---
 
 ## 10. 주의사항

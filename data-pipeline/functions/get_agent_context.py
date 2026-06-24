@@ -20,7 +20,7 @@ def get_agent_context(
     if relational_db is None:
         raise ValueError("relational_db는 필수입니다.")
 
-    from functions.get_target_prices import get_target_prices
+    from functions.get_target_price_data import get_target_price_data
     from functions.get_price_data import get_price_data
     from functions.get_macro_data import get_macro_data
     from functions.search_documents import search_documents

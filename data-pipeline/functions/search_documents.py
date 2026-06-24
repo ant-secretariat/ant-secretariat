@@ -13,9 +13,6 @@ def search_documents(
     document_type: Optional[str] = None,
     report_type: Optional[str] = None,
     source: Optional[str] = None,
-    sector: Optional[str] = None,       # 산업군
-    broker: Optional[str] = None,       # 증권사명
-    topic: Optional[str] = None,        # 주제/키워드
     top_k: int = 5,
     embedding_model: BaseEmbeddingModel = None,
     vector_db: BaseVectorDB = None,
@@ -23,16 +20,7 @@ def search_documents(
     if embedding_model is None or vector_db is None:
         raise ValueError("embedding_model과 vector_db는 필수입니다.")
 
-    # sector, broker, topic은 query에 보강하여 검색 품질 향상
-    enhanced_query = query
-    if sector:
-        enhanced_query += f" {sector}"
-    if broker:
-        enhanced_query += f" {broker}"
-    if topic:
-        enhanced_query += f" {topic}"
-
-    query_vector = embedding_model.embed(enhanced_query)
+    query_vector = embedding_model.embed(query)
 
     filter_conditions = {}
     if ticker:

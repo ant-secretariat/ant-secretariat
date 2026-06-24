@@ -9,7 +9,6 @@ def get_price_data(
     ticker: str,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    frequency: str = "daily",
     relational_db: BaseRelationalDB = None,
 ) -> dict:
     """
@@ -46,17 +45,16 @@ def get_price_data(
     latest = prices[0] if prices else None
 
     return {
-        "ticker":    ticker,
-        "company":   latest["company"] if latest else "",
-        "frequency": frequency,
+        "ticker":  ticker,
+        "company": latest["company"] if latest else "",
         "filters": {
             "date_from": date_from,
             "date_to":   date_to,
         },
         "latest": {
-            "price_date":    latest["price_date"] if latest else None,
-            "current_price": latest["close"] if latest else None,
-            "market_cap":    latest["market_cap"] if latest else None,
+            "price_date":     latest["price_date"] if latest else None,
+            "current_price":  latest["close"] if latest else None,
+            "market_cap":     latest["market_cap"] if latest else None,
             "volatility_30d": latest["volatility_30d"] if latest else None,
         } if latest else None,
         "prices": prices,

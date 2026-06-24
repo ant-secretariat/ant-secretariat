@@ -5,7 +5,7 @@ from interfaces import BaseRelationalDB
 logger = logging.getLogger(__name__)
 
 
-def get_target_prices(
+def get_target_price_data(
     ticker: str,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,

@@ -20,9 +20,16 @@ def get_available_data_status(
     conn = sqlite3.connect(relational_db.db_path)
     conn.row_factory = sqlite3.Row
 
+    # company 조회
+    company_row = conn.execute(
+        "SELECT company FROM company_aliases WHERE ticker = ? LIMIT 1",
+        (ticker,),
+    ).fetchone()
+    company = company_row["company"] if company_row else ""
+
     # 리포트
     report_row = conn.execute(
-        "SELECT COUNT(*) as cnt, MAX(published_at) as latest FROM report_metadata WHERE ticker = ? AND status = 'success'",
+        "SELECT COUNT(*) as cnt, MAX(published_at) as latest FROM report_metadata WHERE ticker = ? AND status IN ('success', 'duplicate')",
         (ticker,),
     ).fetchone()
 
@@ -59,19 +66,20 @@ def get_available_data_status(
 
     return {
         "ticker": ticker,
+        "company": company,
         "available": {
-            "reports":          report_row["cnt"] > 0,
-            "news":             news_row["cnt"] > 0,
-            "disclosures":      disclosure_row["cnt"] > 0,
-            "price_data":       price_row["cnt"] > 0,
-            "macro_data":       macro_row["cnt"] > 0,
+            "reports":           report_row["cnt"] > 0,
+            "news":              news_row["cnt"] > 0,
+            "disclosures":       disclosure_row["cnt"] > 0,
+            "price_data":        price_row["cnt"] > 0,
+            "macro_data":        macro_row["cnt"] > 0,
             "target_price_data": target_row["cnt"] > 0,
         },
         "latest": {
-            "report_date":      report_row["latest"],
-            "news_date":        news_row["latest"],
-            "disclosure_date":  disclosure_row["latest"],
-            "price_date":       price_row["latest"],
-            "macro_date":       macro_row["latest"],
+            "report_date":     report_row["latest"],
+            "news_date":       news_row["latest"],
+            "disclosure_date": disclosure_row["latest"],
+            "price_date":      price_row["latest"],
+            "macro_date":      macro_row["latest"],
         },
     }

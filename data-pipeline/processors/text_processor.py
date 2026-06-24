@@ -78,9 +78,13 @@ def _chunk_text(text: str, base_id: str, metadata_kwargs: dict) -> List[VectorCh
 class NewsProcessor:
 
     def process(self, news: RawNewsInput) -> List[VectorChunk]:
-        # 본문 있으면 본문 사용, 없으면 summary 사용
-        body = news.content if news.content and news.content.strip() else news.summary
-        text = (news.title + "\n\n" + body).strip()
+        # title + summary + content 모두 활용
+        parts = [news.title]
+        if news.summary and news.summary.strip():
+            parts.append(news.summary)
+        if news.content and news.content.strip():
+            parts.append(news.content)
+        text = "\n\n".join(parts).strip()
 
         if len(text) < MIN_CHUNK_LENGTH:
             return []

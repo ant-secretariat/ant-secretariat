@@ -56,7 +56,7 @@ financial_research_data_agent/
 │   └── schema_extension.sql        # 테이블 DDL (report_chunk_records)
 │
 └── config/
-    └── constants.py                # document_type_codes / report_type_codes
+    └── document_type_codes.py      # document_type_codes
 ```
 
 ---
@@ -206,7 +206,7 @@ result = search_documents(
     ticker="005930",
     date_from="2026-01-01",
     date_to="2026-06-21",
-    document_type="report",     # report / news / disclosure / macro_summary
+    document_type="report",
     report_type="company_report",
     source="KIRS",
     top_k=5,
@@ -248,7 +248,7 @@ from functions.get_report_chunks import get_report_chunks
 
 result = get_report_chunks(
     report_id="KIRS_005930_001",
-    page=3,             # 특정 페이지만 조회 (None이면 전체)
+    page=3,
     relational_db=db,
 )
 ```
@@ -380,7 +380,6 @@ result = get_price_data(
 {
   "ticker": "005930",
   "company": "삼성전자",
-  "frequency": "daily",
   "filters": {
     "date_from": "2026-01-01",
     "date_to": "2026-06-21"

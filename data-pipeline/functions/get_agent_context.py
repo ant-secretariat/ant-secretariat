@@ -26,13 +26,12 @@ def get_agent_context(
     from functions.search_documents import search_documents
 
     if agent_type == "trend_report":
-        # Agent D용 - 트렌드 리포트 입력 데이터
         result = {
-            "ticker":         ticker,
-            "agent_type":     agent_type,
-            "target_prices":  get_target_prices(ticker=ticker, relational_db=relational_db),
-            "price_data":     get_price_data(ticker=ticker, relational_db=relational_db),
-            "macro_data":     get_macro_data(relational_db=relational_db),
+            "ticker":        ticker,
+            "agent_type":    agent_type,
+            "target_prices": get_target_price_data(ticker=ticker, relational_db=relational_db),
+            "price_data":    get_price_data(ticker=ticker, relational_db=relational_db),
+            "macro_data":    get_macro_data(relational_db=relational_db),
         }
         if query and embedding_model and vector_db:
             result["documents"] = search_documents(
@@ -45,11 +44,10 @@ def get_agent_context(
             )
 
     elif agent_type == "debate":
-        # Agent F용 - 토론 근거 데이터
         result = {
             "ticker":        ticker,
             "agent_type":    agent_type,
-            "target_prices": get_target_prices(ticker=ticker, relational_db=relational_db),
+            "target_prices": get_target_price_data(ticker=ticker, relational_db=relational_db),
             "macro_data":    get_macro_data(relational_db=relational_db),
         }
         if query and embedding_model and vector_db:
@@ -62,11 +60,10 @@ def get_agent_context(
             )
 
     elif agent_type == "simulation":
-        # Agent G용 - 시뮬레이션 입력 데이터
         result = {
             "ticker":        ticker,
             "agent_type":    agent_type,
-            "target_prices": get_target_prices(ticker=ticker, relational_db=relational_db),
+            "target_prices": get_target_price_data(ticker=ticker, relational_db=relational_db),
             "price_data":    get_price_data(ticker=ticker, relational_db=relational_db),
             "macro_data":    get_macro_data(relational_db=relational_db),
         }

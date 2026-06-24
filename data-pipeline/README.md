@@ -93,7 +93,7 @@ financial_research_data_agent/
 
 ## 5. 사전 준비
 
-이 코드는 (https://github.com/boogiewooki02/financial-research-agent) 가 먼저 실행되어 있어야 합니다.
+이 코드는 (https://github.com/boogiewooki02/financial-research-agent)가 먼저 실행되어 있어야 합니다.
 
 - DB 파일: `db/reports.db`
 - PDF 저장 경로: `storage/raw_report_pdfs/`
@@ -209,9 +209,6 @@ result = search_documents(
     document_type="report",     # report / news / disclosure / macro_summary
     report_type="company_report",
     source="KIRS",
-    sector="반도체",             # 산업군
-    broker="삼성증권",           # 증권사명
-    topic="HBM",                # 주제/키워드
     top_k=5,
     embedding_model=embedding_model,
     vector_db=vector_db,

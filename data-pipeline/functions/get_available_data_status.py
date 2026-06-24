@@ -9,10 +9,6 @@ def get_available_data_status(
     relational_db: BaseRelationalDB = None,
     vector_db: BaseVectorDB = None,
 ) -> dict:
-    """
-    해당 기업에 어떤 데이터가 있는지 확인
-    별도 테이블을 만드는 게 아니라 기존 DB와 Vector DB 상태를 기준으로 계산
-    """
     if relational_db is None or vector_db is None:
         raise ValueError("relational_db와 vector_db는 필수입니다.")
 
@@ -22,7 +18,7 @@ def get_available_data_status(
 
     # company 조회
     company_row = conn.execute(
-        "SELECT company FROM company_aliases WHERE ticker = ? LIMIT 1",
+        "SELECT company FROM report_metadata WHERE ticker = ? LIMIT 1",
         (ticker,),
     ).fetchone()
     company = company_row["company"] if company_row else ""

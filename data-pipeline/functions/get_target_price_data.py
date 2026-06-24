@@ -24,7 +24,7 @@ def get_target_price_data(
 
     query = """
         SELECT report_id, published_at, source, author_org,
-               title, target_price, investment_opinion, report_type
+               target_price, investment_opinion, report_type
         FROM target_price_data
         WHERE ticker = ?
     """

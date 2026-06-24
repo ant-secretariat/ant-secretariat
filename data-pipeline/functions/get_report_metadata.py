@@ -27,7 +27,7 @@ def get_report_metadata(
                published_at, report_type, original_url, pdf_url
         FROM report_metadata
         WHERE ticker = ?
-          AND status = 'success'
+          AND status IN ('success', 'duplicate')
     """
     params = [ticker]
 

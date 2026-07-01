@@ -93,7 +93,7 @@ financial_research_data_agent/
 
 ## 5. 사전 준비
 
-이 코드는 (https://github.com/boogiewooki02/financial-research-agent)가 먼저 실행되어 있어야 합니다.
+이 코드는 (https://github.com/boogiewooki02/financial-research-agent) 가 먼저 실행되어 있어야 합니다.
 
 - DB 파일: `db/reports.db`
 - PDF 저장 경로: `storage/raw_report_pdfs/`
@@ -572,7 +572,7 @@ result = get_agent_context(
 
 ## 10. 주의사항
 
-- `run_pipeline.py` 실행 전 반드시 (https://github.com/boogiewooki02/financial-research-agent)가 먼저 실행되어 있어야 합니다.
+- `run_pipeline.py` 실행 전 반드시 (https://github.com/boogiewooki02/financial-research-agent) 가 먼저 실행되어 있어야 합니다.
 - Upstage API 키와 Pinecone API 키는 `.env` 파일에 저장하며 git에 포함되지 않습니다.
 - Upstage API 키가 없으면 Placeholder 임베딩으로 동작하며, `embedding_status = pending`으로 저장됩니다.
 - PDF가 스캔본이면 OCR이 필요할 수 있습니다. `pdf_processor.is_scanned_pdf()`로 감지 가능합니다.

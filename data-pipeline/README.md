@@ -587,3 +587,72 @@ python test_functions.py
 ```
 
 10개 함수 전체를 삼성전자(005930) 기준으로 테스트하며, 결과 요약이 출력됩니다.
+
+---
+
+## 12. 브랜치 작업 요약
+
+이 브랜치는 트렌드 리포트 Agent가 Agent B 데이터를 안정적으로 사용할 수 있도록 반환 포맷과 함수 계약을 보강하기 위해 만든 작업 브랜치입니다.
+
+브랜치명:
+
+```text
+data-agent-trend-report-fixes
+```
+
+### 반영한 수정사항
+
+- `main`은 건드리지 않고 별도 브랜치 `data-agent-trend-report-fixes` 생성
+- `search_documents()` 반환값 보강
+  - 기존보다 근거 추적에 필요한 필드 추가
+  - `report_id`
+  - `author_org`
+  - `page_start`
+  - `page_end`
+- `chunk_id`에서 `report_id`를 자동 추론하는 로직 추가
+- `get_target_price_data()` 수정
+  - `report_metadata`와 조인
+  - `company`가 `author_org`로 잘못 반환될 수 있던 문제 수정
+  - `title`, `original_url`, `pdf_url`도 함께 반환
+- `get_agent_context("trend_report")` 보강
+  - `report_documents`
+  - `news_documents`
+  - `macro_documents`
+  - 위 세 종류를 분리해서 반환하도록 수정
+- Trend Report Agent와 연결되는 계약 테스트 추가
+  - `tests/test_trend_report_contracts.py`
+
+### 검증 결과
+
+```bash
+python -m compileall .
+python -m pytest tests -q
+```
+
+검증 결과:
+
+```text
+2 passed
+```
+
+### 관련 커밋
+
+```text
+b1b88d0 Fix Agent B trend report contract fields
+```
+
+### 남은 작업
+
+- 실제 `db/reports.db` 생성 및 공유/연결
+- 수집 파이프라인 실행 후 실제 데이터 적재 확인
+- Pinecone에 실제 chunk 저장 확인
+  - `report_chunks`
+  - `news_chunks`
+  - `macro_summary_chunks`
+  - 필요 시 `disclosure_chunks`
+- `search_documents()`가 실제 Pinecone 데이터에서도 기대한 필드를 반환하는지 확인
+- 뉴스/RSS 데이터 품질 확인
+- 매크로 데이터가 현재 환율 중심인지, ECOS 확장까지 필요한지 결정
+- `get_available_data_status()`가 실제 DB/Vector DB 상태를 정확히 반영하는지 확인
+- Agent C/D/F/G가 공통 함수 호출 시 같은 반환 포맷을 쓰는지 최종 점검
+- 실제 데이터 기준 통합 테스트 작성

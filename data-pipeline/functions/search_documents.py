@@ -1,8 +1,15 @@
 import logging
+import re
 from typing import Optional
 from interfaces import BaseEmbeddingModel, BaseVectorDB
 
 logger = logging.getLogger(__name__)
+
+
+def _derive_report_id(chunk_id: str) -> str:
+    if not chunk_id:
+        return ""
+    return re.sub(r"_chunk_\d+$", "", chunk_id)
 
 
 def search_documents(
@@ -45,15 +52,20 @@ def search_documents(
     results = []
     for item in raw_results:
         meta = item.get("metadata", {})
+        chunk_id = meta.get("chunk_id", item.get("id", ""))
         results.append({
-            "chunk_id":      meta.get("chunk_id", ""),
+            "chunk_id":      chunk_id,
+            "report_id":     meta.get("report_id", _derive_report_id(chunk_id)),
             "ticker":        meta.get("ticker", ""),
             "company":       meta.get("company", ""),
             "date":          meta.get("date", ""),
             "source":        meta.get("source", ""),
+            "author_org":    meta.get("author_org", ""),
             "document_type": meta.get("document_type", ""),
             "report_type":   meta.get("report_type", None),
             "title":         meta.get("title", ""),
+            "page_start":    meta.get("page_start", None),
+            "page_end":      meta.get("page_end", None),
             "content":       item.get("content", ""),
             "score":         item.get("score", 0.0),
             "url":           meta.get("url", ""),

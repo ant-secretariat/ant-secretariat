@@ -34,11 +34,27 @@ def get_agent_context(
             "macro_data":    get_macro_data(relational_db=relational_db),
         }
         if query and embedding_model and vector_db:
-            result["documents"] = search_documents(
+            result["report_documents"] = search_documents(
                 query=query,
                 ticker=ticker,
                 document_type="report",
                 top_k=5,
+                embedding_model=embedding_model,
+                vector_db=vector_db,
+            )
+            result["news_documents"] = search_documents(
+                query=query,
+                ticker=ticker,
+                document_type="news",
+                top_k=5,
+                embedding_model=embedding_model,
+                vector_db=vector_db,
+            )
+            result["macro_documents"] = search_documents(
+                query=query,
+                ticker="",
+                document_type="macro_summary",
+                top_k=3,
                 embedding_model=embedding_model,
                 vector_db=vector_db,
             )

@@ -1,0 +1,347 @@
+from __future__ import annotations
+
+import asyncio
+import logging
+from datetime import date
+from pathlib import Path
+from typing import Iterable
+
+from collectors.macro_data_collector import MacroDataCollector
+from collectors.news_collector import NewsCollector
+from collectors.price_data_collector import PriceDataCollector
+from collectors.disclosure_collector import DisclosureCollector
+from config.report_type_codes import normalize_report_type
+from config.settings import PROJECT_ROOT, Settings
+from config.supported_companies import SUPPORTED_COMPANIES, resolve_company_from_text
+from crawler.base_crawler import is_within_months, parse_date
+from crawler.kirs_research_crawler import KirsResearchCrawler
+from crawler.models import ReportMetadata
+from crawler.naver_research_crawler import NaverResearchCrawler
+from crawler.pdf_downloader import PdfDownloader
+from crawler.target_price_extractor import extract_target_price_fields
+from db.database import Database
+from db.repositories import NumericDataRepository, ReportRepository, RunRepository
+
+logger = logging.getLogger(__name__)
+
+
+class CollectionPipeline:
+    def __init__(self, settings: Settings):
+        self.settings = settings
+        self.database = Database(settings.db_path)
+        self.reports = ReportRepository(self.database)
+        self.numeric_data = NumericDataRepository(self.database)
+        self.runs = RunRepository(self.database)
+
+    def run(self) -> dict[str, int]:
+        self.database.initialize()
+        return self.run_collection(self.settings.source)
+
+    def run_collection(self, source: str) -> dict[str, int]:
+        run_id = self.runs.start_run(source)
+        counts = {
+            "total_found": 0,
+            "downloaded": 0,
+            "duplicate": 0,
+            "failed": 0,
+            "price_rows": 0,
+            "macro_rows": 0,
+            "news_rows": 0,
+            "disclosure_rows": 0,
+            "target_rows": 0,
+        }
+        logger.info("수집 시작: source=%s", source)
+
+        try:
+            reports = self._collect_reports(source)
+            scoped_reports = self._limit_collection_scope(reports)
+            counts["total_found"] = len(scoped_reports)
+            self._process_reports(scoped_reports, counts)
+            self._collect_numeric_data(counts)
+            self._collect_news_and_disclosures(counts)
+            status = "partial" if counts["failed"] else "success"
+            self.runs.finish_run(run_id, counts, status)
+            logger.info(
+                "수집 종료: source=%s found=%s downloaded=%s duplicate=%s failed=%s "
+                "target=%s price_rows=%s macro_rows=%s news_rows=%s disclosure_rows=%s",
+                source,
+                counts["total_found"],
+                counts["downloaded"],
+                counts["duplicate"],
+                counts["failed"],
+                counts["target_rows"],
+                counts["price_rows"],
+                counts["macro_rows"],
+                counts["news_rows"],
+                counts["disclosure_rows"],
+            )
+            return counts
+        except Exception as exc:
+            logger.exception("수집 파이프라인 실패: %s", exc)
+            self.runs.finish_run(run_id, counts, "failed", str(exc))
+            raise
+
+    def _collect_reports(self, source: str) -> list[ReportMetadata]:
+        selected_sources = ["naver", "kirs"] if source == "all" else [source]
+        reports: list[ReportMetadata] = []
+        for selected_source in selected_sources:
+            if selected_source == "naver":
+                reports.extend(self._collect_naver_reports())
+            elif selected_source == "kirs":
+                reports.extend(self._collect_kirs_reports())
+        return self._deduplicate_reports(reports)
+
+    def _collect_naver_reports(self) -> list[ReportMetadata]:
+        crawler = NaverResearchCrawler(self.settings)
+        reports: list[ReportMetadata] = []
+        for company in SUPPORTED_COMPANIES:
+            rows = crawler.fetch_reports_for_company(
+                company["ticker"],
+                company["company"],
+                months=self.settings.months,
+                max_pages=self.settings.max_pages,
+            )
+            logger.info(
+                "기업별 발견 리포트 수: source=NAVER company=%s count=%s",
+                company["company"],
+                len(rows),
+            )
+            reports.extend(ReportMetadata(**row) for row in rows)
+        return reports
+
+    def _collect_kirs_reports(self) -> list[ReportMetadata]:
+        try:
+            raw_reports = asyncio.run(KirsResearchCrawler(self.settings).crawl())
+        except Exception as exc:
+            logger.warning("KIRS 수집 실패: %s", exc)
+            return []
+
+        reports: list[ReportMetadata] = []
+        for report in raw_reports:
+            resolved = resolve_company_from_text(
+                f"{report.ticker} {report.company} {report.title}"
+            )
+            if resolved is None:
+                report.report_type = normalize_report_type(report.report_type, report.title)
+                report.source = report.source or "KIRS"
+                reports.append(report)
+                continue
+            report.ticker = resolved["ticker"]
+            report.company = resolved["company"]
+            report.report_type = normalize_report_type(report.report_type, report.title)
+            reports.append(report)
+        logger.info("KIRS 발견 리포트 수: %s", len(reports))
+        return reports
+
+    def _process_reports(
+        self,
+        reports: list[ReportMetadata],
+        counts: dict[str, int],
+    ) -> None:
+        downloader = PdfDownloader(self.settings)
+        try:
+            for report in reports:
+                self._process_one(report, downloader, counts)
+        finally:
+            downloader.close()
+
+    def _process_one(
+        self,
+        report: ReportMetadata,
+        downloader: PdfDownloader,
+        counts: dict[str, int],
+    ) -> None:
+        resolved = resolve_company_from_text(f"{report.ticker} {report.company} {report.title}")
+        if resolved is None:
+            logger.info("지원 기업 외 리포트 제외: %s", report.report_id)
+            return
+
+        report.ticker = resolved["ticker"]
+        report.company = resolved["company"]
+        report.report_type = normalize_report_type(report.report_type, report.title)
+        self.reports.upsert_report(report, "discovered")
+
+        if not report.pdf_url:
+            if self.reports.insert_target_price_if_present(report):
+                counts["target_rows"] += 1
+            self.reports.update_report_status(report.report_id, "no_pdf_url")
+            return
+
+        duplicate = self.reports.find_by_pdf_url(report.pdf_url)
+        if duplicate is not None:
+            previous_target_rows = counts["target_rows"]
+            self._fill_target_price_from_existing_file(report, duplicate, counts)
+            if (
+                counts["target_rows"] == previous_target_rows
+                and self.reports.insert_target_price_if_present(report)
+            ):
+                counts["target_rows"] += 1
+            self.reports.update_report_status(
+                report.report_id,
+                "duplicate",
+                file_path=duplicate.get("file_path", ""),
+                error_message=f"동일 pdf_url: {duplicate['report_id']}",
+            )
+            counts["duplicate"] += 1
+            return
+
+        final_path = self._build_pdf_path(report)
+        try:
+            result = downloader.download_to_temp(report.pdf_url, final_path)
+            hash_duplicate = self.reports.find_by_sha256(result.pdf_hash)
+            if hash_duplicate is not None:
+                self._fill_target_price_from_pdf(report, Path(result.temp_path), counts)
+                Path(result.temp_path).unlink(missing_ok=True)
+                self.reports.update_report_status(
+                    report.report_id,
+                    "duplicate",
+                    file_path=hash_duplicate.get("file_path", ""),
+                    error_message=f"동일 sha256: {hash_duplicate['report_id']}",
+                )
+                counts["duplicate"] += 1
+                return
+
+            downloader.commit(result.temp_path, final_path)
+            self._fill_target_price_from_pdf(report, final_path, counts)
+            stored_path = self._stored_path(final_path)
+            self.reports.insert_report_file(report, result, stored_path)
+            self.reports.update_report_status(report.report_id, "success", file_path=stored_path)
+            counts["downloaded"] += 1
+            logger.info("PDF 저장 완료: %s -> %s", report.report_id, stored_path)
+        except Exception as exc:
+            self.reports.update_report_status(
+                report.report_id,
+                "failed",
+                error_message=str(exc),
+            )
+            counts["failed"] += 1
+            logger.exception("PDF 처리 실패: report_id=%s error=%s", report.report_id, exc)
+
+    def _fill_target_price_from_pdf(
+        self,
+        report: ReportMetadata,
+        pdf_path: Path,
+        counts: dict[str, int],
+    ) -> None:
+        if report.target_price is not None and report.investment_opinion:
+            return
+        target_price, investment_opinion = extract_target_price_fields(pdf_path)
+        if report.target_price is None:
+            report.target_price = target_price
+        if not report.investment_opinion:
+            report.investment_opinion = investment_opinion
+        if self.reports.insert_target_price_if_present(report):
+            counts["target_rows"] += 1
+
+    def _fill_target_price_from_existing_file(
+        self,
+        report: ReportMetadata,
+        duplicate: dict,
+        counts: dict[str, int],
+    ) -> None:
+        file_path = duplicate.get("file_path", "")
+        if not file_path:
+            return
+        pdf_path = Path(file_path)
+        if not pdf_path.is_absolute():
+            pdf_path = PROJECT_ROOT / pdf_path
+        if pdf_path.exists():
+            self._fill_target_price_from_pdf(report, pdf_path, counts)
+
+    def _collect_numeric_data(self, counts: dict[str, int]) -> None:
+        if self.settings.include_price_data:
+            collector = PriceDataCollector(self.settings)
+            for company in SUPPORTED_COMPANIES:
+                try:
+                    rows = collector.collect_price_data(company["ticker"], company["company"])
+                    counts["price_rows"] += self.numeric_data.upsert_price_rows(rows)
+                except Exception as exc:
+                    logger.warning("주가 데이터 수집 실패: %s - %s", company["ticker"], exc)
+
+        if self.settings.include_macro_data:
+            try:
+                rows = MacroDataCollector(self.settings).collect_macro_data()
+                counts["macro_rows"] += self.numeric_data.upsert_macro_rows(rows)
+            except Exception as exc:
+                logger.warning("매크로 데이터 수집 실패: %s", exc)
+
+    def _collect_news_and_disclosures(self, counts: dict[str, int]) -> None:
+        if self.settings.include_news_data:
+            collector = NewsCollector(self.settings)
+            for company in SUPPORTED_COMPANIES:
+                try:
+                    rows = collector.collect_news_data(
+                        company["ticker"],
+                        company["company"],
+                    )
+                    counts["news_rows"] += self.numeric_data.upsert_news_rows(rows)
+                except Exception as exc:
+                    logger.warning("뉴스 데이터 수집 실패: %s - %s", company["ticker"], exc)
+
+        if self.settings.include_disclosure_data:
+            collector = DisclosureCollector(self.settings)
+            for company in SUPPORTED_COMPANIES:
+                try:
+                    rows = collector.collect_disclosure_data(
+                        company["ticker"],
+                        company["company"],
+                    )
+                    counts["disclosure_rows"] += self.numeric_data.upsert_disclosure_rows(rows)
+                except Exception as exc:
+                    logger.warning("공시 데이터 수집 실패: %s - %s", company["ticker"], exc)
+
+    def _limit_collection_scope(
+        self,
+        reports: list[ReportMetadata],
+    ) -> list[ReportMetadata]:
+        per_company_counts: dict[str, int] = {}
+        selected: list[ReportMetadata] = []
+        sorted_reports = sorted(
+            reports,
+            key=lambda report: parse_date(report.published_at) or date.min,
+            reverse=True,
+        )
+        for report in sorted_reports:
+            if not is_within_months(report.published_at, self.settings.months):
+                continue
+            company_key = report.ticker or report.company or report.report_id
+            company_count = per_company_counts.get(company_key, 0)
+            if company_count >= self.settings.max_reports_per_company:
+                continue
+            selected.append(report)
+            per_company_counts[company_key] = company_count + 1
+            if len(selected) >= self.settings.max_total_reports:
+                break
+        logger.info(
+            "수집 범위 적용: 최근 %s개월, 기업당 최대 %s개, 전체 최대 %s개, 결과 %s개",
+            self.settings.months,
+            self.settings.max_reports_per_company,
+            self.settings.max_total_reports,
+            len(selected),
+        )
+        return selected
+
+    def _build_pdf_path(self, report: ReportMetadata) -> Path:
+        published = parse_date(report.published_at) or date.today()
+        return (
+            self.settings.pdf_root
+            / report.source.lower()
+            / f"{published.year:04d}"
+            / f"{published.month:02d}"
+            / f"{published.day:02d}"
+            / f"{report.report_id}.pdf"
+        )
+
+    @staticmethod
+    def _stored_path(final_path: Path) -> str:
+        try:
+            return str(final_path.relative_to(PROJECT_ROOT))
+        except ValueError:
+            return str(final_path.resolve())
+
+    @staticmethod
+    def _deduplicate_reports(reports: Iterable[ReportMetadata]) -> list[ReportMetadata]:
+        unique: dict[str, ReportMetadata] = {}
+        for report in reports:
+            unique[report.report_id] = report
+        return list(unique.values())

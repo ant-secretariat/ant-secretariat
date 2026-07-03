@@ -13,9 +13,10 @@
 └── .env.example
 ```
 
-`crawling/`과 `processing/`은 원래 별도 레포(`financial-research-agent`, `financial_research_data_agent`)였으나
-하나의 레포로 병합되었습니다. 두 폴더는 서로의 Python 코드를 import하지 않고, `crawling/db/reports.db` 파일만 공유합니다.
-DB 테이블 구조(`CREATE TABLE`)는 항상 `crawling/db/schema.sql`이 canonical 소유합니다.
+- `crawling/`과 `processing/`은 원래 별도 레포(`financial-research-agent`, `financial_research_data_agent`)였으나
+하나의 레포로 병합
+- 두 폴더는 서로의 Python 코드를 import하지 않고, `crawling/db/reports.db` 파일만 공유
+- DB 테이블 구조(`CREATE TABLE`)는 항상 `crawling/db/schema.sql`이 canonical 소유
 
 ## 설치
 
@@ -30,7 +31,7 @@ cp .env.example .env
 
 ## 실행
 
-항상 레포 루트에서 실행합니다.
+항상 레포 루트에서 실행
 
 ```bash
 # 1) 리포트/뉴스/공시/시세 수집 → crawling/db/reports.db 적재
@@ -50,7 +51,6 @@ pytest crawling/tests processing/tests
 
 ## 패키지 구조
 
-`crawling`, `processing`은 각각 최상위 Python 패키지입니다 (`crawling/__init__.py`, `processing/__init__.py` 존재).
-내부 모듈은 `crawling.db.database`, `processing.functions.search_documents`처럼 각 패키지 이름을 포함한 절대 경로로 import합니다.
-`crawling/main.py`, `processing/run_pipeline.py` 등 진입점 스크립트는 레포 루트를 `sys.path`에 추가하는 부트스트랩 코드를 포함하고 있어
-`python crawling/main.py`처럼 직접 실행해도, 패키지로 import해도 동일하게 동작합니다.
+1. `crawling`, `processing`은 각각 최상위 Python 패키지입니다 (`crawling/__init__.py`, `processing/__init__.py` 존재).
+2. 내부 모듈은 `crawling.db.database`, `processing.functions.search_documents`처럼 각 패키지 이름을 포함한 절대 경로로 import합니다.
+3. `crawling/main.py`, `processing/run_pipeline.py` 등 진입점 스크립트는 레포 루트를 `sys.path`에 추가하는 부트스트랩 코드를 포함하고 있기 때문에  `python crawling/main.py`처럼 직접 실행해도, 패키지로 import해도 동일하게 동작합니다.

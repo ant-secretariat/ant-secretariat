@@ -1,6 +1,6 @@
 # ant-secretariat-data-pipeline
 
-증권 리포트 분석 서비스의 데이터 인프라. 두 단계로 구성됩니다.
+금융 AI Agent 서비스의 데이터 인프라는 두 단계로 구성됩니다.
 
 ```
 .

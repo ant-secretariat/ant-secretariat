@@ -1,7 +1,4 @@
-"""
-공통 함수 end-to-end 테스트 스크립트
-실행: python test_functions.py
-"""
+
 import os
 import sys
 from dotenv import load_dotenv
@@ -11,22 +8,19 @@ load_dotenv()
 from storage.sqlite_db import SQLiteDB
 from storage.implementations import UpstageEmbeddingModel, PineconeVectorDB
 
-# ── DB 연결 ──
 DB_PATH = r"..\..\financial-research-agent\db\reports.db"
 db = SQLiteDB(db_path=DB_PATH)
 
-# ── Vector DB 연결 ──
 vector_db = PineconeVectorDB(
     api_key=os.environ.get("PINECONE_API_KEY"),
     index_name=os.environ.get("PINECONE_INDEX"),
 )
 
-# ── 임베딩 모델 ──
 embedding_model = UpstageEmbeddingModel(
     api_key=os.environ.get("UPSTAGE_API_KEY"),
 )
 
-TICKER = "005930"  # 삼성전자
+TICKER = "005930"
 DATE_FROM = "2026-01-01"
 DATE_TO = "2026-06-30"
 
@@ -44,11 +38,9 @@ def test(name, fn):
         return None
 
 
-# 1. resolve_company
 from functions.resolve_company import resolve_company
 test("resolve_company", lambda: resolve_company(company_input="삼성전자"))
 
-# 2. search_documents
 from functions.search_documents import search_documents
 test("search_documents", lambda: search_documents(
     query="HBM 수요 증가",
@@ -61,7 +53,6 @@ test("search_documents", lambda: search_documents(
     vector_db=vector_db,
 ))
 
-# 3. get_report_chunks
 from functions.get_report_chunks import get_report_chunks
 report_meta = None
 try:
@@ -80,7 +71,6 @@ except Exception as e:
     results["get_report_chunks"] = f"❌ ERROR: {e}"
     print(f"❌ get_report_chunks: {e}")
 
-# 4. get_report_metadata
 from functions.get_report_metadata import get_report_metadata
 test("get_report_metadata", lambda: get_report_metadata(
     ticker=TICKER,
@@ -92,7 +82,6 @@ test("get_report_metadata", lambda: get_report_metadata(
 meta = get_report_metadata(ticker=TICKER, relational_db=db)
 print("리포트 수:", meta["count"])
 
-# 5. get_target_price_data
 from functions.get_target_price_data import get_target_price_data
 test("get_target_price_data", lambda: get_target_price_data(
     ticker=TICKER,
@@ -101,7 +90,6 @@ test("get_target_price_data", lambda: get_target_price_data(
     relational_db=db,
 ))
 
-# 6. get_price_data
 from functions.get_price_data import get_price_data
 test("get_price_data", lambda: get_price_data(
     ticker=TICKER,
@@ -110,7 +98,6 @@ test("get_price_data", lambda: get_price_data(
     relational_db=db,
 ))
 
-# 7. get_macro_data
 from functions.get_macro_data import get_macro_data
 test("get_macro_data", lambda: get_macro_data(
     indicators=["BASE_RATE_KR", "USD_KRW"],
@@ -119,7 +106,6 @@ test("get_macro_data", lambda: get_macro_data(
     relational_db=db,
 ))
 
-# 8. get_disclosure_data
 from functions.get_disclosure_data import get_disclosure_data
 test("get_disclosure_data", lambda: get_disclosure_data(
     ticker=TICKER,
@@ -128,7 +114,6 @@ test("get_disclosure_data", lambda: get_disclosure_data(
     relational_db=db,
 ))
 
-# 9. get_available_data_status
 from functions.get_available_data_status import get_available_data_status
 test("get_available_data_status", lambda: get_available_data_status(
     ticker=TICKER,
@@ -136,7 +121,6 @@ test("get_available_data_status", lambda: get_available_data_status(
     vector_db=vector_db,
 ))
 
-# 10. get_agent_context
 from functions.get_agent_context import get_agent_context
 test("get_agent_context", lambda: get_agent_context(
     ticker=TICKER,
@@ -147,7 +131,6 @@ test("get_agent_context", lambda: get_agent_context(
     vector_db=vector_db,
 ))
 
-# ── 결과 요약 ──
 print("\n" + "="*50)
 print("테스트 결과 요약")
 print("="*50)

@@ -1,13 +1,7 @@
-# financial_research_data_agent 의존성
+pymupdf>=1.23.0   
 
-# ── PDF 처리 (필수) ──
-pymupdf>=1.23.0             # fitz: PDF 텍스트 추출
-
-# ── 임베딩 모델 (확정) ──
 openai>=1.0.0               # Upstage solar-embedding-1-large-passage 호출용
 
-# ── Vector DB (확정) ──
-chromadb>=1.0.0             # 로컬 파일 기반 Vector DB
+pinecone>=3.0.0
 
-# ── 유틸 ──
 python-dotenv>=1.0.0        # 환경변수 관리

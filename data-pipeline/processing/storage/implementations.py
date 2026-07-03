@@ -1,7 +1,7 @@
 import logging
 from typing import List, Optional
-from interfaces import BaseEmbeddingModel, BaseVectorDB
-from schemas import VectorChunk
+from processing.interfaces import BaseEmbeddingModel, BaseVectorDB
+from processing.schemas import VectorChunk
 
 logger = logging.getLogger(__name__)
 

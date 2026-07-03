@@ -1,6 +1,6 @@
 import re
 from typing import List
-from schemas import (
+from processing.schemas import (
     RawNewsInput,
     RawDisclosureInput,
     RawMacroInput,

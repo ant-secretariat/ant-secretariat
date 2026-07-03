@@ -1,5 +1,5 @@
 import logging
-from config.supported_companies import SUPPORTED_COMPANIES
+from processing.config.supported_companies import SUPPORTED_COMPANIES
 
 logger = logging.getLogger(__name__)
 

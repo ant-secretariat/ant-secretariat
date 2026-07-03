@@ -10,8 +10,8 @@ from xml.etree import ElementTree
 
 import httpx
 
-from config.settings import SETTINGS, Settings
-from crawler.http import create_ssl_context
+from crawling.config.settings import SETTINGS, Settings
+from crawling.crawler.http import create_ssl_context
 
 logger = logging.getLogger(__name__)
 

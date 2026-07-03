@@ -1,0 +1,15 @@
+# crawling/
+APScheduler==3.11.0
+beautifulsoup4==4.13.4
+httpx==0.28.1
+pypdf==5.6.0
+truststore==0.10.4
+pytest==8.4.0
+
+# processing/
+pymupdf>=1.23.0
+openai>=1.0.0               # Upstage solar-embedding-1-large-passage 호출용
+pinecone>=3.0.0
+
+# shared (crawling pinned ==1.1.0, processing only required >=1.0.0 — kept the stricter pin)
+python-dotenv==1.1.0

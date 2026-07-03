@@ -1,7 +1,0 @@
-pymupdf>=1.23.0   
-
-openai>=1.0.0               # Upstage solar-embedding-1-large-passage 호출용
-
-pinecone>=3.0.0
-
-python-dotenv>=1.0.0        # 환경변수 관리

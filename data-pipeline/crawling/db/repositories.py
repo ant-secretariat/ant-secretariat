@@ -4,8 +4,8 @@ import hashlib
 import uuid
 from typing import Any
 
-from crawler.models import DownloadResult, ReportMetadata
-from db.database import Database, utc_now
+from crawling.crawler.models import DownloadResult, ReportMetadata
+from crawling.db.database import Database, utc_now
 
 
 class ReportRepository:

@@ -2,13 +2,18 @@ from __future__ import annotations
 
 import argparse
 import logging
+import sys
 from dataclasses import replace
 from logging.handlers import TimedRotatingFileHandler
+from pathlib import Path
 
-from crawler.config import SETTINGS, Settings
-from crawler.pipeline import CollectionPipeline
-from crawler.scheduler import run_scheduler
-from db.database import Database
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from crawling.crawler.config import SETTINGS, Settings
+from crawling.crawler.pipeline import CollectionPipeline
+from crawling.crawler.scheduler import run_scheduler
+from crawling.db.database import Database
 
 
 SUPPORTED_SOURCES = {"naver", "kirs", "all"}

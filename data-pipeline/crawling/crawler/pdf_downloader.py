@@ -8,9 +8,9 @@ from pathlib import Path
 
 import httpx
 
-from crawler.config import Settings
-from crawler.http import create_ssl_context
-from crawler.models import DownloadResult
+from crawling.crawler.config import Settings
+from crawling.crawler.http import create_ssl_context
+from crawling.crawler.models import DownloadResult
 
 logger = logging.getLogger(__name__)
 

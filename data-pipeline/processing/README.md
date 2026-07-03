@@ -93,24 +93,25 @@ financial_research_data_agent/
 
 ## 5. 사전 준비
 
-이 코드는 (https://github.com/boogiewooki02/financial-research-agent) 가 먼저 실행되어 있어야 합니다.
+`crawling/` 파이프라인(`python crawling/main.py`)이 먼저 실행되어 있어야 합니다.
 
-- DB 파일: `db/reports.db`
-- PDF 저장 경로: `storage/raw_report_pdfs/`
+- DB 파일: `crawling/db/reports.db` (crawling과 공유)
+- PDF 저장 경로: `crawling/storage/raw_report_pdfs/`
 
 ---
 
 ## 6. 환경 설정
 
-가상환경 설치:
+가상환경 설치 (레포 루트에서):
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+cp .env.example .env
 ```
 
-`.env` 파일 생성 (루트 폴더에):
+`.env`에 아래 값을 채웁니다:
 
 ```
 UPSTAGE_API_KEY=your_upstage_key
@@ -124,27 +125,26 @@ PINECONE_INDEX=financial-research-data-agent
 
 **API 키 없을 때 (Placeholder 임베딩)**
 
+레포 루트에서 실행합니다 (기본 `--db-path`는 `crawling/db/reports.db`).
+
 ```powershell
-python run_pipeline.py `
-  --db-path ..\financial-research-agent\db\reports.db `
-  --pdf-base-path ..\financial-research-agent
+python processing/run_pipeline.py `
+  --pdf-base-path crawling
 ```
 
 **리포트만 처리 (API 키 있을 때)**
 
 ```powershell
-python run_pipeline.py `
-  --db-path ..\financial-research-agent\db\reports.db `
-  --pdf-base-path ..\financial-research-agent `
+python processing/run_pipeline.py `
+  --pdf-base-path crawling `
   --pinecone-index financial-research-data-agent
 ```
 
 **뉴스/공시/매크로 포함 전체 처리**
 
 ```powershell
-python run_pipeline.py `
-  --db-path ..\financial-research-agent\db\reports.db `
-  --pdf-base-path ..\financial-research-agent `
+python processing/run_pipeline.py `
+  --pdf-base-path crawling `
   --pinecone-index financial-research-data-agent `
   --include-news-data `
   --include-disclosure-data `
@@ -154,13 +154,13 @@ python run_pipeline.py `
 **dry-run (DB 저장 없이 청킹 결과만 확인)**
 
 ```powershell
-python run_pipeline.py --db-path ... --pdf-base-path ... --dry-run
+python processing/run_pipeline.py --pdf-base-path crawling --dry-run
 ```
 
 **특정 리포트만 처리**
 
 ```powershell
-python run_pipeline.py --db-path ... --pdf-base-path ... --report-id REPORT_ID
+python processing/run_pipeline.py --pdf-base-path crawling --report-id REPORT_ID
 ```
 
 ---
@@ -176,7 +176,7 @@ python run_pipeline.py --db-path ... --pdf-base-path ... --report-id REPORT_ID
 회사명/선택값을 ticker로 변환
 
 ```python
-from functions.resolve_company import resolve_company
+from processing.functions.resolve_company import resolve_company
 
 result = resolve_company(company_input="삼성전자")
 ```
@@ -199,7 +199,7 @@ result = resolve_company(company_input="삼성전자")
 Vector DB에서 의미 기반 문서 chunk 검색
 
 ```python
-from functions.search_documents import search_documents
+from processing.functions.search_documents import search_documents
 
 result = search_documents(
     query="HBM 수요 증가",
@@ -244,7 +244,7 @@ result = search_documents(
 특정 리포트의 chunk 전체를 순서대로 조회
 
 ```python
-from functions.get_report_chunks import get_report_chunks
+from processing.functions.get_report_chunks import get_report_chunks
 
 result = get_report_chunks(
     report_id="KIRS_005930_001",
@@ -285,7 +285,7 @@ result = get_report_chunks(
 리포트 목록과 메타데이터 조회
 
 ```python
-from functions.get_report_metadata import get_report_metadata
+from processing.functions.get_report_metadata import get_report_metadata
 
 result = get_report_metadata(
     ticker="005930",
@@ -323,7 +323,7 @@ result = get_report_metadata(
 목표주가 및 투자의견 조회
 
 ```python
-from functions.get_target_price_data import get_target_price_data
+from processing.functions.get_target_price_data import get_target_price_data
 
 result = get_target_price_data(
     ticker="005930",
@@ -366,7 +366,7 @@ result = get_target_price_data(
 주가, 거래량, 변동성 등 숫자 데이터 조회
 
 ```python
-from functions.get_price_data import get_price_data
+from processing.functions.get_price_data import get_price_data
 
 result = get_price_data(
     ticker="005930",
@@ -410,7 +410,7 @@ result = get_price_data(
 금리, 환율, CPI 등 매크로 숫자 데이터 조회
 
 ```python
-from functions.get_macro_data import get_macro_data
+from processing.functions.get_macro_data import get_macro_data
 
 result = get_macro_data(
     indicators=["BASE_RATE_KR", "USD_KRW"],
@@ -448,7 +448,7 @@ result = get_macro_data(
 공시 데이터 조회
 
 ```python
-from functions.get_disclosure_data import get_disclosure_data
+from processing.functions.get_disclosure_data import get_disclosure_data
 
 result = get_disclosure_data(
     ticker="005930",
@@ -484,7 +484,7 @@ result = get_disclosure_data(
 해당 기업에 어떤 데이터가 있는지 확인 (실행 Agent 선택 전 데이터 준비 여부 확인)
 
 ```python
-from functions.get_available_data_status import get_available_data_status
+from processing.functions.get_available_data_status import get_available_data_status
 
 result = get_available_data_status(
     ticker="005930",
@@ -522,7 +522,7 @@ result = get_available_data_status(
 특정 Agent에 필요한 데이터 묶음을 한 번에 반환
 
 ```python
-from functions.get_agent_context import get_agent_context
+from processing.functions.get_agent_context import get_agent_context
 
 result = get_agent_context(
     ticker="005930",
@@ -572,7 +572,7 @@ result = get_agent_context(
 
 ## 10. 주의사항
 
-- `run_pipeline.py` 실행 전 반드시 (https://github.com/boogiewooki02/financial-research-agent) 가 먼저 실행되어 있어야 합니다.
+- `processing/run_pipeline.py` 실행 전 반드시 `crawling/main.py`가 먼저 실행되어 있어야 합니다.
 - Upstage API 키와 Pinecone API 키는 `.env` 파일에 저장하며 git에 포함되지 않습니다.
 - Upstage API 키가 없으면 Placeholder 임베딩으로 동작하며, `embedding_status = pending`으로 저장됩니다.
 - PDF가 스캔본이면 OCR이 필요할 수 있습니다. `pdf_processor.is_scanned_pdf()`로 감지 가능합니다.
@@ -643,7 +643,7 @@ b1b88d0 Fix Agent B trend report contract fields
 
 ### 남은 작업
 
-- 실제 `db/reports.db` 생성 및 공유/연결
+- 실제 `crawling/db/reports.db` 생성 및 공유/연결
 - 수집 파이프라인 실행 후 실제 데이터 적재 확인
 - Pinecone에 실제 chunk 저장 확인
   - `report_chunks`

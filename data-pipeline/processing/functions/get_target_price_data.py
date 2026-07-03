@@ -1,6 +1,6 @@
 import logging
 from typing import Optional
-from interfaces import BaseRelationalDB
+from processing.interfaces import BaseRelationalDB
 
 logger = logging.getLogger(__name__)
 

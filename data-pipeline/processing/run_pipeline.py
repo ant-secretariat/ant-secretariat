@@ -1,20 +1,24 @@
 import argparse
 import logging
 import os
+import sys
 from pathlib import Path
 from dotenv import load_dotenv
 
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 load_dotenv()
 
-from storage.sqlite_db import SQLiteDB
-from storage.implementations import (
+from processing.storage.sqlite_db import SQLiteDB
+from processing.storage.implementations import (
     PlaceholderEmbeddingModel,
     PlaceholderVectorDB,
     UpstageEmbeddingModel,
     PineconeVectorDB,
 )
-from pipeline import DataPipeline
-from schemas import RawReportInput, RawNewsInput, RawDisclosureInput, RawMacroInput
+from processing.pipeline import DataPipeline
+from processing.schemas import RawReportInput, RawNewsInput, RawDisclosureInput, RawMacroInput
 
 logging.basicConfig(
     level=logging.INFO,
@@ -26,8 +30,8 @@ logger = logging.getLogger(__name__)
 def main():
     parser = argparse.ArgumentParser(description="financial_research_data_agent 파이프라인 실행")
     parser.add_argument(
-        "--db-path", default="db/reports.db",
-        help="B의 SQLite DB 경로 (기본값: db/reports.db)"
+        "--db-path", default=os.environ.get("DATABASE_PATH", "crawling/db/reports.db"),
+        help="공유 SQLite DB 경로 (기본값: crawling/db/reports.db, DATABASE_PATH 환경변수로 override 가능)"
     )
     parser.add_argument(
         "--pdf-base-path", default=None,
@@ -112,7 +116,7 @@ def main():
         )
 
         if args.dry_run:
-            from processors.pdf_processor import PDFProcessor
+            from processing.processors.pdf_processor import PDFProcessor
             proc = PDFProcessor()
             pages = proc.extract_pages(raw.pdf_path)
             chunks = proc.chunk_pages(pages, raw.report_id)

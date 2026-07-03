@@ -11,11 +11,11 @@ from urllib.parse import parse_qsl, urlencode, urljoin, urlparse, urlunparse
 import httpx
 from bs4 import BeautifulSoup, Tag
 
-from config.report_type_codes import normalize_report_type
-from crawler.config import SELECTORS, Settings
-from crawler.base_crawler import generate_report_id
-from crawler.http import create_ssl_context
-from crawler.models import ReportMetadata
+from crawling.config.report_type_codes import normalize_report_type
+from crawling.crawler.config import SELECTORS, Settings
+from crawling.crawler.base_crawler import generate_report_id
+from crawling.crawler.http import create_ssl_context
+from crawling.crawler.models import ReportMetadata
 
 logger = logging.getLogger(__name__)
 

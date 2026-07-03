@@ -1,7 +1,7 @@
 import logging
 from typing import List
 
-from schemas import (
+from processing.schemas import (
     RawReportInput,
     RawNewsInput,
     RawDisclosureInput,
@@ -10,9 +10,9 @@ from schemas import (
     VectorChunk,
     VectorChunkMetadata,
 )
-from interfaces import BaseEmbeddingModel, BaseVectorDB, BaseRelationalDB
-from processors.pdf_processor import PDFProcessor, ChunkResult
-from processors.text_processor import NewsProcessor, DisclosureProcessor, MacroSummaryProcessor
+from processing.interfaces import BaseEmbeddingModel, BaseVectorDB, BaseRelationalDB
+from processing.processors.pdf_processor import PDFProcessor, ChunkResult
+from processing.processors.text_processor import NewsProcessor, DisclosureProcessor, MacroSummaryProcessor
 
 logger = logging.getLogger(__name__)
 

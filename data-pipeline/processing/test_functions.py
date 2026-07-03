@@ -1,14 +1,18 @@
 
 import os
 import sys
+from pathlib import Path
 from dotenv import load_dotenv
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 load_dotenv()
 
-from storage.sqlite_db import SQLiteDB
-from storage.implementations import UpstageEmbeddingModel, PineconeVectorDB
+from processing.storage.sqlite_db import SQLiteDB
+from processing.storage.implementations import UpstageEmbeddingModel, PineconeVectorDB
 
-DB_PATH = r"..\..\financial-research-agent\db\reports.db"
+DB_PATH = str(Path(__file__).resolve().parent.parent / "crawling" / "db" / "reports.db")
 db = SQLiteDB(db_path=DB_PATH)
 
 vector_db = PineconeVectorDB(
@@ -38,10 +42,10 @@ def test(name, fn):
         return None
 
 
-from functions.resolve_company import resolve_company
+from processing.functions.resolve_company import resolve_company
 test("resolve_company", lambda: resolve_company(company_input="삼성전자"))
 
-from functions.search_documents import search_documents
+from processing.functions.search_documents import search_documents
 test("search_documents", lambda: search_documents(
     query="HBM 수요 증가",
     ticker=TICKER,
@@ -53,10 +57,10 @@ test("search_documents", lambda: search_documents(
     vector_db=vector_db,
 ))
 
-from functions.get_report_chunks import get_report_chunks
+from processing.functions.get_report_chunks import get_report_chunks
 report_meta = None
 try:
-    from functions.get_report_metadata import get_report_metadata
+    from processing.functions.get_report_metadata import get_report_metadata
     meta = get_report_metadata(ticker=TICKER, relational_db=db)
     if meta["reports"]:
         report_id = meta["reports"][0]["report_id"]
@@ -71,7 +75,7 @@ except Exception as e:
     results["get_report_chunks"] = f"❌ ERROR: {e}"
     print(f"❌ get_report_chunks: {e}")
 
-from functions.get_report_metadata import get_report_metadata
+from processing.functions.get_report_metadata import get_report_metadata
 test("get_report_metadata", lambda: get_report_metadata(
     ticker=TICKER,
     date_from=DATE_FROM,
@@ -82,7 +86,7 @@ test("get_report_metadata", lambda: get_report_metadata(
 meta = get_report_metadata(ticker=TICKER, relational_db=db)
 print("리포트 수:", meta["count"])
 
-from functions.get_target_price_data import get_target_price_data
+from processing.functions.get_target_price_data import get_target_price_data
 test("get_target_price_data", lambda: get_target_price_data(
     ticker=TICKER,
     date_from=DATE_FROM,
@@ -90,7 +94,7 @@ test("get_target_price_data", lambda: get_target_price_data(
     relational_db=db,
 ))
 
-from functions.get_price_data import get_price_data
+from processing.functions.get_price_data import get_price_data
 test("get_price_data", lambda: get_price_data(
     ticker=TICKER,
     date_from=DATE_FROM,
@@ -98,7 +102,7 @@ test("get_price_data", lambda: get_price_data(
     relational_db=db,
 ))
 
-from functions.get_macro_data import get_macro_data
+from processing.functions.get_macro_data import get_macro_data
 test("get_macro_data", lambda: get_macro_data(
     indicators=["BASE_RATE_KR", "USD_KRW"],
     date_from=DATE_FROM,
@@ -106,7 +110,7 @@ test("get_macro_data", lambda: get_macro_data(
     relational_db=db,
 ))
 
-from functions.get_disclosure_data import get_disclosure_data
+from processing.functions.get_disclosure_data import get_disclosure_data
 test("get_disclosure_data", lambda: get_disclosure_data(
     ticker=TICKER,
     date_from=DATE_FROM,
@@ -114,14 +118,14 @@ test("get_disclosure_data", lambda: get_disclosure_data(
     relational_db=db,
 ))
 
-from functions.get_available_data_status import get_available_data_status
+from processing.functions.get_available_data_status import get_available_data_status
 test("get_available_data_status", lambda: get_available_data_status(
     ticker=TICKER,
     relational_db=db,
     vector_db=vector_db,
 ))
 
-from functions.get_agent_context import get_agent_context
+from processing.functions.get_agent_context import get_agent_context
 test("get_agent_context", lambda: get_agent_context(
     ticker=TICKER,
     agent_type="trend_report",

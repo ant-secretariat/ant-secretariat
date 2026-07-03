@@ -20,6 +20,8 @@ AI Agent 기반 증권 리포트 분석 서비스에서 Agent B는 공통 데이
 
 Python 3.11 이상을 권장합니다.
 
+레포 루트에서 실행합니다.
+
 ```bash
 python -m venv .venv
 source .venv/bin/activate

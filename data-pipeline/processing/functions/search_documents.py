@@ -1,7 +1,7 @@
 import logging
 import re
 from typing import Optional
-from interfaces import BaseEmbeddingModel, BaseVectorDB
+from processing.interfaces import BaseEmbeddingModel, BaseVectorDB
 
 logger = logging.getLogger(__name__)
 

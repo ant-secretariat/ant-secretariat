@@ -5,8 +5,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Iterator
 
-from interfaces import BaseRelationalDB
-from schemas import ReportChunkRecord
+from processing.interfaces import BaseRelationalDB
+from processing.schemas import ReportChunkRecord
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,7 @@ def _utc_now() -> str:
 
 class SQLiteDB(BaseRelationalDB):
 
-    def __init__(self, db_path: str = "db/reports.db"):
+    def __init__(self, db_path: str = "crawling/db/reports.db"):
         self.db_path = Path(db_path)
         self._initialize()
 
@@ -33,7 +33,7 @@ class SQLiteDB(BaseRelationalDB):
             conn.close()
 
     def _initialize(self) -> None:
-        schema_path = Path(__file__).with_name("schema_extension.sql")
+        schema_path = Path(__file__).resolve().parents[2] / "crawling" / "db" / "schema.sql"
         with self._connect() as conn:
             conn.executescript(schema_path.read_text(encoding="utf-8"))
         logger.info(f"SQLiteDB 초기화 완료: {self.db_path}")

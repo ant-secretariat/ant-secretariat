@@ -8,17 +8,17 @@ from pathlib import Path
 
 import httpx
 
-from config.report_type_codes import normalize_report_type
-from config.supported_companies import resolve_company_from_text
-from crawler.base_crawler import generate_report_id
-from crawler.config import Settings
-from crawler.kirs_research_crawler import KirsResearchCrawler
-from crawler.models import ReportMetadata
-from crawler.pdf_downloader import PdfDownloadError, PdfDownloader, is_pdf_content
-from crawler.pipeline import CollectionPipeline
-from crawler.target_price_extractor import extract_investment_opinion, extract_target_price
-from db.database import Database
-from db.repositories import ReportRepository
+from crawling.config.report_type_codes import normalize_report_type
+from crawling.config.supported_companies import resolve_company_from_text
+from crawling.crawler.base_crawler import generate_report_id
+from crawling.crawler.config import Settings
+from crawling.crawler.kirs_research_crawler import KirsResearchCrawler
+from crawling.crawler.models import ReportMetadata
+from crawling.crawler.pdf_downloader import PdfDownloadError, PdfDownloader, is_pdf_content
+from crawling.crawler.pipeline import CollectionPipeline
+from crawling.crawler.target_price_extractor import extract_investment_opinion, extract_target_price
+from crawling.db.database import Database
+from crawling.db.repositories import ReportRepository
 
 
 SAMPLE_HTML = """
@@ -258,7 +258,7 @@ class RepositoryTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             database = Database(Path(directory) / "reports.db")
             database.initialize()
-            from db.repositories import NumericDataRepository
+            from crawling.db.repositories import NumericDataRepository
 
             repository = NumericDataRepository(database)
             news_count = repository.upsert_news_rows(

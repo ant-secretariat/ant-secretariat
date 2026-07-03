@@ -10,9 +10,9 @@ from statistics import pstdev
 import httpx
 from bs4 import BeautifulSoup
 
-from config.settings import SETTINGS, Settings
-from crawler.base_crawler import subtract_months
-from crawler.http import create_ssl_context
+from crawling.config.settings import SETTINGS, Settings
+from crawling.crawler.base_crawler import subtract_months
+from crawling.crawler.http import create_ssl_context
 
 logger = logging.getLogger(__name__)
 

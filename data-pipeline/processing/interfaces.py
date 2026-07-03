@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional
-from schemas import VectorChunk, ReportChunkRecord
+from processing.schemas import VectorChunk, ReportChunkRecord
 
 
 class BaseEmbeddingModel(ABC):

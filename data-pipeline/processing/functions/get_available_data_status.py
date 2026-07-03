@@ -1,5 +1,5 @@
 import logging
-from interfaces import BaseRelationalDB, BaseVectorDB
+from processing.interfaces import BaseRelationalDB, BaseVectorDB
 
 logger = logging.getLogger(__name__)
 

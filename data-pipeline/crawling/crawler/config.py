@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from config.settings import PROJECT_ROOT, SETTINGS, Settings
+from crawling.config.settings import PROJECT_ROOT, SETTINGS, Settings
 
 
 SELECTORS = {

@@ -2,21 +2,21 @@ from __future__ import annotations
 
 import unittest
 
-from collectors.disclosure_collector import DisclosureCollector, _normalize_disclosure_type
-from collectors.macro_data_collector import (
+from crawling.collectors.disclosure_collector import DisclosureCollector, _normalize_disclosure_type
+from crawling.collectors.macro_data_collector import (
     DEFAULT_ECOS_INDICATORS,
     EcosMacroProvider,
     MacroDataCollector,
     NaverMarketIndexProvider,
 )
-from collectors.news_collector import (
+from crawling.collectors.news_collector import (
     NewsCollector,
     _clean_html,
     _extract_article_text,
     _normalize_pub_date,
 )
-from collectors.price_data_collector import NaverPriceProvider, PriceDataCollector
-from config.settings import Settings
+from crawling.collectors.price_data_collector import NaverPriceProvider, PriceDataCollector
+from crawling.config.settings import Settings
 
 
 class PriceDataCollectorTest(unittest.TestCase):

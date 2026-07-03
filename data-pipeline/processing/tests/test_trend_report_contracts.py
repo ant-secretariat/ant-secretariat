@@ -1,8 +1,8 @@
 import sqlite3
 from pathlib import Path
 
-from functions.get_target_price_data import get_target_price_data
-from functions.search_documents import search_documents
+from processing.functions.get_target_price_data import get_target_price_data
+from processing.functions.search_documents import search_documents
 
 
 class FakeEmbeddingModel:

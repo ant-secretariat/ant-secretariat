@@ -5,8 +5,8 @@ import logging
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from crawler.config import Settings
-from crawler.pipeline import CollectionPipeline
+from crawling.crawler.config import Settings
+from crawling.crawler.pipeline import CollectionPipeline
 
 logger = logging.getLogger(__name__)
 

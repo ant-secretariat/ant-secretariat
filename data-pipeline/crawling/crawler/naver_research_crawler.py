@@ -9,15 +9,15 @@ from urllib.parse import urlencode, urljoin
 import httpx
 from bs4 import BeautifulSoup, Tag
 
-from config.report_type_codes import normalize_report_type
-from crawler.base_crawler import (
+from crawling.config.report_type_codes import normalize_report_type
+from crawling.crawler.base_crawler import (
     generate_report_id,
     is_within_months,
     normalize_date,
 )
-from crawler.http import create_ssl_context
-from crawler.models import ReportMetadata
-from config.settings import Settings
+from crawling.crawler.http import create_ssl_context
+from crawling.crawler.models import ReportMetadata
+from crawling.config.settings import Settings
 
 logger = logging.getLogger(__name__)
 

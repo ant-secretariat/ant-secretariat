@@ -1,0 +1,9 @@
+# ant-secretariat-data-pipeline을 editable install로 가져온다.
+# backend와 data-pipeline이 같은 상위 폴더에 나란히 클론되어 있다는 전제
+# (로컬/동일 서버 배포 기준). 배포 구조가 바뀌면 이 경로도 재검토해야 한다.
+-e ../ant-secretariat-data-pipeline
+
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+python-dotenv>=1.0.0
+pytest>=8.0.0

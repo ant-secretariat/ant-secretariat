@@ -12,9 +12,6 @@ def get_report_metadata(
     report_type: Optional[str] = None,
     relational_db: BaseRelationalDB = None,
 ) -> dict:
-    """
-    리포트 목록과 제목/날짜/출처 같은 메타데이터 조회
-    """
     if relational_db is None:
         raise ValueError("relational_db는 필수입니다.")
 

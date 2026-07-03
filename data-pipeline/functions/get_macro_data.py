@@ -13,9 +13,6 @@ def get_macro_data(
     country: str = "KR",
     relational_db: BaseRelationalDB = None,
 ) -> dict:
-    """
-    금리, 환율, CPI 등 매크로 숫자 데이터 조회
-    """
     if relational_db is None:
         raise ValueError("relational_db는 필수입니다.")
 

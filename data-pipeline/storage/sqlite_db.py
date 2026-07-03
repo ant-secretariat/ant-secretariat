@@ -146,7 +146,6 @@ class SQLiteDB(BaseRelationalDB):
             return row is not None
 
     def get_chunks_by_report_id(self, report_id: str) -> list[ReportChunkRecord]:
-        """특정 리포트의 chunk 전체 조회 (chunk_index 순서)"""
         with self._connect() as conn:
             rows = conn.execute(
                 """
@@ -208,7 +207,6 @@ class SQLiteDB(BaseRelationalDB):
             ]
 
     def get_news_to_process(self) -> list:
-        """news_metadata에서 전체 뉴스 조회 (B DB 컬럼 기준)"""
         with self._connect() as conn:
             rows = conn.execute(
                 """
@@ -221,7 +219,6 @@ class SQLiteDB(BaseRelationalDB):
             return [dict(row) for row in rows]
 
     def get_disclosures_to_process(self) -> list:
-        """disclosure_metadata에서 전체 공시 조회 (B DB 컬럼 기준)"""
         with self._connect() as conn:
             rows = conn.execute(
                 """

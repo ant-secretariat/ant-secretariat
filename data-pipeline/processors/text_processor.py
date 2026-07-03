@@ -13,11 +13,6 @@ MIN_CHUNK_LENGTH = 50
 
 
 def _chunk_text(text: str, base_id: str, metadata_kwargs: dict) -> List[VectorChunk]:
-    """
-    문단 단위 청킹 (리포트와 동일한 로직)
-    1. \\n\\n 기준으로 문단 분할
-    2. 문단이 MAX_CHUNK_LENGTH 초과 시 문장 단위로 재분할
-    """
     chunks = []
     chunk_index = 0
     paragraphs = re.split(r'\n\s*\n', text)
@@ -109,14 +104,12 @@ class NewsProcessor:
 class DisclosureProcessor:
 
     def process(self, disclosure: RawDisclosureInput) -> List[VectorChunk]:
-        # 본문 있으면 제목 + 본문, 없으면 제목만
         if disclosure.content and disclosure.content.strip():
             text = (disclosure.report_name + "\n\n" + disclosure.content).strip()
         else:
             text = disclosure.report_name.strip()
 
         if len(text) < MIN_CHUNK_LENGTH:
-            # 제목만 있는 경우 MIN_LENGTH 완화
             if len(text) >= 5:
                 chunk_id = f"disclosure_{disclosure.disclosure_id}_chunk_000"
                 return [VectorChunk(

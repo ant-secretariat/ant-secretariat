@@ -56,7 +56,6 @@ def main():
                         help="매크로 데이터 처리 포함")
     args = parser.parse_args()
 
-    # ── 임베딩 모델 선택 ──
     api_key = args.upstage_api_key or os.environ.get("UPSTAGE_API_KEY")
     if api_key:
         logger.info("Upstage 임베딩 모델 사용")
@@ -65,7 +64,6 @@ def main():
         logger.info("Placeholder 임베딩 사용 (API 키 없음) → embedding_status=pending으로 저장")
         embedding_model = PlaceholderEmbeddingModel()
 
-    # ── Vector DB 선택 ──
     pinecone_api_key = args.pinecone_api_key or os.environ.get("PINECONE_API_KEY")
     pinecone_index = args.pinecone_index or os.environ.get("PINECONE_INDEX")
 
@@ -80,7 +78,6 @@ def main():
     else:
         raise ValueError("Pinecone API 키와 인덱스 이름이 필요합니다. .env 파일을 확인해주세요.")
 
-    # ── DB 연결 ──
     db = SQLiteDB(db_path=args.db_path)
 
     pipeline = DataPipeline(
@@ -89,7 +86,6 @@ def main():
         relational_db=db,
     )
 
-    # ── 처리할 리포트 목록 조회 ──
     reports = db.get_reports_to_process()
     if args.report_id:
         reports = [r for r in reports if r["report_id"] == args.report_id]
@@ -134,7 +130,6 @@ def main():
                 f"errors={result['errors']}"
             )
 
-    # ── 뉴스 처리 ──
     if args.include_news_data:
         news_rows = db.get_news_to_process()
         logger.info(f"처리할 뉴스 수: {len(news_rows)}")
@@ -160,7 +155,6 @@ def main():
                 f"errors={result['errors']}"
             )
 
-    # ── 공시 처리 ──
     if args.include_disclosure_data:
         disclosure_rows = db.get_disclosures_to_process()
         logger.info(f"처리할 공시 수: {len(disclosure_rows)}")
@@ -187,7 +181,6 @@ def main():
                 f"errors={result['errors']}"
             )
 
-    # ── 매크로 처리 ──
     if args.include_macro_data:
         macro_rows = db.get_macro_to_process()
         logger.info(f"처리할 매크로 수: {len(macro_rows)}")

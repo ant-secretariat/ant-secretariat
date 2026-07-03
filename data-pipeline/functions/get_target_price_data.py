@@ -12,9 +12,6 @@ def get_target_price_data(
     report_type: Optional[str] = "company_report",
     relational_db: BaseRelationalDB = None,
 ) -> dict:
-    """
-    리포트에서 추출한 목표주가와 투자의견 데이터 조회
-    """
     if relational_db is None:
         raise ValueError("relational_db는 필수입니다.")
 

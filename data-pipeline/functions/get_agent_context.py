@@ -13,10 +13,7 @@ def get_agent_context(
     embedding_model: BaseEmbeddingModel = None,
     vector_db: BaseVectorDB = None,
 ) -> dict:
-    """
-    특정 Agent에 필요한 데이터 묶음을 한 번에 반환
-    agent_type: trend_report(D용) / debate(F용) / simulation(G용)
-    """
+
     if relational_db is None:
         raise ValueError("relational_db는 필수입니다.")
 

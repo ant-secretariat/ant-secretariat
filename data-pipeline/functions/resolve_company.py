@@ -5,9 +5,6 @@ logger = logging.getLogger(__name__)
 
 
 def resolve_company(company_input: str) -> dict:
-    """
-    회사명/선택값을 ticker로 변환
-    """
     normalized = company_input.casefold().strip()
 
     for company in SUPPORTED_COMPANIES:

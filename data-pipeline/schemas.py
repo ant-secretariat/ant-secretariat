@@ -18,15 +18,14 @@ class RawReportInput:
 
 @dataclass
 class RawNewsInput:
-    """뉴스 원본 — B DB news_metadata 기준"""
     news_id: str
     ticker: str
     company: str
     title: str
-    summary: str        # B DB: summary (요약본)
-    content: str        # B DB: content (본문 전문)
+    summary: str 
+    content: str 
     published_at: str
-    url: str            # B DB: original_url
+    url: str  
     source: str
     provider: str
     created_at: str
@@ -34,18 +33,17 @@ class RawNewsInput:
 
 @dataclass
 class RawDisclosureInput:
-    """공시 원본 — B DB disclosure_metadata 기준"""
     disclosure_id: str
     ticker: str
     company: str
     corp_code: str
-    report_name: str    # B DB: report_name (title 아님)
+    report_name: str 
     disclosure_type: str
-    disclosed_at: str   # B DB: disclosed_at (published_at 아님)
+    disclosed_at: str
     receipt_no: str
-    url: str            # B DB: original_url
+    url: str
     source: str
-    content: str        # B DB: content (본문)
+    content: str
     created_at: str
 
 
@@ -78,7 +76,7 @@ class ReportChunkRecord:
     chunk_index: int
     content: str
     vector_id: Optional[str]
-    embedding_status: str       # pending / success / failed
+    embedding_status: str 
 
 
 

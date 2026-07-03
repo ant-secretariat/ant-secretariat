@@ -5,14 +5,12 @@ from typing import List
 
 @dataclass
 class PageText:
-    """페이지 단위 추출 결과"""
     page_num: int 
     text: str
 
 
 @dataclass
 class ChunkResult:
-    """청킹 결과 단위"""
     chunk_id: str
     chunk_index: int
     page_start: int

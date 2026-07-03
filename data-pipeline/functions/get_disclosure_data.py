@@ -12,9 +12,6 @@ def get_disclosure_data(
     disclosure_type: Optional[str] = None,
     relational_db: BaseRelationalDB = None,
 ) -> dict:
-    """
-    공시 데이터 조회
-    """
     if relational_db is None:
         raise ValueError("relational_db는 필수입니다.")
 

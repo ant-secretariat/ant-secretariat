@@ -33,26 +33,18 @@ class DataPipeline:
         self.disclosure_processor  = DisclosureProcessor()
         self.macro_processor       = MacroSummaryProcessor()
 
-    # ──────────────────────────────────────────────
-    # 리포트 처리
-    # → report_chunk_records + report_chunks
-    # ──────────────────────────────────────────────
-
     def process_report(self, report: RawReportInput) -> dict:
         processed_chunks = 0
 
         try:
-            # 1. PDF 텍스트 추출
             pages = self.pdf_processor.extract_pages(report.pdf_path)
             if not pages:
                 return {"success": False, "chunk_count": 0,
                         "errors": ["PDF에서 텍스트를 추출할 수 없습니다."]}
 
-            # 2. 스캔본 여부 확인
             if self.pdf_processor.is_scanned_pdf(pages):
                 logger.warning(f"스캔본 PDF 의심: {report.pdf_path} - OCR 필요할 수 있음")
 
-            # 3. chunk 분할
             raw_chunks: List[ChunkResult] = self.pdf_processor.chunk_pages(
                 pages=pages,
                 report_id=report.report_id,
@@ -62,7 +54,6 @@ class DataPipeline:
                 return {"success": False, "chunk_count": 0,
                         "errors": ["유효한 chunk가 없습니다."]}
 
-            # 4. 중복 chunk 제외
             new_chunks = [
                 c for c in raw_chunks
                 if not self.relational_db.chunk_exists(c.chunk_id)
@@ -72,7 +63,6 @@ class DataPipeline:
                 logger.info(f"[{report.report_id}] 모든 chunk 이미 저장됨 - 스킵")
                 return {"success": True, "chunk_count": 0, "errors": []}
 
-            # 5. VectorChunk 변환
             vector_chunks = [
                 VectorChunk(
                     id=chunk.chunk_id,
@@ -95,15 +85,12 @@ class DataPipeline:
                 for chunk in new_chunks
             ]
 
-            # 6. 임베딩 생성 (배치)
             vectors = self.embedding_model.embed_batch(
                 [vc.content for vc in vector_chunks]
             )
 
-            # 7. Vector DB 저장 → report_chunks
             vector_ids = self.vector_db.upsert_batch(vector_chunks, vectors)
 
-            # 8. Relational DB 저장 → report_chunk_records
             for chunk, vector_id in zip(new_chunks, vector_ids):
                 record = ReportChunkRecord(
                     chunk_id=chunk.chunk_id,
@@ -131,10 +118,6 @@ class DataPipeline:
 
         return {"success": True, "chunk_count": processed_chunks, "errors": []}
 
-    # ──────────────────────────────────────────────
-    # 뉴스 처리 → news_chunks
-    # ──────────────────────────────────────────────
-
     def process_news(self, news: RawNewsInput) -> dict:
         try:
             chunks: List[VectorChunk] = self.news_processor.process(news)
@@ -148,9 +131,6 @@ class DataPipeline:
             logger.error(f"뉴스 처리 실패: {news.news_id} | {e}")
             return {"success": False, "chunk_count": 0, "errors": [str(e)]}
 
-    # ──────────────────────────────────────────────
-    # 공시 처리 → disclosure_chunks
-    # ──────────────────────────────────────────────
 
     def process_disclosure(self, disclosure: RawDisclosureInput) -> dict:
         try:
@@ -165,9 +145,6 @@ class DataPipeline:
             logger.error(f"공시 처리 실패: {disclosure.disclosure_id} | {e}")
             return {"success": False, "chunk_count": 0, "errors": [str(e)]}
 
-    # ──────────────────────────────────────────────
-    # 매크로 처리 → macro_summary_chunks
-    # ──────────────────────────────────────────────
 
     def process_macro(self, macro: RawMacroInput) -> dict:
         try:

@@ -1,5 +1,55 @@
 # ant-secretariat-backend
 
+## 오케스트레이터 (`orchestrator/`) 및 InsightBoard 에이전트 (`agents/insight_board/`)
+
+[Agent C 라우팅 케이스 설계 문서](https://swift-cost-472.notion.site/Agent-C-383a2756fda480a0a146d8d8535f5d9a)를
+기준으로 구현했다. 오케스트레이터(Agent C)는 사용자 요청을 분석하는 게 아니라,
+프론트엔드의 명시적 액션(기능 토글 선택 vs "토론 시작하기" 버튼 클릭)을 그대로
+반영해 라우팅만 하는 단순한 LangGraph `StateGraph`다.
+
+### 라우팅 케이스
+
+| 구분 | 케이스 1 — InsightBoard | 케이스 2 — Debate(→ Simulation) |
+|---|---|---|
+| 트리거 | 기능 선택: 주가/매크로/공시 | "토론 시작하기" 버튼 클릭 |
+| 호출 대상 | InsightBoard 단독 | Debate 단독 |
+| 이후 흐름 | InsightBoard 내부에서 완결 | Debate가 완료 후 자체적으로 Simulation 호출 |
+| 오케스트레이터의 인지 범위 | 호출 결과(JSON)를 그대로 반환 | 결과는 신경 쓰지 않음(fire-and-forget) — UI 전달은 각 에이전트 책임 |
+| 응답 횟수 | 1회 | 2회(토론 완료 1회, 시뮬레이션 완료 1회) — 오케스트레이터가 아니라 Debate가 직접 전달 |
+
+- `orchestrator/schemas.py` — `CompanyContext`, `OrchestratorRequest` (1~3개 기업,
+  insight_board는 `feature` 필수, debate는 기업 1개만 허용하는 검증 포함)
+- `orchestrator/router.py` — `decide_route()`: `request_type`을 그대로 라우팅 키로
+  사용 (LLM 분류 없음 — 프론트 액션 자체가 이미 명확한 트리거이기 때문)
+- `orchestrator/graph.py` — `route → insight_board | debate → END` StateGraph.
+  insight_board는 `await`해서 결과를 그대로 반환하고, debate는 `asyncio.create_task`로
+  던지기만 하고 기다리지 않는다
+- `orchestrator/service.py` — `run_orchestrator_request()` 공개 진입점
+- `api/orchestrator.py` — `POST /orchestrate/insight-board`, `POST /orchestrate/debate`.
+  프론트가 보낸 기업명을 `processing.functions.resolve_company()`로 ticker/company/
+  sector로 정규화하는 것까지 이 레이어가 맡는다(문서상 "Agent A" 역할 겸함)
+
+### InsightBoard 에이전트 (Agent E, 신규 구현)
+
+기업별 주가/매크로/공시 조회 + LLM 1줄 코멘트를 제공한다. `agents/debate/service.py`는
+아직 인터페이스만 정의된 `NotImplementedError` 스텁이다(Debate 자체 구현은 별도
+작업 범위).
+
+- `agents/insight_board/config.py` — feature 타입, 기업 최대 3개, 코멘트 LLM 모델
+- `agents/insight_board/data_client.py` — `processing.functions.get_price_data` /
+  `get_macro_data` / `get_disclosure_data` 어댑터. 세 함수 모두 동기 sqlite 호출이라
+  기업별 병렬 조회는 `asyncio.to_thread` + `asyncio.gather`로 구현(매크로는 종목
+  무관이라 1회만 호출)
+- `agents/insight_board/comment_generator.py` — Upstage(OpenAI 호환) LLM 1회 호출로
+  1~2줄 코멘트 생성. 코멘트는 부가 정보라 실패해도 빈 문자열로 넘어가고 전체
+  요청을 막지 않는다(trend_report/simulation의 `require_env()` fail-fast와는
+  의도적으로 다른 정책)
+- `agents/insight_board/badges.py` — `compute_badges()`. **문서에 배지 정의가 없어
+  임계값은 전부 자리표시용 추정치**로 직접 설계함(실제 기획 요구사항이 정해지면
+  조정 필요)
+- `agents/insight_board/service.py` — `run_insight_board()`: 1) 병렬 데이터 조회
+  → 2) LLM 코멘트 → 3) `{"raw_data", "llm_comment", "badges"}` 구조로 반환
+
 ## 유저 식별 (`functions/create_user.py`, `api/users.py`)
 
 정식 회원가입/로그인 없이, 프론트엔드가 앱 최초 실행 시 UUID를 생성해 로컬에

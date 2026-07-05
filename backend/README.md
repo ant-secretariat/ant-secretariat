@@ -1,5 +1,21 @@
 # ant-secretariat-backend
 
+## 유저 식별 (`functions/create_user.py`, `api/users.py`)
+
+정식 회원가입/로그인 없이, 프론트엔드가 앱 최초 실행 시 UUID를 생성해 로컬에
+저장하고 그 값을 `user_id`로 계속 사용하는 방식을 쓴다. 백엔드는 그 UUID를
+`users` 테이블에 등록만 해준다.
+
+- `functions/create_user.py` — `user_id`를 `users` 테이블에 INSERT (멱등: 이미
+  있으면 조용히 무시)
+- `api/users.py` — `POST /users` (APIRouter; 메인 앱에 `include_router`로
+  등록되는 것을 전제로 함)
+
+온보딩/시뮬레이션/트렌드 리포트 등 다른 기능은 이렇게 등록된 `user_id`가 이미
+있다고 가정하고 그대로 받아쓴다. 나중에 실제 로그인이 필요해지면 `users`
+테이블에 email 등 인증 관련 컬럼을 추가해 이 UUID에 매핑하는 방식으로
+확장하면 된다.
+
 ## 온보딩 (`onboarding/`, `functions/`, `api/onboarding.py`)
 
 7개 질문 응답을 받아 `users` 테이블의 5개 필드(`risk_profile`, `investment_goal`,

@@ -6,3 +6,5 @@ venv/
 .env
 *.db
 *.egg-info/
+agents/trend_report/output/
+agents/simulation/_model_cache/

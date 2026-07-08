@@ -1,15 +1,18 @@
 # agents/debate/run_debate.py
 
+import asyncio
 import json
 import os
 from datetime import datetime
 from dotenv import load_dotenv
 from openai import OpenAI
 
+from agents.simulation.service import run_simulation
 from functions.get_user_context import get_user_context
 from processing.functions.get_agent_context import get_agent_context
 from processing.functions.get_available_data_status import get_available_data_status
 from processing.storage.implementations import UpstageEmbeddingModel, PineconeVectorDB, SQLiteDB
+
 
 load_dotenv()
 
@@ -292,7 +295,7 @@ def build_debate_result(ticker, company, query, user_id, bull_output, bear_outpu
         }
     }
 
-def run_debate(ticker: str, query: str, user_id: str) -> dict:
+async def run_debate(ticker: str, query: str, user_id: str) -> dict:
     try:
         print(f"[1/5] 데이터 수집 시작: {ticker}")
         agent_context = get_agent_context(
@@ -303,13 +306,20 @@ def run_debate(ticker: str, query: str, user_id: str) -> dict:
             embedding_model=embedding_model,
             vector_db=vector_db,
         )
+        company = (
+            agent_context.get("company") or
+            agent_context.get("price_data", {}).get("company") or
+            agent_context.get("documents", {}).get("company") or
+            ""
+        )
         user_context = get_user_context(user_id, relational_db=relational_db)
         data_status = get_available_data_status(
             ticker=ticker,
             relational_db=relational_db,
             vector_db=vector_db,
         )
-        data_richness = "rich" if data_status["available"]["reports"] else "limited"
+        reports_available = data_status.get("available", {}).get("reports", False)
+        data_richness = "rich" if reports_available else "limited"
 
         print(f"[2/5] Bull Agent 실행 중...")
         bull_user_message = f"""
@@ -346,7 +356,7 @@ Bear Agent 출력: {json.dumps(bear_output, ensure_ascii=False)}
         print(f"[5/5] 결과 조립 중...")
         result = build_debate_result(
             ticker=ticker,
-            company=agent_context.get("company", ""),
+            company=company,
             query=query,
             user_id=user_id,
             bull_output=bull_output,
@@ -361,12 +371,11 @@ Bear Agent 출력: {json.dumps(bear_output, ensure_ascii=False)}
             "bear_summary": bear_output["agendas"][1]["summary"],
             "bear_arguments": bear_output["agendas"][1]["arguments"],
         }
-        # from agents.simulation.service import run_simulation
-        # run_simulation(
-        #     ticker=ticker,
-        #     user_id=user_id,
-        #     agenda_2=agenda_2,
-        # )
+        await run_simulation(
+            ticker=ticker,
+            user_id=user_id,
+            agenda_2=agenda_2,
+        )
 
         return result
 

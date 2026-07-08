@@ -2,8 +2,16 @@ import logging
 from typing import List, Optional
 from processing.interfaces import BaseEmbeddingModel, BaseVectorDB
 from processing.schemas import VectorChunk
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
+
+
+def _to_timestamp(date_str: str) -> int:
+    try:
+        return int(datetime.strptime(date_str[:10], "%Y-%m-%d").timestamp())
+    except Exception:
+        return 0
 
 
 # ──────────────────────────────────────────────
@@ -109,7 +117,7 @@ class PineconeVectorDB(BaseVectorDB):
                         "chunk_id":      chunk.metadata.chunk_id,
                         "ticker":        chunk.metadata.ticker,
                         "company":       chunk.metadata.company,
-                        "date":          chunk.metadata.date,
+                        "date":          _to_timestamp(chunk.metadata.date) if chunk.metadata.date else 0,
                         "source":        chunk.metadata.source,
                         "document_type": chunk.metadata.document_type,
                         "report_type":   chunk.metadata.report_type or "",
@@ -151,7 +159,7 @@ class PineconeVectorDB(BaseVectorDB):
                             "chunk_id":      c.metadata.chunk_id,
                             "ticker":        c.metadata.ticker,
                             "company":       c.metadata.company,
-                            "date":          c.metadata.date,
+                            "date":          _to_timestamp(c.metadata.date) if c.metadata.date else 0,
                             "source":        c.metadata.source,
                             "document_type": c.metadata.document_type,
                             "report_type":   c.metadata.report_type or "",
@@ -193,9 +201,9 @@ class PineconeVectorDB(BaseVectorDB):
                 if k == "document_type":
                     continue
                 elif k == "date_from":
-                    pinecone_filter.setdefault("date", {})["$gte"] = v
+                    pinecone_filter.setdefault("date", {})["$gte"] = _to_timestamp(v)
                 elif k == "date_to":
-                    pinecone_filter.setdefault("date", {})["$lte"] = v
+                    pinecone_filter.setdefault("date", {})["$lte"] = _to_timestamp(v)
                 else:
                     pinecone_filter[k] = {"$eq": v}
 

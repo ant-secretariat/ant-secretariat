@@ -1,13 +1,21 @@
 import sqlite3
-from pathlib import Path
 
-DB_PATH = Path(__file__).resolve().parent.parent / "crawling" / "db" / "reports.db"
-conn = sqlite3.connect(DB_PATH)
+conn = sqlite3.connect(r"C:\Users\nasuz\ant-secretariat-data-pipeline\crawling\db\reports.db")
 
-tables = conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
-print("테이블 목록:", [t[0] for t in tables])
+report = conn.execute("SELECT COUNT(*) FROM report_metadata").fetchone()[0]
+news = conn.execute("SELECT COUNT(*) FROM news_metadata").fetchone()[0]
+disclosure = conn.execute("SELECT COUNT(*) FROM disclosure_metadata").fetchone()[0]
 
-cols = conn.execute("PRAGMA table_info(target_price_data)").fetchall()
-print("target_price_data 컬럼:", [c[1] for c in cols])
+print(f"리포트: {report}건")
+print(f"뉴스: {news}건")
+print(f"공시: {disclosure}건")
+
+# 뉴스 본문 여부
+news_with_content = conn.execute("SELECT COUNT(*) FROM news_metadata WHERE content IS NOT NULL AND content != ''").fetchone()[0]
+print(f"뉴스 본문 있는 것: {news_with_content}/{news}건")
+
+# 공시 본문 여부
+disc_with_content = conn.execute("SELECT COUNT(*) FROM disclosure_metadata WHERE content IS NOT NULL AND content != ''").fetchone()[0]
+print(f"공시 본문 있는 것: {disc_with_content}/{disclosure}건")
 
 conn.close()

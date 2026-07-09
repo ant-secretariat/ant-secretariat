@@ -11,7 +11,11 @@ class FakeEmbeddingModel:
 
 
 class FakeVectorDB:
+    def __init__(self):
+        self.last_filter = None
+
     def search(self, query_vector, top_k=5, filter=None):
+        self.last_filter = filter
         return [
             {
                 "id": "KIRS_005930_001_chunk_001",
@@ -53,6 +57,23 @@ def test_search_documents_returns_evidence_fields():
     assert item["author_org"] == "테스트증권"
     assert item["page_start"] == 3
     assert item["page_end"] == 4
+
+
+def test_search_documents_forwards_date_range_as_raw_iso_strings():
+    vector_db = FakeVectorDB()
+
+    search_documents(
+        query="HBM",
+        ticker="005930",
+        date_from="2026-01-01",
+        date_to="2026-06-30",
+        embedding_model=FakeEmbeddingModel(),
+        vector_db=vector_db,
+    )
+
+    assert vector_db.last_filter["date_from"] == "2026-01-01"
+    assert vector_db.last_filter["date_to"] == "2026-06-30"
+    assert "date" not in vector_db.last_filter
 
 
 def test_get_target_price_data_returns_company_and_title(tmp_path):

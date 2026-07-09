@@ -14,6 +14,15 @@ def _to_timestamp(date_str: str) -> int:
         return 0
 
 
+def _from_timestamp(ts) -> str:
+    if not ts:
+        return ""
+    try:
+        return datetime.fromtimestamp(int(ts)).strftime("%Y-%m-%d")
+    except Exception:
+        return ""
+
+
 # ──────────────────────────────────────────────
 # Placeholder (API 키 올 때까지 임시 사용)
 # ──────────────────────────────────────────────
@@ -218,7 +227,9 @@ class PineconeVectorDB(BaseVectorDB):
                     include_metadata=True,
                 )
                 for match in res.matches:
-                    meta = match.metadata or {}
+                    meta = dict(match.metadata or {})
+                    if "date" in meta:
+                        meta["date"] = _from_timestamp(meta["date"])
                     results.append({
                         "id":       match.id,
                         "content":  meta.pop("content", ""),

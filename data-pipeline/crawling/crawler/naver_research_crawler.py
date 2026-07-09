@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 NAVER_SELECTORS = {
     "report_rows": "table.type_1 tr, table.type_1 tbody tr",
     "cells": "td",
-    "detail_link": "a[href]",
+    "detail_link": "a[href*='company_read']",
     "pdf_link": "a[href$='.pdf'], a[href*='.pdf?'], a[href*='download']",
 }
 
@@ -50,7 +50,7 @@ class NaverResearchCrawler:
                 verify=create_ssl_context(),
             ) as client:
                 for page in range(1, max_pages + 1):
-                    url = self._page_url(company, page)
+                    url = self._page_url(ticker, page)
                     response = client.get(url)
                     response.raise_for_status()
                     page_reports = self.parse_list_html(
@@ -148,8 +148,8 @@ class NaverResearchCrawler:
             investment_opinion=investment_opinion,
         )
 
-    def _page_url(self, company: str, page: int) -> str:
-        query = urlencode({"keyword": company, "page": page})
+    def _page_url(self, ticker: str, page: int) -> str:
+        query = urlencode({"searchType": "itemCode", "itemCode": ticker, "page": page})
         separator = "&" if "?" in self.settings.naver_research_url else "?"
         return f"{self.settings.naver_research_url}{separator}{query}"
 

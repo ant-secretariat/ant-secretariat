@@ -9,7 +9,7 @@ Agent B Storage
 │   └── target_price_data   
 │
 └── Vector DB
-    ├── report_chunks       (453건 / 문단 단위 청킹)
+    ├── report_chunks       (478건 / 문단 단위 청킹)
     ├── news_chunks         (607건 / 문단 단위, 길면 문장 단위)
     ├── disclosure_chunks   (144건 / 문단 단위, 길면 문장 단위)
     └── macro_summary_chunks (5건  / 1건 = 1청크)
@@ -69,7 +69,7 @@ financial_research_data_agent/
 - **최소 길이**: 50자 (미만 시 제외)
 - **fallback**: 문단이 너무 길면 문장 단위로 재분할
 - **예외처리**: 문장이 1500자를 초과하는 경우 글자 수 기준으로 강제 분할 (표 등 비정형 텍스트 대응)
-- **결과**: 15개 리포트 → 453개 청크 (4개 기업: 삼성전자, SK하이닉스, 현대차, NAVER)
+- **결과**: 14개 리포트 → 478개 청크 (4개 기업: 삼성전자, SK하이닉스, 현대차, NAVER)
 
 ### 뉴스
 - **방식**: 문단 단위 청킹 (`\n\n` 기준), 문단이 1500자 초과 시 문장 단위로 재분할

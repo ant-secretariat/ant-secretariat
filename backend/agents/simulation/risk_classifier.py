@@ -13,7 +13,7 @@ load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 logger = logging.getLogger(__name__)
 
 UPSTAGE_BASE_URL = "https://api.upstage.ai/v1"
-CLASSIFIER_MODEL = os.environ.get("RISK_CLASSIFIER_MODEL", "solar-pro")
+CLASSIFIER_MODEL = os.environ.get("RISK_CLASSIFIER_MODEL", "solar-mini")
 
 _SYSTEM_PROMPT = f"""당신은 금융 토론 텍스트에서 정량적으로 시뮬레이션 가능한 \
 매크로 리스크 요인을 추출하는 분류기입니다.

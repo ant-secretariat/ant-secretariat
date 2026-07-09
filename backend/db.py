@@ -23,14 +23,29 @@ from crawling.db.database import Database, utc_now
 DEFAULT_DB_PATH = Path(_database_module.__file__).resolve().parent / "reports.db"
 
 
+_initialized_paths: set[Path] = set()
+
+
 def get_database() -> Database:
     """공유 reports.db에 연결된 Database 인스턴스를 반환한다.
 
     DATABASE_PATH 환경변수가 있으면 그 경로를, 없으면 data-pipeline의
     crawling/db/reports.db를 기본값으로 사용한다.
+
+    이 프로세스에서 해당 경로로 처음 호출될 때 한 번 Database.initialize()
+    (schema.sql 실행)를 보장한다. processing.storage.sqlite_db.SQLiteDB는
+    생성 시점에 스스로 스키마를 실행하지만 이 Database는 그렇지 않아서,
+    reports.db가 아직 없거나 SQLiteDB 계열 에이전트가 한 번도 안 거친
+    상태에서 이 함수가 먼저 호출되면 users 테이블이 없어 "no such table"
+    에러가 났었다. schema.sql은 CREATE TABLE IF NOT EXISTS라 반복 호출해도
+    안전하지만, 매 호출마다 다시 실행할 필요는 없어 경로별로 한 번만 실행한다.
     """
     db_path = Path(os.environ.get("DATABASE_PATH", str(DEFAULT_DB_PATH)))
-    return Database(db_path)
+    database = Database(db_path)
+    if db_path not in _initialized_paths:
+        database.initialize()
+        _initialized_paths.add(db_path)
+    return database
 
 
 __all__ = ["Database", "utc_now", "get_database", "DEFAULT_DB_PATH"]

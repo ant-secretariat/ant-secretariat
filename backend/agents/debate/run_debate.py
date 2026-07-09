@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 from agents.simulation.service import run_simulation
-from db import DEFAULT_DB_PATH
+from db import DEFAULT_DB_PATH, get_database
 from functions.get_user_context import get_user_context
 from processing.functions.get_agent_context import get_agent_context
 from processing.functions.get_available_data_status import get_available_data_status
@@ -18,7 +18,12 @@ from processing.storage.implementations import UpstageEmbeddingModel, PineconeVe
 from processing.storage.sqlite_db import SQLiteDB
 
 
-load_dotenv()
+# 다른 에이전트들(trend_report/simulation/insight_board)과 동일하게 레포 루트의
+# .env를 명시적으로 로드한다 — 인자 없는 load_dotenv()는 현재 작업 디렉터리(CWD)
+# 기준으로 탐색해서 실행 위치에 따라 .env를 못 찾을 수 있다.
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
+
+DEBATE_LLM_MODEL = os.getenv("DEBATE_LLM_MODEL", "solar-pro-3")
 
 # client/embedding_model/vector_db/relational_db는 모듈 import 시점이 아니라 실제로
 # 처음 쓰일 때 지연 생성한다(agents/trend_report/data_agent_client.py,
@@ -275,7 +280,7 @@ def call_solar(system_prompt: str, user_message: str, max_retries: int = 2) -> d
     for attempt in range(max_retries + 1):
         try:
             response = _get_client().chat.completions.create(
-                model="solar-pro",
+                model=DEBATE_LLM_MODEL,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message},
@@ -345,7 +350,10 @@ async def run_debate(ticker: str, query: str, user_id: str, company: str, sector
             embedding_model=_get_embedding_model(),
             vector_db=_get_vector_db(),
         )
-        user_context = get_user_context(user_id, relational_db=_get_relational_db())
+        # get_user_context()는 users 테이블 조회용 db.Database(.get_row())를 요구한다 —
+        # 위의 Agent B 함수들이 쓰는 processing.storage.sqlite_db.SQLiteDB와는
+        # 다른 클래스이므로 혼용하면 AttributeError가 난다.
+        user_context = get_user_context(user_id, relational_db=get_database())
         data_status = get_available_data_status(
             ticker=ticker,
             relational_db=_get_relational_db(),

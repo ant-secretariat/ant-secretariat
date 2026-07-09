@@ -2,7 +2,6 @@ import logging
 import re
 from typing import Optional
 from processing.interfaces import BaseEmbeddingModel, BaseVectorDB
-from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -39,12 +38,10 @@ def search_documents(
         filter_conditions["report_type"] = report_type
     if source:
         filter_conditions["source"] = source
-    if date_from or date_to:
-        filter_conditions["date"] = {}
-        if date_from:
-            filter_conditions["date"]["$gte"] = int(datetime.strptime(date_from, "%Y-%m-%d").timestamp())
-        if date_to:
-            filter_conditions["date"]["$lte"] = int(datetime.strptime(date_to, "%Y-%m-%d").timestamp())
+    if date_from:
+        filter_conditions["date_from"] = date_from
+    if date_to:
+        filter_conditions["date_to"] = date_to
 
     raw_results = vector_db.search(
         query_vector=query_vector,

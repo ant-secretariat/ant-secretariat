@@ -1,34 +1,73 @@
 # agents/debate/run_debate.py
 
-import asyncio
 import json
 import os
 from datetime import datetime
+from pathlib import Path
+from typing import Optional
+
 from dotenv import load_dotenv
 from openai import OpenAI
 
 from agents.simulation.service import run_simulation
+from db import DEFAULT_DB_PATH
 from functions.get_user_context import get_user_context
 from processing.functions.get_agent_context import get_agent_context
 from processing.functions.get_available_data_status import get_available_data_status
-from processing.storage.implementations import UpstageEmbeddingModel, PineconeVectorDB, SQLiteDB
+from processing.storage.implementations import UpstageEmbeddingModel, PineconeVectorDB
+from processing.storage.sqlite_db import SQLiteDB
 
 
 load_dotenv()
 
-client = OpenAI(
-    api_key=os.getenv("UPSTAGE_API_KEY"),
-    base_url="https://api.upstage.ai/v1/solar",
-)
+# client/embedding_model/vector_db/relational_db는 모듈 import 시점이 아니라 실제로
+# 처음 쓰일 때 지연 생성한다(agents/trend_report/data_agent_client.py,
+# agents/insight_board/data_client.py와 동일한 패턴). 모듈 top-level에서 바로
+# 만들면 UPSTAGE_API_KEY/PINECONE_API_KEY가 없거나 DB 경로가 잘못됐을 때
+# `import agents.debate.run_debate` 자체가 실패해버린다.
+_client: Optional[OpenAI] = None
+_embedding_model: Optional[UpstageEmbeddingModel] = None
+_vector_db: Optional[PineconeVectorDB] = None
+_relational_db: Optional[SQLiteDB] = None
 
-embedding_model = UpstageEmbeddingModel(api_key=os.getenv("UPSTAGE_API_KEY"))
-vector_db = PineconeVectorDB(
-    api_key=os.getenv("PINECONE_API_KEY"),
-    index_name=os.getenv("PINECONE_INDEX"),
-)
-relational_db = SQLiteDB(
-    db_path="../financial-research-agent/db/reports.db"
-)
+
+def _get_client() -> OpenAI:
+    global _client
+    if _client is None:
+        _client = OpenAI(
+            api_key=os.getenv("UPSTAGE_API_KEY"),
+            base_url="https://api.upstage.ai/v1",
+        )
+    return _client
+
+
+def _get_embedding_model() -> UpstageEmbeddingModel:
+    global _embedding_model
+    if _embedding_model is None:
+        _embedding_model = UpstageEmbeddingModel(api_key=os.getenv("UPSTAGE_API_KEY"))
+    return _embedding_model
+
+
+def _get_vector_db() -> PineconeVectorDB:
+    global _vector_db
+    if _vector_db is None:
+        _vector_db = PineconeVectorDB(
+            api_key=os.getenv("PINECONE_API_KEY"),
+            index_name=os.getenv("PINECONE_INDEX"),
+        )
+    return _vector_db
+
+
+def _get_relational_db() -> SQLiteDB:
+    global _relational_db
+    if _relational_db is None:
+        # 예전 "financial-research-agent" 외부 레포 경로 하드코딩 대신, db.py/
+        # trend_report/simulation/insight_board와 동일하게 공유 reports.db 경로
+        # (DATABASE_PATH 환경변수 또는 data-pipeline의 기본 경로)를 재사용한다.
+        db_path = Path(os.environ.get("DATABASE_PATH", str(DEFAULT_DB_PATH)))
+        _relational_db = SQLiteDB(db_path=str(db_path))
+    return _relational_db
+
 
 BULL_SYSTEM_PROMPT = """
 당신은 주식 투자 분야의 전문 강세 애널리스트입니다.
@@ -235,7 +274,7 @@ JUDGE_SYSTEM_PROMPT = """
 def call_solar(system_prompt: str, user_message: str, max_retries: int = 2) -> dict:
     for attempt in range(max_retries + 1):
         try:
-            response = client.chat.completions.create(
+            response = _get_client().chat.completions.create(
                 model="solar-pro",
                 messages=[
                     {"role": "system", "content": system_prompt},
@@ -295,28 +334,22 @@ def build_debate_result(ticker, company, query, user_id, bull_output, bear_outpu
         }
     }
 
-async def run_debate(ticker: str, query: str, user_id: str) -> dict:
+async def run_debate(ticker: str, query: str, user_id: str, company: str, sector: str = "") -> dict:
     try:
         print(f"[1/5] 데이터 수집 시작: {ticker}")
         agent_context = get_agent_context(
             ticker=ticker,
             agent_type="debate",
             query=query,
-            relational_db=relational_db,
-            embedding_model=embedding_model,
-            vector_db=vector_db,
+            relational_db=_get_relational_db(),
+            embedding_model=_get_embedding_model(),
+            vector_db=_get_vector_db(),
         )
-        company = (
-            agent_context.get("company") or
-            agent_context.get("price_data", {}).get("company") or
-            agent_context.get("documents", {}).get("company") or
-            ""
-        )
-        user_context = get_user_context(user_id, relational_db=relational_db)
+        user_context = get_user_context(user_id, relational_db=_get_relational_db())
         data_status = get_available_data_status(
             ticker=ticker,
-            relational_db=relational_db,
-            vector_db=vector_db,
+            relational_db=_get_relational_db(),
+            vector_db=_get_vector_db(),
         )
         reports_available = data_status.get("available", {}).get("reports", False)
         data_richness = "rich" if reports_available else "limited"
@@ -324,7 +357,8 @@ async def run_debate(ticker: str, query: str, user_id: str) -> dict:
         print(f"[2/5] Bull Agent 실행 중...")
         bull_user_message = f"""
 종목코드: {ticker}
-회사명: {agent_context.get('company', '')}
+회사명: {company}
+산업/섹터: {sector}
 사용자 질문: {query}
 분석 데이터: {json.dumps(agent_context, ensure_ascii=False)}
 데이터 풍부도: {data_richness}
@@ -334,7 +368,8 @@ async def run_debate(ticker: str, query: str, user_id: str) -> dict:
         print(f"[3/5] Bear Agent 실행 중...")
         bear_user_message = f"""
 종목코드: {ticker}
-회사명: {agent_context.get('company', '')}
+회사명: {company}
+산업/섹터: {sector}
 사용자 질문: {query}
 분석 데이터: {json.dumps(agent_context, ensure_ascii=False)}
 데이터 풍부도: {data_richness}
@@ -345,7 +380,7 @@ Bull Agent 출력: {json.dumps(bull_output, ensure_ascii=False)}
         print(f"[4/5] Judge Agent 실행 중...")
         judge_user_message = f"""
 종목코드: {ticker}
-회사명: {agent_context.get('company', '')}
+회사명: {company}
 사용자 질문: {query}
 사용자 정보: {json.dumps(user_context, ensure_ascii=False)}
 Bull Agent 출력: {json.dumps(bull_output, ensure_ascii=False)}

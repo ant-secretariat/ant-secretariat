@@ -14,4 +14,4 @@ load_dotenv(REPO_ROOT / ".env")
 InsightBoardFeature = Literal["price", "macro", "disclosure"]
 
 MAX_COMPANIES = 3
-COMMENT_MODEL = os.getenv("INSIGHT_BOARD_LLM_MODEL", "solar-pro3")
+COMMENT_MODEL = os.getenv("INSIGHT_BOARD_LLM_MODEL", "solar-mini")

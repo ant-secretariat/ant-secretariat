@@ -197,3 +197,28 @@ CREATE TABLE IF NOT EXISTS crawler_runs (
     disclosure_rows_count INTEGER NOT NULL DEFAULT 0,
     error_message TEXT NOT NULL DEFAULT ''
 );
+
+CREATE TABLE IF NOT EXISTS agent_jobs (
+    job_id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    job_type TEXT NOT NULL CHECK (job_type IN ('debate')),
+    ticker TEXT NOT NULL DEFAULT '',
+    company TEXT NOT NULL DEFAULT '',
+    sector TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL CHECK (
+        status IN (
+            'queued', 'running', 'debate_completed',
+            'simulation_running', 'completed', 'failed'
+        )
+    ),
+    request_json TEXT NOT NULL DEFAULT '{}',
+    debate_result_json TEXT NOT NULL DEFAULT '{}',
+    simulation_result_json TEXT NOT NULL DEFAULT '{}',
+    error_message TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_jobs_user_id ON agent_jobs(user_id);
+CREATE INDEX IF NOT EXISTS idx_agent_jobs_status ON agent_jobs(status);
+CREATE INDEX IF NOT EXISTS idx_agent_jobs_created_at ON agent_jobs(created_at);

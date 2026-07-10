@@ -82,6 +82,29 @@ class PDFProcessor:
                     current = ""
 
                     for sentence in sentences:
+                        while len(sentence) > self.MAX_CHUNK_LENGTH:
+                            piece = sentence[:self.MAX_CHUNK_LENGTH]
+                            sentence = sentence[self.MAX_CHUNK_LENGTH:]
+                            if self.validate_chunk(current):
+                                chunks.append(ChunkResult(
+                                    chunk_id=f"{report_id}_chunk_{chunk_index:03d}",
+                                    chunk_index=chunk_index,
+                                    page_start=page_data.page_num,
+                                    page_end=page_data.page_num,
+                                    content=current.strip(),
+                                ))
+                                chunk_index += 1
+                                current = ""
+                            if self.validate_chunk(piece):
+                                chunks.append(ChunkResult(
+                                    chunk_id=f"{report_id}_chunk_{chunk_index:03d}",
+                                    chunk_index=chunk_index,
+                                    page_start=page_data.page_num,
+                                    page_end=page_data.page_num,
+                                    content=piece.strip(),
+                                ))
+                                chunk_index += 1
+
                         if len(current) + len(sentence) <= self.MAX_CHUNK_LENGTH:
                             current += (" " if current else "") + sentence
                         else:

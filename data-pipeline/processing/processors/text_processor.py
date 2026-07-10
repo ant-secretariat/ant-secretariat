@@ -39,6 +39,33 @@ def _chunk_text(text: str, base_id: str, metadata_kwargs: dict) -> List[VectorCh
             current = ""
 
             for sentence in sentences:
+                while len(sentence) > MAX_CHUNK_LENGTH:
+                    piece = sentence[:MAX_CHUNK_LENGTH]
+                    sentence = sentence[MAX_CHUNK_LENGTH:]
+                    if len(current) >= MIN_CHUNK_LENGTH:
+                        chunk_id = f"{base_id}_chunk_{chunk_index:03d}"
+                        chunks.append(VectorChunk(
+                            id=chunk_id,
+                            content=current.strip(),
+                            metadata=VectorChunkMetadata(
+                                chunk_id=chunk_id,
+                                **metadata_kwargs,
+                            ),
+                        ))
+                        chunk_index += 1
+                        current = ""
+                    if len(piece) >= MIN_CHUNK_LENGTH:
+                        chunk_id = f"{base_id}_chunk_{chunk_index:03d}"
+                        chunks.append(VectorChunk(
+                            id=chunk_id,
+                            content=piece.strip(),
+                            metadata=VectorChunkMetadata(
+                                chunk_id=chunk_id,
+                                **metadata_kwargs,
+                            ),
+                        ))
+                        chunk_index += 1
+
                 if len(current) + len(sentence) <= MAX_CHUNK_LENGTH:
                     current += (" " if current else "") + sentence
                 else:

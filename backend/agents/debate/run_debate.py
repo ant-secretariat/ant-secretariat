@@ -11,6 +11,11 @@ from openai import OpenAI
 
 from agents.simulation.service import run_simulation
 from db import DEFAULT_DB_PATH, get_database
+from functions.agent_jobs import (
+    save_debate_result,
+    save_simulation_result,
+    update_agent_job_status,
+)
 from functions.get_user_context import get_user_context
 from processing.functions.get_agent_context import get_agent_context
 from processing.functions.get_available_data_status import get_available_data_status
@@ -339,8 +344,22 @@ def build_debate_result(ticker, company, query, user_id, bull_output, bear_outpu
         }
     }
 
-async def run_debate(ticker: str, query: str, user_id: str, company: str, sector: str = "") -> dict:
+async def run_debate(
+    ticker: str,
+    query: str,
+    user_id: str,
+    company: str,
+    sector: str = "",
+    job_id: Optional[str] = None,
+) -> dict:
     try:
+        if job_id:
+            update_agent_job_status(
+                job_id=job_id,
+                status="running",
+                relational_db=get_database(),
+            )
+
         print(f"[1/5] 데이터 수집 시작: {ticker}")
         agent_context = get_agent_context(
             ticker=ticker,
@@ -408,20 +427,47 @@ Bear Agent 출력: {json.dumps(bear_output, ensure_ascii=False)}
             data_richness=data_richness,
         )
 
+        if job_id:
+            save_debate_result(
+                job_id=job_id,
+                debate_result=result,
+                relational_db=get_database(),
+            )
+
         agenda_2 = {
             "bull_summary": bull_output["agendas"][1]["summary"],
             "bull_arguments": bull_output["agendas"][1]["arguments"],
             "bear_summary": bear_output["agendas"][1]["summary"],
             "bear_arguments": bear_output["agendas"][1]["arguments"],
         }
-        await run_simulation(
+        if job_id:
+            update_agent_job_status(
+                job_id=job_id,
+                status="simulation_running",
+                relational_db=get_database(),
+            )
+
+        simulation_result = await run_simulation(
             ticker=ticker,
             user_id=user_id,
             agenda_2=agenda_2,
         )
+        if job_id:
+            save_simulation_result(
+                job_id=job_id,
+                simulation_result=simulation_result or {},
+                relational_db=get_database(),
+            )
 
         return result
 
     except Exception as e:
         print(f"[ERROR] run_debate 실패: {e}")
+        if job_id:
+            update_agent_job_status(
+                job_id=job_id,
+                status="failed",
+                relational_db=get_database(),
+                error_message=str(e),
+            )
         raise

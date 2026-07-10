@@ -47,9 +47,25 @@ async def _insight_board_node(state: OrchestratorState) -> dict:
 
 async def _debate_node(state: OrchestratorState) -> dict:
     from agents.debate.service import run_debate
+    from db import get_database
+    from functions.agent_jobs import create_agent_job
 
     request = state["request"]
     company = request.companies[0]
+    job = create_agent_job(
+        user_id=request.user_id,
+        job_type="debate",
+        ticker=company.ticker,
+        company=company.company,
+        sector=company.sector,
+        request={
+            "query": request.query,
+            "ticker": company.ticker,
+            "company": company.company,
+            "sector": company.sector,
+        },
+        relational_db=get_database(),
+    )
 
     # "Debate 호출 후 결과는 신경 쓰지 않음 — UI 전달은 각 Agent 책임".
     # Debate 완료 후 자체적으로 Simulation을 호출하는 것까지 Debate 내부 책임이므로
@@ -61,15 +77,18 @@ async def _debate_node(state: OrchestratorState) -> dict:
             sector=company.sector,
             user_id=request.user_id,
             query=request.query,
+            job_id=job["job_id"],
         )
     )
     task.add_done_callback(_log_debate_task_failure)
 
     return {
         "result": {
-            "status": "started",
+            "job_id": job["job_id"],
+            "status": job["status"],
             "request_type": "debate",
             "ticker": company.ticker,
+            "company": company.company,
         }
     }
 

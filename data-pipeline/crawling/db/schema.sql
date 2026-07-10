@@ -212,6 +212,7 @@ CREATE TABLE IF NOT EXISTS agent_jobs (
         )
     ),
     request_json TEXT NOT NULL DEFAULT '{}',
+    partial_result_json TEXT NOT NULL DEFAULT '{}',
     debate_result_json TEXT NOT NULL DEFAULT '{}',
     simulation_result_json TEXT NOT NULL DEFAULT '{}',
     error_message TEXT NOT NULL DEFAULT '',

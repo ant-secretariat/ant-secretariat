@@ -505,6 +505,14 @@ code {
   align-items: center;
 }
 
+.insight-tabs-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
 .feature-tabs button {
   min-width: 86px;
   min-height: 34px;
@@ -870,7 +878,58 @@ code {
 
 .macro-layout {
   display: grid;
+  grid-template-columns: minmax(260px, 0.42fr) minmax(0, 0.58fr);
   gap: 12px;
+  align-items: stretch;
+}
+
+.macro-summary-table {
+  display: grid;
+  align-content: start;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.macro-summary-row {
+  display: grid;
+  grid-template-columns: minmax(96px, 1fr) minmax(86px, auto) minmax(64px, auto);
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 0 12px;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.macro-summary-row:last-child {
+  border-bottom: 0;
+}
+
+.macro-summary-row span {
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.macro-summary-row strong {
+  text-align: right;
+  font-size: 14px;
+}
+
+.macro-summary-row em {
+  text-align: right;
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.macro-summary-row em.up {
+  color: var(--danger);
+}
+
+.macro-summary-row em.down {
+  color: var(--accent);
 }
 
 .insight-card.large {
@@ -959,6 +1018,7 @@ code {
   .split-grid,
   .dashboard-grid,
   .insight-workspace,
+  .macro-layout,
   .argument-grid {
     grid-template-columns: 1fr;
   }

@@ -1,5 +1,6 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { BarChart3, Play, RefreshCw } from "lucide-react";
+import { useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { BarChart3, RefreshCw } from "lucide-react";
 import {
   CartesianGrid,
   Line,
@@ -38,15 +39,23 @@ export function DashboardPage() {
     queryFn: () => api.dataStatus(selectedCompany!.ticker),
     enabled: Boolean(selectedCompany),
   });
-  const insightMutation = useMutation({
-    mutationFn: () =>
+  const insightQuery = useQuery({
+    queryKey: ["insight-board", activeUserId, selectedCompany?.company, selectedFeature],
+    queryFn: () =>
       api.insightBoard({
         user_id: activeUserId,
         companies: selectedCompany ? [selectedCompany.company] : [],
         feature: selectedFeature,
       }),
+    enabled: Boolean(activeUserId && selectedCompany),
   });
   const companies = companiesQuery.data ?? [];
+
+  useEffect(() => {
+    if (!selectedCompany && companies.length) {
+      setSelectedCompany(companies[0]);
+    }
+  }, [companies, selectedCompany, setSelectedCompany]);
 
   return (
     <div className="page">
@@ -98,32 +107,27 @@ export function DashboardPage() {
             <BarChart3 size={18} />
             InsightBoard
           </div>
-          <div className="feature-tabs">
-            {features.map((feature) => (
-              <button
-                key={feature.id}
-                className={selectedFeature === feature.id ? "active" : ""}
-                onClick={() => setSelectedFeature(feature.id)}
-                type="button"
-              >
-                {feature.label}
-              </button>
-            ))}
+          <div className="insight-tabs-row">
+            <div className="feature-tabs">
+              {features.map((feature) => (
+                <button
+                  key={feature.id}
+                  className={selectedFeature === feature.id ? "active" : ""}
+                  onClick={() => setSelectedFeature(feature.id)}
+                  type="button"
+                >
+                  {feature.label}
+                </button>
+              ))}
+            </div>
+            {selectedCompany ? (
+              <span className="muted-text">{selectedCompany.company} 기준</span>
+            ) : null}
           </div>
-          <div className="action-row">
-            <button
-              className="primary-button"
-              disabled={!selectedCompany || insightMutation.isPending}
-              onClick={() => insightMutation.mutate()}
-            >
-              <Play size={17} />
-              조회
-            </button>
-          </div>
-          {insightMutation.isPending ? <LoadingBlock label="InsightBoard 조회 중" /> : null}
-          {insightMutation.error ? <div className="error-box">{insightMutation.error.message}</div> : null}
-          {insightMutation.data ? (
-            <InsightResult data={insightMutation.data} feature={selectedFeature} />
+          {insightQuery.isLoading || insightQuery.isFetching ? <LoadingBlock label="인사이트 조회 중" /> : null}
+          {insightQuery.error ? <div className="error-box">{insightQuery.error.message}</div> : null}
+          {insightQuery.data ? (
+            <InsightResult data={insightQuery.data} feature={selectedFeature} />
           ) : null}
         </div>
       </section>
@@ -246,13 +250,13 @@ function MacroInsight({ value }: { value: unknown }) {
   const chartTarget = cards.find((card) => card.id === "USD_KRW") ?? cards[0];
   return (
     <div className="macro-layout">
-      <div className="metric-grid">
+      <div className="macro-summary-table">
         {cards.map((card) => (
-          <div className="metric-card" key={card.id}>
+          <div className="macro-summary-row" key={card.id}>
             <span>{card.name}</span>
             <strong>{formatMacroValue(card.value, card.unit)}</strong>
             <em className={card.delta >= 0 ? "up" : "down"}>
-              전 회차 대비 {card.delta >= 0 ? "+" : ""}
+              {card.delta >= 0 ? "+" : ""}
               {card.delta.toFixed(2)}
             </em>
           </div>

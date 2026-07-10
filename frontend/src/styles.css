@@ -337,6 +337,11 @@ a {
   gap: 14px;
 }
 
+.trend-report-header {
+  display: grid;
+  gap: 12px;
+}
+
 .trend-card-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -353,16 +358,15 @@ a {
   font-size: 14px;
 }
 
-.factor-list,
-.evidence-list {
+.factor-list {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .factor-item {
   display: grid;
-  gap: 6px;
-  padding: 12px;
+  gap: 5px;
+  padding: 11px 12px;
   border: 1px solid #e6edf7;
   border-radius: 8px;
   background: #f8fafc;
@@ -379,51 +383,11 @@ a {
   font-size: 13px;
 }
 
-.evidence-row {
-  display: grid;
-  grid-template-columns: 54px minmax(0, 1fr);
-  gap: 12px;
-  align-items: start;
-  padding: 12px;
-  border: 1px solid #e6edf7;
-  border-radius: 8px;
-  background: #ffffff;
-}
-
-.evidence-row > strong {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 28px;
-  border-radius: 8px;
-  color: #1d4ed8;
-  background: #eff6ff;
-  font-size: 12px;
-}
-
-.evidence-row div {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-}
-
-.evidence-row span,
-.evidence-row em {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.evidence-row span {
-  color: #0f172a;
-  font-size: 13px;
-  font-weight: 750;
-}
-
-.evidence-row em {
+.muted-empty-text {
+  margin: 0;
+  padding: 10px 0;
   color: var(--muted);
   font-size: 12px;
-  font-style: normal;
 }
 
 .integration-grid {

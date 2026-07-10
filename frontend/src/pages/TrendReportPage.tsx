@@ -37,7 +37,7 @@ export function TrendReportPage() {
         <div>
           <p className="eyebrow">Trend Report</p>
           <h1>트렌드 리포트</h1>
-          <p>기업을 선택하면 증권사 리포트, 뉴스, 매크로 근거를 모아 카드형 리포트를 생성합니다.</p>
+          <p>기업을 선택하면 최근 리포트와 뉴스 흐름을 요약합니다.</p>
         </div>
       </header>
 
@@ -90,7 +90,7 @@ function TrendReportResultView({ report }: { report: TrendReportResult }) {
 
   return (
     <div className="trend-report-stack">
-      <section className="panel">
+      <section className="panel trend-report-header">
         <div className="panel-toolbar">
           <div>
             <div className="panel-title">
@@ -100,12 +100,7 @@ function TrendReportResultView({ report }: { report: TrendReportResult }) {
             <p className="muted-text">기준일 {report.as_of_date}</p>
           </div>
         </div>
-        <div className="metric-grid">
-          <Metric label="리포트 근거" value={formatValue(report.data_status.report_chunks)} />
-          <Metric label="뉴스 근거" value={formatValue(report.data_status.news_chunks)} />
-          <Metric label="목표주가 데이터" value={formatValue(report.data_status.target_price_count)} />
-          <Metric label="방향" value={formatValue(target.direction)} />
-        </div>
+        {target.comment ? <p className="comment-box">{formatValue(target.comment)}</p> : null}
       </section>
 
       <section className="panel">
@@ -126,43 +121,21 @@ function TrendReportResultView({ report }: { report: TrendReportResult }) {
         <FactorPanel title="리스크 요인" items={cards.risk_factors} />
         <FactorPanel title="뉴스 이슈" items={cards.news_issue_cards} />
         <section className="panel">
-          <div className="panel-title">목표주가 흐름</div>
+          <div className="panel-title">목표주가</div>
           <div className="compact-kv-grid">
             <Metric label="평균" value={money(target.avg_target_price)} />
             <Metric label="최저" value={money(target.min_target_price)} />
             <Metric label="최고" value={money(target.max_target_price)} />
           </div>
-          {target.comment ? <p className="comment-box">{formatValue(target.comment)}</p> : null}
         </section>
       </div>
 
       {cards.macro_comment ? (
         <section className="panel">
-          <div className="panel-title">매크로 코멘트</div>
+          <div className="panel-title">시장 환경 코멘트</div>
           <p className="comment-box">{cards.macro_comment}</p>
         </section>
       ) : null}
-
-      <section className="panel">
-        <div className="panel-title">근거 자료</div>
-        {report.evidence.length ? (
-          <div className="evidence-list">
-            {report.evidence.slice(0, 8).map((item, index) => (
-              <div className="evidence-row" key={`${formatValue(item.evidence_id)}-${index}`}>
-                <strong>{formatValue(item.evidence_id)}</strong>
-                <div>
-                  <span>{formatValue(item.title)}</span>
-                  <em>
-                    {formatValue(item.author_org || item.source)} · {formatValue(item.date)}
-                  </em>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <EmptyState title="근거 자료가 없습니다" />
-        )}
-      </section>
     </div>
   );
 }
@@ -181,7 +154,7 @@ function FactorPanel({ title, items }: { title: string; items?: Array<Record<str
           ))}
         </div>
       ) : (
-        <EmptyState title={`${title} 데이터가 없습니다`} />
+        <p className="muted-empty-text">{title} 데이터가 없습니다.</p>
       )}
     </section>
   );

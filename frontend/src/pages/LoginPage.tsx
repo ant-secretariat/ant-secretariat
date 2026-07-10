@@ -1,5 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
-import { ArrowRight, LockKeyhole, UserRoundCheck } from "lucide-react";
+import { ArrowRight, LockKeyhole, RotateCcw, UserRoundCheck } from "lucide-react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { useAppStore } from "../store/appStore";
@@ -20,11 +21,20 @@ const demoAccounts = [
 export function LoginPage() {
   const navigate = useNavigate();
   const login = useAppStore((state) => state.login);
+  const logout = useAppStore((state) => state.logout);
+  const [resetMessage, setResetMessage] = useState("");
   const mutation = useMutation({
     mutationFn: (account: (typeof demoAccounts)[number]) => api.createUser(account.userId),
     onSuccess: (_, account) => {
       login({ userId: account.userId, accountName: account.accountName });
       navigate("/onboarding");
+    },
+  });
+  const resetMutation = useMutation({
+    mutationFn: (account: (typeof demoAccounts)[number]) => api.resetUser(account.userId),
+    onSuccess: (data, account) => {
+      logout();
+      setResetMessage(`${account.accountName} 초기화 완료 · 분석 이력 ${data.deleted_jobs}건 삭제`);
     },
   });
 
@@ -44,23 +54,48 @@ export function LoginPage() {
         </div>
         <div className="login-card-list">
           {demoAccounts.map((account) => (
-            <button
+            <div
               className="login-card"
               key={account.userId}
-              onClick={() => mutation.mutate(account)}
-              type="button"
-              disabled={mutation.isPending}
+              onClick={() => {
+                if (!mutation.isPending && !resetMutation.isPending) {
+                  mutation.mutate(account);
+                }
+              }}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(event) => {
+                if ((event.key === "Enter" || event.key === " ") && !mutation.isPending && !resetMutation.isPending) {
+                  mutation.mutate(account);
+                }
+              }}
             >
               <div>
                 <UserRoundCheck size={20} />
                 <strong>{account.accountName}</strong>
                 <span>{account.description}</span>
               </div>
-              <ArrowRight size={18} />
-            </button>
+              <div className="login-card-actions">
+                <button
+                  className="reset-account-button"
+                  disabled={resetMutation.isPending}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    resetMutation.mutate(account);
+                  }}
+                  type="button"
+                >
+                  <RotateCcw size={14} />
+                  초기화
+                </button>
+                <ArrowRight size={18} />
+              </div>
+            </div>
           ))}
         </div>
         {mutation.error ? <div className="error-box">{mutation.error.message}</div> : null}
+        {resetMutation.error ? <div className="error-box">{resetMutation.error.message}</div> : null}
+        {resetMessage ? <div className="success-box">{resetMessage}</div> : null}
       </section>
     </main>
   );

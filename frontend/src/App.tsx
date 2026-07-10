@@ -5,6 +5,7 @@ import { DebatePage } from "./pages/DebatePage";
 import { HistoryPage } from "./pages/HistoryPage";
 import { LoginPage } from "./pages/LoginPage";
 import { OnboardingPage } from "./pages/OnboardingPage";
+import { TrendReportPage } from "./pages/TrendReportPage";
 import { useAppStore } from "./store/appStore";
 
 export default function App() {
@@ -20,6 +21,7 @@ export default function App() {
       <Route element={<AppLayout />}>
         <Route path="/" element={<Navigate to={userId ? "/insight" : "/login"} replace />} />
         <Route path="/insight" element={userId ? <DashboardPage /> : <Navigate to="/login" replace />} />
+        <Route path="/trend-report" element={userId ? <TrendReportPage /> : <Navigate to="/login" replace />} />
         <Route path="/debate/:jobId?" element={userId ? <DebatePage /> : <Navigate to="/login" replace />} />
         <Route path="/history" element={userId ? <HistoryPage /> : <Navigate to="/login" replace />} />
       </Route>

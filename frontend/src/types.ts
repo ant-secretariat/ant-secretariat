@@ -20,6 +20,24 @@ export type InsightBoardResult = {
   badges: string[];
 };
 
+export type TrendReportResult = {
+  ticker: string;
+  company: string;
+  as_of_date: string;
+  cards: {
+    summary?: string[];
+    positive_factors?: Array<Record<string, unknown>>;
+    risk_factors?: Array<Record<string, unknown>>;
+    broker_differences?: Array<Record<string, unknown>>;
+    target_price_trend?: Record<string, unknown>;
+    news_issue_cards?: Array<Record<string, unknown>>;
+    macro_comment?: string;
+    [key: string]: unknown;
+  };
+  evidence: Array<Record<string, unknown>>;
+  data_status: Record<string, unknown>;
+};
+
 export type JobStatus =
   | "queued"
   | "running"
@@ -40,8 +58,47 @@ export type DebateJob = {
   created_at: string;
   updated_at: string;
   request: Record<string, unknown>;
+  partial_result?: DebatePartialResult;
   debate_result?: DebateResult;
   simulation_result?: SimulationResult | Record<string, never>;
+};
+
+export type DebatePartialResult = {
+  stage?: string;
+  ticker?: string;
+  company?: string;
+  query?: string;
+  data_richness?: string;
+  bull_output?: {
+    agendas?: Array<{
+      agenda_id?: number;
+      agenda_title?: string;
+      arguments?: DebateArgument[];
+      summary?: string;
+    }>;
+    overall_summary?: string;
+  };
+  bear_output?: {
+    agendas?: Array<{
+      agenda_id?: number;
+      agenda_title?: string;
+      arguments?: DebateArgument[];
+      summary?: string;
+      bull_claim?: string;
+    }>;
+    overall_summary?: string;
+  };
+  judge_output?: {
+    agenda_verdicts?: Array<{
+      agenda_id?: number;
+      agenda_title?: string;
+      winner?: string;
+      reasoning?: string;
+      key_point?: string;
+    }>;
+    overall_verdict?: Record<string, unknown>;
+  };
+  updated_at?: string;
 };
 
 export type DebateResult = {

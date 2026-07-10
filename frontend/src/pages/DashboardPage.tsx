@@ -18,7 +18,7 @@ import type { InsightFeature } from "../types";
 
 const features: Array<{ id: InsightFeature; label: string }> = [
   { id: "price", label: "주가" },
-  { id: "macro", label: "매크로" },
+  { id: "macro", label: "시장 환경" },
   { id: "disclosure", label: "공시" },
 ];
 
@@ -62,8 +62,8 @@ export function DashboardPage() {
       <header className="page-header">
         <div>
           <p className="eyebrow">Agent E</p>
-          <h1>빠른 인사이트</h1>
-          <p>기업을 선택하고 주가, 매크로, 공시 데이터를 빠르게 확인합니다.</p>
+          <h1>인사이트 보드</h1>
+          <p>기업을 선택하고 주가, 시장 환경, 공시 데이터를 빠르게 확인합니다.</p>
         </div>
         <button className="secondary-button" onClick={() => companiesQuery.refetch()}>
           <RefreshCw size={16} />
@@ -105,7 +105,7 @@ export function DashboardPage() {
         <div className="panel">
           <div className="panel-title">
             <BarChart3 size={18} />
-            InsightBoard
+            인사이트 보드
           </div>
           <div className="insight-tabs-row">
             <div className="feature-tabs">

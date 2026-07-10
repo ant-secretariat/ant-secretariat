@@ -4,6 +4,7 @@ import type {
   DebateJob,
   InsightBoardResult,
   InsightFeature,
+  TrendReportResult,
   UserContext,
 } from "../types";
 
@@ -44,6 +45,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ user_id: userId }),
     }),
+  resetUser: (userId: string) =>
+    request<{ user_id: string; deleted_jobs: number; deleted_user: boolean }>(`/users/${userId}/reset`, {
+      method: "DELETE",
+    }),
   saveOnboarding: (payload: Record<string, unknown>) =>
     request<Record<string, unknown>>("/onboarding", {
       method: "POST",
@@ -61,6 +66,18 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  trendReport: async (payload: {
+    company: string;
+    query?: string;
+    date_from?: string;
+    date_to?: string;
+  }) => {
+    const data = await request<{ report: TrendReportResult }>("/agents/trend-report", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    return data.report;
+  },
   startDebate: (payload: { user_id: string; company: string; query: string }) =>
     request<{
       job_id: string;

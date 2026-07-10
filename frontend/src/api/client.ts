@@ -9,14 +9,18 @@ import type {
 } from "../types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
+const ngrokBypassHeaders = API_BASE_URL.includes("ngrok-free")
+  ? { "ngrok-skip-browser-warning": "true" }
+  : {};
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers = new Headers(init?.headers);
+  headers.set("Content-Type", "application/json");
+  Object.entries(ngrokBypassHeaders).forEach(([key, value]) => headers.set(key, value));
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
+    headers,
   });
 
   if (!response.ok) {

@@ -267,6 +267,20 @@ JUDGE_SYSTEM_PROMPT = """
       "winner": "bull",
       "reasoning": "어느 쪽 근거가 더 강한지 설명",
       "key_point": "이 아젠다의 핵심 판단 포인트 한 줄"
+    },
+    {
+      "agenda_id": 2,
+      "agenda_title": "산업 및 매크로 환경",
+      "winner": "bear",
+      "reasoning": "어느 쪽 근거가 더 강한지 설명",
+      "key_point": "이 아젠다의 핵심 판단 포인트 한 줄"
+    },
+    {
+      "agenda_id": 3,
+      "agenda_title": "리스크 요인",
+      "winner": "neutral",
+      "reasoning": "어느 쪽 근거가 더 강한지 설명",
+      "key_point": "이 아젠다의 핵심 판단 포인트 한 줄"
     }
   ],
   "overall_verdict": {
@@ -303,27 +317,63 @@ def call_solar(system_prompt: str, user_message: str, max_retries: int = 2) -> d
         except Exception as e:
             raise RuntimeError(f"Solar Pro 호출 오류: {e}")
 
+
+def _fallback_agenda(agent: str, index: int, title: str) -> dict:
+    return {
+        "agenda_id": index + 1,
+        "agenda_title": title,
+        "arguments": [],
+        "summary": f"{agent} 응답에서 해당 아젠다가 누락되었습니다.",
+    }
+
+
+def _fallback_verdict(index: int, title: str) -> dict:
+    return {
+        "agenda_id": index + 1,
+        "agenda_title": title,
+        "winner": "neutral",
+        "reasoning": "Judge 응답에서 해당 아젠다 판정이 누락되어 중립으로 처리했습니다.",
+        "key_point": "추가 검토 필요",
+    }
+
+
 def build_debate_result(ticker, company, query, user_id, bull_output, bear_output, judge_output, data_richness):
     agendas = []
+    agenda_titles = ["실적 및 밸류에이션", "산업 및 매크로 환경", "리스크 요인"]
+    bull_agendas = bull_output.get("agendas") or []
+    bear_agendas = bear_output.get("agendas") or []
+    judge_verdicts = judge_output.get("agenda_verdicts") or []
     for i in range(3):
-        bull_agenda = bull_output["agendas"][i]
-        bear_agenda = bear_output["agendas"][i]
-        judge_verdict = judge_output["agenda_verdicts"][i]
+        bull_agenda = (
+            bull_agendas[i]
+            if i < len(bull_agendas)
+            else _fallback_agenda("Bull", i, agenda_titles[i])
+        )
+        bear_agenda = (
+            bear_agendas[i]
+            if i < len(bear_agendas)
+            else _fallback_agenda("Bear", i, agenda_titles[i])
+        )
+        judge_verdict = (
+            judge_verdicts[i]
+            if i < len(judge_verdicts)
+            else _fallback_verdict(i, agenda_titles[i])
+        )
         agendas.append({
-            "agenda_id": bull_agenda["agenda_id"],
-            "agenda_title": bull_agenda["agenda_title"],
+            "agenda_id": bull_agenda.get("agenda_id", i + 1),
+            "agenda_title": bull_agenda.get("agenda_title", agenda_titles[i]),
             "bull": {
-                "arguments": bull_agenda["arguments"],
-                "summary": bull_agenda["summary"],
+                "arguments": bull_agenda.get("arguments", []),
+                "summary": bull_agenda.get("summary", ""),
             },
             "bear": {
-                "arguments": bear_agenda["arguments"],
-                "summary": bear_agenda["summary"],
+                "arguments": bear_agenda.get("arguments", []),
+                "summary": bear_agenda.get("summary", ""),
             },
             "verdict": {
-                "winner": judge_verdict["winner"],
-                "reasoning": judge_verdict["reasoning"],
-                "key_point": judge_verdict["key_point"],
+                "winner": judge_verdict.get("winner", "neutral"),
+                "reasoning": judge_verdict.get("reasoning", ""),
+                "key_point": judge_verdict.get("key_point", ""),
             },
         })
     return {
@@ -338,8 +388,8 @@ def build_debate_result(ticker, company, query, user_id, bull_output, bear_outpu
             },
             "agendas": agendas,
             "judge": {
-                "user_profile": judge_output["user_profile"],
-                "overall_verdict": judge_output["overall_verdict"],
+                "user_profile": judge_output.get("user_profile", {}),
+                "overall_verdict": judge_output.get("overall_verdict", {}),
             },
         }
     }

@@ -54,6 +54,12 @@ class Database:
                 "content",
                 "TEXT NOT NULL DEFAULT ''",
             )
+            self._ensure_column(
+                connection,
+                "agent_jobs",
+                "partial_result_json",
+                "TEXT NOT NULL DEFAULT '{}'",
+            )
 
     @staticmethod
     def _ensure_column(

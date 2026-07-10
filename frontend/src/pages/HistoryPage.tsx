@@ -9,9 +9,11 @@ import { useAppStore } from "../store/appStore";
 
 export function HistoryPage() {
   const userId = useAppStore((state) => state.userId);
+  const activeUserId = userId ?? "";
   const jobsQuery = useQuery({
-    queryKey: ["user-jobs", userId],
-    queryFn: () => api.userJobs(userId),
+    queryKey: ["user-jobs", activeUserId],
+    queryFn: () => api.userJobs(activeUserId),
+    enabled: Boolean(activeUserId),
   });
 
   return (
@@ -41,7 +43,7 @@ export function HistoryPage() {
               <Link className="history-row" to={`/debate/${job.job_id}`} key={job.job_id}>
                 <div>
                   <strong>{job.company}</strong>
-                  <span>{job.job_id}</span>
+                  <span>분석 번호 {job.job_id.replace(/^debate_/, "").slice(0, 8)}</span>
                 </div>
                 <StatusBadge status={job.status} />
               </Link>

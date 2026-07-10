@@ -21,6 +21,7 @@ export function DashboardPage() {
   const selectedFeature = useAppStore((state) => state.selectedFeature);
   const setSelectedFeature = useAppStore((state) => state.setSelectedFeature);
   const setCurrentJobId = useAppStore((state) => state.setCurrentJobId);
+  const activeUserId = userId ?? "";
 
   const companiesQuery = useQuery({
     queryKey: ["companies"],
@@ -34,7 +35,7 @@ export function DashboardPage() {
   const insightMutation = useMutation({
     mutationFn: () =>
       api.insightBoard({
-        user_id: userId,
+        user_id: activeUserId,
         companies: selectedCompany ? [selectedCompany.company] : [],
         feature: selectedFeature,
       }),
@@ -42,7 +43,7 @@ export function DashboardPage() {
   const debateMutation = useMutation({
     mutationFn: () =>
       api.startDebate({
-        user_id: userId,
+        user_id: activeUserId,
         company: selectedCompany!.company,
         query: `${selectedCompany!.company}의 업황과 주가 전망을 분석해줘`,
       }),
@@ -58,9 +59,9 @@ export function DashboardPage() {
     <div className="page">
       <header className="page-header">
         <div>
-          <p className="eyebrow">Dashboard</p>
-          <h1>기업 분석 대시보드</h1>
-          <p>지원 기업의 데이터 상태를 확인하고 빠른 인사이트 또는 토론 분석을 실행합니다.</p>
+          <p className="eyebrow">Agent E</p>
+          <h1>빠른 인사이트</h1>
+          <p>기업을 선택하고 주가, 매크로, 공시 데이터를 빠르게 확인합니다.</p>
         </div>
         <button className="secondary-button" onClick={() => companiesQuery.refetch()}>
           <RefreshCw size={16} />
@@ -72,7 +73,7 @@ export function DashboardPage() {
         <div className="panel">
           <div className="panel-title">
             <Building2 size={18} />
-            지원 기업
+            분석 대상
           </div>
           {companiesQuery.isLoading ? (
             <LoadingBlock />
@@ -101,7 +102,7 @@ export function DashboardPage() {
         <div className="panel">
           <div className="panel-title">
             <Database size={18} />
-            데이터 상태
+            분석 준비 상태
           </div>
           {selectedCompany ? (
             statusQuery.isLoading ? (
@@ -140,7 +141,7 @@ export function DashboardPage() {
               onClick={() => insightMutation.mutate()}
             >
               <Play size={17} />
-              인사이트 조회
+              조회
             </button>
             <button
               className="secondary-button strong"
@@ -148,7 +149,7 @@ export function DashboardPage() {
               onClick={() => debateMutation.mutate()}
             >
               <Play size={17} />
-              토론 시작
+              토론·시뮬레이션으로 이동
             </button>
           </div>
           {insightMutation.isPending ? <LoadingBlock label="InsightBoard 조회 중" /> : null}
@@ -162,12 +163,19 @@ export function DashboardPage() {
 }
 
 function DataStatusGrid({ status }: { status: Record<string, boolean> }) {
-  const entries = Object.entries(status);
+  const entries = [
+    ["분석 리포트", status.reports],
+    ["뉴스", status.news],
+    ["공시", status.disclosures],
+    ["가격 데이터", status.price_data],
+    ["시장 지표", status.macro_data],
+    ["목표주가", status.target_price_data],
+  ] as const;
   return (
     <div className="status-grid">
-      {entries.map(([key, value]) => (
-        <div key={key} className="status-cell">
-          <span>{key}</span>
+      {entries.map(([label, value]) => (
+        <div key={label} className="status-cell">
+          <span>{label}</span>
           <strong className={value ? "positive" : "muted"}>{value ? "준비됨" : "없음"}</strong>
         </div>
       ))}
@@ -373,5 +381,5 @@ function labelize(key: string) {
     volatility_30d: "30일 변동성",
     current_price: "현재가",
   };
-  return labels[key] ?? key.replace(/_/g, " ");
+  return labels[key] ?? "정보";
 }

@@ -2,30 +2,41 @@ import { create } from "zustand";
 import type { Company, InsightFeature } from "../types";
 
 type AppState = {
-  userId: string;
+  userId?: string;
+  accountName?: string;
   selectedCompany?: Company;
   selectedFeature: InsightFeature;
   currentJobId?: string;
-  setUserId: (userId: string) => void;
+  login: (account: { userId: string; accountName: string }) => void;
+  logout: () => void;
   setSelectedCompany: (company?: Company) => void;
   setSelectedFeature: (feature: InsightFeature) => void;
   setCurrentJobId: (jobId?: string) => void;
 };
 
-const getInitialUserId = () => {
-  const stored = localStorage.getItem("ant-secretariat-user-id");
-  if (stored) return stored;
-  const generated = crypto.randomUUID();
-  localStorage.setItem("ant-secretariat-user-id", generated);
-  return generated;
+const getInitialAccount = () => {
+  const raw = localStorage.getItem("ant-secretariat-account");
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw) as { userId?: string; accountName?: string };
+  } catch {
+    return {};
+  }
 };
 
+const initialAccount = getInitialAccount();
+
 export const useAppStore = create<AppState>((set) => ({
-  userId: getInitialUserId(),
+  userId: initialAccount.userId,
+  accountName: initialAccount.accountName,
   selectedFeature: "price",
-  setUserId: (userId) => {
-    localStorage.setItem("ant-secretariat-user-id", userId);
-    set({ userId });
+  login: (account) => {
+    localStorage.setItem("ant-secretariat-account", JSON.stringify(account));
+    set({ userId: account.userId, accountName: account.accountName });
+  },
+  logout: () => {
+    localStorage.removeItem("ant-secretariat-account");
+    set({ userId: undefined, accountName: undefined, selectedCompany: undefined, currentJobId: undefined });
   },
   setSelectedCompany: (selectedCompany) => set({ selectedCompany }),
   setSelectedFeature: (selectedFeature) => set({ selectedFeature }),

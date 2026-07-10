@@ -11,6 +11,14 @@ import { useAppStore } from "../store/appStore";
 import type { DebateAgenda, DebateJob, SimulationResult } from "../types";
 
 const terminalStatuses = new Set(["completed", "failed"]);
+const statusLabels: Record<string, string> = {
+  queued: "분석 준비 중",
+  running: "토론 생성 중",
+  debate_completed: "토론 완료",
+  simulation_running: "시뮬레이션 실행 중",
+  completed: "전체 완료",
+  failed: "실패",
+};
 
 export function DebatePage() {
   const params = useParams();
@@ -20,6 +28,7 @@ export function DebatePage() {
   const setCurrentJobId = useAppStore((state) => state.setCurrentJobId);
   const [query, setQuery] = useState("");
   const jobId = params.jobId;
+  const activeUserId = userId ?? "";
 
   const jobQuery = useQuery({
     queryKey: ["debate-job", jobId],
@@ -34,7 +43,7 @@ export function DebatePage() {
   const startMutation = useMutation({
     mutationFn: () =>
       api.startDebate({
-        user_id: userId,
+        user_id: activeUserId,
         company: selectedCompany!.company,
         query: query || `${selectedCompany!.company}의 업황과 주가 전망을 분석해줘`,
       }),
@@ -103,7 +112,7 @@ function JobDetail({ job, onRefresh }: { job: DebateJob; onRefresh: () => void }
         <div className="panel-toolbar">
           <div>
             <div className="panel-title">작업 상태</div>
-            <p className="muted-text">{job.job_id}</p>
+            <p className="muted-text">분석 번호 {shortId(job.job_id)}</p>
           </div>
           <button className="secondary-button" onClick={onRefresh}>
             <RefreshCw size={16} />
@@ -112,7 +121,7 @@ function JobDetail({ job, onRefresh }: { job: DebateJob; onRefresh: () => void }
         </div>
         <div className="job-summary-grid">
           <Info label="기업" value={`${job.company} (${job.ticker})`} />
-          <Info label="상태" value={job.status} />
+          <Info label="진행 상태" value={statusLabels[job.status] ?? job.status} />
           <Info label="생성" value={new Date(job.created_at).toLocaleString("ko-KR")} />
           <Info label="갱신" value={new Date(job.updated_at).toLocaleString("ko-KR")} />
         </div>
@@ -246,4 +255,8 @@ function Info({ label, value }: { label: string; value: string }) {
 
 function pct(value?: number) {
   return typeof value === "number" ? `${value.toFixed(2)}%` : "-";
+}
+
+function shortId(value: string) {
+  return value.replace(/^debate_/, "").slice(0, 8);
 }

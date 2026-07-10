@@ -213,7 +213,7 @@ a {
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: 360px minmax(320px, 1fr);
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
   gap: 18px;
 }
 
@@ -325,6 +325,10 @@ a {
   gap: 12px;
 }
 
+.company-list {
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+
 .company-row,
 .history-row {
   display: flex;
@@ -334,6 +338,10 @@ a {
   min-height: 58px;
   padding: 10px 12px;
   text-align: left;
+}
+
+.company-row {
+  min-height: 50px;
 }
 
 .company-row strong,
@@ -795,7 +803,7 @@ code {
     justify-content: center;
   }
 
-  .sidebar-footer {
+.sidebar-footer {
     display: none;
   }
 
@@ -808,6 +816,118 @@ code {
   .wide-panel {
     grid-column: auto;
   }
+}
+
+.sidebar-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: #334155;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.sidebar-link.danger {
+  color: #991b1b;
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.login-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background:
+    linear-gradient(180deg, rgba(15, 118, 110, 0.06), rgba(15, 118, 110, 0)),
+    #f8fafc;
+}
+
+.login-panel {
+  width: min(980px, 100%);
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(320px, 1.05fr);
+  gap: 18px;
+}
+
+.login-copy,
+.login-card-list {
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.login-copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+}
+
+.login-copy h1 {
+  margin: 0;
+  font-size: 32px;
+  letter-spacing: 0;
+}
+
+.login-copy p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.login-card-list {
+  display: grid;
+  gap: 12px;
+}
+
+.login-card {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 112px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  text-align: left;
+  background: #ffffff;
+}
+
+.login-card:hover {
+  border-color: var(--primary);
+  background: #f0fdfa;
+}
+
+.login-card div {
+  display: grid;
+  gap: 7px;
+}
+
+.login-card svg {
+  color: var(--primary);
+}
+
+.login-card strong {
+  font-size: 16px;
+}
+
+.login-card span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.setup-page {
+  max-width: 1180px;
+  padding: 28px;
 }
 
 @media (max-width: 640px) {

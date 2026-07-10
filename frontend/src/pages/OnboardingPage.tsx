@@ -1,24 +1,29 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { CheckCircle2, RefreshCw, UserRound } from "lucide-react";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { defaultOnboarding, onboardingOptions } from "../data/onboarding";
 import { useAppStore } from "../store/appStore";
 
 export function OnboardingPage() {
+  const navigate = useNavigate();
   const userId = useAppStore((state) => state.userId);
+  const accountName = useAppStore((state) => state.accountName);
   const [form, setForm] = useState(defaultOnboarding);
+  const activeUserId = userId ?? "";
 
   const createUser = useMutation({
-    mutationFn: () => api.createUser(userId),
+    mutationFn: () => api.createUser(activeUserId),
   });
   const saveOnboarding = useMutation({
-    mutationFn: () => api.saveOnboarding({ user_id: userId, ...form }),
+    mutationFn: () => api.saveOnboarding({ user_id: activeUserId, ...form }),
   });
   const contextQuery = useQuery({
-    queryKey: ["user-context", userId],
-    queryFn: () => api.userContext(userId),
+    queryKey: ["user-context", activeUserId],
+    queryFn: () => api.userContext(activeUserId),
     retry: false,
+    enabled: Boolean(activeUserId),
   });
 
   const setValue = (key: keyof typeof defaultOnboarding, value: string) => {
@@ -37,15 +42,16 @@ export function OnboardingPage() {
     await createUser.mutateAsync();
     await saveOnboarding.mutateAsync();
     await contextQuery.refetch();
+    navigate("/insight");
   };
 
   return (
-    <div className="page">
+    <div className="page setup-page">
       <header className="page-header">
         <div>
-          <p className="eyebrow">Profile</p>
+          <p className="eyebrow">Initial Setup</p>
           <h1>투자 성향 설정</h1>
-          <p>시뮬레이션과 최종 판단 톤에 사용할 기본 투자 정보를 저장합니다.</p>
+          <p>{accountName}으로 접속했습니다. 분석 결과 해석에 사용할 투자 성향을 설정합니다.</p>
         </div>
         <button className="secondary-button" onClick={() => contextQuery.refetch()}>
           <RefreshCw size={16} />
@@ -117,7 +123,7 @@ export function OnboardingPage() {
           </Question>
           <button className="primary-button wide" onClick={submit} disabled={saveOnboarding.isPending}>
             <CheckCircle2 size={17} />
-            {saveOnboarding.isPending ? "저장 중" : "온보딩 저장"}
+            {saveOnboarding.isPending ? "저장 중" : "저장하고 시작하기"}
           </button>
           {saveOnboarding.error ? (
             <div className="error-box">{saveOnboarding.error.message}</div>
@@ -128,11 +134,10 @@ export function OnboardingPage() {
           <div className="panel-title">저장된 프로필</div>
           {contextQuery.data ? (
             <div className="profile-list">
-              <Info label="User ID" value={contextQuery.data.user_id} />
-              <Info label="위험 성향" value={contextQuery.data.risk_profile} />
-              <Info label="투자 목표" value={contextQuery.data.investment_goal} />
-              <Info label="투자 금액" value={contextQuery.data.investment_amount_range} />
-              <Info label="경험 수준" value={contextQuery.data.investment_experience} />
+              <Info label="위험 성향" value={profileLabel(contextQuery.data.risk_profile)} />
+              <Info label="투자 목표" value={goalLabel(contextQuery.data.investment_goal)} />
+              <Info label="투자 금액" value={amountLabel(contextQuery.data.investment_amount_range)} />
+              <Info label="경험 수준" value={experienceLabel(contextQuery.data.investment_experience)} />
               <Info label="관심 산업" value={contextQuery.data.interest_sectors.join(", ")} />
             </div>
           ) : (
@@ -142,6 +147,35 @@ export function OnboardingPage() {
       </section>
     </div>
   );
+}
+
+function profileLabel(value: string) {
+  return (
+    {
+      conservative: "안정형",
+      moderate_conservative: "안정추구형",
+      moderate: "위험중립형",
+      aggressive: "적극투자형",
+      very_aggressive: "공격투자형",
+    }[value] ?? value
+  );
+}
+
+function goalLabel(value: string) {
+  return { short_term: "단기", mid_term: "중기", long_term: "장기" }[value] ?? value;
+}
+
+function amountLabel(value: string) {
+  return {
+    under_500: "500만원 미만",
+    "500_2000": "500만원 ~ 2,000만원",
+    "2000_5000": "2,000만원 ~ 5,000만원",
+    over_5000: "5,000만원 이상",
+  }[value] ?? value;
+}
+
+function experienceLabel(value: string) {
+  return { beginner: "초보", intermediate: "경험 있음", advanced: "고급" }[value] ?? value;
 }
 
 function Question({ title, children }: { title: string; children: React.ReactNode }) {

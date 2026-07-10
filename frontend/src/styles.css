@@ -393,6 +393,20 @@ code {
   font-size: 22px;
 }
 
+.metric-card em {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.metric-card em.up {
+  color: var(--danger);
+}
+
+.metric-card em.down {
+  color: var(--accent);
+}
+
 .positive {
   color: var(--success);
 }
@@ -768,6 +782,61 @@ code {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: #ffffff;
+}
+
+.chart-box.compact {
+  margin: 0;
+}
+
+.macro-layout {
+  display: grid;
+  gap: 12px;
+}
+
+.insight-card.large {
+  grid-column: span 2;
+}
+
+.disclosure-list {
+  display: grid;
+  gap: 10px;
+}
+
+.disclosure-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.disclosure-row:hover {
+  border-color: var(--primary);
+  background: #f8fafc;
+}
+
+.disclosure-row div {
+  display: grid;
+  gap: 6px;
+}
+
+.disclosure-row strong {
+  font-size: 14px;
+}
+
+.disclosure-row span {
+  color: var(--muted);
+  line-height: 1.5;
+  font-size: 12px;
+}
+
+.disclosure-row time {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .history-row {

@@ -1,6 +1,15 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { BarChart3, Building2, Database, Play, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { api } from "../api/client";
 import { EmptyState } from "../components/EmptyState";
 import { LoadingBlock } from "../components/LoadingBlock";
@@ -154,7 +163,9 @@ export function DashboardPage() {
           </div>
           {insightMutation.isPending ? <LoadingBlock label="InsightBoard 조회 중" /> : null}
           {insightMutation.error ? <div className="error-box">{insightMutation.error.message}</div> : null}
-          {insightMutation.data ? <InsightResult data={insightMutation.data} /> : null}
+          {insightMutation.data ? (
+            <InsightResult data={insightMutation.data} feature={selectedFeature} />
+          ) : null}
           {debateMutation.error ? <div className="error-box">{debateMutation.error.message}</div> : null}
         </div>
       </section>
@@ -183,7 +194,13 @@ function DataStatusGrid({ status }: { status: Record<string, boolean> }) {
   );
 }
 
-function InsightResult({ data }: { data: { badges: string[]; llm_comment: string; raw_data: unknown } }) {
+function InsightResult({
+  data,
+  feature,
+}: {
+  data: { badges: string[]; llm_comment: string; raw_data: unknown };
+  feature: InsightFeature;
+}) {
   return (
     <div className="result-stack">
       <div className="badge-row">
@@ -194,159 +211,174 @@ function InsightResult({ data }: { data: { badges: string[]; llm_comment: string
         ))}
       </div>
       {data.llm_comment ? <p className="comment-box">{data.llm_comment}</p> : null}
-      <InsightDataView value={data.raw_data} />
+      <InsightDataView value={data.raw_data} feature={feature} />
     </div>
   );
 }
 
-function InsightDataView({ value }: { value: unknown }) {
-  if (Array.isArray(value)) {
-    if (!value.length) return <EmptyState title="조회된 데이터가 없습니다" />;
-    return (
-      <div className="insight-card-grid">
-        {value.map((item, index) => (
-          <InsightRecordCard key={index} value={item} title={`데이터 ${index + 1}`} />
-        ))}
-      </div>
-    );
-  }
-  if (isRecord(value)) {
-    return <InsightRecordCard value={value} title="조회 데이터" />;
-  }
-  return <div className="empty-state">표시할 수 있는 데이터가 없습니다.</div>;
-}
-
-function InsightRecordCard({ value, title }: { value: unknown; title: string }) {
-  if (!isRecord(value)) {
-    return (
-      <div className="insight-card">
-        <strong>{title}</strong>
-        <span>{formatValue(value)}</span>
-      </div>
-    );
-  }
-
-  const heading = [value.company, value.ticker].filter(Boolean).join(" · ") || title;
-  const scalarEntries = Object.entries(value).filter(([, entryValue]) => isScalar(entryValue));
-  const collectionEntries = Object.entries(value).filter(([, entryValue]) => !isScalar(entryValue));
-
-  return (
-    <article className="insight-card">
-      <div className="insight-card-header">
-        <strong>{heading}</strong>
-        {typeof value.sector === "string" ? <span>{value.sector}</span> : null}
-      </div>
-      {scalarEntries.length ? (
-        <div className="compact-kv-grid">
-          {scalarEntries.map(([key, entryValue]) => (
-            <div className="compact-kv" key={key}>
-              <span>{labelize(key)}</span>
-              <strong>{formatValue(entryValue)}</strong>
-            </div>
-          ))}
-        </div>
-      ) : null}
-      {collectionEntries.map(([key, entryValue]) => (
-        <NestedPreview key={key} name={key} value={entryValue} />
-      ))}
-    </article>
-  );
-}
-
-function NestedPreview({ name, value }: { name: string; value: unknown }) {
-  if (Array.isArray(value)) {
-    return (
-      <div className="nested-preview">
-        <div className="nested-title">
-          <span>{labelize(name)}</span>
-          <strong>{value.length.toLocaleString("ko-KR")}건</strong>
-        </div>
-        {value.length ? <MiniTable rows={value.slice(0, 5)} /> : <span className="muted-text">데이터 없음</span>}
-      </div>
-    );
-  }
-  if (isRecord(value)) {
-    return (
-      <div className="nested-preview">
-        <div className="nested-title">
-          <span>{labelize(name)}</span>
-        </div>
-        <div className="compact-kv-grid">
-          {Object.entries(value)
-            .slice(0, 8)
-            .map(([key, entryValue]) => (
-              <div className="compact-kv" key={key}>
-                <span>{labelize(key)}</span>
-                <strong>{formatValue(entryValue)}</strong>
-              </div>
-            ))}
-        </div>
-      </div>
-    );
-  }
+function InsightDataView({ value, feature }: { value: unknown; feature: InsightFeature }) {
+  if (feature === "price") return <PriceInsight value={value} />;
+  if (feature === "macro") return <MacroInsight value={value} />;
+  if (feature === "disclosure") return <DisclosureInsight value={value} />;
   return null;
 }
 
-function MiniTable({ rows }: { rows: unknown[] }) {
-  const objectRows = rows.filter(isRecord);
-  if (!objectRows.length) {
-    return <span className="muted-text">{rows.map(formatValue).join(", ")}</span>;
-  }
-  const columns = pickColumns(objectRows);
+function PriceInsight({ value }: { value: unknown }) {
+  const records = Array.isArray(value) ? value.filter(isRecord) : [];
+  if (!records.length) return <EmptyState title="주가 데이터가 없습니다" />;
   return (
-    <div className="mini-table-wrap">
-      <table className="mini-table">
-        <thead>
-          <tr>
-            {columns.map((column) => (
-              <th key={column}>{labelize(column)}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {objectRows.map((row, index) => (
-            <tr key={index}>
-              {columns.map((column) => (
-                <td key={column}>{formatValue(row[column])}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="insight-card-grid">
+      {records.map((record, index) => {
+        const latest = isRecord(record.latest) ? record.latest : {};
+        const prices = Array.isArray(record.prices) ? record.prices.filter(isRecord) : [];
+        const chartRows = prices
+          .slice()
+          .reverse()
+          .slice(-90)
+          .map((row) => ({
+            date: String(row.price_date ?? "").slice(5),
+            close: Number(row.close ?? 0),
+          }));
+        return (
+          <article className="insight-card large" key={index}>
+            <div className="insight-card-header">
+              <strong>{formatValue(record.company)}</strong>
+              <span>{formatValue(record.ticker)}</span>
+            </div>
+            <div className="metric-grid">
+              <Metric label="현재가" value={money(latest.current_price)} />
+              <Metric label="30일 변동성" value={percentFromRatio(latest.volatility_30d)} />
+              <Metric label="기준일" value={formatValue(latest.price_date)} />
+            </div>
+            <SimpleLineChart rows={chartRows} dataKey="close" color="#0f766e" />
+          </article>
+        );
+      })}
     </div>
   );
 }
 
-function pickColumns(rows: Array<Record<string, unknown>>) {
-  const preferred = [
-    "date",
-    "price_date",
-    "published_at",
-    "disclosed_at",
-    "title",
-    "report_name",
-    "close",
-    "value",
-    "target_price",
-    "source",
-  ];
-  const keys = new Set(rows.flatMap((row) => Object.keys(row)));
-  const selected = preferred.filter((key) => keys.has(key));
-  for (const key of keys) {
-    if (selected.length >= 5) break;
-    if (!selected.includes(key) && isScalar(rows.find((row) => row[key] !== undefined)?.[key])) {
-      selected.push(key);
-    }
-  }
-  return selected.slice(0, 5);
+function MacroInsight({ value }: { value: unknown }) {
+  const root = Array.isArray(value) && isRecord(value[0]) ? value[0] : value;
+  const indicators = isRecord(root) && Array.isArray(root.indicators) ? root.indicators.filter(isRecord) : [];
+  if (!indicators.length) return <EmptyState title="시장 지표 데이터가 없습니다" />;
+  const cards = indicators.map((indicator) => {
+    const records = Array.isArray(indicator.records) ? indicator.records.filter(isRecord) : [];
+    const latest = records[0] ?? {};
+    const previous = records[1] ?? {};
+    const latestValue = Number(latest.value ?? 0);
+    const previousValue = Number(previous.value ?? latestValue);
+    const delta = latestValue - previousValue;
+    return {
+      id: String(indicator.indicator_id ?? ""),
+      name: macroName(String(indicator.indicator_id ?? ""), String(indicator.indicator_name ?? "")),
+      value: latestValue,
+      delta,
+      date: String(latest.date ?? ""),
+      unit: String(indicator.unit ?? ""),
+      rows: records
+        .slice()
+        .reverse()
+        .slice(-24)
+        .map((row) => ({
+          date: String(row.date ?? "").slice(2),
+          value: Number(row.value ?? 0),
+        })),
+    };
+  });
+  const chartTarget = cards.find((card) => card.id === "USD_KRW") ?? cards[0];
+  return (
+    <div className="macro-layout">
+      <div className="metric-grid">
+        {cards.map((card) => (
+          <div className="metric-card" key={card.id}>
+            <span>{card.name}</span>
+            <strong>{formatMacroValue(card.value, card.unit)}</strong>
+            <em className={card.delta >= 0 ? "up" : "down"}>
+              전 회차 대비 {card.delta >= 0 ? "+" : ""}
+              {card.delta.toFixed(2)}
+            </em>
+          </div>
+        ))}
+      </div>
+      <article className="insight-card large">
+        <div className="insight-card-header">
+          <strong>{chartTarget.name} 추이</strong>
+          <span>{chartTarget.date}</span>
+        </div>
+        <SimpleLineChart rows={chartTarget.rows} dataKey="value" color="#2563eb" />
+      </article>
+    </div>
+  );
+}
+
+function DisclosureInsight({ value }: { value: unknown }) {
+  const records = Array.isArray(value) ? value.filter(isRecord) : [];
+  const disclosures = records.flatMap((record) =>
+    Array.isArray(record.disclosures) ? record.disclosures.filter(isRecord) : [],
+  );
+  if (!disclosures.length) return <EmptyState title="공시 데이터가 없습니다" />;
+  return (
+    <div className="disclosure-list">
+      {disclosures.slice(0, 10).map((item, index) => (
+        <a
+          className="disclosure-row"
+          href={typeof item.url === "string" ? item.url : undefined}
+          target="_blank"
+          rel="noreferrer"
+          key={`${item.title}-${index}`}
+        >
+          <div>
+            <strong>{formatValue(item.title)}</strong>
+            <span>{truncate(formatValue(item.summary), 140)}</span>
+          </div>
+          <time>{formatValue(item.date)}</time>
+        </a>
+      ))}
+    </div>
+  );
+}
+
+function SimpleLineChart({
+  rows,
+  dataKey,
+  color,
+}: {
+  rows: Array<Record<string, number | string>>;
+  dataKey: string;
+  color: string;
+}) {
+  if (!rows.length) return <div className="chart-placeholder">차트 데이터가 없습니다.</div>;
+  return (
+    <div className="chart-box compact">
+      <ResponsiveContainer width="100%" height={240}>
+        <LineChart data={rows} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+          <CartesianGrid stroke="#e2e8f0" vertical={false} />
+          <XAxis dataKey="date" tickLine={false} axisLine={false} />
+          <YAxis tickLine={false} axisLine={false} width={72} />
+          <Tooltip
+            formatter={(entry) =>
+              typeof entry === "number" ? entry.toLocaleString("ko-KR") : entry
+            }
+          />
+          <Line type="monotone" dataKey={dataKey} stroke={color} dot={false} strokeWidth={2.3} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="metric-card">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isScalar(value: unknown) {
-  return value === null || ["string", "number", "boolean"].includes(typeof value);
 }
 
 function formatValue(value: unknown): string {
@@ -359,27 +391,38 @@ function formatValue(value: unknown): string {
   return String(value);
 }
 
-function labelize(key: string) {
-  const labels: Record<string, string> = {
-    ticker: "티커",
-    company: "기업",
-    sector: "섹터",
-    latest: "최근 데이터",
-    prices: "주가",
-    indicators: "지표",
-    disclosures: "공시",
-    date: "날짜",
-    price_date: "날짜",
-    published_at: "발행일",
-    disclosed_at: "공시일",
-    close: "종가",
-    value: "값",
-    title: "제목",
-    report_name: "보고서명",
-    source: "출처",
-    target_price: "목표주가",
-    volatility_30d: "30일 변동성",
-    current_price: "현재가",
-  };
-  return labels[key] ?? "정보";
+function money(value: unknown) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number === 0) return "-";
+  return `${number.toLocaleString("ko-KR")}원`;
+}
+
+function percentFromRatio(value: unknown) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "-";
+  return `${(number * 100).toFixed(2)}%`;
+}
+
+function macroName(id: string, fallback: string) {
+  return (
+    {
+      KTB_10Y_KR: "국고채 10년",
+      KTB_3Y_KR: "국고채 3년",
+      USD_KRW: "원/달러 환율",
+      BASE_RATE_KR: "기준금리",
+      CPI_KR: "소비자물가",
+    }[id] ?? fallback
+  );
+}
+
+function formatMacroValue(value: number, unit: string) {
+  if (!Number.isFinite(value)) return "-";
+  if (unit === "KRW") return `${value.toLocaleString("ko-KR")}원`;
+  if (unit.includes("연%")) return `${value.toFixed(2)}%`;
+  return value.toFixed(2);
+}
+
+function truncate(value: string, maxLength: number) {
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, maxLength)}...`;
 }

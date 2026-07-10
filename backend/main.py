@@ -14,6 +14,7 @@ from api.companies import router as companies_router
 from api.debate_jobs import router as debate_jobs_router
 from api.onboarding import router as onboarding_router
 from api.orchestrator import router as orchestrator_router
+from api.trend_report import router as trend_report_router
 from api.users import router as users_router
 
 app = FastAPI(title="ant-secretariat-backend")
@@ -31,6 +32,7 @@ app.include_router(onboarding_router)
 app.include_router(orchestrator_router)
 app.include_router(companies_router)
 app.include_router(debate_jobs_router)
+app.include_router(trend_report_router)
 
 
 @app.get("/health")

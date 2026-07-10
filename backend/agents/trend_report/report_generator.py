@@ -12,6 +12,13 @@ from agents.trend_report.schemas import CompanyEvidence, TrendReportRequest
 
 
 class ReportGenerator:
+    MAX_REPORT_DOCS = 5
+    MAX_NEWS_DOCS = 4
+    MAX_MACRO_DOCS = 2
+    MAX_CONTENT_CHARS = 700
+    MAX_METADATA_REPORTS = 12
+    MAX_SERIES_ROWS = 40
+
     def __init__(self) -> None:
         self.client = OpenAI(
             api_key=require_env("UPSTAGE_API_KEY"),
@@ -121,14 +128,85 @@ class ReportGenerator:
     @staticmethod
     def _compact_context(context: dict[str, Any]) -> dict[str, Any]:
         return {
-            "report_documents": context.get("report_documents", {}).get("results", []),
-            "news_documents": context.get("news_documents", {}).get("results", []),
-            "macro_documents": context.get("macro_documents", {}).get("results", []),
-            "report_metadata": context.get("report_metadata", {}),
-            "target_prices": context.get("target_prices", {}),
-            "price_data": context.get("price_data", {}),
-            "macro_data": context.get("macro_data", {}),
+            "report_documents": {
+                "results": ReportGenerator._compact_documents(
+                    context.get("report_documents", {}).get("results", []),
+                    ReportGenerator.MAX_REPORT_DOCS,
+                )
+            },
+            "news_documents": {
+                "results": ReportGenerator._compact_documents(
+                    context.get("news_documents", {}).get("results", []),
+                    ReportGenerator.MAX_NEWS_DOCS,
+                )
+            },
+            "macro_documents": {
+                "results": ReportGenerator._compact_documents(
+                    context.get("macro_documents", {}).get("results", []),
+                    ReportGenerator.MAX_MACRO_DOCS,
+                )
+            },
+            "report_metadata": ReportGenerator._compact_report_metadata(
+                context.get("report_metadata", {})
+            ),
+            "target_prices": ReportGenerator._compact_nested(context.get("target_prices", {})),
+            "price_data": ReportGenerator._compact_nested(context.get("price_data", {})),
+            "macro_data": ReportGenerator._compact_nested(context.get("macro_data", {})),
         }
+
+    @staticmethod
+    def _compact_documents(items: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+        keys = (
+            "chunk_id",
+            "report_id",
+            "ticker",
+            "company",
+            "document_type",
+            "report_type",
+            "title",
+            "source",
+            "author_org",
+            "date",
+            "page_start",
+            "page_end",
+            "score",
+            "url",
+            "content",
+        )
+        compacted: list[dict[str, Any]] = []
+        for item in items[:limit]:
+            row = {key: item.get(key) for key in keys if key in item}
+            content = str(row.get("content") or "")
+            if content:
+                row["content"] = content[: ReportGenerator.MAX_CONTENT_CHARS]
+            compacted.append(row)
+        return compacted
+
+    @staticmethod
+    def _compact_report_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
+        compacted = dict(metadata)
+        reports = compacted.get("reports")
+        if isinstance(reports, list):
+            compacted["reports"] = [
+                ReportGenerator._compact_nested(report)
+                for report in reports[: ReportGenerator.MAX_METADATA_REPORTS]
+            ]
+        return ReportGenerator._compact_nested(compacted)
+
+    @staticmethod
+    def _compact_nested(value: Any) -> Any:
+        if isinstance(value, dict):
+            return {
+                key: ReportGenerator._compact_nested(child)
+                for key, child in value.items()
+                if key not in {"raw_data", "embedding", "vector"}
+            }
+        if isinstance(value, list):
+            sliced = value[-ReportGenerator.MAX_SERIES_ROWS :]
+            return [ReportGenerator._compact_nested(item) for item in sliced]
+        if isinstance(value, str):
+            return value[: ReportGenerator.MAX_CONTENT_CHARS]
+        return value
 
     @staticmethod
     def _parse_cards(body: str) -> dict[str, Any]:

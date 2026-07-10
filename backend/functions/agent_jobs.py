@@ -45,6 +45,7 @@ def _row_to_job(row: dict[str, Any], *, include_results: bool = True) -> dict[st
         "request": _loads(row["request_json"]),
     }
     if include_results:
+        job["partial_result"] = _loads(row["partial_result_json"])
         job["debate_result"] = _loads(row["debate_result_json"])
         job["simulation_result"] = _loads(row["simulation_result_json"])
     return job
@@ -141,6 +142,29 @@ def update_agent_job_status(
             WHERE job_id = ?
             """,
             (status, error_message, utc_now(), job_id),
+        )
+    if cursor.rowcount == 0:
+        raise ValueError(f"작업을 찾을 수 없습니다: {job_id}")
+    return get_agent_job(job_id=job_id, relational_db=relational_db)
+
+
+def save_partial_debate_result(
+    *,
+    job_id: str,
+    partial_result: dict[str, Any],
+    relational_db: Database,
+) -> dict[str, Any]:
+    with relational_db.connect() as connection:
+        cursor = connection.execute(
+            """
+            UPDATE agent_jobs
+            SET status = 'running',
+                partial_result_json = ?,
+                error_message = '',
+                updated_at = ?
+            WHERE job_id = ?
+            """,
+            (_dumps(partial_result), utc_now(), job_id),
         )
     if cursor.rowcount == 0:
         raise ValueError(f"작업을 찾을 수 없습니다: {job_id}")

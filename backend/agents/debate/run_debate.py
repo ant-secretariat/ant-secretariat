@@ -1,5 +1,6 @@
 # agents/debate/run_debate.py
 
+import asyncio
 import json
 import os
 from datetime import datetime
@@ -13,6 +14,7 @@ from agents.simulation.service import run_simulation
 from db import DEFAULT_DB_PATH, get_database
 from functions.agent_jobs import (
     save_debate_result,
+    save_partial_debate_result,
     save_simulation_result,
     update_agent_job_status,
 )
@@ -410,6 +412,38 @@ def build_debate_result(ticker, company, query, user_id, bull_output, bear_outpu
         }
     }
 
+
+def _save_partial(
+    *,
+    job_id: Optional[str],
+    stage: str,
+    ticker: str,
+    company: str,
+    query: str,
+    data_richness: str = "",
+    bull_output: Optional[dict] = None,
+    bear_output: Optional[dict] = None,
+    judge_output: Optional[dict] = None,
+) -> None:
+    if not job_id:
+        return
+    save_partial_debate_result(
+        job_id=job_id,
+        partial_result={
+            "stage": stage,
+            "ticker": ticker,
+            "company": company,
+            "query": query,
+            "data_richness": data_richness,
+            "bull_output": bull_output or {},
+            "bear_output": bear_output or {},
+            "judge_output": judge_output or {},
+            "updated_at": datetime.now().isoformat(),
+        },
+        relational_db=get_database(),
+    )
+
+
 async def run_debate(
     ticker: str,
     query: str,
@@ -427,7 +461,8 @@ async def run_debate(
             )
 
         print(f"[1/5] 데이터 수집 시작: {ticker}")
-        agent_context = get_agent_context(
+        agent_context = await asyncio.to_thread(
+            get_agent_context,
             ticker=ticker,
             agent_type="debate",
             query=query,
@@ -438,14 +473,23 @@ async def run_debate(
         # get_user_context()는 users 테이블 조회용 db.Database(.get_row())를 요구한다 —
         # 위의 Agent B 함수들이 쓰는 processing.storage.sqlite_db.SQLiteDB와는
         # 다른 클래스이므로 혼용하면 AttributeError가 난다.
-        user_context = get_user_context(user_id, relational_db=get_database())
-        data_status = get_available_data_status(
+        user_context = await asyncio.to_thread(get_user_context, user_id, relational_db=get_database())
+        data_status = await asyncio.to_thread(
+            get_available_data_status,
             ticker=ticker,
             relational_db=_get_relational_db(),
             vector_db=_get_vector_db(),
         )
         reports_available = data_status.get("available", {}).get("reports", False)
         data_richness = "rich" if reports_available else "limited"
+        _save_partial(
+            job_id=job_id,
+            stage="data_collected",
+            ticker=ticker,
+            company=company,
+            query=query,
+            data_richness=data_richness,
+        )
 
         print(f"[2/5] Bull Agent 실행 중...")
         bull_user_message = f"""
@@ -456,7 +500,16 @@ async def run_debate(
 분석 데이터: {json.dumps(agent_context, ensure_ascii=False)}
 데이터 풍부도: {data_richness}
 """
-        bull_output = call_solar(BULL_SYSTEM_PROMPT, bull_user_message)
+        bull_output = await asyncio.to_thread(call_solar, BULL_SYSTEM_PROMPT, bull_user_message)
+        _save_partial(
+            job_id=job_id,
+            stage="bull_completed",
+            ticker=ticker,
+            company=company,
+            query=query,
+            data_richness=data_richness,
+            bull_output=bull_output,
+        )
 
         print(f"[3/5] Bear Agent 실행 중...")
         bear_user_message = f"""
@@ -468,7 +521,17 @@ async def run_debate(
 데이터 풍부도: {data_richness}
 Bull Agent 출력: {json.dumps(bull_output, ensure_ascii=False)}
 """
-        bear_output = call_solar(BEAR_SYSTEM_PROMPT, bear_user_message)
+        bear_output = await asyncio.to_thread(call_solar, BEAR_SYSTEM_PROMPT, bear_user_message)
+        _save_partial(
+            job_id=job_id,
+            stage="bear_completed",
+            ticker=ticker,
+            company=company,
+            query=query,
+            data_richness=data_richness,
+            bull_output=bull_output,
+            bear_output=bear_output,
+        )
 
         print(f"[4/5] Judge Agent 실행 중...")
         judge_user_message = f"""
@@ -479,7 +542,18 @@ Bull Agent 출력: {json.dumps(bull_output, ensure_ascii=False)}
 Bull Agent 출력: {json.dumps(bull_output, ensure_ascii=False)}
 Bear Agent 출력: {json.dumps(bear_output, ensure_ascii=False)}
 """
-        judge_output = call_solar(JUDGE_SYSTEM_PROMPT, judge_user_message)
+        judge_output = await asyncio.to_thread(call_solar, JUDGE_SYSTEM_PROMPT, judge_user_message)
+        _save_partial(
+            job_id=job_id,
+            stage="judge_completed",
+            ticker=ticker,
+            company=company,
+            query=query,
+            data_richness=data_richness,
+            bull_output=bull_output,
+            bear_output=bear_output,
+            judge_output=judge_output,
+        )
 
         print(f"[5/5] 결과 조립 중...")
         result = build_debate_result(

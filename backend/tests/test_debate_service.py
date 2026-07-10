@@ -5,12 +5,13 @@ from agents.debate.service import run_debate
 async def test_service_bridges_to_run_debate_pipeline_with_matching_args(monkeypatch):
     captured = {}
 
-    async def fake_pipeline(ticker, query, user_id, company, sector):
+    async def fake_pipeline(ticker, query, user_id, company, sector, job_id=None):
         captured["ticker"] = ticker
         captured["query"] = query
         captured["user_id"] = user_id
         captured["company"] = company
         captured["sector"] = sector
+        captured["job_id"] = job_id
         return {"debate_result": {"meta": {"ticker": ticker}}}
 
     # service.py는 agents.debate.run_debate.run_debate를 import 시점에
@@ -33,13 +34,14 @@ async def test_service_bridges_to_run_debate_pipeline_with_matching_args(monkeyp
         "user_id": "u1",
         "company": "삼성전자",
         "sector": "반도체",
+        "job_id": None,
     }
 
 
 async def test_service_defaults_query_to_empty_string(monkeypatch):
     captured = {}
 
-    async def fake_pipeline(ticker, query, user_id, company, sector):
+    async def fake_pipeline(ticker, query, user_id, company, sector, job_id=None):
         captured["query"] = query
         return {}
 

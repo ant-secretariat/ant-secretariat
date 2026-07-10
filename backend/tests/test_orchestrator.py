@@ -69,7 +69,7 @@ async def test_orchestrator_debate_does_not_wait_for_completion(monkeypatch):
     started = asyncio.Event()
     finished = asyncio.Event()
 
-    async def slow_run_debate(ticker, company, sector, user_id, query=None):
+    async def slow_run_debate(ticker, company, sector, user_id, query=None, job_id=None):
         started.set()
         await asyncio.sleep(0.2)
         finished.set()
@@ -80,7 +80,10 @@ async def test_orchestrator_debate_does_not_wait_for_completion(monkeypatch):
     result = await run_orchestrator_request(request)
 
     # 오케스트레이터는 Debate 완료를 기다리지 않고 바로 반환해야 한다.
-    assert result == {"status": "started", "request_type": "debate", "ticker": "005930"}
+    assert result["status"] == "queued"
+    assert result["request_type"] == "debate"
+    assert result["ticker"] == "005930"
+    assert result["job_id"].startswith("debate_")
     assert not finished.is_set()
 
     await asyncio.wait_for(started.wait(), timeout=1)

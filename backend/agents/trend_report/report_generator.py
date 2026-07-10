@@ -17,7 +17,7 @@ class ReportGenerator:
             api_key=require_env("UPSTAGE_API_KEY"),
             base_url="https://api.upstage.ai/v1",
         )
-        self.model = os.getenv("TREND_REPORT_LLM_MODEL", "solar-pro-3")
+        self.model = os.getenv("TREND_REPORT_LLM_MODEL", "solar-mini")
 
     def generate(self, evidence: list[CompanyEvidence]) -> str:
         evidence_text, sources = self._format_evidence(evidence)

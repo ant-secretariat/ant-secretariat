@@ -28,7 +28,7 @@ from processing.storage.sqlite_db import SQLiteDB
 # 기준으로 탐색해서 실행 위치에 따라 .env를 못 찾을 수 있다.
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
-DEBATE_LLM_MODEL = os.getenv("DEBATE_LLM_MODEL", "solar-pro-3")
+DEBATE_LLM_MODEL = os.getenv("DEBATE_LLM_MODEL", "solar-mini")
 
 # client/embedding_model/vector_db/relational_db는 모듈 import 시점이 아니라 실제로
 # 처음 쓰일 때 지연 생성한다(agents/trend_report/data_agent_client.py,

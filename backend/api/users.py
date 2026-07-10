@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from db import get_database
 from functions.create_user import create_user
+from functions.reset_user import reset_user
 
 router = APIRouter(prefix="", tags=["users"])
 
@@ -21,5 +22,13 @@ class CreateUserRequest(BaseModel):
 def register_user(payload: CreateUserRequest) -> dict:
     try:
         return create_user(user_id=payload.user_id, relational_db=get_database())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.delete("/users/{user_id}/reset")
+def reset_demo_user(user_id: str) -> dict:
+    try:
+        return reset_user(user_id=user_id, relational_db=get_database())
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

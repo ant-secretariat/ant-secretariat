@@ -31,6 +31,7 @@ async def run_debate(
     sector: str,
     user_id: str,
     query: Optional[str] = None,
+    job_id: Optional[str] = None,
 ) -> None:
     result = await _run_debate_pipeline(
         ticker=ticker,
@@ -38,5 +39,6 @@ async def run_debate(
         user_id=user_id,
         company=company,
         sector=sector,
+        job_id=job_id,
     )
     logger.info("[F] Debate 완료 - ticker=%s\n%s", ticker, result)

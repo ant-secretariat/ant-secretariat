@@ -26,7 +26,7 @@ async def run_simulation(
     agenda_2: dict,
     db_path: str = DEFAULT_B_DB_PATH,
     send_result_fn=None,
-) -> None:
+) -> dict:
 
     logger.info("[G] run_simulation 시작 - ticker=%s, user_id=%s", ticker, user_id)
 
@@ -93,24 +93,29 @@ async def run_simulation(
             ))
 
         logger.info("[G] run_simulation 완료 - ticker=%s", ticker)
+        return final_result
 
     except InsufficientDataError as e:
         logger.error("[G] 데이터 부족으로 시뮬레이션 불가: %s", e)
+        error_result = {
+            "ticker": ticker,
+            "error": "데이터 부족",
+            "message": str(e),
+        }
         if send_result_fn:
-            await send_result_fn({
-                "ticker": ticker,
-                "error": "데이터 부족",
-                "message": str(e),
-            })
+            await send_result_fn(error_result)
+        return error_result
 
     except Exception as e:
         logger.error("[G] 시뮬레이션 실패: %s", e, exc_info=True)
+        error_result = {
+            "ticker": ticker,
+            "error": "시뮬레이션 실패",
+            "message": str(e),
+        }
         if send_result_fn:
-            await send_result_fn({
-                "ticker": ticker,
-                "error": "시뮬레이션 실패",
-                "message": str(e),
-            })
+            await send_result_fn(error_result)
+        return error_result
 
 
 if __name__ == "__main__":

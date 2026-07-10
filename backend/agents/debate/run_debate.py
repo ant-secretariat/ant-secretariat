@@ -1,5 +1,6 @@
 # agents/debate/run_debate.py
 
+import asyncio
 import json
 import os
 from datetime import datetime
@@ -11,6 +12,12 @@ from openai import OpenAI
 
 from agents.simulation.service import run_simulation
 from db import DEFAULT_DB_PATH, get_database
+from functions.agent_jobs import (
+    save_debate_result,
+    save_partial_debate_result,
+    save_simulation_result,
+    update_agent_job_status,
+)
 from functions.get_user_context import get_user_context
 from processing.functions.get_agent_context import get_agent_context
 from processing.functions.get_available_data_status import get_available_data_status
@@ -23,7 +30,7 @@ from processing.storage.sqlite_db import SQLiteDB
 # 기준으로 탐색해서 실행 위치에 따라 .env를 못 찾을 수 있다.
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
-DEBATE_LLM_MODEL = os.getenv("DEBATE_LLM_MODEL", "solar-pro-3")
+DEBATE_LLM_MODEL = os.getenv("DEBATE_LLM_MODEL", "solar-mini")
 
 # client/embedding_model/vector_db/relational_db는 모듈 import 시점이 아니라 실제로
 # 처음 쓰일 때 지연 생성한다(agents/trend_report/data_agent_client.py,
@@ -262,6 +269,20 @@ JUDGE_SYSTEM_PROMPT = """
       "winner": "bull",
       "reasoning": "어느 쪽 근거가 더 강한지 설명",
       "key_point": "이 아젠다의 핵심 판단 포인트 한 줄"
+    },
+    {
+      "agenda_id": 2,
+      "agenda_title": "산업 및 매크로 환경",
+      "winner": "bear",
+      "reasoning": "어느 쪽 근거가 더 강한지 설명",
+      "key_point": "이 아젠다의 핵심 판단 포인트 한 줄"
+    },
+    {
+      "agenda_id": 3,
+      "agenda_title": "리스크 요인",
+      "winner": "neutral",
+      "reasoning": "어느 쪽 근거가 더 강한지 설명",
+      "key_point": "이 아젠다의 핵심 판단 포인트 한 줄"
     }
   ],
   "overall_verdict": {
@@ -298,27 +319,79 @@ def call_solar(system_prompt: str, user_message: str, max_retries: int = 2) -> d
         except Exception as e:
             raise RuntimeError(f"Solar Pro 호출 오류: {e}")
 
+
+def _fallback_agenda(agent: str, index: int, title: str) -> dict:
+    return {
+        "agenda_id": index + 1,
+        "agenda_title": title,
+        "arguments": [],
+        "summary": f"{agent} 응답에서 해당 아젠다가 누락되었습니다.",
+    }
+
+
+def _fallback_verdict(index: int, title: str) -> dict:
+    return {
+        "agenda_id": index + 1,
+        "agenda_title": title,
+        "winner": "neutral",
+        "reasoning": "Judge 응답에서 해당 아젠다 판정이 누락되어 중립으로 처리했습니다.",
+        "key_point": "추가 검토 필요",
+    }
+
+
+def _to_text(value) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list):
+        return " ".join(_to_text(item) for item in value if item)
+    if isinstance(value, dict):
+        parts = []
+        for key in ("title", "content", "summary", "source", "source_title", "source_date"):
+            if value.get(key):
+                parts.append(str(value[key]))
+        return " ".join(parts) if parts else json.dumps(value, ensure_ascii=False)
+    return str(value)
+
+
 def build_debate_result(ticker, company, query, user_id, bull_output, bear_output, judge_output, data_richness):
     agendas = []
+    agenda_titles = ["실적 및 밸류에이션", "산업 및 매크로 환경", "리스크 요인"]
+    bull_agendas = bull_output.get("agendas") or []
+    bear_agendas = bear_output.get("agendas") or []
+    judge_verdicts = judge_output.get("agenda_verdicts") or []
     for i in range(3):
-        bull_agenda = bull_output["agendas"][i]
-        bear_agenda = bear_output["agendas"][i]
-        judge_verdict = judge_output["agenda_verdicts"][i]
+        bull_agenda = (
+            bull_agendas[i]
+            if i < len(bull_agendas)
+            else _fallback_agenda("Bull", i, agenda_titles[i])
+        )
+        bear_agenda = (
+            bear_agendas[i]
+            if i < len(bear_agendas)
+            else _fallback_agenda("Bear", i, agenda_titles[i])
+        )
+        judge_verdict = (
+            judge_verdicts[i]
+            if i < len(judge_verdicts)
+            else _fallback_verdict(i, agenda_titles[i])
+        )
         agendas.append({
-            "agenda_id": bull_agenda["agenda_id"],
-            "agenda_title": bull_agenda["agenda_title"],
+            "agenda_id": bull_agenda.get("agenda_id", i + 1),
+            "agenda_title": bull_agenda.get("agenda_title", agenda_titles[i]),
             "bull": {
-                "arguments": bull_agenda["arguments"],
-                "summary": bull_agenda["summary"],
+                "arguments": bull_agenda.get("arguments", []),
+                "summary": bull_agenda.get("summary", ""),
             },
             "bear": {
-                "arguments": bear_agenda["arguments"],
-                "summary": bear_agenda["summary"],
+                "arguments": bear_agenda.get("arguments", []),
+                "summary": bear_agenda.get("summary", ""),
             },
             "verdict": {
-                "winner": judge_verdict["winner"],
-                "reasoning": judge_verdict["reasoning"],
-                "key_point": judge_verdict["key_point"],
+                "winner": judge_verdict.get("winner", "neutral"),
+                "reasoning": judge_verdict.get("reasoning", ""),
+                "key_point": judge_verdict.get("key_point", ""),
             },
         })
     return {
@@ -333,16 +406,63 @@ def build_debate_result(ticker, company, query, user_id, bull_output, bear_outpu
             },
             "agendas": agendas,
             "judge": {
-                "user_profile": judge_output["user_profile"],
-                "overall_verdict": judge_output["overall_verdict"],
+                "user_profile": judge_output.get("user_profile", {}),
+                "overall_verdict": judge_output.get("overall_verdict", {}),
             },
         }
     }
 
-async def run_debate(ticker: str, query: str, user_id: str, company: str, sector: str = "") -> dict:
+
+def _save_partial(
+    *,
+    job_id: Optional[str],
+    stage: str,
+    ticker: str,
+    company: str,
+    query: str,
+    data_richness: str = "",
+    bull_output: Optional[dict] = None,
+    bear_output: Optional[dict] = None,
+    judge_output: Optional[dict] = None,
+) -> None:
+    if not job_id:
+        return
+    save_partial_debate_result(
+        job_id=job_id,
+        partial_result={
+            "stage": stage,
+            "ticker": ticker,
+            "company": company,
+            "query": query,
+            "data_richness": data_richness,
+            "bull_output": bull_output or {},
+            "bear_output": bear_output or {},
+            "judge_output": judge_output or {},
+            "updated_at": datetime.now().isoformat(),
+        },
+        relational_db=get_database(),
+    )
+
+
+async def run_debate(
+    ticker: str,
+    query: str,
+    user_id: str,
+    company: str,
+    sector: str = "",
+    job_id: Optional[str] = None,
+) -> dict:
     try:
+        if job_id:
+            update_agent_job_status(
+                job_id=job_id,
+                status="running",
+                relational_db=get_database(),
+            )
+
         print(f"[1/5] 데이터 수집 시작: {ticker}")
-        agent_context = get_agent_context(
+        agent_context = await asyncio.to_thread(
+            get_agent_context,
             ticker=ticker,
             agent_type="debate",
             query=query,
@@ -353,14 +473,23 @@ async def run_debate(ticker: str, query: str, user_id: str, company: str, sector
         # get_user_context()는 users 테이블 조회용 db.Database(.get_row())를 요구한다 —
         # 위의 Agent B 함수들이 쓰는 processing.storage.sqlite_db.SQLiteDB와는
         # 다른 클래스이므로 혼용하면 AttributeError가 난다.
-        user_context = get_user_context(user_id, relational_db=get_database())
-        data_status = get_available_data_status(
+        user_context = await asyncio.to_thread(get_user_context, user_id, relational_db=get_database())
+        data_status = await asyncio.to_thread(
+            get_available_data_status,
             ticker=ticker,
             relational_db=_get_relational_db(),
             vector_db=_get_vector_db(),
         )
         reports_available = data_status.get("available", {}).get("reports", False)
         data_richness = "rich" if reports_available else "limited"
+        _save_partial(
+            job_id=job_id,
+            stage="data_collected",
+            ticker=ticker,
+            company=company,
+            query=query,
+            data_richness=data_richness,
+        )
 
         print(f"[2/5] Bull Agent 실행 중...")
         bull_user_message = f"""
@@ -371,7 +500,16 @@ async def run_debate(ticker: str, query: str, user_id: str, company: str, sector
 분석 데이터: {json.dumps(agent_context, ensure_ascii=False)}
 데이터 풍부도: {data_richness}
 """
-        bull_output = call_solar(BULL_SYSTEM_PROMPT, bull_user_message)
+        bull_output = await asyncio.to_thread(call_solar, BULL_SYSTEM_PROMPT, bull_user_message)
+        _save_partial(
+            job_id=job_id,
+            stage="bull_completed",
+            ticker=ticker,
+            company=company,
+            query=query,
+            data_richness=data_richness,
+            bull_output=bull_output,
+        )
 
         print(f"[3/5] Bear Agent 실행 중...")
         bear_user_message = f"""
@@ -383,7 +521,17 @@ async def run_debate(ticker: str, query: str, user_id: str, company: str, sector
 데이터 풍부도: {data_richness}
 Bull Agent 출력: {json.dumps(bull_output, ensure_ascii=False)}
 """
-        bear_output = call_solar(BEAR_SYSTEM_PROMPT, bear_user_message)
+        bear_output = await asyncio.to_thread(call_solar, BEAR_SYSTEM_PROMPT, bear_user_message)
+        _save_partial(
+            job_id=job_id,
+            stage="bear_completed",
+            ticker=ticker,
+            company=company,
+            query=query,
+            data_richness=data_richness,
+            bull_output=bull_output,
+            bear_output=bear_output,
+        )
 
         print(f"[4/5] Judge Agent 실행 중...")
         judge_user_message = f"""
@@ -394,7 +542,18 @@ Bull Agent 출력: {json.dumps(bull_output, ensure_ascii=False)}
 Bull Agent 출력: {json.dumps(bull_output, ensure_ascii=False)}
 Bear Agent 출력: {json.dumps(bear_output, ensure_ascii=False)}
 """
-        judge_output = call_solar(JUDGE_SYSTEM_PROMPT, judge_user_message)
+        judge_output = await asyncio.to_thread(call_solar, JUDGE_SYSTEM_PROMPT, judge_user_message)
+        _save_partial(
+            job_id=job_id,
+            stage="judge_completed",
+            ticker=ticker,
+            company=company,
+            query=query,
+            data_richness=data_richness,
+            bull_output=bull_output,
+            bear_output=bear_output,
+            judge_output=judge_output,
+        )
 
         print(f"[5/5] 결과 조립 중...")
         result = build_debate_result(
@@ -408,20 +567,48 @@ Bear Agent 출력: {json.dumps(bear_output, ensure_ascii=False)}
             data_richness=data_richness,
         )
 
+        if job_id:
+            save_debate_result(
+                job_id=job_id,
+                debate_result=result,
+                relational_db=get_database(),
+            )
+
+        macro_agenda = result["debate_result"]["agendas"][1]
         agenda_2 = {
-            "bull_summary": bull_output["agendas"][1]["summary"],
-            "bull_arguments": bull_output["agendas"][1]["arguments"],
-            "bear_summary": bear_output["agendas"][1]["summary"],
-            "bear_arguments": bear_output["agendas"][1]["arguments"],
+            "bull_summary": _to_text(macro_agenda["bull"]["summary"]),
+            "bull_arguments": _to_text(macro_agenda["bull"]["arguments"]),
+            "bear_summary": _to_text(macro_agenda["bear"]["summary"]),
+            "bear_arguments": _to_text(macro_agenda["bear"]["arguments"]),
         }
-        await run_simulation(
+        if job_id:
+            update_agent_job_status(
+                job_id=job_id,
+                status="simulation_running",
+                relational_db=get_database(),
+            )
+
+        simulation_result = await run_simulation(
             ticker=ticker,
             user_id=user_id,
             agenda_2=agenda_2,
         )
+        if job_id:
+            save_simulation_result(
+                job_id=job_id,
+                simulation_result=simulation_result or {},
+                relational_db=get_database(),
+            )
 
         return result
 
     except Exception as e:
         print(f"[ERROR] run_debate 실패: {e}")
+        if job_id:
+            update_agent_job_status(
+                job_id=job_id,
+                status="failed",
+                relational_db=get_database(),
+                error_message=str(e),
+            )
         raise

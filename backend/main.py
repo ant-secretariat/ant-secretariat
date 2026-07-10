@@ -10,8 +10,11 @@ api/ 아래의 모든 라우터(users, onboarding, orchestrator)를 한 곳에 �
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from api.companies import router as companies_router
+from api.debate_jobs import router as debate_jobs_router
 from api.onboarding import router as onboarding_router
 from api.orchestrator import router as orchestrator_router
+from api.trend_report import router as trend_report_router
 from api.users import router as users_router
 
 app = FastAPI(title="ant-secretariat-backend")
@@ -27,6 +30,9 @@ app.add_middleware(
 app.include_router(users_router)
 app.include_router(onboarding_router)
 app.include_router(orchestrator_router)
+app.include_router(companies_router)
+app.include_router(debate_jobs_router)
+app.include_router(trend_report_router)
 
 
 @app.get("/health")

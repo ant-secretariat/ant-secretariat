@@ -337,6 +337,22 @@ def _fallback_verdict(index: int, title: str) -> dict:
     }
 
 
+def _to_text(value) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list):
+        return " ".join(_to_text(item) for item in value if item)
+    if isinstance(value, dict):
+        parts = []
+        for key in ("title", "content", "summary", "source", "source_title", "source_date"):
+            if value.get(key):
+                parts.append(str(value[key]))
+        return " ".join(parts) if parts else json.dumps(value, ensure_ascii=False)
+    return str(value)
+
+
 def build_debate_result(ticker, company, query, user_id, bull_output, bear_output, judge_output, data_richness):
     agendas = []
     agenda_titles = ["실적 및 밸류에이션", "산업 및 매크로 환경", "리스크 요인"]
@@ -484,11 +500,12 @@ Bear Agent 출력: {json.dumps(bear_output, ensure_ascii=False)}
                 relational_db=get_database(),
             )
 
+        macro_agenda = result["debate_result"]["agendas"][1]
         agenda_2 = {
-            "bull_summary": bull_output["agendas"][1]["summary"],
-            "bull_arguments": bull_output["agendas"][1]["arguments"],
-            "bear_summary": bear_output["agendas"][1]["summary"],
-            "bear_arguments": bear_output["agendas"][1]["arguments"],
+            "bull_summary": _to_text(macro_agenda["bull"]["summary"]),
+            "bull_arguments": _to_text(macro_agenda["bull"]["arguments"]),
+            "bear_summary": _to_text(macro_agenda["bear"]["summary"]),
+            "bear_arguments": _to_text(macro_agenda["bear"]["arguments"]),
         }
         if job_id:
             update_agent_job_status(

@@ -211,14 +211,90 @@ a {
   align-items: start;
 }
 
-.dashboard-grid {
+.dashboard-grid,
+.insight-workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
-  gap: 18px;
+  gap: 14px;
 }
 
 .wide-panel {
   grid-column: 1 / -1;
+}
+
+.compact-control-panel {
+  padding: 14px 16px;
+}
+
+.control-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 44px;
+}
+
+.control-row label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.control-row label span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.control-row select {
+  min-width: 180px;
+  height: 36px;
+  padding: 0 34px 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: #0f172a;
+  background: #ffffff;
+}
+
+.selected-company-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 2px;
+}
+
+.selected-company-summary strong {
+  font-size: 14px;
+}
+
+.selected-company-summary span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.status-pill-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.data-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  color: #94a3b8;
+  background: #f8fafc;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.data-pill.ready {
+  color: #166534;
+  border-color: #bbf7d0;
+  background: #f0fdf4;
 }
 
 .sticky-panel {
@@ -423,6 +499,10 @@ code {
   flex-wrap: wrap;
   gap: 10px;
   margin-bottom: 14px;
+}
+
+.action-row {
+  align-items: center;
 }
 
 .feature-tabs button {
@@ -878,6 +958,7 @@ code {
 
   .split-grid,
   .dashboard-grid,
+  .insight-workspace,
   .argument-grid {
     grid-template-columns: 1fr;
   }
@@ -1016,5 +1097,24 @@ code {
 
   .debate-start-row {
     grid-template-columns: 1fr;
+  }
+
+  .control-row {
+    align-items: stretch;
+    display: grid;
+  }
+
+  .control-row label {
+    align-items: stretch;
+    display: grid;
+  }
+
+  .control-row select {
+    width: 100%;
+  }
+
+  .status-pill-row {
+    margin-left: 0;
+    flex-wrap: wrap;
   }
 }

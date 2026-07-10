@@ -1,6 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { BarChart3, Building2, Database, Play, RefreshCw } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { BarChart3, Play, RefreshCw } from "lucide-react";
 import {
   CartesianGrid,
   Line,
@@ -14,7 +13,7 @@ import { api } from "../api/client";
 import { EmptyState } from "../components/EmptyState";
 import { LoadingBlock } from "../components/LoadingBlock";
 import { useAppStore } from "../store/appStore";
-import type { Company, InsightFeature } from "../types";
+import type { InsightFeature } from "../types";
 
 const features: Array<{ id: InsightFeature; label: string }> = [
   { id: "price", label: "주가" },
@@ -23,13 +22,11 @@ const features: Array<{ id: InsightFeature; label: string }> = [
 ];
 
 export function DashboardPage() {
-  const navigate = useNavigate();
   const userId = useAppStore((state) => state.userId);
   const selectedCompany = useAppStore((state) => state.selectedCompany);
   const setSelectedCompany = useAppStore((state) => state.setSelectedCompany);
   const selectedFeature = useAppStore((state) => state.selectedFeature);
   const setSelectedFeature = useAppStore((state) => state.setSelectedFeature);
-  const setCurrentJobId = useAppStore((state) => state.setCurrentJobId);
   const activeUserId = userId ?? "";
 
   const companiesQuery = useQuery({
@@ -49,19 +46,6 @@ export function DashboardPage() {
         feature: selectedFeature,
       }),
   });
-  const debateMutation = useMutation({
-    mutationFn: () =>
-      api.startDebate({
-        user_id: activeUserId,
-        company: selectedCompany!.company,
-        query: `${selectedCompany!.company}의 업황과 주가 전망을 분석해줘`,
-      }),
-    onSuccess: (data) => {
-      setCurrentJobId(data.job_id);
-      navigate(`/debate/${data.job_id}`);
-    },
-  });
-
   const companies = companiesQuery.data ?? [];
 
   return (
@@ -78,55 +62,38 @@ export function DashboardPage() {
         </button>
       </header>
 
-      <section className="dashboard-grid">
-        <div className="panel">
-          <div className="panel-title">
-            <Building2 size={18} />
-            분석 대상
+      <section className="insight-workspace">
+        <div className="panel compact-control-panel">
+          <div className="control-row">
+            <label>
+              <span>분석 대상</span>
+              <select
+                value={selectedCompany?.ticker ?? ""}
+                onChange={(event) => {
+                  const company = companies.find((item) => item.ticker === event.target.value);
+                  setSelectedCompany(company);
+                }}
+                disabled={companiesQuery.isLoading}
+              >
+                <option value="">기업 선택</option>
+                {companies.map((company) => (
+                  <option value={company.ticker} key={company.ticker}>
+                    {company.company}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {selectedCompany ? (
+              <div className="selected-company-summary">
+                <strong>{selectedCompany.company}</strong>
+                <span>{selectedCompany.sector}</span>
+              </div>
+            ) : null}
+            <DataStatusPills status={statusQuery.data?.available} loading={statusQuery.isLoading} />
           </div>
-          {companiesQuery.isLoading ? (
-            <LoadingBlock />
-          ) : (
-            <div className="company-list">
-              {companies.map((company) => (
-                <button
-                  key={company.ticker}
-                  className={`company-row ${
-                    selectedCompany?.ticker === company.ticker ? "selected" : ""
-                  }`}
-                  onClick={() => setSelectedCompany(company)}
-                  type="button"
-                >
-                  <div>
-                    <strong>{company.company}</strong>
-                    <span>{company.sector}</span>
-                  </div>
-                  <code>{company.ticker}</code>
-                </button>
-              ))}
-            </div>
-          )}
         </div>
 
         <div className="panel">
-          <div className="panel-title">
-            <Database size={18} />
-            분석 준비 상태
-          </div>
-          {selectedCompany ? (
-            statusQuery.isLoading ? (
-              <LoadingBlock />
-            ) : statusQuery.data ? (
-              <DataStatusGrid status={statusQuery.data.available} />
-            ) : (
-              <EmptyState title="상태 데이터 없음" />
-            )
-          ) : (
-            <EmptyState title="기업을 선택하세요" description="좌측 목록에서 분석할 기업을 선택합니다." />
-          )}
-        </div>
-
-        <div className="panel wide-panel">
           <div className="panel-title">
             <BarChart3 size={18} />
             InsightBoard
@@ -152,43 +119,33 @@ export function DashboardPage() {
               <Play size={17} />
               조회
             </button>
-            <button
-              className="secondary-button strong"
-              disabled={!selectedCompany || debateMutation.isPending}
-              onClick={() => debateMutation.mutate()}
-            >
-              <Play size={17} />
-              토론·시뮬레이션으로 이동
-            </button>
           </div>
           {insightMutation.isPending ? <LoadingBlock label="InsightBoard 조회 중" /> : null}
           {insightMutation.error ? <div className="error-box">{insightMutation.error.message}</div> : null}
           {insightMutation.data ? (
             <InsightResult data={insightMutation.data} feature={selectedFeature} />
           ) : null}
-          {debateMutation.error ? <div className="error-box">{debateMutation.error.message}</div> : null}
         </div>
       </section>
     </div>
   );
 }
 
-function DataStatusGrid({ status }: { status: Record<string, boolean> }) {
+function DataStatusPills({ status, loading }: { status?: Record<string, boolean>; loading: boolean }) {
+  if (loading) return <span className="muted-text">준비 상태 확인 중</span>;
+  if (!status) return <span className="muted-text">기업 선택 후 확인</span>;
   const entries = [
-    ["분석 리포트", status.reports],
-    ["뉴스", status.news],
+    ["가격", status.price_data],
+    ["시장", status.macro_data],
     ["공시", status.disclosures],
-    ["가격 데이터", status.price_data],
-    ["시장 지표", status.macro_data],
-    ["목표주가", status.target_price_data],
+    ["리포트", status.reports],
   ] as const;
   return (
-    <div className="status-grid">
+    <div className="status-pill-row">
       {entries.map(([label, value]) => (
-        <div key={label} className="status-cell">
-          <span>{label}</span>
-          <strong className={value ? "positive" : "muted"}>{value ? "준비됨" : "없음"}</strong>
-        </div>
+        <span key={label} className={`data-pill ${value ? "ready" : ""}`}>
+          {label}
+        </span>
       ))}
     </div>
   );

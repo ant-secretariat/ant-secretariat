@@ -186,7 +186,192 @@ function InsightResult({ data }: { data: { badges: string[]; llm_comment: string
         ))}
       </div>
       {data.llm_comment ? <p className="comment-box">{data.llm_comment}</p> : null}
-      <pre className="json-preview">{JSON.stringify(data.raw_data, null, 2)}</pre>
+      <InsightDataView value={data.raw_data} />
     </div>
   );
+}
+
+function InsightDataView({ value }: { value: unknown }) {
+  if (Array.isArray(value)) {
+    if (!value.length) return <EmptyState title="조회된 데이터가 없습니다" />;
+    return (
+      <div className="insight-card-grid">
+        {value.map((item, index) => (
+          <InsightRecordCard key={index} value={item} title={`데이터 ${index + 1}`} />
+        ))}
+      </div>
+    );
+  }
+  if (isRecord(value)) {
+    return <InsightRecordCard value={value} title="조회 데이터" />;
+  }
+  return <div className="empty-state">표시할 수 있는 데이터가 없습니다.</div>;
+}
+
+function InsightRecordCard({ value, title }: { value: unknown; title: string }) {
+  if (!isRecord(value)) {
+    return (
+      <div className="insight-card">
+        <strong>{title}</strong>
+        <span>{formatValue(value)}</span>
+      </div>
+    );
+  }
+
+  const heading = [value.company, value.ticker].filter(Boolean).join(" · ") || title;
+  const scalarEntries = Object.entries(value).filter(([, entryValue]) => isScalar(entryValue));
+  const collectionEntries = Object.entries(value).filter(([, entryValue]) => !isScalar(entryValue));
+
+  return (
+    <article className="insight-card">
+      <div className="insight-card-header">
+        <strong>{heading}</strong>
+        {typeof value.sector === "string" ? <span>{value.sector}</span> : null}
+      </div>
+      {scalarEntries.length ? (
+        <div className="compact-kv-grid">
+          {scalarEntries.map(([key, entryValue]) => (
+            <div className="compact-kv" key={key}>
+              <span>{labelize(key)}</span>
+              <strong>{formatValue(entryValue)}</strong>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {collectionEntries.map(([key, entryValue]) => (
+        <NestedPreview key={key} name={key} value={entryValue} />
+      ))}
+    </article>
+  );
+}
+
+function NestedPreview({ name, value }: { name: string; value: unknown }) {
+  if (Array.isArray(value)) {
+    return (
+      <div className="nested-preview">
+        <div className="nested-title">
+          <span>{labelize(name)}</span>
+          <strong>{value.length.toLocaleString("ko-KR")}건</strong>
+        </div>
+        {value.length ? <MiniTable rows={value.slice(0, 5)} /> : <span className="muted-text">데이터 없음</span>}
+      </div>
+    );
+  }
+  if (isRecord(value)) {
+    return (
+      <div className="nested-preview">
+        <div className="nested-title">
+          <span>{labelize(name)}</span>
+        </div>
+        <div className="compact-kv-grid">
+          {Object.entries(value)
+            .slice(0, 8)
+            .map(([key, entryValue]) => (
+              <div className="compact-kv" key={key}>
+                <span>{labelize(key)}</span>
+                <strong>{formatValue(entryValue)}</strong>
+              </div>
+            ))}
+        </div>
+      </div>
+    );
+  }
+  return null;
+}
+
+function MiniTable({ rows }: { rows: unknown[] }) {
+  const objectRows = rows.filter(isRecord);
+  if (!objectRows.length) {
+    return <span className="muted-text">{rows.map(formatValue).join(", ")}</span>;
+  }
+  const columns = pickColumns(objectRows);
+  return (
+    <div className="mini-table-wrap">
+      <table className="mini-table">
+        <thead>
+          <tr>
+            {columns.map((column) => (
+              <th key={column}>{labelize(column)}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {objectRows.map((row, index) => (
+            <tr key={index}>
+              {columns.map((column) => (
+                <td key={column}>{formatValue(row[column])}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function pickColumns(rows: Array<Record<string, unknown>>) {
+  const preferred = [
+    "date",
+    "price_date",
+    "published_at",
+    "disclosed_at",
+    "title",
+    "report_name",
+    "close",
+    "value",
+    "target_price",
+    "source",
+  ];
+  const keys = new Set(rows.flatMap((row) => Object.keys(row)));
+  const selected = preferred.filter((key) => keys.has(key));
+  for (const key of keys) {
+    if (selected.length >= 5) break;
+    if (!selected.includes(key) && isScalar(rows.find((row) => row[key] !== undefined)?.[key])) {
+      selected.push(key);
+    }
+  }
+  return selected.slice(0, 5);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isScalar(value: unknown) {
+  return value === null || ["string", "number", "boolean"].includes(typeof value);
+}
+
+function formatValue(value: unknown): string {
+  if (value === null || value === undefined || value === "") return "-";
+  if (typeof value === "number") return Number.isInteger(value) ? value.toLocaleString("ko-KR") : value.toFixed(2);
+  if (typeof value === "boolean") return value ? "예" : "아니오";
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return `${value.length.toLocaleString("ko-KR")}건`;
+  if (isRecord(value)) return `${Object.keys(value).length.toLocaleString("ko-KR")}개 항목`;
+  return String(value);
+}
+
+function labelize(key: string) {
+  const labels: Record<string, string> = {
+    ticker: "티커",
+    company: "기업",
+    sector: "섹터",
+    latest: "최근 데이터",
+    prices: "주가",
+    indicators: "지표",
+    disclosures: "공시",
+    date: "날짜",
+    price_date: "날짜",
+    published_at: "발행일",
+    disclosed_at: "공시일",
+    close: "종가",
+    value: "값",
+    title: "제목",
+    report_name: "보고서명",
+    source: "출처",
+    target_price: "목표주가",
+    volatility_30d: "30일 변동성",
+    current_price: "현재가",
+  };
+  return labels[key] ?? key.replace(/_/g, " ");
 }

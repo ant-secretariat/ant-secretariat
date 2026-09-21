@@ -48,9 +48,16 @@ cd data-pipeline && pip install -r requirements.txt
 - 리빌드 로드맵 v2 — 항목별 업계 사례·디벨롭 방향, 직무 JD 분석: https://claude.ai/artifact/CADp3pwAnNfpC34tdx9ayt
 - 팀 노션 (백로그·회의록·의사결정·실험 로그): https://app.notion.com/p/3df1fad9262e8130a679fdeb0df068dd
 
-## 출처와 기여자
+## 팀
 
-이 저장소는 [tobigs-conference](https://github.com/tobigs-conference) 조직에서 진행된 팀 프로젝트를 이어받아 리빌드한 것입니다. 원 저장소의 커밋 히스토리를 그대로 가져왔기 때문에 아래 기여자들의 작업 이력이 이 저장소에 남아 있습니다.
+리빌드 참여 (알파벳순)
+- [@kkamret](https://github.com/kkamret)
+- [@nasuzz](https://github.com/nasuzz)
+- [@taeeunni](https://github.com/taeeunni)
+
+## 출처와 원 기여자
+
+이 저장소는 [tobigs-conference](https://github.com/tobigs-conference) 조직에서 진행된 팀 프로젝트를 이어받아 리빌드한 것입니다. 원 저장소의 커밋 히스토리를 그대로 가져왔습니다. 따라서 **커밋 목록과 Contributors에는 리빌드에 참여하지 않는 원 팀원도 함께 표시됩니다.** 그분들이 작성한 코드가 실제로 이 저장소에 포함돼 있기 때문이며, 리빌드 이후의 작업은 위 팀 목록의 3인이 진행합니다.
 
 원 저장소
 - [ant-secretariat-frontend](https://github.com/tobigs-conference/ant-secretariat-frontend)

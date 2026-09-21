@@ -41,12 +41,6 @@ cd data-pipeline && pip install -r requirements.txt
 - 작업 단위와 우선순위는 팀 노션의 **로드맵 백로그**를 따릅니다.
 - 프롬프트·청킹·모델을 바꾸는 변경은 같은 평가셋으로 이전 버전과 비교한 수치를 PR에 적어주세요.
 
-## 팀 내부 문서
-
-접근 권한이 있는 팀원만 열 수 있습니다.
-
-- 리빌드 로드맵 v2 — 항목별 업계 사례·디벨롭 방향, 직무 JD 분석: https://claude.ai/artifact/CADp3pwAnNfpC34tdx9ayt
-- 팀 노션 (백로그·회의록·의사결정·실험 로그): https://app.notion.com/p/3df1fad9262e8130a679fdeb0df068dd
 
 ## 출처와 기여자
 

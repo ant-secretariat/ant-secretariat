@@ -1,0 +1,14 @@
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+db/*.db
+db/*.db-shm
+db/*.db-wal
+logs/*.log*
+storage/raw_pdfs/**/*.pdf
+storage/raw_pdfs/**/*.part
+storage/raw_report_pdfs/**/*.pdf
+storage/raw_report_pdfs/**/*.part

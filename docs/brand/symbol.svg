@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="개미비서단 심볼">
+  <title>개미비서단 심볼</title>
+  <rect width="64" height="64" rx="14" fill="#16211C"/>
+
+  <!-- 개미: 리서치를 읽는 개인 투자자 -->
+  <g stroke="#D6A94F" stroke-width="2.1" stroke-linecap="round" fill="none">
+    <path d="M29.4 11.6 L25.6 6.6"/>
+    <path d="M34.6 11.6 L38.4 6.6"/>
+  </g>
+  <g stroke="#EFEAD9" stroke-width="2.1" stroke-linecap="round" fill="none">
+    <path d="M28.2 21.4 L20.4 17.2"/>
+    <path d="M35.8 21.4 L43.6 17.2"/>
+    <path d="M28 25.2 L19.4 25.2"/>
+    <path d="M36 25.2 L44.6 25.2"/>
+    <path d="M28.2 29 L20.4 33.2"/>
+    <path d="M35.8 29 L43.6 33.2"/>
+  </g>
+  <g fill="#EFEAD9">
+    <circle cx="32" cy="15.4" r="5.2"/>
+    <ellipse cx="32" cy="25.2" rx="4.2" ry="4.6"/>
+    <ellipse cx="32" cy="36.4" rx="6.6" ry="7"/>
+  </g>
+
+  <!-- 토론이 만들어내는 가격 시나리오(하락·중립·상승) -->
+  <g>
+    <rect x="14" y="49" width="7.5" height="6" rx="1.5" fill="#4E86C4"/>
+    <rect x="28.2" y="46" width="7.5" height="9" rx="1.5" fill="#D6A94F"/>
+    <rect x="42.5" y="42.5" width="7.5" height="12.5" rx="1.5" fill="#C1443F"/>
+  </g>
+  <rect x="12" y="56.2" width="40" height="1.8" rx="0.9" fill="#3C4741"/>
+</svg>

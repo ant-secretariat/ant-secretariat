@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 80" width="360" height="80" role="img" aria-label="개미비서단">
+  <title>개미비서단 로고</title>
+  <g transform="translate(8 8)">
+    <rect width="64" height="64" rx="14" fill="#16211C"/>
+    <g fill="#EFEAD9">
+      <ellipse cx="24" cy="27" rx="8" ry="6.6"/>
+      <ellipse cx="34" cy="27" rx="4.6" ry="4.1"/>
+      <circle cx="42" cy="25.4" r="4.6"/>
+    </g>
+    <circle cx="43.6" cy="24.2" r="1.05" fill="#16211C"/>
+    <g stroke="#EFEAD9" stroke-width="1.9" stroke-linecap="round" fill="none">
+      <path d="M29.5 31.5 L26.5 39.5"/>
+      <path d="M34.5 31.2 L34 40"/>
+      <path d="M38.5 30.2 L42.5 38"/>
+    </g>
+    <g stroke="#D6A94F" stroke-width="1.9" stroke-linecap="round" fill="none">
+      <path d="M44.8 21.8 L49.6 16.4"/>
+      <path d="M41.6 21.2 L44.2 14.8"/>
+    </g>
+    <g>
+      <rect x="15" y="47" width="8" height="7" rx="1.6" fill="#4E86C4"/>
+      <rect x="28" y="43.5" width="8" height="10.5" rx="1.6" fill="#D6A94F"/>
+      <rect x="41" y="39.5" width="8" height="14.5" rx="1.6" fill="#C1443F"/>
+    </g>
+    <rect x="13" y="55.4" width="38" height="1.8" rx="0.9" fill="#3C4741"/>
+  </g>
+  <text x="88" y="45" font-family="Pretendard, 'Noto Sans KR', 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif" font-size="30" font-weight="700" fill="#16211C" letter-spacing="-0.5">개미비서단</text>
+  <text x="88" y="63" font-family="'IBM Plex Mono', ui-monospace, monospace" font-size="12" fill="#6D7A70" letter-spacing="1.4">ANT SECRETARIAT</text>
+</svg>

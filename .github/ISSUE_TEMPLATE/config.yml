@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 협업 컨벤션
+    url: https://github.com/ant-secretariat/ant-secretariat/blob/main/docs/CONVENTIONS.md
+    about: 브랜치·커밋·이슈·PR 규칙을 먼저 확인해주세요.

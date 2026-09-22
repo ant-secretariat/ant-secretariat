@@ -23,12 +23,20 @@ logger = logging.getLogger(__name__)
 async def run_simulation(
     ticker: str,
     user_id: str,
-    agenda_2: dict,
+    debate_agendas: list,
     db_path: str = DEFAULT_B_DB_PATH,
     send_result_fn=None,
 ) -> dict:
+    """
+    Args:
+        debate_agendas: 토론의 모든 아젠다.
+            agents.debate.simulation_input.build_simulation_agendas()의 출력.
+    """
 
-    logger.info("[G] run_simulation 시작 - ticker=%s, user_id=%s", ticker, user_id)
+    logger.info(
+        "[G] run_simulation 시작 - ticker=%s, user_id=%s, 아젠다=%d개",
+        ticker, user_id, len(debate_agendas or []),
+    )
 
     try:
         logger.info("[G] 1단계: 데이터 수집")
@@ -44,7 +52,7 @@ async def run_simulation(
         table = build_feature_table(raw["price_data"], raw["macro_data"])
 
         logger.info("[G] 3단계: 리스크 분류")
-        risk_factors = classify_risk_factors(macro_agenda=agenda_2)
+        risk_factors = classify_risk_factors(agendas=debate_agendas)
         logger.info("[G] 분류된 리스크 요인: %s", risk_factors)
 
         logger.info("[G] 4단계: LSTM 예측")
@@ -130,16 +138,16 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO)
 
-    agenda_2 = {
-        "bull_summary": "환율 상승이 수출에 긍정적",
-        "bull_arguments": "원달러 환율 상승으로 수출 채산성 개선",
-        "bear_summary": "금리 인상 우려",
-        "bear_arguments": "기준금리 추가 인상 시 투자심리 위축 우려",
-    }
+    debate_agendas = [{
+        "agenda_id": 2,
+        "agenda_title": "산업 및 매크로 환경",
+        "bull_text": "환율 상승이 수출에 긍정적. 원달러 환율 상승으로 수출 채산성 개선",
+        "bear_text": "금리 인상 우려. 기준금리 추가 인상 시 투자심리 위축 우려",
+    }]
 
     asyncio.run(run_simulation(
         ticker=args.ticker,
         user_id=args.user_id,
-        agenda_2=agenda_2,
+        debate_agendas=debate_agendas,
         db_path=args.db_path,
     ))

@@ -2,7 +2,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -25,8 +25,10 @@ _SYSTEM_PROMPT = f"""당신은 금융 토론 텍스트에서 정량적으로 시
 - KTB_10Y_KR: 한국 국고채 10년물 금리
 - USD_KRW: 원/달러 환율
 
-입력으로 주어지는 토론 텍스트(Bull 주장 + Bear 반박)를 읽고, 위 5개 변수 중 \
+입력으로 주어지는 토론 전체(아젠다별 Bull 주장 + Bear 반박)를 읽고, 위 5개 변수 중 \
 "리스크 요인"으로 명시적으로 언급된 것이 있으면 추출하세요. \
+아젠다 제목과 무관하게 토론 어디에서 언급되었든 추출 대상입니다. \
+같은 변수가 여러 아젠다에서 언급되면 한 번만 추출하세요. \
 유가, 경쟁사 동향, 신제품, 규제 등 위 5개에 해당하지 않는 내용은 무시하세요.
 
 반드시 아래 JSON 형식으로만 답하세요. 다른 텍스트는 절대 포함하지 마세요.
@@ -48,52 +50,43 @@ class RiskClassificationError(Exception):
     pass
 
 
-def _build_user_prompt(macro_agenda: Optional[dict], risk_agenda: Optional[dict]) -> str:
+def _build_user_prompt(agendas: List[dict]) -> str:
+    """아젠다 목록 전체를 하나의 프롬프트로 펼친다.
+
+    아젠다 개수나 순서를 가정하지 않는다. 토론이 몇 개의 쟁점으로 갈리든
+    매크로 리스크는 그중 어디에서도 언급될 수 있다.
+    """
     parts = []
-    if macro_agenda:
-        bull = " ".join(filter(None, [
-            macro_agenda.get("bull_summary", ""),
-            macro_agenda.get("bull_arguments", ""),
-        ]))
-        bear = " ".join(filter(None, [
-            macro_agenda.get("bear_summary", ""),
-            macro_agenda.get("bear_arguments", ""),
-        ]))
-        parts.append(
-            "[아젠다 2: 산업 및 매크로 환경]\n"
-            f"Bull 주장: {bull}\n"
-            f"Bear 반박: {bear}"
-        )
-    if risk_agenda:
-        bull = " ".join(filter(None, [
-            risk_agenda.get("bull_summary", ""),
-            risk_agenda.get("bull_arguments", ""),
-        ]))
-        bear = " ".join(filter(None, [
-            risk_agenda.get("bear_summary", ""),
-            risk_agenda.get("bear_arguments", ""),
-        ]))
-        parts.append(
-            "[아젠다 3: 리스크 요인]\n"
-            f"Bull 주장: {bull}\n"
-            f"Bear 반박: {bear}"
-        )
-    return "\n\n".join(parts) if parts else "(토론 텍스트 없음)"
+    for index, agenda in enumerate(agendas, start=1):
+        bull = str(agenda.get("bull_text") or "").strip()
+        bear = str(agenda.get("bear_text") or "").strip()
+        if not bull and not bear:
+            continue
+        title = str(agenda.get("agenda_title") or "").strip()
+        label = agenda.get("agenda_id") or index
+        header = f"[아젠다 {label}: {title}]" if title else f"[아젠다 {label}]"
+        parts.append(f"{header}\nBull 주장: {bull}\nBear 반박: {bear}")
+    return "\n\n".join(parts)
 
 
 def classify_risk_factors(
-    macro_agenda: Optional[dict] = None,
-    risk_agenda: Optional[dict] = None,
+    agendas: Optional[List[dict]] = None,
     client: Optional[OpenAI] = None,
 ) -> list:
-    """
+    """토론 전체에서 시뮬레이션 가능한 매크로 리스크 요인을 추출한다.
+
+    Args:
+        agendas: build_simulation_agendas()가 만든 목록.
+            [{"agenda_id", "agenda_title", "bull_text", "bear_text"}, ...]
+
     Returns:
         [{"variable": "BASE_RATE_KR", "direction": "up"}, ...] 또는 []
 
-    macro_agenda, risk_agenda가 둘 다 없으면 LLM 호출 없이 바로 [] 반환.
+    읽을 토론 텍스트가 없으면 LLM을 호출하지 않고 [] 반환.
     """
-    if not macro_agenda and not risk_agenda:
-        logger.info("macro_agenda/risk_agenda가 없어 리스크 분류를 건너뜁니다.")
+    user_prompt = _build_user_prompt(agendas or [])
+    if not user_prompt:
+        logger.info("토론 텍스트가 없어 리스크 분류를 건너뜁니다.")
         return []
 
     if client is None:
@@ -103,8 +96,6 @@ def classify_risk_factors(
                 "UPSTAGE_API_KEY가 설정되어 있지 않습니다 (.env 확인 필요)."
             )
         client = OpenAI(api_key=api_key, base_url=UPSTAGE_BASE_URL)
-
-    user_prompt = _build_user_prompt(macro_agenda, risk_agenda)
 
     try:
         response = client.chat.completions.create(
@@ -153,11 +144,11 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
     result = classify_risk_factors(
-    macro_agenda={
-        "bull_summary": args.bull_summary,
-        "bull_arguments": args.bull_arguments,
-        "bear_summary": args.bear_summary,
-        "bear_arguments": args.bear_arguments,
-    },
-)
+        agendas=[{
+            "agenda_id": 2,
+            "agenda_title": "산업 및 매크로 환경",
+            "bull_text": f"{args.bull_summary} {args.bull_arguments}",
+            "bear_text": f"{args.bear_summary} {args.bear_arguments}",
+        }],
+    )
     print(json.dumps(result, ensure_ascii=False, indent=2))

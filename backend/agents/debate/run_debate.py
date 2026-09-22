@@ -10,6 +10,7 @@ from typing import Optional
 from dotenv import load_dotenv
 from openai import OpenAI
 
+from agents.debate.simulation_input import build_simulation_agendas
 from agents.simulation.service import run_simulation
 from db import DEFAULT_DB_PATH, get_database
 from functions.agent_jobs import (
@@ -339,22 +340,6 @@ def _fallback_verdict(index: int, title: str) -> dict:
     }
 
 
-def _to_text(value) -> str:
-    if value is None:
-        return ""
-    if isinstance(value, str):
-        return value
-    if isinstance(value, list):
-        return " ".join(_to_text(item) for item in value if item)
-    if isinstance(value, dict):
-        parts = []
-        for key in ("title", "content", "summary", "source", "source_title", "source_date"):
-            if value.get(key):
-                parts.append(str(value[key]))
-        return " ".join(parts) if parts else json.dumps(value, ensure_ascii=False)
-    return str(value)
-
-
 def build_debate_result(ticker, company, query, user_id, bull_output, bear_output, judge_output, data_richness):
     agendas = []
     agenda_titles = ["실적 및 밸류에이션", "산업 및 매크로 환경", "리스크 요인"]
@@ -574,13 +559,9 @@ Bear Agent 출력: {json.dumps(bear_output, ensure_ascii=False)}
                 relational_db=get_database(),
             )
 
-        macro_agenda = result["debate_result"]["agendas"][1]
-        agenda_2 = {
-            "bull_summary": _to_text(macro_agenda["bull"]["summary"]),
-            "bull_arguments": _to_text(macro_agenda["bull"]["arguments"]),
-            "bear_summary": _to_text(macro_agenda["bear"]["summary"]),
-            "bear_arguments": _to_text(macro_agenda["bear"]["arguments"]),
-        }
+        # 토론 전체를 시뮬레이션에 넘긴다. 특정 아젠다 위치를 가정하지 않는다 —
+        # 매크로 리스크는 어느 쟁점에서도 언급될 수 있고, 아젠다 수도 고정이 아니다.
+        debate_agendas = build_simulation_agendas(result)
         if job_id:
             update_agent_job_status(
                 job_id=job_id,
@@ -591,7 +572,7 @@ Bear Agent 출력: {json.dumps(bear_output, ensure_ascii=False)}
         simulation_result = await run_simulation(
             ticker=ticker,
             user_id=user_id,
-            agenda_2=agenda_2,
+            debate_agendas=debate_agendas,
         )
         if job_id:
             save_simulation_result(

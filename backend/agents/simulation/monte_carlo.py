@@ -164,13 +164,13 @@ if __name__ == "__main__":
     table = build_feature_table(raw["price_data"], raw["macro_data"])
     current_price = float(raw["price_data"]["latest"]["current_price"])
 
-    macro_agenda = {
-        "bull_summary": "환율 상승이 수출에 긍정적",
-        "bull_arguments": "원달러 환율 상승으로 수출 채산성 개선",
-        "bear_summary": "금리 인상 우려",
-        "bear_arguments": "기준금리 추가 인상 시 투자심리 위축 우려",
-    }
-    risk_factors = classify_risk_factors(macro_agenda=macro_agenda)
+    debate_agendas = [{
+        "agenda_id": 2,
+        "agenda_title": "산업 및 매크로 환경",
+        "bull_text": "환율 상승이 수출에 긍정적. 원달러 환율 상승으로 수출 채산성 개선",
+        "bear_text": "금리 인상 우려. 기준금리 추가 인상 시 투자심리 위축 우려",
+    }]
+    risk_factors = classify_risk_factors(agendas=debate_agendas)
     logger.info("분류된 리스크 요인: %s", risk_factors)
 
     model = get_or_train_model(

@@ -12,6 +12,10 @@
     <img src="https://img.shields.io/badge/Pinecone-Vector_DB-000000?logo=pinecone&logoColor=white" alt="Pinecone" />
     <img src="https://img.shields.io/badge/Upstage-Solar-7C3AED" alt="Upstage Solar" />
   </p>
+  <p>
+    <a href="https://hug-and-render-47.lovable.app"><img src="https://img.shields.io/badge/▶_데모_체험하기-0f766e?style=for-the-badge" alt="데모 체험하기" /></a>
+  </p>
+  <sub>데모는 사전 생성된 목업 데이터로 동작하며, 실제 LLM·벡터 검색을 호출하지 않습니다.</sub>
 </div>
 
 개인 투자자가 종목을 판단할 때 필요한 근거를 한곳에 모아주는 서비스입니다. 증권사 리포트를 수집해 검색 가능한 형태로 쌓고, 강세(Bull)·약세(Bear) 에이전트가 같은 근거를 두고 토론한 뒤 판정 에이전트(Judge)가 정리합니다. 토론에서 나온 리스크는 몬테카를로 시뮬레이션의 입력이 되어 30일 가격 분포로 이어집니다.

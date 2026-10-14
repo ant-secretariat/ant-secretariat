@@ -1,0 +1,172 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2060" height="1190" viewBox="0 0 2060 1190" font-family="Pretendard, 'Noto Sans KR', 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif">
+<defs>
+<marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1F2328"/></marker>
+<filter id="sh" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="#000" flood-opacity="0.12"/></filter>
+</defs>
+<rect width="2060" height="1190" fill="#FFFFFF"/>
+<rect x="290" y="100" width="1310" height="800" rx="12" fill="#F6F7F9" stroke="#B9BEC7" stroke-width="1.4"/>
+<text x="308" y="130" font-size="16" font-weight="700" fill="#1F2328">백엔드 — 단일 FastAPI 프로세스 (Python · LangGraph)</text>
+<rect x="460" y="150" width="222" height="735" rx="12" fill="#EEF0F4" stroke="#B9BEC7" stroke-width="1.4"/>
+<text x="478" y="180" font-size="15" font-weight="700" fill="#1F2328">오케스트레이터 (C)</text>
+<rect x="722" y="150" width="176" height="735" rx="12" fill="#EEF0F4" stroke="#B9BEC7" stroke-width="1.4"/>
+<text x="740" y="180" font-size="15" font-weight="700" fill="#1F2328">비동기 실행</text>
+<rect x="940" y="150" width="222" height="735" rx="12" fill="#EEF0F4" stroke="#B9BEC7" stroke-width="1.4"/>
+<text x="958" y="180" font-size="15" font-weight="700" fill="#1F2328">전문 에이전트</text>
+<rect x="1202" y="150" width="176" height="735" rx="12" fill="#EEF0F4" stroke="#B9BEC7" stroke-width="1.4"/>
+<text x="1220" y="180" font-size="15" font-weight="700" fill="#1F2328">공통 인프라</text>
+<rect x="1418" y="150" width="166" height="735" rx="12" fill="#EEF0F4" stroke="#B9BEC7" stroke-width="1.4"/>
+<text x="1436" y="180" font-size="15" font-weight="700" fill="#1F2328">데이터 에이전트 (A·B)</text>
+<rect x="1650" y="120" width="380" height="270" rx="12" fill="#EEF0F4" stroke="#B9BEC7" stroke-width="1.4"/>
+<text x="1668" y="150" font-size="15" font-weight="700" fill="#1F2328">저장소</text>
+<rect x="1650" y="430" width="380" height="470" rx="12" fill="none" stroke="#B9BEC7" stroke-width="1.4" stroke-dasharray="7 6"/>
+<text x="1668" y="460" font-size="15" font-weight="700" fill="#1F2328">외부 서비스 (HTTPS)</text>
+<circle cx="52" cy="242" r="13" fill="none" stroke="#1F2328" stroke-width="2"/>
+<path d="M28,278 Q52,256 76,278" fill="none" stroke="#1F2328" stroke-width="2"/>
+<text x="52" y="306" text-anchor="middle" font-size="14" fill="#1F2328">사용자</text>
+<rect x="116.0" y="216.0" width="84" height="84" rx="12" fill="#7B5BD6" filter="url(#sh)"/>
+<text x="158" y="265" text-anchor="middle" font-size="21" font-weight="800" fill="#FFFFFF">APP</text>
+<text x="158" y="322.0" text-anchor="middle" font-size="14" fill="#1F2328">FE 웹앱</text>
+<rect x="330.0" y="216.0" width="84" height="84" rx="12" fill="#4F6BD0" filter="url(#sh)"/>
+<text x="372" y="265" text-anchor="middle" font-size="21" font-weight="800" fill="#FFFFFF">API</text>
+<text x="372" y="322.0" text-anchor="middle" font-size="14" fill="#1F2328">API 레이어</text>
+<text x="372" y="340.0" text-anchor="middle" font-size="12.5" fill="#59636E">인증 · 응답 봉투</text>
+<text x="372" y="358.0" text-anchor="middle" font-size="12.5" fill="#59636E">RFC 9457</text>
+<rect x="529.0" y="216.0" width="84" height="84" rx="12" fill="#2F7D72" filter="url(#sh)"/>
+<text x="571" y="265" text-anchor="middle" font-size="21" font-weight="800" fill="#FFFFFF">ENT</text>
+<text x="571" y="322.0" text-anchor="middle" font-size="14" fill="#1F2328">관문1 종목 확정</text>
+<text x="571" y="340.0" text-anchor="middle" font-size="12.5" fill="#59636E">애매하면 되묻기</text>
+<rect x="529.0" y="386.0" width="84" height="84" rx="12" fill="#2F7D72" filter="url(#sh)"/>
+<text x="571" y="435" text-anchor="middle" font-size="21" font-weight="800" fill="#FFFFFF">PRE</text>
+<text x="571" y="492.0" text-anchor="middle" font-size="14" fill="#1F2328">사전 판정 precheck</text>
+<text x="571" y="510.0" text-anchor="middle" font-size="12.5" fill="#59636E">룰 · job 생성 전</text>
+<rect x="529.0" y="556.0" width="84" height="84" rx="12" fill="#2F7D72" filter="url(#sh)"/>
+<text x="571" y="605" text-anchor="middle" font-size="21" font-weight="800" fill="#FFFFFF">RT</text>
+<text x="571" y="662.0" text-anchor="middle" font-size="14" fill="#1F2328">라우터</text>
+<text x="571" y="680.0" text-anchor="middle" font-size="12.5" fill="#59636E">버튼 경로 · 결정적</text>
+<rect x="529.0" y="726.0" width="84" height="84" rx="12" fill="#2F7D72" filter="url(#sh)"/>
+<text x="571" y="775" text-anchor="middle" font-size="21" font-weight="800" fill="#FFFFFF">PL</text>
+<text x="571" y="832.0" text-anchor="middle" font-size="14" fill="#1F2328">플래너·실행기</text>
+<text x="571" y="850.0" text-anchor="middle" font-size="12.5" fill="#59636E">자유 질의 · 계획 1회</text>
+<rect x="768.0" y="556.0" width="84" height="84" rx="12" fill="#C77A34" filter="url(#sh)"/>
+<text x="810" y="605" text-anchor="middle" font-size="21" font-weight="800" fill="#FFFFFF">Q</text>
+<text x="810" y="662.0" text-anchor="middle" font-size="14" fill="#1F2328">작업 큐</text>
+<text x="810" y="680.0" text-anchor="middle" font-size="12.5" fill="#59636E">job_events · Postgres</text>
+<rect x="1009.0" y="216.0" width="84" height="84" rx="12" fill="#2E86AB" filter="url(#sh)"/>
+<text x="1051" y="265" text-anchor="middle" font-size="21" font-weight="800" fill="#FFFFFF">TR</text>
+<text x="1051" y="322.0" text-anchor="middle" font-size="14" fill="#1F2328">트렌드 리포트 (D)</text>
+<text x="1051" y="340.0" text-anchor="middle" font-size="12.5" fill="#59636E">순차 파이프라인</text>
+<rect x="1009.0" y="386.0" width="84" height="84" rx="12" fill="#2E86AB" filter="url(#sh)"/>
+<text x="1051" y="435" text-anchor="middle" font-size="21" font-weight="800" fill="#FFFFFF">IB</text>
+<text x="1051" y="492.0" text-anchor="middle" font-size="14" fill="#1F2328">인사이트보드 (E)</text>
+<text x="1051" y="510.0" text-anchor="middle" font-size="12.5" fill="#59636E">병렬 팬아웃</text>
+<rect x="1009.0" y="556.0" width="84" height="84" rx="12" fill="#2E86AB" filter="url(#sh)"/>
+<text x="1051" y="605" text-anchor="middle" font-size="21" font-weight="800" fill="#FFFFFF">DBT</text>
+<text x="1051" y="662.0" text-anchor="middle" font-size="14" fill="#1F2328">토론 (F)</text>
+<text x="1051" y="680.0" text-anchor="middle" font-size="12.5" fill="#59636E">Bull → Bear → Judge</text>
+<rect x="1009.0" y="726.0" width="84" height="84" rx="12" fill="#2E86AB" filter="url(#sh)"/>
+<text x="1051" y="775" text-anchor="middle" font-size="21" font-weight="800" fill="#FFFFFF">SIM</text>
+<text x="1051" y="832.0" text-anchor="middle" font-size="14" fill="#1F2328">시뮬레이션 (G)</text>
+<text x="1051" y="850.0" text-anchor="middle" font-size="12.5" fill="#59636E">GJR-GARCH · FHS</text>
+<rect x="1248.0" y="386.0" width="84" height="84" rx="12" fill="#5B6577" filter="url(#sh)"/>
+<text x="1290" y="435" text-anchor="middle" font-size="21" font-weight="800" fill="#FFFFFF">REG</text>
+<text x="1290" y="492.0" text-anchor="middle" font-size="14" fill="#1F2328">도구 레지스트리</text>
+<text x="1290" y="510.0" text-anchor="middle" font-size="12.5" fill="#59636E">인자 검증·권한·추적</text>
+<rect x="1248.0" y="726.0" width="84" height="84" rx="12" fill="#5B6577" filter="url(#sh)"/>
+<text x="1290" y="775" text-anchor="middle" font-size="21" font-weight="800" fill="#FFFFFF">VER</text>
+<text x="1290" y="832.0" text-anchor="middle" font-size="14" fill="#1F2328">검증 레이어</text>
+<text x="1290" y="850.0" text-anchor="middle" font-size="12.5" fill="#59636E">L1·L2 · 근거 부족 루프</text>
+<rect x="1459.0" y="216.0" width="84" height="84" rx="12" fill="#8B4FC2" filter="url(#sh)"/>
+<text x="1501" y="265" text-anchor="middle" font-size="18" font-weight="800" fill="#FFFFFF">DATA</text>
+<text x="1501" y="322.0" text-anchor="middle" font-size="14" fill="#1F2328">조회 함수</text>
+<text x="1501" y="340.0" text-anchor="middle" font-size="12.5" fill="#59636E">resolve_company</text>
+<text x="1501" y="358.0" text-anchor="middle" font-size="12.5" fill="#59636E">extract_company_mentions</text>
+<rect x="1459.0" y="386.0" width="84" height="84" rx="12" fill="#8B4FC2" filter="url(#sh)"/>
+<text x="1501" y="435" text-anchor="middle" font-size="21" font-weight="800" fill="#FFFFFF">SEM</text>
+<text x="1501" y="492.0" text-anchor="middle" font-size="14" fill="#1F2328">시맨틱 레이어</text>
+<text x="1501" y="510.0" text-anchor="middle" font-size="12.5" fill="#59636E">지표 정의 단일화</text>
+<rect x="1459.0" y="556.0" width="84" height="84" rx="12" fill="#FFFFFF" stroke="#8B4FC2" stroke-width="2.4" stroke-dasharray="6 4"/>
+<text x="1501" y="605" text-anchor="middle" font-size="21" font-weight="800" fill="#8B4FC2">ONT</text>
+<text x="1501" y="662.0" text-anchor="middle" font-size="14" fill="#1F2328">관계 사전 (온톨로지)</text>
+<text x="1501" y="680.0" text-anchor="middle" font-size="12.5" fill="#59636E">기능 플래그 · 기본 꺼짐</text>
+<rect x="1674.0" y="216.0" width="84" height="84" rx="12" fill="#3D5A99" filter="url(#sh)"/>
+<text x="1716" y="265" text-anchor="middle" font-size="21" font-weight="800" fill="#FFFFFF">DB</text>
+<text x="1776.0" y="254" font-size="15" fill="#1F2328">Supabase</text>
+<text x="1776.0" y="275" font-size="13.5" fill="#59636E">Postgres + pgvector</text>
+<rect x="1674.0" y="478.0" width="84" height="84" rx="12" fill="#B03A5B" filter="url(#sh)"/>
+<text x="1716" y="527" text-anchor="middle" font-size="21" font-weight="800" fill="#FFFFFF">LLM</text>
+<text x="1776.0" y="516" font-size="15" fill="#1F2328">Upstage Solar</text>
+<text x="1776.0" y="537" font-size="13.5" fill="#59636E">LLM · 임베딩</text>
+<rect x="1674.0" y="618.0" width="84" height="84" rx="12" fill="#B03A5B" filter="url(#sh)"/>
+<text x="1716" y="667" text-anchor="middle" font-size="21" font-weight="800" fill="#FFFFFF">OBS</text>
+<text x="1776.0" y="656" font-size="15" fill="#1F2328">Langfuse</text>
+<text x="1776.0" y="677" font-size="13.5" fill="#59636E">트레이스 · 비용 측정</text>
+<rect x="1674.0" y="758.0" width="84" height="84" rx="12" fill="#B03A5B" filter="url(#sh)"/>
+<text x="1716" y="807" text-anchor="middle" font-size="21" font-weight="800" fill="#FFFFFF">SRC</text>
+<text x="1776.0" y="796" font-size="15" fill="#1F2328">KIS · DART · pykrx · 뉴스</text>
+<text x="1776.0" y="817" font-size="13.5" fill="#59636E">원천 데이터</text>
+<rect x="1674.0" y="968.0" width="84" height="84" rx="12" fill="#24292F" filter="url(#sh)"/>
+<text x="1716" y="1017" text-anchor="middle" font-size="21" font-weight="800" fill="#FFFFFF">GHA</text>
+<text x="1776.0" y="1006" font-size="15" fill="#1F2328">GitHub Actions</text>
+<text x="1776.0" y="1027" font-size="13.5" fill="#59636E">일일 수집 · sim_params 적합</text>
+<path d="M84,258 L112.0,258" fill="none" stroke="#1F2328" stroke-width="1.8" marker-end="url(#ar)"/>
+<circle cx="97" cy="228" r="14" fill="#1F2328"/>
+<text x="97" y="233.5" text-anchor="middle" font-size="15" font-weight="800" fill="#FFFFFF">1</text>
+<path d="M204.0,258 L326.0,258" fill="none" stroke="#1F2328" stroke-width="1.8" marker-start="url(#ar)" marker-end="url(#ar)"/>
+<circle cx="232" cy="228" r="14" fill="#1F2328"/>
+<text x="232" y="233.5" text-anchor="middle" font-size="15" font-weight="800" fill="#FFFFFF">2</text>
+<text x="250" y="233" text-anchor="start" font-size="14" fill="#1F2328">REST · SSE</text>
+<circle cx="232" cy="288" r="14" fill="#1F2328"/>
+<text x="232" y="293.5" text-anchor="middle" font-size="15" font-weight="800" fill="#FFFFFF">13</text>
+<text x="250" y="293" text-anchor="start" font-size="14" fill="#1F2328">응답 봉투</text>
+<path d="M418.0,258 L525.0,258" fill="none" stroke="#1F2328" stroke-width="1.8" marker-end="url(#ar)"/>
+<circle cx="447" cy="228" r="14" fill="#1F2328"/>
+<text x="447" y="233.5" text-anchor="middle" font-size="15" font-weight="800" fill="#FFFFFF">3</text>
+<path d="M571,350.0 L571,382.0" fill="none" stroke="#1F2328" stroke-width="1.8" marker-end="url(#ar)"/>
+<circle cx="600" cy="364" r="14" fill="#1F2328"/>
+<text x="600" y="369.5" text-anchor="middle" font-size="15" font-weight="800" fill="#FFFFFF">4</text>
+<path d="M571,520.0 L571,552.0" fill="none" stroke="#1F2328" stroke-width="1.8" marker-end="url(#ar)"/>
+<circle cx="600" cy="534" r="14" fill="#1F2328"/>
+<text x="600" y="539.5" text-anchor="middle" font-size="15" font-weight="800" fill="#FFFFFF">5</text>
+<path d="M529.0,428 L482,428 L482,768 L525.0,768" fill="none" stroke="#1F2328" stroke-width="1.8" marker-end="url(#ar)"/>
+<path d="M613.0,598 L702,598 L702,258 L1005.0,258" fill="none" stroke="#1F2328" stroke-width="1.8" marker-end="url(#ar)"/>
+<path d="M702,428 L1005.0,428" fill="none" stroke="#1F2328" stroke-width="1.8" marker-end="url(#ar)"/>
+<circle cx="702" cy="358" r="14" fill="#1F2328"/>
+<text x="702" y="363.5" text-anchor="middle" font-size="15" font-weight="800" fill="#FFFFFF">6</text>
+<text x="722" y="244" text-anchor="start" font-size="14" fill="#1F2328">함수 호출 (async)</text>
+<path d="M702,598 L764.0,598" fill="none" stroke="#1F2328" stroke-width="1.8" marker-end="url(#ar)"/>
+<text x="712" y="584" text-anchor="start" font-size="14" fill="#1F2328">job 등록</text>
+<path d="M852.0,598 L1005.0,598" fill="none" stroke="#1F2328" stroke-width="1.8" marker-end="url(#ar)"/>
+<text x="870" y="584" text-anchor="start" font-size="14" fill="#1F2328">워커 실행</text>
+<path d="M613.0,768 L936,768" fill="none" stroke="#1F2328" stroke-width="1.8" marker-end="url(#ar)"/>
+<text x="640" y="754" text-anchor="start" font-size="14" fill="#1F2328">계획대로 호출</text>
+<path d="M1051,690.0 L1051,722.0" fill="none" stroke="#1F2328" stroke-width="1.8" stroke-dasharray="7 6" marker-end="url(#ar)"/>
+<circle cx="1080" cy="704" r="14" fill="#1F2328"/>
+<text x="1080" y="709.5" text-anchor="middle" font-size="15" font-weight="800" fill="#FFFFFF">7</text>
+<text x="1098" y="709" font-size="12.5" fill="#59636E">버튼 → 큐</text>
+<path d="M1162,428 L1244.0,428" fill="none" stroke="#1F2328" stroke-width="1.8" marker-end="url(#ar)"/>
+<circle cx="1186" cy="400" r="14" fill="#1F2328"/>
+<text x="1186" y="405.5" text-anchor="middle" font-size="15" font-weight="800" fill="#FFFFFF">8</text>
+<path d="M1162,768 L1244.0,768" fill="none" stroke="#1F2328" stroke-width="1.8" marker-end="url(#ar)"/>
+<path d="M1332.0,428 L1455.0,428" fill="none" stroke="#1F2328" stroke-width="1.8" marker-end="url(#ar)"/>
+<path d="M1398,428 L1398,258 L1455.0,258" fill="none" stroke="#1F2328" stroke-width="1.8" marker-end="url(#ar)"/>
+<path d="M1398,428 L1398,598 L1455.0,598" fill="none" stroke="#1F2328" stroke-width="1.8" stroke-dasharray="7 6" marker-end="url(#ar)"/>
+<path d="M1543.0,258 L1670.0,258" fill="none" stroke="#1F2328" stroke-width="1.8" marker-end="url(#ar)"/>
+<circle cx="1566" cy="230" r="14" fill="#1F2328"/>
+<text x="1566" y="235.5" text-anchor="middle" font-size="15" font-weight="800" fill="#FFFFFF">9</text>
+<text x="1584" y="236" text-anchor="start" font-size="14" fill="#1F2328">SQL</text>
+<path d="M1110,150 L1110,122 L1624,122 L1624,520 L1670.0,520" fill="none" stroke="#1F2328" stroke-width="1.8" marker-end="url(#ar)"/>
+<circle cx="1360" cy="122" r="14" fill="#1F2328"/>
+<text x="1360" y="127.5" text-anchor="middle" font-size="15" font-weight="800" fill="#FFFFFF">10</text>
+<text x="1382" y="114" text-anchor="start" font-size="14" fill="#1F2328">HTTPS</text>
+<path d="M1600,660 L1670.0,660" fill="none" stroke="#1F2328" stroke-width="1.8" stroke-dasharray="7 6" marker-end="url(#ar)"/>
+<circle cx="1626" cy="634" r="14" fill="#1F2328"/>
+<text x="1626" y="639.5" text-anchor="middle" font-size="15" font-weight="800" fill="#FFFFFF">12</text>
+<path d="M1716,968.0 L1716,846.0" fill="none" stroke="#1F2328" stroke-width="1.8" marker-end="url(#ar)"/>
+<circle cx="1690" cy="925" r="14" fill="#1F2328"/>
+<text x="1690" y="930.5" text-anchor="middle" font-size="15" font-weight="800" fill="#FFFFFF">11</text>
+<path d="M1674.0,1010 L1640,1010 L1640,288 L1670.0,288" fill="none" stroke="#1F2328" stroke-width="1.8" marker-end="url(#ar)"/>
+<text x="1730" y="930" font-size="12.5" fill="#59636E">수집</text>
+<text x="1632" y="1002" font-size="12.5" fill="#59636E" text-anchor="end">적재</text>
+<text x="30" y="1128" font-size="16" fill="#59636E">번호는 요청 1건이 흐르는 순서입니다. 실선은 매 요청, 점선은 조건부(⑦ 사용자가 시뮬레이션 버튼을 누를 때, 관계 사전은 기능 플래그가 켜졌을 때, ⑫ 비동기 추적)입니다.</text>
+<text x="30" y="1156" font-size="16" fill="#59636E">흰 바탕 점선 타일(ONT)은 기본 꺼짐 상태입니다. 토론·시뮬레이션은 작업 큐(Q)를 거쳐 워커가 실행하고, 진행 상황은 job_events로 SSE에 전달됩니다(⑬).</text>
+</svg>

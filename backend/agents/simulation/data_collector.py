@@ -1,7 +1,7 @@
 """Simulation Agent(Agent G) 1단계: Agent B DB에서 주가/매크로/유저 컨텍스트 수집.
 
-Agent B 데이터는 ant-secretariat-data-pipeline의 processing 패키지를 통해
-가져온다(agents/trend_report/data_agent_client.py와 동일한 패턴: -e ../ant-secretariat-data-pipeline
+Agent B 데이터는 data-pipeline의 processing 패키지를 통해
+가져온다(agents/trend_report/data_agent_client.py와 동일한 패턴: -e ../data-pipeline
 editable install을 그대로 사용하고 별도 sys.path 조작을 하지 않는다).
 
 유저 투자 성향 컨텍스트는 원본 simulation-agent에서 목업으로 남아 있던 부분을,

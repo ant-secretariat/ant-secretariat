@@ -79,8 +79,6 @@ cp .env.example .env
 uvicorn main:app --reload      # http://localhost:8000
 ```
 
-> `backend/requirements.txt`는 아직 `-e ../ant-secretariat-data-pipeline` 상대경로로 data-pipeline을 참조합니다. 모노레포 구조에서는 경로가 맞지 않으므로, 당분간은 `pip install -e ../data-pipeline`으로 설치해 주세요. 워크스페이스 정리는 리빌드 항목 6.2입니다.
-
 ### 4. 프론트엔드 (Node.js 18 이상)
 
 ```bash

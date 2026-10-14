@@ -1,9 +1,9 @@
 """InsightBoard 에이전트 데이터 어댑터.
 
-Agent B(ant-secretariat-data-pipeline의 processing 패키지)의 get_price_data /
+Agent B(data-pipeline의 processing 패키지)의 get_price_data /
 get_macro_data / get_disclosure_data를 그대로 재사용한다 — trend_report의
 data_agent_client.py, simulation의 data_collector.py와 동일한 패턴이며, 이미
-requirements.txt의 editable install(-e ../ant-secretariat-data-pipeline)로
+requirements.txt의 editable install(-e ../data-pipeline)로
 연결되어 있어 별도 경로 설정이 필요 없다.
 
 세 함수 모두 동기 sqlite 호출이라, 기업별 병렬 조회는 asyncio.to_thread로 스레드에

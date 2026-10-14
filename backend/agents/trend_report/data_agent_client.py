@@ -1,9 +1,9 @@
 """Agent B(데이터 조회 공통 함수) 어댑터.
 
 Agent D(trend_report)는 Pinecone/SQLite에 직접 접근하지 않고 이 클래스를 통해
-`ant-secretariat-data-pipeline`의 `processing.functions.*`, `processing.storage.*`를
+`data-pipeline`의 `processing.functions.*`, `processing.storage.*`를
 그대로 재사용한다. data-pipeline은 requirements.txt의 editable install(
-`-e ../ant-secretariat-data-pipeline`)로 이미 이 레포에 들어와 있으므로(db.py 참고),
+`-e ../data-pipeline`)로 이미 이 레포에 들어와 있으므로(db.py 참고),
 별도의 sys.path 조작이나 외부 레포 경로 설정이 필요 없다.
 
 reports.db 접근은 users 테이블에 쓰는 db.py의 Database와 별개로, report_chunks

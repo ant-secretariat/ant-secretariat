@@ -1,7 +1,7 @@
 # ant-secretariat-backend
 
 금융 분석 에이전트 백엔드입니다. FastAPI로 API를 제공하고, 공통 데이터는
-`ant-secretariat-data-pipeline`의 SQLite `reports.db`와 Pinecone 인덱스를 사용합니다.
+`data-pipeline`의 SQLite `reports.db`와 Pinecone 인덱스를 사용합니다.
 
 ## 주요 기능
 
@@ -15,11 +15,11 @@
 ## 요구 사항
 
 - Python 3.11+
-- 형제 디렉터리에 `ant-secretariat-data-pipeline` 필요
+- 모노레포의 `data-pipeline/` 디렉터리 필요
 - `requirements.txt`의 editable dependency가 아래 경로를 참조합니다.
 
 ```text
-../ant-secretariat-data-pipeline
+../data-pipeline
 ```
 
 ## 설치
@@ -39,7 +39,7 @@ cp .env.example .env
 UPSTAGE_API_KEY=
 PINECONE_API_KEY=
 PINECONE_INDEX=
-DATABASE_PATH=../ant-secretariat-data-pipeline/crawling/db/reports.db
+DATABASE_PATH=../data-pipeline/crawling/db/reports.db
 ```
 
 선택값:
@@ -177,7 +177,7 @@ judge_completed
 백엔드는 데이터를 직접 수집하지 않습니다. 실제 데이터는 data-pipeline에서 갱신합니다.
 
 ```bash
-cd ../ant-secretariat-data-pipeline
+cd ../data-pipeline
 
 python crawling/main.py \
   --run-once \

@@ -166,7 +166,7 @@ unknown
 기본값은 실제 수집 provider입니다.
 
 - `PRICE_DATA_PROVIDER=naver`: Naver Finance 일별 시세를 수집해 `price_data`에 저장
-- `MACRO_DATA_PROVIDER=ecos`: 한국은행 ECOS에서 기준금리, 국고채 금리, CPI를 수집하고 Naver 시장지표에서 USD/KRW를 함께 저장
+- `MACRO_DATA_PROVIDER=ecos`: 한국은행 ECOS에서 기준금리, 국고채 3·10년 금리, CPI, USD/KRW 환율, 유가(WTI·Dubai·Brent 월평균)를 수집
 - `MACRO_DATA_PROVIDER=naver`: Naver 시장지표에서 USD/KRW만 수집
 
 실제 수치 데이터까지 포함해 실행:
@@ -177,6 +177,13 @@ python main.py --run-once --source naver --include-price-data --include-macro-da
 
 ECOS 수집에는 `ECOS_API_KEY`가 필요합니다. 네트워크가 없는 테스트 환경에서는 `.env`에서 `PRICE_DATA_PROVIDER=mock`,
 `MACRO_DATA_PROVIDER=mock`으로 바꿀 수 있습니다. 추후 한국투자 Open API 같은 provider로 교체할 수 있도록 `collectors/`에 provider 경계를 두었습니다.
+
+Supabase `macro_data` 테이블 적재(`SUPABASE_DB_URL`, `ECOS_API_KEY` 필요):
+
+```bash
+python -m crawling.macro_loader --backfill   # 2000년부터 전체 이력
+python -m crawling.macro_loader --daily      # 최근 구간(일별 45일, 월별 400일) 갱신
+```
 
 ## 뉴스 / 공시 Provider
 

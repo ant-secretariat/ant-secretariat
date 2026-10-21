@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import patch
+
+import httpx
 
 from crawling.collectors.disclosure_collector import DisclosureCollector, _normalize_disclosure_type
 from crawling.collectors.macro_data_collector import (
@@ -92,6 +95,64 @@ class MacroDataCollectorTest(unittest.TestCase):
         self.assertEqual(row["date"], "2026-06-18")
         self.assertEqual(row["value"], 2.5)
         self.assertEqual(row["source"], "ECOS")
+
+    def test_ecos_provider_follows_pages(self) -> None:
+        requested: list[str] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            requested.append(request.url.path)
+            first = int(request.url.path.split("/")[6])
+            times = ["20260617", "20260618", "20260619"][first - 1 : first + 1]
+            return httpx.Response(
+                200,
+                json={
+                    "StatisticSearch": {
+                        "list_total_count": 3,
+                        "row": [{"TIME": time, "DATA_VALUE": "1,380.5"} for time in times],
+                    }
+                },
+            )
+
+        provider = EcosMacroProvider(Settings(ecos_api_key="SECRET"))
+        with patch("crawling.collectors.macro_data_collector.ECOS_PAGE_SIZE", 2), httpx.Client(
+            transport=httpx.MockTransport(handler)
+        ) as client:
+            rows = provider._fetch_indicator(
+                client, DEFAULT_ECOS_INDICATORS["USD_KRW"], "2026-06-17", "2026-06-19"
+            )
+
+        self.assertEqual(len(requested), 2)
+        self.assertEqual([row["TIME"] for row in rows], ["20260617", "20260618", "20260619"])
+
+    def test_ecos_provider_treats_no_data_as_empty(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                200,
+                json={"RESULT": {"CODE": "INFO-200", "MESSAGE": "해당하는 데이터가 없습니다."}},
+            )
+
+        provider = EcosMacroProvider(Settings(ecos_api_key="SECRET"))
+        with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+            rows = provider._fetch_indicator(
+                client, DEFAULT_ECOS_INDICATORS["WTI"], "2026-06-01", "2026-06-30"
+            )
+
+        self.assertEqual(rows, [])
+
+    def test_ecos_provider_skips_blank_values_and_masks_key(self) -> None:
+        provider = EcosMacroProvider(Settings(ecos_api_key="SECRET"))
+
+        row = provider._to_macro_row(
+            DEFAULT_ECOS_INDICATORS["WTI"],
+            {"TIME": "202606", "DATA_VALUE": ""},
+        )
+
+        self.assertIsNone(row["value"])
+        self.assertEqual(row["date"], "2026-06-01")
+        self.assertEqual(
+            provider._mask("error for url https://ecos.bok.or.kr/api/StatisticSearch/SECRET/json"),
+            "error for url https://ecos.bok.or.kr/api/StatisticSearch/***/json",
+        )
 
 
 class NewsCollectorTest(unittest.TestCase):

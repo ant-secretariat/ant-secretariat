@@ -7,6 +7,8 @@ truststore==0.10.4
 pytest==8.4.0
 pykrx==1.2.9                # KRX 시세·펀더멘털·지수 (KRX_ID/KRX_PW 필요)
 psycopg[binary]==3.3.6      # Supabase Postgres 적재
+arch==8.0.0                 # 시뮬레이션 GJR-GARCH 적합
+statsmodels==0.15.0         # 민감도 회귀 (HAC 표준오차)
 
 # processing/
 pymupdf>=1.23.0

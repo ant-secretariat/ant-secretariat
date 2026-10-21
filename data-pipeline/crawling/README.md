@@ -185,6 +185,17 @@ python -m crawling.macro_loader --backfill   # 2000년부터 전체 이력
 python -m crawling.macro_loader --daily      # 최근 구간(일별 45일, 월별 400일) 갱신
 ```
 
+시뮬레이션 파라미터(`sim_params`, GJR-GARCH + FHS)와 민감도(`sensitivities`) 적합. 시세·지수·매크로 적재 후 실행:
+
+```bash
+python -m crawling.sim_loader                     # T1/T2 종목, 최신 거래일 기준 최근 3년
+python -m crawling.sim_loader --tickers 005930    # 특정 종목만
+```
+
+- `sim_params.params_json`: 계수(omega·alpha·gamma·beta), 다음날 조건부 분산, 표준화 잔차(`std_resid`), 30일 예상 변동성. 경로 생성은 `crawling.analytics.garch.simulate_paths` 참고
+- `status=not_converged`이면 `params_json.status_reason`이 `optimizer_failed`(최적화 실패) 또는 `nonstationary`(지속성 ≥ 1)
+- `sensitivities`: 요인(KOSPI·USD_KRW·KTB_3Y_KR)이 30거래일 동안 1σ 움직일 때 종목 30일 수익률(%) 변화. `multi`는 세 요인 동시 회귀, `simple`은 단일 요인 회귀, `corr_daily`는 일별 상관계수(온톨로지 엣지 가중치)
+
 ## 뉴스 / 공시 Provider
 
 - `NEWS_DATA_PROVIDER=naver`: Naver Search API로 뉴스 메타데이터를 수집하고 `original_url` 본문을 best-effort로 파싱해 `news_metadata.content`에 저장

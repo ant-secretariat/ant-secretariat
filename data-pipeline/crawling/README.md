@@ -185,6 +185,14 @@ python -m crawling.macro_loader --backfill   # 2000년부터 전체 이력
 python -m crawling.macro_loader --daily      # 최근 구간(일별 45일, 월별 400일) 갱신
 ```
 
+WICS 섹터 분류(`companies.sector_l1` 대분류, `sector_l2` 중분류) 갱신. 분류는 자주 바뀌지 않아 주 1회면 충분합니다:
+
+```bash
+python -m crawling.market_loader --sectors
+```
+
+wiseindex.com의 robots.txt는 일반 크롤러를 허용하지 않으므로 팀 내부 테스트 범위에서만 사용합니다. 우선주는 보통주 분류를 따르고, 코넥스·외국기업 등 WICS 미편입 종목은 비워 둡니다.
+
 시뮬레이션 파라미터(`sim_params`, GJR-GARCH + FHS)와 민감도(`sensitivities`) 적합. 시세·지수·매크로 적재 후 실행:
 
 ```bash

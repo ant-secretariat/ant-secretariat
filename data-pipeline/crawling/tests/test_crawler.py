@@ -1,16 +1,18 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import tempfile
 import unittest
 from datetime import date, timedelta
 from pathlib import Path
+from unittest.mock import patch
 
 import httpx
 
 from crawling.config.report_type_codes import normalize_report_type
 from crawling.config.supported_companies import resolve_company_from_text
-from crawling.crawler.base_crawler import generate_report_id
+from crawling.crawler.base_crawler import generate_report_id, subtract_months
 from crawling.crawler.config import Settings
 from crawling.crawler.kirs_research_crawler import KirsResearchCrawler
 from crawling.crawler.models import ReportMetadata
@@ -89,6 +91,53 @@ class CrawlerParserTest(unittest.TestCase):
             report.pdf_url,
             "https://api.kirs.or.kr/aireport/504/report.pdf",
         )
+
+    def test_parse_alphanumeric_ticker(self) -> None:
+        self.assertEqual(
+            KirsResearchCrawler._parse_company("에스엔시스 (0008Z0)"),
+            ("에스엔시스", "0008Z0"),
+        )
+
+    def test_crawl_stops_at_collection_window(self) -> None:
+        today = date.today()
+        old = subtract_months(today, 2).isoformat()
+        pages = {
+            "1": _kirs_page(1, [today.isoformat(), today.isoformat()]),
+            "2": _kirs_page(2, [today.isoformat(), old]),
+            "3": _kirs_page(3, [old]),
+        }
+        requested: list[str] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path == "/robots.txt":
+                return httpx.Response(200, text="User-agent: *\nAllow: /")
+            page = request.url.params["page"]
+            requested.append(page)
+            return httpx.Response(200, text=pages[page])
+
+        transport = httpx.MockTransport(handler)
+        real_client = httpx.AsyncClient
+
+        def client_factory(*args, **kwargs):
+            kwargs.pop("verify", None)
+            return real_client(*args, transport=transport, **kwargs)
+
+        crawler = KirsResearchCrawler(Settings(months=1, max_pages=10, request_delay_seconds=0))
+        with patch("crawling.crawler.kirs_research_crawler.httpx.AsyncClient", client_factory):
+            reports = asyncio.run(crawler.crawl())
+
+        self.assertEqual(requested, ["1", "2"])
+        self.assertEqual(len(reports), 3)
+
+
+def _kirs_page(page: int, dates: list[str]) -> str:
+    rows = "".join(
+        f"""<tr><td>회사{page}{index} (00{page}{index:03d}0)</td><td>리포트 {page}-{index}</td>
+        <td>한국IR협의회</td><td>{day}</td>
+        <td><a href="https://w4.kirs.or.kr/download/{page}-{index}.pdf">PDF</a></td></tr>"""
+        for index, day in enumerate(dates)
+    )
+    return f'<table class="board_list_table04"><tbody>{rows}</tbody></table>'
 
 
 class DatabaseTest(unittest.TestCase):

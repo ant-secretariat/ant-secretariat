@@ -78,7 +78,7 @@ class Settings:
         default=1.5,
     )
     download_retries: int = _env_int("MAX_RETRIES", "DOWNLOAD_RETRIES", default=3)
-    max_pages: int = _env_int("MAX_PAGES", default=3)
+    max_pages: int = _env_int("MAX_PAGES", default=50)
     months: int = _env_int("COLLECTION_MONTHS", default=1)
     max_reports_per_company: int = _env_int("MAX_REPORTS_PER_COMPANY", default=10)
     max_total_reports: int = _env_int("MAX_TOTAL_REPORTS", default=50)

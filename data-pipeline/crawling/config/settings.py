@@ -40,9 +40,9 @@ def _env_float(*names: str, default: float) -> float:
 @dataclass(frozen=True)
 class Settings:
     source: str = os.getenv("CRAWLER_SOURCE", os.getenv("COLLECTION_SOURCE", "naver"))
-    naver_research_url: str = os.getenv(
-        "NAVER_RESEARCH_URL",
-        "https://finance.naver.com/research/company_list.naver",
+    naver_research_api_url: str = os.getenv(
+        "NAVER_RESEARCH_API_URL",
+        "https://stock.naver.com/api/stockSecurity/researches/v2/company",
     )
     kirs_research_url: str = os.getenv(
         "KIRS_RESEARCH_URL",

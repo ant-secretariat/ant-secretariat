@@ -155,6 +155,35 @@ DEFAULT_ECOS_INDICATORS = {
         frequency="monthly",
         country="GLOBAL",
     ),
+    # 통관 기준. ECOS에 무역수지 항목이 없어 수출 − 수입으로 계산한다(TRADE_BALANCE_KR)
+    "EXPORTS_KR": EcosIndicator(
+        indicator_id="EXPORTS_KR",
+        indicator_name="수출금액",
+        stat_code="901Y118",
+        cycle="M",
+        item_code="T002",
+        unit="USD thousand",
+        frequency="monthly",
+    ),
+    "IMPORTS_KR": EcosIndicator(
+        indicator_id="IMPORTS_KR",
+        indicator_name="수입금액",
+        stat_code="901Y118",
+        cycle="M",
+        item_code="T004",
+        unit="USD thousand",
+        frequency="monthly",
+    ),
+    # 항목이 두 단계다. A00 전산업(농림어업 제외) / 2 계절조정
+    "IPI_KR": EcosIndicator(
+        indicator_id="IPI_KR",
+        indicator_name="전산업생산지수(계절조정)",
+        stat_code="901Y033",
+        cycle="M",
+        item_code="A00/2",
+        unit="2020=100",
+        frequency="monthly",
+    ),
 }
 
 ECOS_PAGE_SIZE = 10000
@@ -205,7 +234,7 @@ class EcosMacroProvider:
                     for row in (self._to_macro_row(indicator, ecos_row) for ecos_row in ecos_rows)
                     if row["value"] is not None
                 )
-        return rows
+        return rows + _trade_balance_rows(rows)
 
     def _fetch_indicator(
         self,
@@ -377,6 +406,21 @@ def _parse_optional_number(value: str | None) -> float | None:
         return _parse_number(value or "")
     except ValueError:
         return None
+
+
+def _trade_balance_rows(rows: list[dict]) -> list[dict]:
+    """수출과 수입이 모두 있는 달만 무역수지를 만든다."""
+    imports = {row["date"]: row["value"] for row in rows if row["indicator_id"] == "IMPORTS_KR"}
+    return [
+        {
+            **row,
+            "indicator_id": "TRADE_BALANCE_KR",
+            "indicator_name": "무역수지",
+            "value": row["value"] - imports[row["date"]],
+        }
+        for row in rows
+        if row["indicator_id"] == "EXPORTS_KR" and row["date"] in imports
+    ]
 
 
 def _ecos_date_range(

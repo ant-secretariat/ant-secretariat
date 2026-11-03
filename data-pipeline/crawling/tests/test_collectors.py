@@ -124,6 +124,64 @@ class MacroDataCollectorTest(unittest.TestCase):
         self.assertEqual(len(requested), 2)
         self.assertEqual([row["TIME"] for row in rows], ["20260617", "20260618", "20260619"])
 
+    def test_ecos_provider_requests_two_level_item_code(self) -> None:
+        requested: list[str] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            requested.append(request.url.path)
+            return httpx.Response(
+                200,
+                json={
+                    "StatisticSearch": {
+                        "list_total_count": 1,
+                        "row": [{"TIME": "202609", "DATA_VALUE": "118.5"}],
+                    }
+                },
+            )
+
+        provider = EcosMacroProvider(Settings(ecos_api_key="SECRET"))
+        with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+            provider._fetch_indicator(
+                client, DEFAULT_ECOS_INDICATORS["IPI_KR"], "2026-09-01", "2026-09-30"
+            )
+
+        self.assertTrue(requested[0].endswith("/901Y033/M/202609/202609/A00/2"))
+
+    def test_trade_balance_is_exports_minus_imports_for_matching_months(self) -> None:
+        values = {
+            ("T002", "202608"): "60000",
+            ("T004", "202608"): "45000",
+            ("T002", "202609"): "65000",
+        }
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            parts = request.url.path.split("/")
+            item_code = parts[-1]
+            rows = [
+                {"TIME": time, "DATA_VALUE": value}
+                for (code, time), value in values.items()
+                if code == item_code
+            ]
+            return httpx.Response(
+                200,
+                json={"StatisticSearch": {"list_total_count": len(rows), "row": rows}},
+            )
+
+        real_client = httpx.Client
+
+        def client_factory(**kwargs) -> httpx.Client:
+            kwargs.pop("verify", None)
+            return real_client(transport=httpx.MockTransport(handler), **kwargs)
+
+        provider = EcosMacroProvider(Settings(ecos_api_key="SECRET"))
+        with patch("crawling.collectors.macro_data_collector.httpx.Client", client_factory):
+            rows = provider.collect(["EXPORTS_KR", "IMPORTS_KR"], "2026-08-01", "2026-09-30")
+
+        balance = [row for row in rows if row["indicator_id"] == "TRADE_BALANCE_KR"]
+        self.assertEqual([(row["date"], row["value"]) for row in balance], [("2026-08-01", 15000.0)])
+        self.assertEqual(balance[0]["indicator_name"], "무역수지")
+        self.assertEqual(balance[0]["unit"], "USD thousand")
+
     def test_ecos_provider_treats_no_data_as_empty(self) -> None:
         def handler(request: httpx.Request) -> httpx.Response:
             return httpx.Response(

@@ -1,4 +1,4 @@
-"""ECOS 매크로 지표(금리·환율·물가·유가)를 Supabase macro_data에 적재한다.
+"""ECOS 매크로 지표(금리·환율·물가·유가·무역수지·산업생산)를 Supabase macro_data에 적재한다.
 
     python -m crawling.macro_loader --backfill         # 2000년부터 전체 이력 적재
     python -m crawling.macro_loader --daily            # 최근 구간만 다시 받아 갱신
@@ -52,7 +52,8 @@ def load(indicators: list[str], date_from: date | None, date_to: date | None) ->
         )
 
     counts = Counter(row["indicator_id"] for row in rows)
-    for indicator_id in indicators:
+    # 무역수지처럼 계산으로 만든 지표도 함께 남긴다
+    for indicator_id in dict.fromkeys([*indicators, *counts]):
         dates = [row["date"] for row in rows if row["indicator_id"] == indicator_id]
         if dates:
             logger.info("%s: %s행 (%s ~ %s)", indicator_id, counts[indicator_id], min(dates), max(dates))

@@ -166,7 +166,7 @@ unknown
 기본값은 실제 수집 provider입니다.
 
 - `PRICE_DATA_PROVIDER=naver`: Naver Finance 일별 시세를 수집해 `price_data`에 저장
-- `MACRO_DATA_PROVIDER=ecos`: 한국은행 ECOS에서 기준금리, 국고채 3·10년 금리, CPI, USD/KRW 환율, 유가(WTI·Dubai·Brent 월평균)를 수집
+- `MACRO_DATA_PROVIDER=ecos`: 한국은행 ECOS에서 기준금리, 국고채 3·10년 금리, CPI, USD/KRW 환율, 유가(WTI·Dubai·Brent 월평균), 통관 수출·수입과 무역수지(수출 − 수입), 전산업생산지수(계절조정)를 수집
 - `MACRO_DATA_PROVIDER=naver`: Naver 시장지표에서 USD/KRW만 수집
 
 실제 수치 데이터까지 포함해 실행:

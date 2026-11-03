@@ -323,7 +323,14 @@ result = get_report_metadata(
 
 ### get_target_price_data()
 
-목표주가 및 투자의견 조회
+목표주가 및 투자의견 조회. Supabase `broker_opinions_adjusted`(KIS 종목투자의견)를 읽으며 `SUPABASE_DB_URL`이 필요합니다.
+
+- `target_price`: 액면분할을 환산한 값 (현재 수정주가와 같은 기준)
+- `investment_opinion`: 매수 / 중립 / 매도 또는 `null`(NotRated 등). 증권사 원래 표기는 `opinion_raw`
+- `report_id`, `title`, `report_type`, `original_url`, `pdf_url`: KIS 데이터는 리포트와 연결되지 않아 빈 문자열
+- `report_type`, `relational_db` 인자: 기존 호출과의 호환을 위해 받기만 하고 쓰지 않음
+- 조회 실패 시 예외 대신 빈 결과와 `"error": "target_price_unavailable"`을 반환
+- 현재 T1/T2만 적재되어 있어 그 외 종목은 빈 결과
 
 ```python
 from processing.functions.get_target_price_data import get_target_price_data
@@ -332,8 +339,6 @@ result = get_target_price_data(
     ticker="005930",
     date_from="2026-01-01",
     date_to="2026-06-21",
-    report_type="company_report",
-    relational_db=db,
 )
 ```
 
@@ -343,14 +348,19 @@ result = get_target_price_data(
   "company": "삼성전자",
   "target_prices": [
     {
-      "report_id": "KIRS_005930_001",
+      "report_id": "",
+      "ticker": "005930",
+      "company": "삼성전자",
       "published_at": "2026-06-15",
-      "source": "KIRS",
-      "author_org": "작성 기관",
-      "title": "리포트 제목",
+      "source": "KIS",
+      "author_org": "삼성",
+      "title": "",
       "target_price": 95000,
       "investment_opinion": "매수",
-      "report_type": "company_report"
+      "opinion_raw": "BUY",
+      "report_type": "",
+      "original_url": "",
+      "pdf_url": ""
     }
   ],
   "summary": {

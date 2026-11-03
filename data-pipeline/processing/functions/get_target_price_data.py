@@ -4,6 +4,8 @@ from processing.interfaces import BaseRelationalDB
 
 logger = logging.getLogger(__name__)
 
+OPINION_LABELS = {"buy": "매수", "hold": "중립", "sell": "매도"}
+
 
 def get_target_price_data(
     ticker: str,
@@ -12,57 +14,78 @@ def get_target_price_data(
     report_type: Optional[str] = "company_report",
     relational_db: BaseRelationalDB = None,
 ) -> dict:
-    if relational_db is None:
-        raise ValueError("relational_db는 필수입니다.")
+    """Supabase broker_opinions_adjusted(KIS)를 읽는다.
 
-    import sqlite3
-    conn = sqlite3.connect(relational_db.db_path)
-    conn.row_factory = sqlite3.Row
+    KIS 데이터는 리포트와 연결되지 않아 report_id, title, original_url, pdf_url,
+    report_type은 빈 값이다. report_type, relational_db 인자는 기존 호출을 깨지
+    않으려고 받기만 한다.
+    """
+    # 조회 실패로 토론·시뮬레이션 전체가 멈추지 않게 한다. 접속 주소가 메시지에 섞일 수 있어 종류만 남긴다
+    try:
+        rows = _fetch_rows(ticker, date_from, date_to)
+    except Exception as exc:
+        logger.error("목표주가 조회 실패: %s(%s)", ticker, type(exc).__name__)
+        return {**_build_result(ticker, []), "error": "target_price_unavailable"}
+    return _build_result(ticker, rows)
+
+
+def has_target_price_data(ticker: str) -> bool:
+    try:
+        from crawling.db.postgres import connect
+
+        with connect() as connection:
+            row = connection.execute(
+                "select exists (select 1 from broker_opinions where ticker = %s)",
+                (ticker,),
+            ).fetchone()
+    except Exception as exc:
+        logger.error("목표주가 존재 여부 조회 실패: %s(%s)", ticker, type(exc).__name__)
+        return False
+    return bool(row[0])
+
+
+def _fetch_rows(ticker: str, date_from: Optional[str], date_to: Optional[str]) -> list[tuple]:
+    from crawling.db.postgres import connect
 
     query = """
-        SELECT t.*,
-               r.company AS report_company,
-               r.title AS title,
-               r.original_url AS original_url,
-               r.pdf_url AS pdf_url
-        FROM target_price_data t
-        LEFT JOIN report_metadata r ON t.report_id = r.report_id
-        WHERE t.ticker = ?
+        select b.opinion_date, b.broker, b.opinion, b.opinion_norm,
+               b.target_price_adjusted, c.name
+        from broker_opinions_adjusted b
+        join companies c using (ticker)
+        where b.ticker = %s
     """
     params = [ticker]
 
     if date_from:
-        query += " AND t.published_at >= ?"
+        query += " and b.opinion_date >= %s::date"
         params.append(date_from)
     if date_to:
-        query += " AND t.published_at <= ?"
+        query += " and b.opinion_date <= %s::date"
         params.append(date_to)
-    if report_type:
-        query += " AND t.report_type = ?"
-        params.append(report_type)
 
-    query += " ORDER BY t.published_at DESC"
+    query += " order by b.opinion_date desc, b.broker"
 
-    rows = conn.execute(query, params).fetchall()
-    conn.close()
+    with connect() as connection:
+        return connection.execute(query, params).fetchall()
 
+
+def _build_result(ticker: str, rows: list[tuple]) -> dict:
     target_prices = []
-    for row in rows:
-        record = dict(row)
-        record["company"] = record.get("company") or record.get("report_company") or ""
+    for opinion_date, broker, opinion, opinion_norm, target_price, company in rows:
         target_prices.append({
-            "report_id": record.get("report_id", ""),
-            "ticker": record.get("ticker", ticker),
-            "company": record.get("company", ""),
-            "published_at": record.get("published_at", ""),
-            "source": record.get("source", ""),
-            "author_org": record.get("author_org", ""),
-            "title": record.get("title", ""),
-            "target_price": record.get("target_price"),
-            "investment_opinion": record.get("investment_opinion"),
-            "report_type": record.get("report_type"),
-            "original_url": record.get("original_url", ""),
-            "pdf_url": record.get("pdf_url", ""),
+            "report_id": "",
+            "ticker": ticker,
+            "company": company,
+            "published_at": opinion_date.isoformat(),
+            "source": "KIS",
+            "author_org": broker,
+            "title": "",
+            "target_price": target_price,
+            "investment_opinion": OPINION_LABELS.get(opinion_norm),
+            "opinion_raw": opinion,
+            "report_type": "",
+            "original_url": "",
+            "pdf_url": "",
         })
 
     prices = [r["target_price"] for r in target_prices if r["target_price"] is not None]

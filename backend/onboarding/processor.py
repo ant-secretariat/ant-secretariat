@@ -151,7 +151,7 @@ def process_onboarding(
     return {
         "risk_profile": to_risk_profile(total_score, q1_choice),
         "investment_goal": Q1_GOAL[q1_choice],
-        "investment_amount_range": Q3_AMOUNT[q3_choice],
+        "investment_amount_range": Q3_AMOUNT[q3_choice] if q3_choice else "",
         "investment_experience": Q5_EXPERIENCE[q5_score],
         "interest_sectors": validate_sectors(q6_choices),
         "total_score": total_score,

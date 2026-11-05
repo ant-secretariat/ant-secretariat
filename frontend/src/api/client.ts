@@ -1,9 +1,11 @@
+import { mockApi } from "./mock";
 import type {
   Company,
   DataStatus,
   DebateJob,
   InsightBoardResult,
   InsightFeature,
+  TrendFeed,
   TrendReportResult,
   UserContext,
 } from "../types";
@@ -37,7 +39,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export const api = {
+const realApi = {
   health: () => request<{ status: string }>("/health"),
   companies: async () => {
     const data = await request<{ companies: Company[] }>("/companies");
@@ -101,6 +103,16 @@ export const api = {
     const data = await request<{ jobs: DebateJob[] }>(`/users/${userId}/jobs`);
     return data.jobs;
   },
+  sendFeedback: (jobId: string, payload: { helpful: boolean; reason?: string }) =>
+    request<Record<string, unknown>>(`/debate/jobs/${jobId}/feedback`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  // shortcut: 사전 생성 API가 없어 빈 값을 준다. 일일 사전 생성이 생기면 서버 값으로 바꾼다.
+  trendFeed: async (_userId: string): Promise<TrendFeed> => ({ cards: {}, changes: [] }),
 };
+
+// 화면 점검용. VITE_USE_MOCK=true일 때만 예시 데이터를 쓴다.
+export const api: typeof realApi = import.meta.env.VITE_USE_MOCK === "true" ? mockApi : realApi;
 
 export { API_BASE_URL };

@@ -11,7 +11,7 @@ from onboarding.processor import process_onboarding
 
 logger = logging.getLogger(__name__)
 
-REQUIRED_KEYS = ["q1", "q2", "q3", "q3_1", "q4", "q5", "q6"]
+REQUIRED_KEYS = ["q1", "q2", "q3_1", "q4", "q5", "q6"]
 
 _UPSERT_SQL = """
 INSERT INTO users (
@@ -57,7 +57,7 @@ def save_onboarding(
     result = process_onboarding(
         q1_choice=form_data["q1"],
         q2_choice=form_data["q2"],
-        q3_choice=form_data["q3"],
+        q3_choice=form_data.get("q3", ""),
         q3_1_choice=form_data["q3_1"],
         q4_choice=form_data["q4"],
         q5_choice=form_data["q5"],

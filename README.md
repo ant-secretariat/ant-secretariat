@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="docs/brand/app-icon-192.png" alt="개미비서단 앱 아이콘" width="120" height="120" />
+  <img src="docs/brand/ant-character.svg" alt="개미비서단 캐릭터" width="140" height="128" />
   <h3>개미비서단 · ant-secretariat</h3>
   <p>애널리스트 리포트를 근거로 강세·약세 에이전트가 토론하고, 그 결론을 가격 분포로 보여주는 금융 AI 서비스</p>
   <p>

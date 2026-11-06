@@ -17,7 +17,8 @@
 | `symbol.svg` | 기본 심볼. 크기 제한 없이 사용 |
 | `logo-lockup.svg` | 심볼 + 이름 가로 조합. 발표자료 표지용 (텍스트는 시스템 폰트로 렌더링) |
 | `app-icon-512.png` | 파비콘·앱 아이콘 원본 |
-| `app-icon-192.png` | README, 문서 삽입용 |
+| `app-icon-192.png` | 문서 삽입용 |
+| `ant-character.svg` | README 대표 이미지. 앱 로그인 화면의 캐릭터(`frontend/src/assets/ant-chart.svg`)와 같은 파일 |
 
 ## 색
 

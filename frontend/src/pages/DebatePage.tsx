@@ -1,441 +1,487 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
-import {
-  AlertTriangle,
-  ArrowRight,
-  CheckCircle2,
-  Circle,
-  Loader2,
-  Play,
-  RefreshCw,
-  XCircle,
-} from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ChevronDown, ThumbsDown, ThumbsUp, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client";
-import { EmptyState } from "../components/EmptyState";
-import { LoadingBlock } from "../components/LoadingBlock";
-import { SimulationChart } from "../components/SimulationChart";
-import { StatusBadge } from "../components/StatusBadge";
+import { SimulationChart, simulationStats } from "../components/SimulationChart";
+import {
+  AiNote,
+  Ant,
+  Badge,
+  Button,
+  Chip,
+  Confidence,
+  DebateStepper,
+  Disclaimer,
+  ErrorText,
+  OptionCard,
+  Skeleton,
+  Tip,
+  TopBar,
+} from "../components/ui";
+import { profiles, sectorLabel } from "../data/onboarding";
+import { debateStep, isOutOfScope, stepHeadline } from "../lib/debate";
 import { useAppStore } from "../store/appStore";
-import type { DebateAgenda, DebateArgument, DebateJob, DebatePartialResult, JobStatus, SimulationResult } from "../types";
+import type { Company, DebateArgument, DebateJob, SimulationResult } from "../types";
 
-const terminalStatuses = new Set(["completed", "failed"]);
-const statusLabels: Record<string, string> = {
-  queued: "분석 준비 중",
-  running: "토론 생성 중",
-  debate_completed: "토론 완료",
-  simulation_running: "시뮬레이션 실행 중",
-  completed: "전체 완료",
-  failed: "실패",
-};
-
-const exampleQuestions = [
-  "최근 업황 기준으로 주가 상승 여력이 있는지 분석해줘",
-  "실적 개선 가능성과 주요 리스크를 비교해줘",
-  "목표주가와 현재가 차이를 근거 중심으로 판단해줘",
-  "단기 투자 관점에서 긍정/부정 요인을 토론해줘",
-];
+const terminal = new Set(["completed", "failed"]);
+const topics = ["목표주가가 오른 근거", "최근 쟁점", "위험 요인"];
+const scopeTopics = ["최근 리포트의 쟁점", "목표주가가 바뀐 근거", "환율이 바뀌면 받는 영향"];
 
 export function DebatePage() {
-  const params = useParams();
+  const { jobId } = useParams();
+  return jobId ? <JobView jobId={jobId} /> : <StartView />;
+}
+
+function StartView() {
   const navigate = useNavigate();
-  const userId = useAppStore((state) => state.userId);
-  const selectedCompany = useAppStore((state) => state.selectedCompany);
+  const client = useQueryClient();
+  const userId = useAppStore((state) => state.userId) ?? "";
   const setCurrentJobId = useAppStore((state) => state.setCurrentJobId);
-  const [query, setQuery] = useState("");
-  const jobId = params.jobId;
-  const activeUserId = userId ?? "";
-
-  const jobQuery = useQuery({
-    queryKey: ["debate-job", jobId],
-    queryFn: () => api.debateJob(jobId!),
-    enabled: Boolean(jobId),
-    refetchInterval: (queryInfo) => {
-      const status = queryInfo.state.data?.status;
-      return status && !terminalStatuses.has(status) ? 2500 : false;
-    },
+  const companies = useQuery({ queryKey: ["companies"], queryFn: api.companies });
+  const context = useQuery({
+    queryKey: ["user-context", userId],
+    queryFn: () => api.userContext(userId),
+    retry: false,
   });
+  const [sector, setSector] = useState<string>();
+  const [company, setCompany] = useState<Company>();
+  const [topic, setTopic] = useState<string>();
+  const [text, setText] = useState("");
+  const [screen, setScreen] = useState<"form" | "scope" | "collecting">("form");
 
-  const startMutation = useMutation({
-    mutationFn: () =>
-      api.startDebate({
-        user_id: activeUserId,
-        company: selectedCompany!.company,
-        query: query || `${selectedCompany!.company}의 업황과 주가 전망을 분석해줘`,
-      }),
+  const all = companies.data ?? [];
+  const sectors = context.data?.interest_sectors?.length
+    ? context.data.interest_sectors
+    : [...new Set(all.map((c) => c.sector))];
+  const activeSector = sector ?? sectors[0];
+  const inSector = all.filter((c) => c.sector === activeSector);
+  const activeCompany = company && company.sector === activeSector ? company : inSector[0];
+
+  const start = useMutation({
+    mutationFn: async (query: string) => {
+      const status = await api.dataStatus(activeCompany!.ticker);
+      if (!status.available.reports) return null;
+      return api.startDebate({ user_id: userId, company: activeCompany!.company, query });
+    },
     onSuccess: (data) => {
+      if (!data) return setScreen("collecting");
       setCurrentJobId(data.job_id);
+      client.invalidateQueries({ queryKey: ["user-jobs", userId] });
       navigate(`/debate/${data.job_id}`);
     },
   });
 
-  return (
-    <div className="page">
-      <header className="page-header">
-        <div>
-          <p className="eyebrow">Debate</p>
-          <h1>토론 분석</h1>
-          <p>찬성 측, 반대 측, 판정 분석과 시뮬레이션 결과를 분석 단위로 확인합니다.</p>
-        </div>
-        {jobQuery.data ? <StatusBadge status={jobQuery.data.status} /> : null}
-      </header>
+  const begin = (override?: string) => {
+    const query = override ?? (text.trim() || topic || `${activeCompany!.company}의 최근 쟁점`);
+    if (isOutOfScope(query)) return setScreen("scope");
+    setScreen("form");
+    start.mutate(query);
+  };
 
-      <section className="panel">
-        <div className="panel-title">새 토론 시작</div>
-        <div className="debate-start-row">
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={
-              selectedCompany
-                ? `${selectedCompany.company}에 대해 궁금한 점을 입력하세요`
-                : "대시보드에서 기업을 먼저 선택하세요"
-            }
-          />
-          <button
-            className="primary-button"
-            disabled={!selectedCompany || startMutation.isPending}
-            onClick={() => startMutation.mutate()}
-          >
-            {startMutation.isPending ? <Loader2 className="spin-icon" size={17} /> : <Play size={17} />}
-            {startMutation.isPending ? "시작 중" : "시작"}
-          </button>
-        </div>
-        <div className="prompt-chip-row">
-          {exampleQuestions.map((question) => (
-            <button
-              className="prompt-chip"
-              key={question}
-              onClick={() => setQuery(question)}
-              type="button"
-            >
-              {question}
-            </button>
+  if (screen === "scope") {
+    return (
+      <div className="screen">
+        <TopBar title="찬반 토론" back={() => setScreen("form")} />
+        <Ant kind="analysis" size={100} />
+        <h2 className="display gap-top">
+          단기 주가 예측은
+          <br />
+          도와드리기 어려워요
+        </h2>
+        <p className="lead">아래 주제는 함께 살펴볼 수 있어요.</p>
+        <div className="options" role="radiogroup" aria-label="살펴볼 수 있는 주제">
+          {scopeTopics.map((t) => (
+            <OptionCard key={t} selected={false} onClick={() => begin(`${activeCompany?.company} ${t}`)}>
+              {t}
+            </OptionCard>
           ))}
         </div>
-        {startMutation.isPending ? (
-          <LoadingBlock label="분석 작업을 생성하는 중입니다. 잠시 후 진행 상태 화면으로 이동합니다." />
-        ) : null}
-        {startMutation.error ? <div className="error-box">{startMutation.error.message}</div> : null}
-      </section>
+      </div>
+    );
+  }
 
-      {!jobId ? (
-        <EmptyState title="선택된 분석이 없습니다" description="새 토론을 시작하거나 분석 이력에서 기존 토론을 선택하세요." />
-      ) : jobQuery.isLoading ? (
-        <LoadingBlock label="분석 상태 조회 중" />
-      ) : jobQuery.error ? (
-        <div className="error-box">{jobQuery.error.message}</div>
-      ) : jobQuery.data ? (
-        <JobDetail job={jobQuery.data} onRefresh={() => jobQuery.refetch()} />
-      ) : null}
+  if (screen === "collecting") {
+    return (
+      <div className="screen">
+        <TopBar title="찬반 토론" back={() => setScreen("form")} />
+        <Ant kind="alert" size={100} />
+        <h2 className="display gap-top">아직 자료를 모으는 중이에요</h2>
+        <p className="lead">내일 다시 확인해 주세요.</p>
+        <Button variant="secondary" onClick={() => navigate(`/trend-report/${activeCompany?.ticker}`)}>
+          트렌드 리포트 보기
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="screen">
+      <TopBar title="찬반 토론" settings />
+      <div className="hero-row">
+        <Ant kind="analysis" size={84} />
+        <h2 className="display">
+          어떤 종목을
+          <br />
+          같이 볼까요?
+        </h2>
+      </div>
+      {companies.isLoading ? <Skeleton /> : null}
+      {companies.error ? <ErrorText>종목 목록을 불러오지 못했어요.</ErrorText> : null}
+
+      <h3 className="field-label">내 관심 산업</h3>
+      <div className="chips">
+        {sectors.map((s) => (
+          <Chip key={s} selected={s === activeSector} onClick={() => setSector(s)}>
+            {sectorLabel(s)}
+          </Chip>
+        ))}
+      </div>
+
+      <h3 className="field-label">종목</h3>
+      <div className="chips">
+        {inSector.map((c) => (
+          <Chip key={c.ticker} selected={c.ticker === activeCompany?.ticker} onClick={() => setCompany(c)}>
+            {c.company}
+          </Chip>
+        ))}
+      </div>
+
+      <h3 className="field-label">궁금한 주제 (선택)</h3>
+      <div className="chips">
+        {topics.map((t) => (
+          <Chip key={t} selected={t === topic} onClick={() => setTopic(t === topic ? undefined : t)}>
+            {t}
+          </Chip>
+        ))}
+      </div>
+
+      <div className="field">
+        <label htmlFor="ask">직접 물어보기 (선택)</label>
+        <input
+          id="ask"
+          maxLength={100}
+          value={text}
+          placeholder="100자까지 쓸 수 있어요"
+          onChange={(e) => setText(e.target.value)}
+        />
+        <p className="helper">비워두면 기본 질문으로 시작해요.</p>
+      </div>
+
+      {start.error ? <ErrorText>토론을 시작하지 못했어요. 다시 시도해 주세요.</ErrorText> : null}
+      <Button disabled={!activeCompany || start.isPending} onClick={() => begin()}>
+        {start.isPending ? "시작하고 있어요" : "토론 시작"}
+      </Button>
+      <p className="caption gap-top-sm">약 2~3분 걸리고, 이력에 저장돼요.</p>
+      <Disclaimer />
     </div>
   );
 }
 
-function JobDetail({ job, onRefresh }: { job: DebateJob; onRefresh: () => void }) {
+function JobView({ jobId }: { jobId: string }) {
+  const job = useQuery({
+    queryKey: ["debate-job", jobId],
+    queryFn: () => api.debateJob(jobId),
+    refetchInterval: (q) => {
+      const status = q.state.data?.status;
+      return status && terminal.has(status) ? false : 2500;
+    },
+  });
+
+  if (job.isLoading) {
+    return (
+      <div className="screen">
+        <TopBar title="토론" back="/debate" />
+        <Skeleton />
+      </div>
+    );
+  }
+  if (job.error || !job.data) {
+    return (
+      <div className="screen">
+        <TopBar title="토론" back="/debate" />
+        <ErrorText>토론을 불러오지 못했어요.</ErrorText>
+        <Button variant="secondary" onClick={() => job.refetch()}>
+          다시 시도
+        </Button>
+      </div>
+    );
+  }
+  const data = job.data;
+  return data.status === "queued" || data.status === "running" || data.status === "failed" ? (
+    <ProgressView job={data} />
+  ) : (
+    <ResultView job={data} />
+  );
+}
+
+function ProgressView({ job }: { job: DebateJob }) {
+  const step = debateStep(job);
+  const seconds = useElapsed(job.created_at);
+  const bull = job.partial_result?.bull_output;
+  const bear = job.partial_result?.bear_output;
+
+  return (
+    <div className="screen">
+      <TopBar title={`${job.company} 토론`} back="/history" />
+      <DebateStepper current={step} />
+      {job.status === "failed" ? (
+        <ErrorText>분석을 마치지 못했어요. 이력에서 다시 시도해 주세요.</ErrorText>
+      ) : (
+        <>
+          <div className="hero-row">
+            <Ant kind="analysis" size={84} />
+            <div>
+              <h2 className="display">{stepHeadline[step]}</h2>
+              <p className="caption">
+                {Math.floor(seconds / 60)}분 {seconds % 60}초 지났어요. 보통 2~3분 걸려요.
+              </p>
+            </div>
+          </div>
+          <SideCard title="찬성 측 의견" summary={bull?.overall_summary ?? bull?.agendas?.[0]?.summary} args={bull?.agendas?.[0]?.arguments} active={step >= 1} />
+          <SideCard title="반대 측 의견" summary={bear?.overall_summary ?? bear?.agendas?.[0]?.summary} args={bear?.agendas?.[0]?.arguments} active={step >= 2} />
+          <Tip>다른 화면을 봐도 분석은 계속돼요. 이력에서 다시 열 수 있어요.</Tip>
+        </>
+      )}
+      <Disclaimer />
+    </div>
+  );
+}
+
+function SideCard({
+  title,
+  summary,
+  args,
+  active,
+}: {
+  title: string;
+  summary?: string;
+  args?: DebateArgument[];
+  active: boolean;
+}) {
+  const source = args?.[0];
+  return (
+    <section className="card side">
+      <div className="side-head">
+        <h3>{title}</h3>
+        {summary ? <Badge tone="success">완료</Badge> : null}
+      </div>
+      {summary ? (
+        <>
+          <p>{summary}</p>
+          {source?.source_title ? (
+            <span className="source">
+              {source.source_title}
+              {source.source_date ? `, ${source.source_date}` : ""}
+            </span>
+          ) : null}
+        </>
+      ) : active ? (
+        <Skeleton />
+      ) : (
+        <p className="caption">차례를 기다리고 있어요.</p>
+      )}
+    </section>
+  );
+}
+
+function useElapsed(iso: string) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  return Math.max(0, Math.floor((now - new Date(iso).getTime()) / 1000));
+}
+
+function ResultView({ job }: { job: DebateJob }) {
+  const [showSim, setShowSim] = useState(false);
   const debate = job.debate_result?.debate_result;
+  const verdict = debate?.judge?.overall_verdict ?? {};
+  const brief = String(verdict.final_brief ?? "");
+  const [headline, ...rest] = brief.split(/(?<=[.!?요다])\s+/);
+  const agendas = debate?.agendas ?? [];
   const simulation = job.simulation_result as SimulationResult | undefined;
-  const finalBrief = debate?.judge?.overall_verdict?.final_brief;
-  const partial = job.partial_result;
-  const hasDebate = Boolean(debate?.agendas?.length);
-  const hasPartial = Boolean(
-    partial?.bull_output?.agendas?.length ||
-      partial?.bear_output?.agendas?.length ||
-      partial?.judge_output?.overall_verdict,
-  );
-  const hasSimulation = Boolean(simulation && Object.keys(simulation).length);
-  const waitingForDebate = job.status === "queued" || job.status === "running";
-  const waitingForSimulation = job.status === "debate_completed" || job.status === "simulation_running";
-  const failed = job.status === "failed";
+  const hasSim = Boolean(simulation && Object.keys(simulation).length);
+  const simWaiting = job.status === "debate_completed" || job.status === "simulation_running";
+  const userId = useAppStore((state) => state.userId) ?? "";
+  const context = useQuery({
+    queryKey: ["user-context", userId],
+    queryFn: () => api.userContext(userId),
+    retry: false,
+  });
+  const focus = profiles[context.data?.risk_profile ?? ""]?.focus;
+  const keyPoints = agendas.map((a) => a.verdict?.key_point).filter(Boolean).slice(0, 2);
 
   return (
-    <div className="job-layout">
-      <section className="panel">
-        <div className="panel-toolbar">
-          <div>
-            <div className="panel-title">작업 상태</div>
-          </div>
-          <button className="secondary-button" onClick={onRefresh}>
-            <RefreshCw size={16} />
-            갱신
-          </button>
-        </div>
-        <div className="job-summary-grid">
-          <Info label="기업" value={`${job.company} (${job.ticker})`} />
-          <Info label="진행 상태" value={statusLabels[job.status] ?? job.status} />
-        </div>
-        {job.error_message ? (
-          <div className="error-box">
-            <AlertTriangle size={16} />
-            {job.error_message}
-          </div>
-        ) : null}
+    <div className="screen">
+      <TopBar title={`${job.company} 토론 결과`} back="/history" />
+      <section className="verdict">
+        <h2>{headline || "판정 결과를 정리했어요."}</h2>
+        {rest.length ? <p>{rest.join(" ")}</p> : null}
       </section>
 
-      <ProgressPanel status={job.status} partial={partial} />
-
-      {failed ? null : waitingForDebate && !hasPartial ? (
-        <LoadingBlock label="토론 결과를 생성하는 중입니다" />
-      ) : finalBrief ? (
-        <section className="panel">
-          <div className="panel-title">판정 브리핑</div>
-          <p className="comment-box">{typeof finalBrief === "string" ? finalBrief : "최종 브리핑 데이터가 없습니다."}</p>
+      {showSim && hasSim ? (
+        <SimulationCard simulation={simulation!} />
+      ) : (
+        <section className="card sim-cta">
+          <h3>이 위험이 가격에 어느 범위로 나타날까요?</h3>
+          <p className="caption">
+            {simWaiting ? "시뮬레이션을 계산하고 있어요." : "결과는 판정 아래에 이어서 보여드려요."}
+          </p>
+          <Button disabled={simWaiting || !hasSim} onClick={() => setShowSim(true)}>
+            {simWaiting ? "계산하고 있어요" : hasSim ? "가격 시나리오 보기" : "시나리오를 만들지 못했어요"}
+          </Button>
         </section>
-      ) : null}
+      )}
 
-      {hasDebate ? (
-        <section className="agenda-stack">
-          {debate!.agendas.map((agenda) => (
-            <AgendaCard agenda={agenda} key={agenda.agenda_id} />
+      {keyPoints.length ? (
+        <section className="focus">
+          <h3>먼저 확인할 것</h3>
+          <p>온보딩 답변에 맞춰 {focus ?? "확인할 내용"}을 앞에 뒀어요. 결론은 성향과 관계없이 같아요.</p>
+          {keyPoints.map((k) => (
+            <strong key={k}>{k}</strong>
           ))}
         </section>
-      ) : hasPartial ? (
-        <PartialDebateResult partial={partial!} />
-      ) : !failed && !waitingForDebate ? (
-        <EmptyState title="토론 결과가 없습니다" description="토론 단계가 완료됐지만 표시할 결과가 없습니다." />
       ) : null}
 
-      {hasSimulation ? (
-        <SimulationPanel simulation={simulation!} />
-      ) : !failed && waitingForSimulation ? (
-        <LoadingBlock label={job.status === "simulation_running" ? "시뮬레이션 결과를 계산하는 중입니다" : "시뮬레이션 실행을 준비하는 중입니다"} />
-      ) : job.status === "completed" ? (
-        <EmptyState title="시뮬레이션 결과가 없습니다" description="분석은 완료됐지만 표시할 시뮬레이션 결과가 없습니다." />
-      ) : null}
+      {agendas.map((a) => (
+        <section key={a.agenda_id}>
+          <h2 className="section-title">{a.agenda_title}</h2>
+          <ArgumentCard tone="강세" side={a.bull} />
+          <ArgumentCard tone="약세" side={a.bear} />
+          <div className="judge">
+            <h4>판정</h4>
+            <p>{a.verdict?.reasoning}</p>
+          </div>
+        </section>
+      ))}
+
+      <FeedbackCard jobId={job.job_id} />
+      <AiNote />
+      <Disclaimer />
     </div>
   );
 }
 
-function AgendaCard({ agenda }: { agenda: DebateAgenda }) {
+function ArgumentCard({ tone, side }: { tone: string; side: { summary: string; arguments: DebateArgument[] } }) {
+  const [open, setOpen] = useState(tone === "강세" ? 0 : -1);
+  const a = side.arguments?.[0];
+  const relation = a?.relation_evidence ?? [];
   return (
-    <article className="panel agenda-card">
-      <div className="agenda-header">
-        <div>
-          <span>Agenda {agenda.agenda_id}</span>
-          <h2>{agenda.agenda_title}</h2>
+    <article className="card argument">
+      <div className="argument-head">
+        <span>{tone}</span>
+        <Confidence value={a?.confidence} />
+      </div>
+      <h3>{a?.title ?? side.summary}</h3>
+      <p>{a?.content ?? side.summary}</p>
+      {a?.source_title ? (
+        <span className="source">
+          {a.source_title}
+          {a.source_date ? `, ${a.source_date}` : ""}
+        </span>
+      ) : null}
+      {relation.map((r, i) => (
+        <div className="relation" key={r.title}>
+          <button type="button" aria-expanded={open === i} onClick={() => setOpen(open === i ? -1 : i)}>
+            관계 근거: {r.title}
+            {open === i ? <X size={20} aria-hidden /> : <ChevronDown size={20} aria-hidden />}
+          </button>
+          {open === i ? <p>{r.body}</p> : null}
         </div>
-        <div className="winner-pill">{roleLabel(agenda.verdict.winner)}</div>
-      </div>
-      <div className="argument-grid">
-        <ArgumentSide title="찬성 측" summary={agenda.bull.summary} items={agenda.bull.arguments} />
-        <ArgumentSide title="반대 측" summary={agenda.bear.summary} items={agenda.bear.arguments} />
-      </div>
-      <div className="verdict-box">
-        <strong>{agenda.verdict.key_point}</strong>
-        <span>{agenda.verdict.reasoning}</span>
-      </div>
+      ))}
     </article>
   );
 }
 
-const progressSteps = [
-  { label: "데이터 수집", description: "기업 데이터와 사용자 정보를 불러옵니다." },
-  { label: "찬성 측 분석", description: "긍정 투자 근거를 구성합니다." },
-  { label: "반대 측 분석", description: "리스크와 반박 근거를 구성합니다." },
-  { label: "판정", description: "양쪽 근거를 종합해 결론을 정리합니다." },
-  { label: "시뮬레이션", description: "수익률 분포를 계산합니다." },
-  { label: "완료", description: "전체 결과를 확인할 수 있습니다." },
-];
-
-function ProgressPanel({ status, partial }: { status: JobStatus; partial?: DebatePartialResult }) {
-  const currentIndex = progressIndex(status, partial?.stage);
-  const failed = status === "failed";
-  const completed = status === "completed";
-
+function SimulationCard({ simulation }: { simulation: SimulationResult }) {
+  const base = simulation.chart_data?.base;
+  const stats = simulationStats(base, simulation.current_price);
   return (
-    <section className="panel progress-panel">
-      <div className="panel-title">진행 상태</div>
-      {failed ? (
-        <div className="error-box">
-          <XCircle size={16} />
-          분석 처리 중 오류가 발생했습니다. 상단의 작업 상태에서 오류 내용을 확인하세요.
+    <section className="card sim">
+      <h3>
+        {stats ? `${stats.days}일 ` : ""}가격 범위{stats ? ` (${stats.lowName}~${stats.highName})` : ""}
+      </h3>
+      <SimulationChart paths={base} />
+      {stats ? <p className="caption">오늘부터 {stats.days}일. 가운데 점선은 중앙값이에요.</p> : null}
+      {stats ? (
+        <dl>
+          <div>
+            <dt>
+              {stats.lowName}~{stats.highName} 범위
+            </dt>
+            <dd>
+              {stats.low} ~ {stats.high}
+            </dd>
+          </div>
+          <div>
+            <dt>하위 {stats.lowName.slice(1)}% 손실 기준</dt>
+            <dd>{stats.low}</dd>
+          </div>
+        </dl>
+      ) : null}
+      {simulation.interpretation ? <p className="sim-text">{simulation.interpretation}</p> : null}
+      <p className="sim-note">
+        이 결과는 과거 데이터와 가정에 기반한 가상의 시나리오이며, 미래 수익률이나 가격을 예측·보장하지 않습니다.
+      </p>
+    </section>
+  );
+}
+
+const feedbackReasons = ["사실 오류", "근거 없음", "오래된 정보", "이해 어려움"];
+
+function FeedbackCard({ jobId }: { jobId: string }) {
+  const [vote, setVote] = useState<"up" | "down">();
+  const [reason, setReason] = useState<string>();
+  const send = useMutation({
+    mutationFn: (payload: { helpful: boolean; reason?: string }) => api.sendFeedback(jobId, payload),
+  });
+  return (
+    <section className="card feedback">
+      <h3>이 결과가 도움이 됐나요?</h3>
+      <div className="vote">
+        <button
+          type="button"
+          aria-pressed={vote === "up"}
+          className={vote === "up" ? "selected" : ""}
+          onClick={() => {
+            setVote("up");
+            setReason(undefined);
+            send.mutate({ helpful: true });
+          }}
+        >
+          <ThumbsUp size={24} aria-hidden /> 도움됨
+        </button>
+        <button
+          type="button"
+          aria-pressed={vote === "down"}
+          className={vote === "down" ? "selected" : ""}
+          onClick={() => {
+            setVote("down");
+            send.mutate({ helpful: false });
+          }}
+        >
+          <ThumbsDown size={24} aria-hidden /> 아쉬움
+        </button>
+      </div>
+      {vote === "down" ? (
+        <div className="chips">
+          {feedbackReasons.map((r) => (
+            <Chip
+              key={r}
+              selected={reason === r}
+              onClick={() => {
+                setReason(r);
+                send.mutate({ helpful: false, reason: r });
+              }}
+            >
+              {r}
+            </Chip>
+          ))}
         </div>
       ) : null}
-      <div className="progress-step-grid">
-        {progressSteps.map((step, index) => {
-          const done = !failed && (completed || index < currentIndex);
-          const active = !failed && !completed && index === currentIndex;
-          const Icon = done ? CheckCircle2 : active ? Loader2 : Circle;
-          return (
-            <div className={`progress-step ${done ? "done" : ""} ${active ? "active" : ""}`} key={step.label}>
-              <Icon className={active ? "spin-icon" : ""} size={18} />
-              <div>
-                <strong>{step.label}</strong>
-                <span>{step.description}</span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      {send.error ? <ErrorText>의견을 저장하지 못했어요.</ErrorText> : null}
     </section>
   );
-}
-
-function progressIndex(status: JobStatus, stage?: string) {
-  if (status === "completed") return progressSteps.length - 1;
-  if (status === "simulation_running" || status === "debate_completed") return 4;
-  if (status === "failed") return -1;
-  if (stage === "judge_completed") return 4;
-  if (stage === "bear_completed") return 3;
-  if (stage === "bull_completed") return 2;
-  if (stage === "data_collected") return 1;
-  return 0;
-}
-
-function PartialDebateResult({ partial }: { partial: DebatePartialResult }) {
-  const bullAgendas = partial.bull_output?.agendas ?? [];
-  const bearAgendas = partial.bear_output?.agendas ?? [];
-  const judge = partial.judge_output?.overall_verdict;
-
-  return (
-    <div className="partial-debate-stack">
-      {bullAgendas.length ? (
-        <PartialAgentPanel title="찬성 측 분석" tone="bull" agendas={bullAgendas} />
-      ) : (
-        <LoadingBlock label="찬성 측 분석을 생성하는 중입니다" />
-      )}
-      {bearAgendas.length ? (
-        <PartialAgentPanel title="반대 측 분석" tone="bear" agendas={bearAgendas} />
-      ) : bullAgendas.length ? (
-        <LoadingBlock label="반대 측 분석을 생성하는 중입니다" />
-      ) : null}
-      {judge ? (
-        <section className="panel">
-          <div className="panel-title">판정 생성 완료</div>
-          <p className="comment-box">{formatUnknown(judge.final_brief) || "판정 결과를 정리했습니다."}</p>
-        </section>
-      ) : bearAgendas.length ? (
-        <LoadingBlock label="판정 브리핑을 생성하는 중입니다" />
-      ) : null}
-    </div>
-  );
-}
-
-function PartialAgentPanel({
-  title,
-  tone,
-  agendas,
-}: {
-  title: string;
-  tone: "bull" | "bear";
-  agendas: Array<{
-    agenda_id?: number;
-    agenda_title?: string;
-    arguments?: DebateArgument[];
-    summary?: string;
-  }>;
-}) {
-  return (
-    <section className={`panel partial-agent-panel ${tone}`}>
-      <div className="panel-title">{title}</div>
-      <div className="partial-agenda-grid">
-        {agendas.map((agenda, index) => (
-          <article className="partial-agenda-card" key={`${agenda.agenda_id ?? index}-${agenda.agenda_title ?? title}`}>
-            <span>Agenda {agenda.agenda_id ?? index + 1}</span>
-            <strong>{agenda.agenda_title ?? "분석 아젠다"}</strong>
-            {agenda.summary ? <p>{agenda.summary}</p> : null}
-            <ul>
-              {(agenda.arguments ?? []).slice(0, 2).map((item, itemIndex) => (
-                <li key={`${item.title ?? "근거"}-${itemIndex}`}>
-                  <strong>{item.title ?? "근거"}</strong>
-                  <span>{item.content ?? ""}</span>
-                </li>
-              ))}
-            </ul>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function ArgumentSide({
-  title,
-  summary,
-  items,
-}: {
-  title: string;
-  summary: string;
-  items: DebateAgenda["bull"]["arguments"];
-}) {
-  return (
-    <div className="argument-side">
-      <div className="argument-title">
-        <span>{title}</span>
-        <ArrowRight size={15} />
-      </div>
-      <p>{summary}</p>
-      <ul>
-        {(items ?? []).slice(0, 3).map((item, index) => (
-          <li key={`${item.title}-${index}`}>
-            <strong>{item.title ?? "근거"}</strong>
-            <span>{item.content ?? ""}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-function SimulationPanel({ simulation }: { simulation: SimulationResult }) {
-  const chartPaths = simulation.chart_data?.base;
-  const summaryRows = useMemo(
-    () => [
-      { label: "예상 수익률", value: pct(simulation.summary?.expected_return_pct) },
-      { label: "상승 확률", value: pct(simulation.summary?.upside_probability) },
-      { label: "변동성", value: pct(simulation.summary?.volatility) },
-      {
-        label: "현재가",
-        value: simulation.current_price ? simulation.current_price.toLocaleString("ko-KR") : "-",
-      },
-    ],
-    [simulation],
-  );
-
-  return (
-    <section className="panel">
-      <div className="panel-title">시뮬레이션</div>
-      {simulation.error ? <div className="error-box">{simulation.message ?? simulation.error}</div> : null}
-      <div className="metric-grid">
-        {summaryRows.map((row) => (
-          <div className="metric-card" key={row.label}>
-            <span>{row.label}</span>
-            <strong>{row.value}</strong>
-          </div>
-        ))}
-      </div>
-      <SimulationChart paths={chartPaths} />
-      {simulation.interpretation ? <p className="comment-box">{simulation.interpretation}</p> : null}
-    </section>
-  );
-}
-
-function Info({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="info-row">
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
-}
-
-function pct(value?: number) {
-  return typeof value === "number" ? `${value.toFixed(2)}%` : "-";
-}
-
-function formatUnknown(value: unknown) {
-  if (value === null || value === undefined) return "";
-  return typeof value === "string" ? value : JSON.stringify(value);
-}
-
-function roleLabel(value: string) {
-  const labels: Record<string, string> = {
-    Bull: "찬성 측",
-    bull: "찬성 측",
-    Bear: "반대 측",
-    bear: "반대 측",
-    Judge: "판정",
-    judge: "판정",
-  };
-  return labels[value] ?? value;
 }

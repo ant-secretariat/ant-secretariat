@@ -1,222 +1,371 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { CheckCircle2, RefreshCw, UserRound } from "lucide-react";
-import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
-import { defaultOnboarding, onboardingOptions } from "../data/onboarding";
+import { Ant, Button, Chip, ErrorText, OptionCard, ProgressAnt, Tip } from "../components/ui";
+import {
+  type Answers,
+  mismatchMessage,
+  profiles,
+  questions,
+  sectorLabel,
+  sectors,
+  tickersKey,
+  toPayload,
+} from "../data/onboarding";
 import { useAppStore } from "../store/appStore";
+
+// 단계: 0 안내·동의, 1~6 객관식, 7 퀴즈, 8 관심 산업, 9 결과
+const QUIZ = 7;
+const INTEREST = 8;
+const RESULT = 9;
+const MAX_SECTORS = 3;
+const MAX_TICKERS = 5;
+const draftKey = "ant-secretariat-onboarding";
+
+type Draft = { step: number; consent: boolean; answers: Answers; riskProfile?: string };
+
+function loadDraft(): Draft {
+  try {
+    const raw = localStorage.getItem(draftKey);
+    if (raw) return JSON.parse(raw) as Draft;
+  } catch {
+    // 저장 내용이 깨졌으면 처음부터 시작한다.
+  }
+  return { step: 0, consent: false, answers: {} };
+}
 
 export function OnboardingPage() {
   const navigate = useNavigate();
-  const userId = useAppStore((state) => state.userId);
-  const accountName = useAppStore((state) => state.accountName);
-  const [form, setForm] = useState(defaultOnboarding);
-  const activeUserId = userId ?? "";
+  const client = useQueryClient();
+  const userId = useAppStore((state) => state.userId) ?? "";
+  const [draft, setDraft] = useState<Draft>(loadDraft);
+  const [warned, setWarned] = useState<string | null>(null);
+  const { step, consent, answers } = draft;
 
-  const createUser = useMutation({
-    mutationFn: () => api.createUser(activeUserId),
-  });
-  const saveOnboarding = useMutation({
-    mutationFn: () => api.saveOnboarding({ user_id: activeUserId, ...form }),
-  });
-  const contextQuery = useQuery({
-    queryKey: ["user-context", activeUserId],
-    queryFn: () => api.userContext(activeUserId),
-    retry: false,
-    enabled: Boolean(activeUserId),
-  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(draftKey, JSON.stringify(draft));
+    } catch {
+      // 이어하기만 안 될 뿐 진행에는 지장 없다.
+    }
+  }, [draft]);
 
-  const setValue = (key: keyof typeof defaultOnboarding, value: string) => {
-    setForm((prev) => ({ ...prev, [key]: value }));
+  const go = (next: number) => {
+    setWarned(null);
+    setDraft((d) => ({ ...d, step: next }));
+    window.scrollTo(0, 0);
+  };
+  const answer = (patch: Answers) => {
+    setWarned(null);
+    setDraft((d) => ({ ...d, answers: { ...d.answers, ...patch } }));
   };
 
-  const toggleSector = (sector: string) => {
-    setForm((prev) => {
-      const exists = prev.q6.includes(sector);
-      const next = exists ? prev.q6.filter((item) => item !== sector) : [...prev.q6, sector];
-      return { ...prev, q6: next.slice(0, 3) };
-    });
-  };
+  const save = useMutation({
+    mutationFn: () => api.saveOnboarding(toPayload(userId, answers)),
+    onSuccess: (data) => {
+      // 저장 전 조회 결과가 남아 있으면 홈이 다시 온보딩으로 돌려보낸다.
+      client.removeQueries({ queryKey: ["user-context", userId] });
+      setDraft((d) => ({ ...d, step: RESULT, riskProfile: String(data.risk_profile ?? "") }));
+      window.scrollTo(0, 0);
+    },
+  });
 
-  const submit = async () => {
-    await createUser.mutateAsync();
-    await saveOnboarding.mutateAsync();
-    await contextQuery.refetch();
-    navigate("/insight");
-  };
-
-  return (
-    <div className="page setup-page">
-      <header className="page-header">
-        <div>
-          <p className="eyebrow">Initial Setup</p>
-          <h1>투자 성향 설정</h1>
-          <p>{accountName}으로 접속했습니다. 분석 결과 해석에 사용할 투자 성향을 설정합니다.</p>
-        </div>
-        <button className="secondary-button" onClick={() => contextQuery.refetch()}>
-          <RefreshCw size={16} />
-          새로고침
-        </button>
-      </header>
-
-      <section className="split-grid">
-        <div className="panel">
-          <div className="panel-title">
-            <UserRound size={18} />
-            설문 응답
+  if (step === 0) {
+    return (
+      <Shell
+        footer={
+          <Button disabled={!consent} onClick={() => go(1)}>
+            다음
+          </Button>
+        }
+      >
+        <div className="onb-intro">
+          <Ant kind="chart" size={130} />
+          <h1 className="display">
+            안녕하세요, 오늘부터 곁에서
+            <br />
+            투자 공부를 도울 개미 비서예요.
+          </h1>
+          <p className="lead">제가 어떤 점을 먼저 챙기면 좋을지 알 수 있도록 몇 가지만 여쭤볼게요. 2분이면 끝나요.</p>
+          <div className="card consent">
+            <p>답변은 확인 포인트를 정리하는 데만 써요.</p>
+            <p>종목 추천이나 매수·매도 조언에는 쓰지 않아요.</p>
+            <p>답변은 설정에서 언제든 지울 수 있어요.</p>
+            <label>
+              <input
+                type="checkbox"
+                checked={consent}
+                onChange={(e) => setDraft((d) => ({ ...d, consent: e.target.checked }))}
+              />
+              투자 성향 답변 수집·이용에 동의해요 (필수)
+            </label>
           </div>
-          <Question title="투자 기간">
-            <Segmented
-              options={onboardingOptions.q1}
-              value={form.q1}
-              onChange={(value) => setValue("q1", value)}
-            />
-          </Question>
-          <Question title="투자 목표">
-            <Segmented
-              options={onboardingOptions.q2}
-              value={form.q2}
-              onChange={(value) => setValue("q2", value)}
-            />
-          </Question>
-          <Question title="투자 금액">
-            <Segmented
-              options={onboardingOptions.q3}
-              value={form.q3}
-              onChange={(value) => setValue("q3", value)}
-            />
-          </Question>
-          <Question title="총 자산 대비 비중">
-            <Segmented
-              options={onboardingOptions.q3_1}
-              value={form.q3_1}
-              onChange={(value) => setValue("q3_1", value)}
-            />
-          </Question>
-          <Question title="손실 시 행동">
-            <Segmented
-              options={onboardingOptions.q4}
-              value={form.q4}
-              onChange={(value) => setValue("q4", value)}
-            />
-          </Question>
-          <Question title="투자 경험">
-            <Segmented
-              options={onboardingOptions.q5}
-              value={form.q5}
-              onChange={(value) => setValue("q5", value)}
-            />
-          </Question>
-          <Question title="관심 산업">
-            <div className="chip-grid">
-              {onboardingOptions.q6.map((sector) => (
-                <button
-                  key={sector}
-                  className={`chip ${form.q6.includes(sector) ? "selected" : ""}`}
-                  onClick={() => toggleSector(sector)}
-                  type="button"
-                >
-                  {sector}
-                </button>
-              ))}
-            </div>
-          </Question>
-          <button className="primary-button wide" onClick={submit} disabled={saveOnboarding.isPending}>
-            <CheckCircle2 size={17} />
-            {saveOnboarding.isPending ? "저장 중" : "저장하고 시작하기"}
-          </button>
-          {saveOnboarding.error ? (
-            <div className="error-box">{saveOnboarding.error.message}</div>
-          ) : null}
         </div>
+      </Shell>
+    );
+  }
 
-        <aside className="panel sticky-panel">
-          <div className="panel-title">저장된 프로필</div>
-          {contextQuery.data ? (
-            <div className="profile-list">
-              <Info label="위험 성향" value={profileLabel(contextQuery.data.risk_profile)} />
-              <Info label="투자 목표" value={goalLabel(contextQuery.data.investment_goal)} />
-              <Info label="투자 금액" value={amountLabel(contextQuery.data.investment_amount_range)} />
-              <Info label="경험 수준" value={experienceLabel(contextQuery.data.investment_experience)} />
-              <Info label="관심 산업" value={contextQuery.data.interest_sectors.join(", ")} />
+  if (step === RESULT) {
+    const profile = profiles[draft.riskProfile ?? ""];
+    const horizon = questions[1].options.find((o) => o.id === answers.horizon)?.label;
+    const reaction = questions[3].options.find((o) => o.id === answers.loss_reaction)?.label;
+    return (
+      <Shell
+        footer={
+          <>
+            <div className="btn-row">
+              <Button variant="secondary" onClick={() => go(1)}>
+                답변 수정
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => setDraft({ step: 1, consent: true, answers: {} })}
+              >
+                다시 하기
+              </Button>
             </div>
-          ) : (
-            <p className="muted-text">아직 저장된 온보딩 정보가 없습니다.</p>
-          )}
-        </aside>
-      </section>
-    </div>
+            <Button
+              onClick={() => {
+                localStorage.setItem(tickersKey, JSON.stringify(answers.tickers ?? []));
+                localStorage.removeItem(draftKey);
+                navigate("/insight");
+              }}
+            >
+              시작하기
+            </Button>
+          </>
+        }
+      >
+        <div className="onb-result">
+          <ProgressAnt done={8} />
+          <h1 className="display">
+            지금 답변을 보면
+            <br />
+            {profile?.label ?? "확인한 성향"}에 가까워요.
+          </h1>
+          <p className="lead">앞으로 토론 결과에서 {profile?.focus ?? "근거"}을 먼저 챙겨드릴게요.</p>
+          <p className="caption">이 결과는 종목 추천이나 적합 여부 판단이 아니에요.</p>
+          <div className="card summary">
+            <h2>내 답변</h2>
+            <p>투자 기간: {horizon}</p>
+            <p>하락 시 행동: {reaction}</p>
+            <p>관심 산업: {(answers.sectors ?? []).map(sectorLabel).join(", ")}</p>
+          </div>
+        </div>
+      </Shell>
+    );
+  }
+
+  const header = (
+    <>
+      <button type="button" className="icon-btn back" aria-label="이전 단계" onClick={() => go(step - 1)}>
+        <ArrowLeft size={24} />
+      </button>
+      <ProgressAnt done={step - 1} />
+    </>
   );
-}
 
-function profileLabel(value: string) {
+  if (step === QUIZ) {
+    return (
+      <Shell
+        footer={
+          <Button disabled={!answers.risk_return} onClick={() => go(INTEREST)}>
+            다음
+          </Button>
+        }
+      >
+        {header}
+        <p className="eyebrow">잠깐 퀴즈예요.</p>
+        <h1 className="question">
+          기대 수익이 높은 투자일수록
+          <br />
+          손실 위험도 커지는 편일까요?
+        </h1>
+        <div className="tiles" role="radiogroup">
+          <Tile id="yes" label="네, 커지는 편이에요" tone="up" answers={answers} answer={answer} />
+          <Tile id="no" label="아니요, 상관없어요" tone="flat" answers={answers} answer={answer} />
+        </div>
+        {answers.risk_return ? (
+          <Tip>보통은 기대 수익이 높을수록 손실 위험도 커요. 다만 높은 위험이 높은 수익을 보장하지는 않아요.</Tip>
+        ) : null}
+      </Shell>
+    );
+  }
+
+  if (step === INTEREST) {
+    return (
+      <Shell
+        footer={
+          <>
+            {save.error ? <ErrorText>저장하지 못했어요. 답변은 그대로 있으니 다시 시도해 주세요.</ErrorText> : null}
+            <Button disabled={!answers.sectors?.length || save.isPending} onClick={() => save.mutate()}>
+              {save.isPending ? "저장하고 있어요" : "결과 보기"}
+            </Button>
+          </>
+        }
+      >
+        {header}
+        <p className="eyebrow">마지막이에요.</p>
+        <h1 className="question">
+          제가 소식을 먼저 챙겨볼
+          <br />
+          산업을 골라주세요.
+        </h1>
+        <p className="caption gap">최대 {MAX_SECTORS}개까지 고를 수 있어요.</p>
+        <SectorChips answers={answers} answer={answer} />
+        <TickerPicker answers={answers} answer={answer} />
+      </Shell>
+    );
+  }
+
+  const q = questions[step - 1];
+  const warning = q.id === "loss_limit" ? mismatchMessage(answers) : null;
+  const needsWarning = warning && warned !== warning;
+
   return (
-    {
-      conservative: "안정형",
-      moderate_conservative: "안정추구형",
-      moderate: "위험중립형",
-      aggressive: "적극투자형",
-      very_aggressive: "공격투자형",
-    }[value] ?? value
-  );
-}
-
-function goalLabel(value: string) {
-  return { short_term: "단기", mid_term: "중기", long_term: "장기" }[value] ?? value;
-}
-
-function amountLabel(value: string) {
-  return {
-    under_500: "500만원 미만",
-    "500_2000": "500만원 ~ 2,000만원",
-    "2000_5000": "2,000만원 ~ 5,000만원",
-    over_5000: "5,000만원 이상",
-  }[value] ?? value;
-}
-
-function experienceLabel(value: string) {
-  return { beginner: "초보", intermediate: "경험 있음", advanced: "고급" }[value] ?? value;
-}
-
-function Question({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="question-block">
-      <h3>{title}</h3>
-      {children}
-    </div>
-  );
-}
-
-function Segmented({
-  options,
-  value,
-  onChange,
-}: {
-  options: string[];
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <div className="option-list">
-      {options.map((option) => (
-        <button
-          key={option}
-          className={`option-row ${value === option ? "selected" : ""}`}
-          onClick={() => onChange(option)}
-          type="button"
+    <Shell
+      footer={
+        <Button
+          disabled={!answers[q.id]}
+          onClick={() => {
+            if (needsWarning) return setWarned(warning);
+            go(step + 1);
+          }}
         >
-          {option}
-        </button>
-      ))}
+          {warned ? "이대로 다음" : "다음"}
+        </Button>
+      }
+    >
+      {header}
+      {q.eyebrow ? <p className="eyebrow">{q.eyebrow}</p> : null}
+      <h1 className="question">{q.title}</h1>
+      {q.sub ? <p className="caption gap">{q.sub}</p> : null}
+      <div className="options" role="radiogroup" aria-label={q.title}>
+        {q.options.map((o) => (
+          <OptionCard key={o.id} selected={answers[q.id] === o.id} onClick={() => answer({ [q.id]: o.id })}>
+            {o.label}
+          </OptionCard>
+        ))}
+      </div>
+      {q.tip && answers[q.id] ? <Tip>{q.tip}</Tip> : null}
+      {warned ? (
+        <div className="notice" role="alert">
+          <p>{warned}</p>
+          <Button variant="text" onClick={() => go(step - 1)}>
+            앞 답변 다시 보기
+          </Button>
+        </div>
+      ) : null}
+    </Shell>
+  );
+}
+
+function Shell({ children, footer }: { children: React.ReactNode; footer: React.ReactNode }) {
+  return (
+    <div className="app">
+      <main className="screen onb">
+        <div className="onb-body">{children}</div>
+        <div className="onb-foot">{footer}</div>
+      </main>
     </div>
   );
 }
 
-function Info({ label, value }: { label: string; value: string }) {
+function Tile({
+  id,
+  label,
+  tone,
+  answers,
+  answer,
+}: {
+  id: string;
+  label: string;
+  tone: "up" | "flat";
+  answers: Answers;
+  answer: (patch: Answers) => void;
+}) {
+  const selected = answers.risk_return === id;
   return (
-    <div className="info-row">
-      <span>{label}</span>
-      <strong>{value || "-"}</strong>
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      className={`tile tile-${tone} ${selected ? "selected" : ""}`}
+      onClick={() => answer({ risk_return: id })}
+    >
+      <span className="bars" aria-hidden>
+        <i />
+        <i />
+        <i />
+      </span>
+      {label}
+    </button>
+  );
+}
+
+function SectorChips({ answers, answer }: { answers: Answers; answer: (patch: Answers) => void }) {
+  const picked = answers.sectors ?? [];
+  const full = picked.length >= MAX_SECTORS;
+  return (
+    <div className="chips">
+      {sectors.map((s) => {
+        const on = picked.includes(s.code);
+        return (
+          <Chip
+            key={s.code}
+            selected={on}
+            muted={full && !on}
+            disabled={full && !on}
+            onClick={() => answer({ sectors: on ? picked.filter((c) => c !== s.code) : [...picked, s.code] })}
+          >
+            {s.label}
+          </Chip>
+        );
+      })}
+    </div>
+  );
+}
+
+function TickerPicker({ answers, answer }: { answers: Answers; answer: (patch: Answers) => void }) {
+  const [text, setText] = useState("");
+  const companies = useQuery({ queryKey: ["companies"], queryFn: api.companies });
+  const picked = answers.tickers ?? [];
+  const matches = text
+    ? (companies.data ?? []).filter((c) => c.company.includes(text) && !picked.includes(c.ticker)).slice(0, 5)
+    : [];
+  return (
+    <div className="field">
+      <label htmlFor="ticker">이미 보고 있는 종목이 있다면 함께 알려주세요. (선택)</label>
+      <input
+        id="ticker"
+        value={text}
+        placeholder="종목명으로 찾기"
+        onChange={(e) => setText(e.target.value)}
+        disabled={picked.length >= MAX_TICKERS}
+      />
+      <p className="helper">최대 {MAX_TICKERS}개까지 추가할 수 있어요.</p>
+      {matches.length || picked.length ? (
+        <div className="chips">
+          {picked.map((ticker) => (
+            <Chip key={ticker} selected onClick={() => answer({ tickers: picked.filter((t) => t !== ticker) })}>
+              {companies.data?.find((c) => c.ticker === ticker)?.company ?? ticker}
+            </Chip>
+          ))}
+          {matches.map((c) => (
+            <Chip
+              key={c.ticker}
+              onClick={() => {
+                answer({ tickers: [...picked, c.ticker] });
+                setText("");
+              }}
+            >
+              {c.company}
+            </Chip>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

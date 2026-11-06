@@ -1,48 +1,54 @@
-import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import type { PercentilePath } from "../types";
 
-function toRows(paths?: PercentilePath) {
-  const p50 = paths?.p50 ?? [];
-  return p50.map((value, index) => ({
-    day: index,
-    p10: paths?.p10?.[index],
-    p50: value,
-    p90: paths?.p90?.[index],
-  }));
+function bands(paths?: PercentilePath) {
+  if (!paths?.p50?.length) return null;
+  // 서버는 현재 p10/p90을 주고, 계약서(openapi)는 p5/p95를 예정한다. 있는 쪽을 그대로 쓴다.
+  const outer = paths.p5 && paths.p95 ? { low: paths.p5, high: paths.p95, lowName: "p5", highName: "p95" } : null;
+  const inner = paths.p10 && paths.p90 ? { low: paths.p10, high: paths.p90, lowName: "p10", highName: "p90" } : null;
+  const widest = outer ?? inner;
+  return widest ? { outer, inner, widest, mid: paths.p50 } : null;
+}
+
+const pct = (value: number, base: number) => {
+  const p = ((value - base) / base) * 100;
+  return `${p >= 0 ? "+" : ""}${p.toFixed(0)}%`;
+};
+
+export function simulationStats(paths?: PercentilePath, currentPrice?: number) {
+  const b = bands(paths);
+  if (!b) return null;
+  const base = currentPrice || b.mid[0];
+  const last = (a: number[]) => a[a.length - 1];
+  return {
+    days: b.mid.length - 1,
+    lowName: b.widest.lowName,
+    highName: b.widest.highName,
+    low: pct(last(b.widest.low), base),
+    high: pct(last(b.widest.high), base),
+    mid: pct(last(b.mid), base),
+  };
 }
 
 export function SimulationChart({ paths }: { paths?: PercentilePath }) {
-  const rows = toRows(paths);
-  if (!rows.length) {
-    return <div className="chart-placeholder">차트 데이터가 없습니다.</div>;
-  }
+  const b = bands(paths);
+  if (!b) return <p className="caption">차트 데이터가 없습니다.</p>;
+
+  const w = 312;
+  const h = 150;
+  const values = [...b.widest.low, ...b.widest.high];
+  const min = Math.min(...values);
+  const span = Math.max(...values) - min || 1;
+  const x = (i: number) => (i / (b.mid.length - 1)) * w;
+  const y = (v: number) => 8 + (1 - (v - min) / span) * (h - 16);
+  const area = (low: number[], high: number[]) =>
+    [...high.map((v, i) => `${x(i)},${y(v)}`), ...low.map((v, i) => `${x(i)},${y(v)}`).reverse()].join(" ");
 
   return (
-    <div className="chart-box">
-      <ResponsiveContainer width="100%" height={280}>
-        <LineChart data={rows} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
-          <CartesianGrid stroke="#e2e8f0" vertical={false} />
-          <XAxis dataKey="day" tickLine={false} axisLine={false} />
-          <YAxis tickLine={false} axisLine={false} width={72} />
-          <Tooltip
-            formatter={(value) =>
-              typeof value === "number" ? value.toLocaleString("ko-KR") : value
-            }
-            labelFormatter={(label) => `${label}일 후`}
-          />
-          <Line type="monotone" dataKey="p90" stroke="#94a3b8" dot={false} strokeWidth={1.5} />
-          <Line type="monotone" dataKey="p50" stroke="#0f766e" dot={false} strokeWidth={2.5} />
-          <Line type="monotone" dataKey="p10" stroke="#94a3b8" dot={false} strokeWidth={1.5} />
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
+    <svg className="sim-chart" viewBox={`0 0 ${w} ${h + 2}`} role="img" aria-label="시뮬레이션 가격 범위 차트">
+      {b.outer ? <polygon className="band-outer" points={area(b.outer.low, b.outer.high)} /> : null}
+      {b.inner ? <polygon className={b.outer ? "band-inner" : "band-outer"} points={area(b.inner.low, b.inner.high)} /> : null}
+      <polyline className="mid" points={b.mid.map((v, i) => `${x(i)},${y(v)}`).join(" ")} />
+      <line className="axis" x1="0" x2={w} y1={h + 1} y2={h + 1} />
+    </svg>
   );
 }

@@ -145,6 +145,7 @@ export type DebateArgument = {
   source_date?: string;
   confidence?: number;
   rebuttal_target?: string;
+  relation_evidence?: Array<{ title: string; body: string }>;
 };
 
 export type SimulationResult = {
@@ -182,9 +183,11 @@ export type SimulationResult = {
 };
 
 export type PercentilePath = {
+  p5?: number[];
   p10?: number[];
   p50?: number[];
   p90?: number[];
+  p95?: number[];
   [key: string]: number[] | undefined;
 };
 
@@ -196,4 +199,9 @@ export type UserContext = {
   investment_experience: string;
   interest_sectors: string[];
   onboarding_done: boolean;
+};
+
+export type TrendFeed = {
+  cards: Record<string, { title: string; meta: string }>;
+  changes: Array<{ ticker: string; company: string; text: string }>;
 };

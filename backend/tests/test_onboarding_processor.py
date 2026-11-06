@@ -70,3 +70,17 @@ def test_process_onboarding_full_flow_total_score_twenty_is_aggressive():
     assert result["investment_amount_range"] == "2000_5000"
     assert result["investment_experience"] == "advanced"
     assert result["interest_sectors"] == ["반도체_종합전자", "자동차"]
+
+
+def test_process_onboarding_without_amount_keeps_column_empty():
+    result = process_onboarding(
+        q1_choice="3년 이상 장기 투자할 거예요",
+        q2_choice="크게 벌고 싶어요. 리스크는 감수할게요",
+        q3_choice="",
+        q3_1_choice="10% 미만",
+        q4_choice="왜 떨어진 건지 알아보고 일부만 판다",
+        q5_choice="선물·옵션·레버리지 ETF도 해봤어요",
+        q6_choices=["메모리_HBM"],
+    )
+    assert result["investment_amount_range"] == ""
+    assert result["total_score"] == 20

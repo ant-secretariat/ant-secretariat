@@ -20,7 +20,7 @@ class OnboardingRequest(BaseModel):
     user_id: str
     q1: str
     q2: str
-    q3: str
+    q3: str = ""  # 금액대는 온보딩에서 받지 않음(FN-ONB-01). 컬럼 유지용.
     q3_1: str
     q4: str
     q5: str

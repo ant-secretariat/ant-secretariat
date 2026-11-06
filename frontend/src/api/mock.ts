@@ -12,7 +12,8 @@ const companies: Company[] = [
 const path = (start: number, end: number, n = 31) =>
   Array.from({ length: n }, (_, i) => start + ((end - start) * i) / (n - 1));
 
-const argument = (title: string, content: string, source: string, date: string, confidence: number, relation?: { title: string; body: string }) => ({
+const argument = (title: string, content: string, source: string, date: string, confidence: number, relation?: { title: string; body: string }, rebuttal_target?: string) => ({
+  rebuttal_target,
   title,
   content,
   source_title: source,
@@ -42,6 +43,7 @@ const debateResult = {
               title: "환율 민감도",
               body: "삼성전자는 최근 3년 환율 변화와 양의 상관을 보였어요. 관계: 종목-매크로 민감도 / 값: +0.32 / 출처: 한국은행 환율, 시세 / 방법: 상관 기반 민감도 / 기준일: 2026-11-05",
             }),
+            argument("메모리 가격 회복이 환율 효과를 더해 줘요", "가격과 환율이 함께 움직인 분기에 이익 개선 폭이 컸어요.", "B증권 리포트", "2026-11-03", 0.5),
           ],
         },
         bear: {
@@ -50,7 +52,7 @@ const debateResult = {
             argument("환율 효과는 원가 상승으로 줄어들 수 있어요", "수입 장비와 소재 비용도 함께 오르는 구간이에요.", "B증권 리포트", "2026-11-02", 0.6, {
               title: "원가 영향",
               body: "장비 수입 비중이 높은 구간에는 환율 상승이 원가에 먼저 반영될 수 있어요.",
-            }),
+            }, "Bull은 환율 상승이 수출 실적에 도움이 된다고 주장해요."),
           ],
         },
         verdict: { winner: "neutral", reasoning: "영향의 크기를 단정하기 어려워요. 환율과 원가를 함께 봐야 해요.", key_point: "다음 분기 메모리 가격 흐름" },
@@ -64,7 +66,7 @@ const debateResult = {
         },
         bear: {
           summary: "",
-          arguments: [argument("스마트폰 수요 회복이 늦어요", "완성품 수요가 약하면 메모리 회복도 늦어질 수 있어요.", "D증권 리포트", "2026-10-30", 0.6)],
+          arguments: [argument("스마트폰 수요 회복이 늦어요", "완성품 수요가 약하면 메모리 회복도 늦어질 수 있어요.", "D증권 리포트", "2026-10-30", 0.6, undefined, "Bull은 재고 조정이 거의 끝났다고 주장해요.")],
         },
         verdict: { winner: "neutral", reasoning: "단기 수요 지표가 더 필요해요.", key_point: "환율이 실적에 주는 영향" },
       },
@@ -94,18 +96,32 @@ const simulation = {
     "반영한 위험 변수: 환율, 메모리 가격. 환율 시나리오는 구간이 0을 포함해 방향이 불확실해요.",
 };
 
-const running = job({
-  job_id: "mock-running",
-  status: "running",
-  created_at: new Date(Date.now() - 72_000).toISOString(),
-  partial_result: {
-    stage: "bull_completed",
-    bull_output: {
-      overall_summary: "메모리 가격 회복이 실적을 끌어올릴 수 있다고 봐요.",
-      agendas: [{ arguments: [{ source_title: "A증권 리포트", source_date: "2026-11-04" }] }],
+const sideOf = (agendas: typeof debateResult.debate_result.agendas, side: "bull" | "bear") =>
+  agendas.map((a) => ({ agenda_id: a.agenda_id, agenda_title: a.agenda_title, ...a[side] }));
+
+const running = job({ job_id: "mock-running", status: "running", created_at: new Date(Date.now() - 72_000).toISOString(), partial_result: { stage: "data_collected" } });
+
+let liveStart = 0;
+let liveCompany = "삼성전자";
+/** 화면 점검용: 시작 후 약 45초에 걸쳐 실제 단계 순서대로 진행한다. */
+function liveJob(): DebateJob {
+  liveStart ||= Date.now();
+  const t = (Date.now() - liveStart) / 1000;
+  const base = { company: liveCompany, created_at: new Date(liveStart).toISOString() };
+  const agendas = debateResult.debate_result.agendas;
+  if (t >= 45) return job({ ...base, job_id: "mock-running", debate_result: debateResult, simulation_result: simulation });
+  const stage = t < 3 ? undefined : t < 8 ? "data_collected" : t < 20 ? "bull_completed" : t < 41 ? "bear_completed" : "judge_completed";
+  return job({
+    ...base,
+    job_id: "mock-running",
+    status: "running",
+    partial_result: {
+      stage,
+      bull_output: t >= 8 ? { agendas: sideOf(agendas, "bull") } : {},
+      bear_output: t >= 20 ? { agendas: sideOf(agendas, "bear") } : {},
     },
-  },
-});
+  });
+}
 
 const jobs: DebateJob[] = [
   running,
@@ -174,9 +190,12 @@ export const mockApi = {
     ),
   trendReport: (payload: { company: string }) =>
     wait(payload.company === "카카오" ? { ...report, company: "카카오", cards: {}, evidence: [] } : { ...report, company: payload.company }),
-  startDebate: (payload: { company: string }) =>
-    wait({ job_id: "mock-running", status: "queued", request_type: "debate", ticker: "", company: payload.company }),
+  startDebate: (payload: { company: string }) => (
+    (liveStart = Date.now()), (liveCompany = payload.company),
+    wait({ job_id: "mock-running", status: "queued", request_type: "debate", ticker: "", company: payload.company })
+  ),
   debateJob: (jobId: string) => {
+    if (jobId === "mock-running") return wait(liveJob());
     const found = jobs.find((j) => j.job_id === jobId);
     return found ? wait(found) : Promise.reject(new Error("not found"));
   },

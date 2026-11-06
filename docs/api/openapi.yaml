@@ -1,0 +1,3573 @@
+# 개미비서단 에이전트 계약. OpenAPI 3.1, SwaggerHub에서 관리합니다.
+openapi: 3.1.0
+info:
+  title: 개미비서단 에이전트 계약 명세
+  version: 1.0.0-draft.4
+  description: |
+    MVP 목표 구조(TO-BE) 기준의 API·에이전트 계약입니다. 현재 코드가 아니라 구현해야 할 계약을 설명합니다.
+
+    **읽는 법**
+    - `paths`에는 실제 HTTP·SSE 엔드포인트만 있습니다.
+    - 프로세스 내 함수는 각 태그 설명의 표와 루트의 `x-internal-functions`에 있고, 입출력은 Schemas에 있습니다.
+    - 각 오퍼레이션 설명 첫 줄에 상태(유지·변경·신규·제안), 릴리스(MVP·Post-MVP), 전송 방식을 표시합니다.
+    - `x-` 필드는 OpenAPI 확장이며, 도구에서 읽기 위한 같은 정보입니다.
+
+    **응답 규칙**
+    - 업무 결과는 HTTP 200과 `status`(`ok`·`partial`·`rejected`·`clarification_needed`·`job_started`)로 구분합니다.
+    - 인프라·정책 오류는 HTTP 4xx/5xx와 RFC 9457 `application/problem+json`으로 반환합니다.
+    - `user_id`는 세션에서 주입하며, 요청 바디로 받지 않습니다.
+
+    **기준 문서 우선순위**
+    1. 멀티에이전트 설계 최종 확정(10/14) 2. MVP 기술 설계 문서·PRD(10/27) 3. 시그니처 계약 4. 각 에이전트 수정안(10/3)
+
+    11/4 결정(관계 사전 MVP 포함)과 11/5 결정(자유 질의·2종목 비교는 MVP 이후)을 반영했습니다.
+
+    **출처:** 토론 수정안 v2.3, 데이터 수정안, 시뮬레이션 수정안, 오케스트레이터 설계 초안, 시그니처 계약.
+  x-open-questions:
+  - id: OQ-1
+    topic: envelope.py 대조
+    detail: 시그니처 계약은 backend/orchestrator/envelope.py 구현 완료로 적혀 있으나 저장소 어느 브랜치에도 없습니다. NextAction의 payload 구조를 파일과 대조해야 합니다.
+  - id: OQ-2
+    topic: 오류 코드 누락
+    detail: 정책표에 404와 잘못된 job 상태용 코드가 없어 job_not_found, invalid_job_state를 제안했습니다.
+  - id: OQ-3
+    topic: FE용 종목 검색 경로
+    detail: 자동완성 10개가 확정됐지만 search_companies의 HTTP 경로가 없어 GET /companies/search를 제안했습니다.
+  - id: OQ-4
+    topic: 시뮬레이션 버튼 활성화 정보
+    detail: FE가 sim_params 유무로 버튼을 비활성화해야 하지만 노출 필드가 없어 DataStatus.simulation_ready를 제안했습니다.
+  - id: OQ-5
+    topic: 시뮬레이션 결과 필드명
+    detail: 수정안은 개념만 정의합니다. impact_pct·ci_low·ci_high·significant·seed·model_id·data_as_of 외 필드명은 제안입니다.
+  - id: OQ-7
+    topic: 중복 필드
+    detail: InsightBoardResult와 TrendReportResult의 status·meta가 봉투와 겹칩니다. 시그니처 계약대로 유지했으며 정리 여부를 결정해야 합니다.
+  - id: OQ-8
+    topic: 인증 방식
+    detail: Design Doc 4.4의 서명 쿠키안을 반영했습니다. 팀 결정 전입니다. 쿠키 인증은 CSRF에 취약하므로 CSRF 토큰 또는 SameSite 정책을 함께 정해야 합니다.
+  - id: OQ-9
+    topic: 스토리형 온보딩
+    detail: 문구 일치 방식(q1~q6)을 question_id·option_id 방식으로 바꾸는 제안입니다. 문항과 환산표는 기능 명세서에서 확정해야 합니다.
+  - id: OQ-10
+    topic: 트렌드 리포트 카드 목록
+    detail: 현재 계약은 종목 1개 생성만 있습니다. 관심 종목·산업 기반 목록의 생성 시점이 정해지면 조회 엔드포인트를 추가해야 합니다.
+externalDocs:
+  description: 멀티에이전트 설계 최종 확정
+  url: https://app.notion.com/p/3e11fad9262e80cfb5d7d58c6ef704a5
+servers:
+- url: http://localhost:8000
+  description: 로컬 개발 서버. /internal/* 경로는 제공되지 않습니다.
+security:
+- sessionCookie: []
+tags:
+- name: 데이터 에이전트
+  description: |-
+    **역할:** 입력을 종목으로 특정하고(A), 데이터를 수집·정제·저장한 뒤 조회 함수로 제공합니다(B). 결과는 LLM 생성물이 아니라 결정적 데이터입니다.
+    **담당:** 수경. **티어:** T0(전종목, 구조화 데이터) · T1(핵심 종목, 심층 근거) · T2(수집 중).
+
+    **내부 함수** (HTTP로 노출하지 않음, 입출력은 Schemas 참고)
+
+    | 함수 | 역할 | 입력 | 출력 | 상태 |
+    |---|---|---|---|---|
+    | `resolve_company` | 회사명·종목코드를 종목으로 해석 | `ResolveCompanyInput` | `ResolvedCompany` | 변경 · MVP |
+    | `search_companies` | 종목 후보 검색 | `SearchCompaniesInput` | `SearchCompaniesOutput` | 신규 · MVP |
+    | `extract_company_mentions` | 문장 속 종목 추출 | `ExtractCompanyMentionsInput` | `ExtractCompanyMentionsOutput` | 신규 · MVP |
+    | `search_documents` | 문서 벡터 검색 | `SearchDocumentsInput` | `DataRecord` | 유지 · MVP |
+    | `get_report_metadata` | 리포트 메타데이터 조회 | `GetReportMetadataInput` | `DataRecord` | 유지 · MVP |
+    | `get_report_chunks` | 리포트 청크 조회 | `GetReportChunksInput` | `DataRecord` | 유지 · MVP |
+    | `get_target_price_data` | 목표주가와 컨센서스 조회 | `GetTargetPriceDataInput` | `TargetPriceData` | 변경 · MVP |
+    | `get_price_data` | 시세 이력 조회 | `GetPriceDataInput` | `PriceData` | 변경 · MVP |
+    | `get_macro_data` | 매크로 지표 조회 | `GetMacroDataInput` | `DataRecord` | 변경 · MVP |
+    | `get_disclosure_data` | 공시 조회 | `GetDisclosureDataInput` | `DataRecord` | 유지 · MVP |
+    | `get_available_data_status` | 데이터 보유 상태 조회 | `GetAvailableDataStatusInput` | `DataStatus` | 변경 · MVP |
+    | `get_agent_context` | 에이전트별 근거 묶음 조회 | `GetAgentContextInput` | `GetAgentContextOutput` | 변경 · MVP |
+    | `get_financials` | 재무제표 조회 | `GetFinancialsInput` | `DataRecord` | 신규 · MVP |
+    | `get_market_snapshot` | 시장·업종 종목 목록 조회 | `GetMarketSnapshotInput` | `DataRecord` | 신규 · MVP |
+    | `ensure_company_data` | 심층 수집 예약 | `EnsureCompanyDataInput` | `EnsureCompanyDataOutput` | 신규 · Post-MVP |
+    | `get_derived_snapshot` | 계산 근거 조회 | `GetDerivedSnapshotInput` | `DerivedSnapshot` | 신규 · MVP |
+    | `get_metric` | 시맨틱 레이어 지표 조회 | `GetMetricInput` | `MetricValue` | 신규 · MVP |
+  externalDocs:
+    description: 데이터 에이전트 수정안
+    url: https://app.notion.com/p/3ee1fad9262e80249779d71906886aa1
+- name: 시뮬레이션 에이전트
+  description: |-
+    **역할:** 토론이 끝난 종목의 30일 뒤 가격 범위를 확률 분포로 보여주고, 금리·환율 시나리오의 변화를 계산합니다. 가격을 맞히는 기능이 아닙니다.
+    **모델:** GJR-GARCH + FHS. **담당:** 수경. **실행:** 사용자 버튼, 작업 큐.
+
+    **내부 함수** (HTTP로 노출하지 않음, 입출력은 Schemas 참고)
+
+    | 함수 | 역할 | 입력 | 출력 | 상태 |
+    |---|---|---|---|---|
+    | `run_simulation` | 시뮬레이션 실행 함수 | `RunSimulationInput` | `RunSimulationOutput` | 변경 · MVP |
+  externalDocs:
+    description: 시뮬레이션 에이전트 수정안
+    url: https://app.notion.com/p/3ee1fad9262e80f49038f22e439c6421
+- name: 트렌드 리포트 에이전트
+  description: |-
+    **역할:** 근거 선별, 목표주가 계산, 카드 생성, L1 검증, 부족 카드 보완을 거쳐 종목 리포트 카드를 만듭니다. 숫자와 방향은 코드가 계산하고 LLM은 설명만 생성합니다.
+    **담당:** 태은. **목표:** p95 10초 이내.
+
+    **내부 함수** (HTTP로 노출하지 않음, 입출력은 Schemas 참고)
+
+    | 함수 | 역할 | 입력 | 출력 | 상태 |
+    |---|---|---|---|---|
+    | `run_trend_report` | 트렌드 리포트 실행 함수 | `TrendReportRequest` | `TrendReportResult` | 변경 · MVP |
+  externalDocs:
+    description: 시그니처 계약
+    url: https://app.notion.com/p/3eb1fad9262e8113bc12f6803670476a
+- name: 오케스트레이터
+  description: |-
+    **역할:** 모든 요청의 진입점입니다. 종목 확정(관문1), 사전 판정 호출, 라우팅, job 생성, 공통 봉투 조합을 담당합니다.
+    **패턴:** MVP는 버튼 경로의 결정적 라우팅입니다. 자유 질의는 MVP 이후 범위입니다. **담당:** 태은.
+
+    **내부 함수** (HTTP로 노출하지 않음, 입출력은 Schemas 참고)
+
+    | 함수 | 역할 | 입력 | 출력 | 상태 |
+    |---|---|---|---|---|
+    | `resolve_entities` | 관문1 종목 확정 | `ResolveEntitiesInput` | `EntityResolution` | 신규 · MVP |
+    | `run_orchestrator_request` | 버튼 경로 실행 | `OrchestratorRequest` | `AnyEnvelope` | 변경 · MVP |
+    | `log_uncovered_query` | 미커버 질의 적재 | `UncoveredQueryEvent` | `-` | 신규 · MVP |
+    | `make_plan` | 계획 1회 생성 | `MakePlanInput` | `Plan` | 신규 · Post-MVP |
+  externalDocs:
+    description: 오케스트레이터 설계 초안
+    url: https://app.notion.com/p/3eb1fad9262e81268d09c98d34f47a39
+- name: 인사이트보드 에이전트
+  description: |-
+    **역할:** 관심 종목별 가격·공시·거시 데이터와 배지를 계산하고 LLM 코멘트 1개를 붙입니다. 종목 일부가 실패해도 나머지를 표시합니다.
+    **담당:** 태은.
+
+    **내부 함수** (HTTP로 노출하지 않음, 입출력은 Schemas 참고)
+
+    | 함수 | 역할 | 입력 | 출력 | 상태 |
+    |---|---|---|---|---|
+    | `run_insight_board` | 인사이트보드 실행 함수 | `RunInsightBoardInput` | `InsightBoardResult` | 변경 · MVP |
+  externalDocs:
+    description: 시그니처 계약
+    url: https://app.notion.com/p/3eb1fad9262e8113bc12f6803670476a
+- name: 토론 에이전트
+  description: |-
+    **역할:** Bull·Bear·Judge가 아젠다별 순차 토론을 하고 근거가 연결된 브리핑을 생성합니다. 사전 판정(관문2·3)도 소유합니다. 매수·매도 권유는 하지 않습니다.
+    **흐름:** Bull → Bear → Judge, 점수차가 작으면 조건부 2라운드. **담당:** 유민.
+
+    **내부 함수** (HTTP로 노출하지 않음, 입출력은 Schemas 참고)
+
+    | 함수 | 역할 | 입력 | 출력 | 상태 |
+    |---|---|---|---|---|
+    | `precheck` | 사전 판정(관문2·3) | `PrecheckInput` | `PrecheckResult` | 신규 · MVP |
+    | `run_debate` | 토론 실행 함수 | `RunDebateInput` | `DebateResult` | 변경 · MVP |
+  externalDocs:
+    description: 토론 에이전트 수정안
+    url: https://app.notion.com/p/3ee1fad9262e80b3866be964d84e4631
+- name: 관계 사전
+  description: |-
+    **역할:** 종목·섹터·매크로·이슈의 관계를 읽기 전용 도구로 제공합니다. 원본은 Supabase `ontology_nodes`·`ontology_edges`이며 서버 시작 시 메모리에 로드합니다.
+    **담당:** 유민(스키마) · 수경(적재) · 태은(탐색·연결). MVP 시연에서 실제 동작 대상입니다.
+
+    **내부 함수** (HTTP로 노출하지 않음, 입출력은 Schemas 참고)
+
+    | 함수 | 역할 | 입력 | 출력 | 상태 |
+    |---|---|---|---|---|
+    | `get_ontology_context` | 아젠다별 관계 컨텍스트 조회 | `GetOntologyContextInput` | `OntologyContext` | 변경 · MVP |
+  externalDocs:
+    description: 온톨로지 프로덕트 기획
+    url: https://app.notion.com/p/3e11fad9262e80419c16ed84546cc6ce
+- name: 작업
+  description: 토론·시뮬레이션 작업의 상태, 결과, 진행 이벤트를 제공합니다.
+- name: 사용자와 온보딩
+  description: 사용자 등록, 투자 성향 수집, 데모 초기화, 결과 피드백을 제공합니다.
+- name: 운영
+  description: 헬스 체크입니다.
+paths:
+  /health:
+    get:
+      tags:
+      - 운영
+      operationId: healthCheck
+      summary: 헬스 체크
+      security: []
+      x-transport: http
+      x-release: mvp
+      x-status: existing
+      responses:
+        '200':
+          description: 서버 정상
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+      description: '**상태:** 유지 · **릴리스:** MVP · **전송:** HTTP'
+  /users:
+    post:
+      tags:
+      - 사용자와 온보딩
+      operationId: registerUser
+      summary: 사용자 등록과 세션 발급
+      description: |-
+        **상태:** 변경 · **릴리스:** MVP · **전송:** HTTP
+
+        서명 쿠키안(OQ-8)에서는 서버가 세션 쿠키를 발급합니다.
+      security: []
+      x-transport: http
+      x-release: mvp
+      x-status: changed
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - user_id
+              properties:
+                user_id:
+                  type: string
+                  description: FE가 생성한 UUID
+      responses:
+        '200':
+          description: 등록 완료
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+              description: httpOnly 서명 세션 쿠키
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserContext'
+        '422':
+          $ref: '#/components/responses/InvalidRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /onboarding:
+    post:
+      tags:
+      - 사용자와 온보딩
+      operationId: submitOnboarding
+      summary: 스토리형 온보딩 응답 제출
+      description: |-
+        **상태:** 제안 · **릴리스:** MVP · **전송:** HTTP
+
+        현재 `q1~q6`의 한글 문구를 그대로 받아 점수를 계산합니다. 스토리형 문항은 문구가 계속 바뀌므로 안정적인 ID로 받는 방식을 제안합니다(OQ-9).
+        기존 총점 범위와 Q1 단기 특칙은 환산표 확정 전까지 유지합니다.
+      x-transport: http
+      x-release: mvp
+      x-status: proposed
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OnboardingSubmission'
+      responses:
+        '200':
+          description: 저장 완료
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserContext'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '422':
+          $ref: '#/components/responses/InvalidRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /users/{user_id}/context:
+    get:
+      tags:
+      - 사용자와 온보딩
+      operationId: readUserContext
+      summary: 사용자 투자 성향 조회
+      description: |-
+        **상태:** 변경 · **릴리스:** MVP · **전송:** HTTP
+
+        세션의 사용자와 일치할 때만 조회합니다.
+      x-transport: http
+      x-release: mvp
+      x-status: changed
+      parameters:
+      - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: 사용자 컨텍스트
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserContext'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /users/{user_id}/reset:
+    delete:
+      tags:
+      - 사용자와 온보딩
+      operationId: resetDemoUser
+      summary: 데모 사용자 초기화
+      x-transport: http
+      x-release: mvp
+      x-status: existing
+      parameters:
+      - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: 초기화 완료
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      description: '**상태:** 유지 · **릴리스:** MVP · **전송:** HTTP'
+  /debate/jobs/{job_id}/feedback:
+    post:
+      tags:
+      - 사용자와 온보딩
+      operationId: submitFeedback
+      summary: 토론 결과 피드백 제출
+      description: |-
+        **상태:** 제안 · **릴리스:** MVP · **전송:** HTTP
+
+        1주차 회의 피드백과 로드맵 4.4를 반영한 제안입니다. `trace_id`로 Langfuse 트레이스와 연결합니다.
+      x-transport: http
+      x-release: mvp
+      x-status: proposed
+      parameters:
+      - $ref: '#/components/parameters/JobId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackRequest'
+      responses:
+        '204':
+          description: 저장 완료
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/InvalidRequest'
+  /companies:
+    get:
+      tags:
+      - 데이터 에이전트
+      operationId: listCompanies
+      summary: 커버 종목 목록 조회
+      description: |-
+        **상태:** 변경 · **릴리스:** MVP · **전송:** HTTP
+
+        7개 하드코딩에서 `companies` 마스터 조회로 변경합니다. 전종목 대상이므로 페이지 조회를 사용합니다.
+      x-transport: http
+      x-release: mvp
+      x-status: changed
+      parameters:
+      - name: tier
+        in: query
+        schema:
+          $ref: '#/components/schemas/Tier'
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 50
+      - name: offset
+        in: query
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+      responses:
+        '200':
+          description: 종목 목록
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - companies
+                properties:
+                  companies:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CompanySummary'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+  /companies/search:
+    get:
+      tags:
+      - 데이터 에이전트
+      operationId: searchCompaniesHttp
+      summary: 종목 자동완성
+      description: |-
+        **상태:** 제안 · **릴리스:** MVP · **전송:** HTTP
+
+        FE 자동완성용 제안 경로입니다(OQ-3). 정렬은 완전일치, 별칭, 접두어, 초성 순이며 같은 그룹은 시총이 큰 순서입니다. 자동 확정하지 않습니다.
+      x-transport: http
+      x-release: mvp
+      x-status: proposed
+      parameters:
+      - name: q
+        in: query
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 10
+      responses:
+        '200':
+          description: 후보 목록
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - candidates
+                properties:
+                  candidates:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Candidate'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+  /companies/{ticker}/data-status:
+    get:
+      tags:
+      - 데이터 에이전트
+      operationId: readCompanyDataStatus
+      summary: 종목 데이터 상태 조회
+      x-transport: http
+      x-release: mvp
+      x-status: changed
+      parameters:
+      - $ref: '#/components/parameters/Ticker'
+      responses:
+        '200':
+          description: 데이터 상태
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataStatus'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      description: '**상태:** 변경 · **릴리스:** MVP · **전송:** HTTP'
+  /orchestrate/debate/{job_id}/simulate:
+    post:
+      tags:
+      - 시뮬레이션 에이전트
+      operationId: orchestrateSimulation
+      summary: 시뮬레이션 실행
+      description: |-
+        **상태:** 신규 · **릴리스:** MVP · **전송:** HTTP
+
+        `debate_completed`·`simulation_pending` 상태의 본인 job만 실행합니다. 이미 실행 중이면 기존 상태를 반환합니다(멱등).
+        이력 부족은 즉시 거절하지 않고 `job_started` 후 `failed` + `error_code=insufficient_history`로 끝납니다.
+      x-transport: http
+      x-release: mvp
+      x-status: new
+      parameters:
+      - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: 작업 시작
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStartedResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /debate/jobs/{job_id}/simulation:
+    get:
+      tags:
+      - 시뮬레이션 에이전트
+      operationId: readSimulationResult
+      summary: 시뮬레이션 결과 조회
+      x-transport: http
+      x-release: mvp
+      x-status: changed
+      parameters:
+      - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: 작업 상태와 결과
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - job_id
+                - status
+                properties:
+                  job_id:
+                    type: string
+                  status:
+                    $ref: '#/components/schemas/JobStatus'
+                  simulation_result:
+                    oneOf:
+                    - $ref: '#/components/schemas/SimulationResult'
+                    - $ref: '#/components/schemas/SimulationFailure'
+                    - type: 'null'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      description: '**상태:** 변경 · **릴리스:** MVP · **전송:** HTTP'
+  /orchestrate/trend-report:
+    post:
+      tags:
+      - 트렌드 리포트 에이전트
+      operationId: orchestrateTrendReport
+      summary: 트렌드 리포트 생성
+      description: |-
+        **상태:** 신규 · **릴리스:** MVP · **전송:** HTTP
+
+        T0·T2 종목은 거절하지 않고 범위를 축소해 실행합니다.
+      x-transport: http
+      x-release: mvp
+      x-status: new
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrendReportApiRequest'
+      responses:
+        '200':
+          description: 공통 봉투
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrendReportEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '422':
+          $ref: '#/components/responses/InvalidRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/UpstreamUnavailable'
+  /agents/trend-report:
+    post:
+      tags:
+      - 트렌드 리포트 에이전트
+      operationId: legacyTrendReport
+      summary: 기존 트렌드 리포트 경로
+      description: |-
+        **상태:** 유지 · **릴리스:** MVP · **전송:** HTTP
+
+        FE 전환 후 삭제합니다.
+      deprecated: true
+      x-transport: http
+      x-release: mvp
+      x-status: existing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrendReportApiRequest'
+      responses:
+        '200':
+          description: 기존 응답
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  report:
+                    type: object
+                    additionalProperties: true
+        '400':
+          description: 지원하지 않는 기업
+        '500':
+          description: 생성 실패
+  /orchestrate/chat:
+    post:
+      tags:
+      - 오케스트레이터
+      operationId: orchestrateChat
+      summary: '[Post-MVP] 자유 질의'
+      description: |-
+        **상태:** 신규 · **릴리스:** Post-MVP · **전송:** HTTP
+
+        종목 확정, 사전 판정, 계획, 검증, 실행, 응답 조합 순서로 처리합니다.
+      x-transport: http
+      x-release: post-mvp
+      x-status: new
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - message
+              properties:
+                conversation_id:
+                  type:
+                  - string
+                  - 'null'
+                message:
+                  type: string
+                  minLength: 1
+      responses:
+        '200':
+          description: 답변, 되묻기, 거절, 작업 시작 중 하나
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '422':
+          $ref: '#/components/responses/InvalidRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/UpstreamUnavailable'
+  /orchestrate/chat/{conversation_id}/clarify:
+    post:
+      tags:
+      - 오케스트레이터
+      operationId: orchestrateChatClarify
+      summary: '[Post-MVP] 되묻기 응답으로 질의 재개'
+      x-transport: http
+      x-release: post-mvp
+      x-status: new
+      parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - selections
+              properties:
+                selections:
+                  type: object
+                  description: 입력 문자열별로 사용자가 고른 ticker
+                  additionalProperties:
+                    type: string
+      responses:
+        '200':
+          description: 공통 봉투
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      description: '**상태:** 신규 · **릴리스:** Post-MVP · **전송:** HTTP'
+  /orchestrate/insight-board:
+    post:
+      tags:
+      - 인사이트보드 에이전트
+      operationId: orchestrateInsightBoard
+      summary: 인사이트보드 조회
+      description: |-
+        **상태:** 변경 · **릴리스:** MVP · **전송:** HTTP
+
+        `user_id` 바디 필드를 제거합니다. 일부 종목 실패는 `partial`로 반환합니다.
+      x-transport: http
+      x-release: mvp
+      x-status: changed
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - companies
+              - feature
+              properties:
+                companies:
+                  type: array
+                  minItems: 1
+                  maxItems: 3
+                  items:
+                    type: string
+                feature:
+                  $ref: '#/components/schemas/InsightBoardFeature'
+                date_from:
+                  $ref: '#/components/schemas/NullableDate'
+                date_to:
+                  $ref: '#/components/schemas/NullableDate'
+      responses:
+        '200':
+          description: 공통 봉투
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InsightBoardEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '422':
+          $ref: '#/components/responses/InvalidRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/UpstreamUnavailable'
+  /orchestrate/debate:
+    post:
+      tags:
+      - 토론 에이전트
+      operationId: orchestrateDebate
+      summary: 토론 시작
+      description: |-
+        **상태:** 변경 · **릴리스:** MVP · **전송:** HTTP
+
+        종목 확정과 사전 판정을 통과한 요청만 job을 만듭니다. 같은 사용자·종목·질문의 진행 중 job이 있으면 `reused=true`로 반환합니다.
+      x-transport: http
+      x-release: mvp
+      x-status: changed
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                query:
+                  type:
+                  - string
+                  - 'null'
+                  description: 버튼 시작은 기본 질문을 사용합니다
+                companies:
+                  type: array
+                  minItems: 1
+                  maxItems: 1
+                  items:
+                    type: string
+                  description: MVP는 단일 종목입니다. 2종목 비교는 MVP 이후 범위입니다.
+              required:
+              - companies
+            examples:
+              button:
+                summary: 버튼으로 시작
+                value:
+                  companies:
+                  - 삼성전자
+                  query: null
+      responses:
+        '200':
+          description: 작업 시작 또는 거절
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DebateStartEnvelope'
+              examples:
+                started:
+                  summary: 작업 시작
+                  value:
+                    status: job_started
+                    job:
+                      job_id: 8f7c0c3e
+                      reused: false
+                    meta:
+                      trace_id: tr_01
+                      data_as_of: null
+                      generated_at: '2026-11-05T09:00:00Z'
+                rejected:
+                  summary: 범위 밖 질문 거절
+                  value:
+                    status: rejected
+                    reason:
+                      code: out_of_scope_topic
+                      message: 단기 주가 예측은 도와드리기 어려워요.
+                      next_action:
+                        type: choose_supported_topic
+                        payload:
+                          topics:
+                          - valuation
+                          - macro
+                          - risk
+                    meta:
+                      trace_id: tr_02
+                      data_as_of: null
+                      generated_at: '2026-11-05T09:00:00Z'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/InvalidRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/UpstreamUnavailable'
+  /debate/jobs/{job_id}:
+    get:
+      tags:
+      - 작업
+      operationId: readDebateJob
+      summary: 작업 상태 조회
+      description: |-
+        **상태:** 변경 · **릴리스:** MVP · **전송:** HTTP
+
+        SSE 실패 시 사용하는 보조 경로입니다. 본인 job만 조회합니다.
+      x-transport: http
+      x-release: mvp
+      x-status: changed
+      parameters:
+      - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: 작업
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - job
+                properties:
+                  job:
+                    $ref: '#/components/schemas/Job'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /debate/jobs/{job_id}/result:
+    get:
+      tags:
+      - 작업
+      operationId: readDebateResult
+      summary: 토론 결과 조회
+      x-transport: http
+      x-release: mvp
+      x-status: changed
+      parameters:
+      - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: 작업 상태와 결과
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - job_id
+                - status
+                properties:
+                  job_id:
+                    type: string
+                  status:
+                    $ref: '#/components/schemas/JobStatus'
+                  debate_result:
+                    oneOf:
+                    - $ref: '#/components/schemas/DebateResult'
+                    - type: 'null'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      description: '**상태:** 변경 · **릴리스:** MVP · **전송:** HTTP'
+  /jobs/{job_id}/events:
+    get:
+      tags:
+      - 작업
+      operationId: streamJobEvents
+      summary: 진행 이벤트 스트림
+      description: |-
+        **상태:** 신규 · **릴리스:** MVP · **전송:** SSE
+
+        `Last-Event-ID` 다음 `seq`부터 전송합니다. 15초마다 `: ping`을 보내고 종료 이벤트 후 연결을 닫습니다.
+      x-transport: sse
+      x-release: mvp
+      x-status: new
+      parameters:
+      - $ref: '#/components/parameters/JobId'
+      - name: Last-Event-ID
+        in: header
+        schema:
+          type: integer
+        description: 마지막으로 받은 seq
+      responses:
+        '200':
+          description: 이벤트 스트림. 각 data 줄의 형식은 JobEvent입니다.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+              example: |
+                id: 2
+                event: data_collected
+                data: {"seq":2,"type":"data_collected","payload":{"report_count":12,"news_count":30,"disclosure_count":4}}
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /users/{user_id}/jobs:
+    get:
+      tags:
+      - 작업
+      operationId: readUserJobs
+      summary: 사용자 작업 이력 조회
+      x-transport: http
+      x-release: mvp
+      x-status: changed
+      parameters:
+      - $ref: '#/components/parameters/UserId'
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+      responses:
+        '200':
+          description: 작업 목록
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - jobs
+                properties:
+                  jobs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Job'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+      description: '**상태:** 변경 · **릴리스:** MVP · **전송:** HTTP'
+x-internal-functions:
+- name: resolve_company
+  agent: 데이터 에이전트
+  summary: 회사명·종목코드를 종목으로 해석
+  signature: 'resolve_company(company_input: str) -> dict'
+  input: ResolveCompanyInput
+  output: ResolvedCompany
+  status: changed
+  release: mvp
+  note: 종목코드·정식명·별칭이 정확히 일치할 때만 자동 확정합니다. 이행 기간에는 `matched`와 `status`를 함께 반환합니다.
+- name: search_companies
+  agent: 데이터 에이전트
+  summary: 종목 후보 검색
+  signature: 'search_companies(query: str, limit: int = 10) -> list[dict]'
+  input: SearchCompaniesInput
+  output: SearchCompaniesOutput
+  status: new
+  release: mvp
+- name: extract_company_mentions
+  agent: 데이터 에이전트
+  summary: 문장 속 종목 추출
+  signature: 'extract_company_mentions(text: str) -> list[dict]'
+  input: ExtractCompanyMentionsInput
+  output: ExtractCompanyMentionsOutput
+  status: new
+  release: mvp
+  note: 사전에 있는 표현만 처리합니다. 사전에 없는 표현은 오케스트레이터가 되묻습니다.
+- name: search_documents
+  agent: 데이터 에이전트
+  summary: 문서 벡터 검색
+  signature: search_documents(query, ticker, date_from=None, date_to=None, document_type=None, report_type=None, source=None,
+    top_k=5, embedding_model=None, vector_db=None) -> dict
+  input: SearchDocumentsInput
+  output: DataRecord
+  status: existing
+  release: mvp
+- name: get_report_metadata
+  agent: 데이터 에이전트
+  summary: 리포트 메타데이터 조회
+  signature: get_report_metadata(ticker, date_from=None, date_to=None, report_type=None) -> dict
+  input: GetReportMetadataInput
+  output: DataRecord
+  status: existing
+  release: mvp
+- name: get_report_chunks
+  agent: 데이터 에이전트
+  summary: 리포트 청크 조회
+  signature: 'get_report_chunks(report_id: str, page: int | None = None) -> dict'
+  input: GetReportChunksInput
+  output: DataRecord
+  status: existing
+  release: mvp
+- name: get_target_price_data
+  agent: 데이터 에이전트
+  summary: 목표주가와 컨센서스 조회
+  signature: get_target_price_data(ticker, date_from=None, date_to=None) -> dict
+  input: GetTargetPriceDataInput
+  output: TargetPriceData
+  status: changed
+  release: mvp
+  note: KIS 종목투자의견 API 기준입니다. 리포트 ID 연결과 `report_type`은 삭제됐습니다.
+- name: get_price_data
+  agent: 데이터 에이전트
+  summary: 시세 이력 조회
+  signature: get_price_data(ticker, date_from=None, date_to=None) -> dict
+  input: GetPriceDataInput
+  output: PriceData
+  status: changed
+  release: mvp
+  note: 수정주가(pykrx)입니다. `volatility_30d`는 제거됐습니다.
+- name: get_macro_data
+  agent: 데이터 에이전트
+  summary: 매크로 지표 조회
+  signature: 'get_macro_data(indicators: list[str] | None = None, date_from=None, date_to=None) -> dict'
+  input: GetMacroDataInput
+  output: DataRecord
+  status: changed
+  release: mvp
+- name: get_disclosure_data
+  agent: 데이터 에이전트
+  summary: 공시 조회
+  signature: get_disclosure_data(ticker, date_from=None, date_to=None, disclosure_type=None) -> dict
+  input: GetDisclosureDataInput
+  output: DataRecord
+  status: existing
+  release: mvp
+- name: get_available_data_status
+  agent: 데이터 에이전트
+  summary: 데이터 보유 상태 조회
+  signature: get_available_data_status(ticker) -> dict
+  input: GetAvailableDataStatusInput
+  output: DataStatus
+  status: changed
+  release: mvp
+- name: get_agent_context
+  agent: 데이터 에이전트
+  summary: 에이전트별 근거 묶음 조회
+  signature: 'get_agent_context(ticker: str, agent_type: str, query: str | None = None, intent: str | None = None) -> dict'
+  input: GetAgentContextInput
+  output: GetAgentContextOutput
+  status: changed
+  release: mvp
+  note: '`intent`는 아젠다 ID와 같습니다. `data_tier`는 항상 포함합니다. 시뮬레이션은 `intent` 없이 호출합니다.'
+- name: get_financials
+  agent: 데이터 에이전트
+  summary: 재무제표 조회
+  signature: 'get_financials(ticker: str, period_type: str = "quarter", date_from: str | None = None, date_to: str | None
+    = None) -> dict'
+  input: GetFinancialsInput
+  output: DataRecord
+  status: new
+  release: mvp
+  note: dart-fss 기반이며 공시 접수일 기준으로 시점 오염을 막습니다.
+- name: get_market_snapshot
+  agent: 데이터 에이전트
+  summary: 시장·업종 종목 목록 조회
+  signature: 'get_market_snapshot(sector: str | None = None, top_n: int = 20, sort_by: str = "market_cap") -> dict'
+  input: GetMarketSnapshotInput
+  output: DataRecord
+  status: new
+  release: mvp
+- name: ensure_company_data
+  agent: 데이터 에이전트
+  summary: 심층 수집 예약
+  signature: 'ensure_company_data(ticker: str, user_id: str | None = None) -> dict'
+  input: EnsureCompanyDataInput
+  output: EnsureCompanyDataOutput
+  status: new
+  release: post-mvp
+  note: 예약만 하고 즉시 반환합니다. 부작용이 있어 플래너가 직접 호출하지 않습니다. PRD 초안은 실시간 수집을 Post-MVP로 둡니다.
+- name: get_derived_snapshot
+  agent: 데이터 에이전트
+  summary: 계산 근거 조회
+  signature: 'get_derived_snapshot(ticker: str, as_of: str | None = None) -> dict'
+  input: GetDerivedSnapshotInput
+  output: DerivedSnapshot
+  status: new
+  release: mvp
+  note: 과거 변동성의 단일 계산 지점입니다. 표준편차 × √252로 연율화합니다.
+- name: get_metric
+  agent: 데이터 에이전트
+  summary: 시맨틱 레이어 지표 조회
+  signature: 'get_metric(ticker: str, metric_id: str, as_of: str) -> MetricValue'
+  input: GetMetricInput
+  output: MetricValue
+  status: new
+  release: mvp
+  note: 최종 설계 6장의 계약입니다. PER·PBR·ROE처럼 매일 바뀌는 값은 노드에 저장하지 않고 이 함수로 조회합니다.
+- name: run_simulation
+  agent: 시뮬레이션 에이전트
+  summary: 시뮬레이션 실행 함수
+  signature: run_simulation(ticker, user_id, job_id)
+  input: RunSimulationInput
+  output: RunSimulationOutput
+  status: changed
+  release: mvp
+  note: '`job_id`로 토론 결과를 직접 조회해 `macro`·`risk` 아젠다를 ID로 추출합니다. 둘 다 없으면 what-if 없이 기본 분포만 제공합니다.'
+- name: run_trend_report
+  agent: 트렌드 리포트 에이전트
+  summary: 트렌드 리포트 실행 함수
+  signature: 'def run_trend_report(self, request: TrendReportRequest) -> TrendReportResult'
+  input: TrendReportRequest
+  output: TrendReportResult
+  status: changed
+  release: mvp
+  note: '내부 단계: select_evidence, compute_target_price_trend, generate_cards, verify_cards, fill_card_gaps.'
+- name: resolve_entities
+  agent: 오케스트레이터
+  summary: 관문1 종목 확정
+  signature: 'def resolve_entities(text: str, max_companies: int = 2) -> EntityResolution'
+  input: ResolveEntitiesInput
+  output: EntityResolution
+  status: new
+  release: mvp
+- name: run_orchestrator_request
+  agent: 오케스트레이터
+  summary: 버튼 경로 실행
+  signature: 'async def run_orchestrator_request(request: OrchestratorRequest) -> Envelope'
+  input: OrchestratorRequest
+  output: AnyEnvelope
+  status: changed
+  release: mvp
+  note: '`decide_route`로 라우팅하고 공통 봉투를 반환합니다. 토론은 job 생성 전에 `precheck`를 동기 호출합니다.'
+- name: log_uncovered_query
+  agent: 오케스트레이터
+  summary: 미커버 질의 적재
+  signature: 'def log_uncovered_query(event: UncoveredQueryEvent) -> None'
+  input: UncoveredQueryEvent
+  output: null
+  status: new
+  release: mvp
+- name: make_plan
+  agent: 오케스트레이터
+  summary: 계획 1회 생성
+  signature: 'def make_plan(query: str, entities: EntityResolution, precheck: PrecheckResult | None) -> Plan'
+  input: MakePlanInput
+  output: Plan
+  status: new
+  release: post-mvp
+- name: run_insight_board
+  agent: 인사이트보드 에이전트
+  summary: 인사이트보드 실행 함수
+  signature: 'async def run_insight_board(companies: list[CompanyContext], feature: InsightBoardFeature, date_from=None, date_to=None)
+    -> InsightBoardResult'
+  input: RunInsightBoardInput
+  output: InsightBoardResult
+  status: changed
+  release: mvp
+  note: '내부 단계: 종목별 병렬 조회, compute_badges, summarize_for_comment, generate_comment, verify_comment.'
+- name: precheck
+  agent: 토론 에이전트
+  summary: 사전 판정(관문2·3)
+  signature: 'def precheck(query: str, companies: list[CompanyContext]) -> PrecheckResult'
+  input: PrecheckInput
+  output: PrecheckResult
+  status: new
+  release: mvp
+  note: LLM 없는 룰 기반 순수 함수이며 목표는 100ms 미만입니다. job 생성 전에 동기 호출합니다.
+- name: run_debate
+  agent: 토론 에이전트
+  summary: 토론 실행 함수
+  signature: 'async def run_debate(companies: list[CompanyContext], user_id: str, query: str, precheck: PrecheckResult, job_id:
+    str) -> DebateResult'
+  input: RunDebateInput
+  output: DebateResult
+  status: changed
+  release: mvp
+  note: 작업 큐 워커가 실행합니다. 단계마다 `job_events`를 기록하고 완료 시 상태를 `simulation_pending`으로 바꿉니다.
+- name: get_ontology_context
+  agent: 관계 사전
+  summary: 아젠다별 관계 컨텍스트 조회
+  signature: get_ontology_context(ticker, agenda_id) -> OntologyContext
+  input: GetOntologyContextInput
+  output: OntologyContext
+  status: changed
+  release: mvp
+  note: 토론 job에서 아젠다별 1회 호출해 Bull·Bear·Judge가 같은 결과를 공유합니다. 입장·성향별 필터는 없습니다.
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: session
+      description: httpOnly 서명 쿠키입니다. 브라우저 EventSource가 Authorization 헤더를 보낼 수 없어 제안된 방식입니다(OQ-8). `POST /users` 응답의 Set-Cookie
+        헤더는 참고용 문서입니다.
+  parameters:
+    JobId:
+      name: job_id
+      in: path
+      required: true
+      schema:
+        type: string
+    Ticker:
+      name: ticker
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/TickerValue'
+    UserId:
+      name: user_id
+      in: path
+      required: true
+      schema:
+        type: string
+  responses:
+    Unauthenticated:
+      description: 로그인 필요
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    InvalidRequest:
+      description: 요청 형식 오류
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: 대상이 없거나 본인 소유가 아님
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Conflict:
+      description: 동시 실행 한도 초과 또는 잘못된 job 상태
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    RateLimited:
+      description: 일일 한도 초과
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          description: 재시도까지 남은 초
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    UpstreamUnavailable:
+      description: 외부 서비스 장애
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    InternalError:
+      description: 내부 오류
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  schemas:
+    TickerValue:
+      type: string
+      pattern: ^[0-9A-Z]{6}$
+      examples:
+      - 005930
+    NullableDate:
+      type:
+      - string
+      - 'null'
+      format: date
+    Tier:
+      type: string
+      enum:
+      - T0
+      - T1
+      - T2
+    AgendaId:
+      type: string
+      enum:
+      - valuation
+      - macro
+      - risk
+      - growth
+      - shareholder_return
+      - flow
+    DataTier:
+      type: string
+      enum:
+      - report
+      - news_only
+      - disclosure_only
+      - derived_only
+      - macro_only
+    RiskProfile:
+      type: string
+      enum:
+      - conservative
+      - moderate_conservative
+      - moderate
+      - aggressive
+      - very_aggressive
+    InsightBoardFeature:
+      type: string
+      enum:
+      - price
+      - macro
+      - disclosure
+    JobStatus:
+      type: string
+      enum:
+      - queued
+      - running
+      - debate_completed
+      - simulation_pending
+      - simulation_running
+      - completed
+      - failed
+    ResponseMeta:
+      type: object
+      required:
+      - trace_id
+      - data_as_of
+      - generated_at
+      properties:
+        trace_id:
+          type: string
+        data_as_of:
+          type:
+          - string
+          - 'null'
+          description: 기준일. 해당 없을 때만 null을 명시합니다.
+        generated_at:
+          type: string
+          format: date-time
+        prompt_version:
+          type:
+          - string
+          - 'null'
+        model:
+          type:
+          - string
+          - 'null'
+    ReasonCode:
+      type: string
+      enum:
+      - uncovered_company
+      - no_data
+      - company_not_found
+      - too_many_companies
+      - partial_coverage
+      - out_of_scope_topic
+      - data_collecting
+      - partial_result
+      - unauthenticated
+      - invalid_request
+      - concurrent_job_limit
+      - rate_limited
+      - upstream_unavailable
+      - internal_error
+      - job_not_found
+      - invalid_job_state
+      description: 마지막 두 값은 제안입니다(OQ-2). 사용자 문구는 reason.message를 사용합니다.
+    NextAction:
+      description: 사유 코드와 1:1로 대응합니다(REASON_POLICY).
+      oneOf:
+      - type: object
+        title: choose_alternative_company
+        required:
+        - type
+        - payload
+        properties:
+          type:
+            const: choose_alternative_company
+          payload:
+            type: object
+            required:
+            - alternatives
+            properties:
+              alternatives:
+                type: array
+                minItems: 1
+                items:
+                  $ref: '#/components/schemas/Candidate'
+      - type: object
+        title: rephrase_company
+        required:
+        - type
+        properties:
+          type:
+            const: rephrase_company
+      - type: object
+        title: select_companies
+        required:
+        - type
+        - payload
+        properties:
+          type:
+            const: select_companies
+          payload:
+            type: object
+            required:
+            - candidates
+            - max_select
+            properties:
+              candidates:
+                type: array
+                minItems: 3
+                items:
+                  $ref: '#/components/schemas/Candidate'
+              max_select:
+                const: 2
+      - type: object
+        title: run_single_analysis
+        required:
+        - type
+        - payload
+        properties:
+          type:
+            const: run_single_analysis
+          payload:
+            type: object
+            required:
+            - company
+            properties:
+              company:
+                $ref: '#/components/schemas/CompanyContext'
+      - type: object
+        title: choose_supported_topic
+        required:
+        - type
+        - payload
+        properties:
+          type:
+            const: choose_supported_topic
+          payload:
+            type: object
+            required:
+            - topics
+            properties:
+              topics:
+                type: array
+                minItems: 1
+                items:
+                  $ref: '#/components/schemas/AgendaId'
+      - type: object
+        title: check_back_later
+        required:
+        - type
+        properties:
+          type:
+            const: check_back_later
+          payload:
+            type: object
+            properties:
+              ready_at:
+                type:
+                - string
+                - 'null'
+                format: date-time
+      - type: object
+        title: retry_failed_parts
+        required:
+        - type
+        - payload
+        properties:
+          type:
+            const: retry_failed_parts
+          payload:
+            type: object
+            required:
+            - failed_parts
+            properties:
+              failed_parts:
+                type: array
+                minItems: 1
+                items:
+                  type: string
+      - type: object
+        title: login
+        required:
+        - type
+        properties:
+          type:
+            const: login
+      - type: object
+        title: fix_input
+        required:
+        - type
+        properties:
+          type:
+            const: fix_input
+          payload:
+            type: object
+            properties:
+              fields:
+                type: array
+                items:
+                  type: string
+      - type: object
+        title: view_existing_job
+        required:
+        - type
+        - payload
+        properties:
+          type:
+            const: view_existing_job
+          payload:
+            type: object
+            required:
+            - job_id
+            properties:
+              job_id:
+                type: string
+      - type: object
+        title: retry_later
+        required:
+        - type
+        - payload
+        properties:
+          type:
+            const: retry_later
+          payload:
+            type: object
+            required:
+            - retry_after_seconds
+            properties:
+              retry_after_seconds:
+                type: integer
+                minimum: 1
+      - type: object
+        title: retry
+        required:
+        - type
+        properties:
+          type:
+            const: retry
+    Reason:
+      type: object
+      required:
+      - code
+      - message
+      - next_action
+      properties:
+        code:
+          $ref: '#/components/schemas/ReasonCode'
+        message:
+          type: string
+          description: 기술 용어와 코드값을 노출하지 않는 사용자 문구
+        next_action:
+          $ref: '#/components/schemas/NextAction'
+    Problem:
+      type: object
+      required:
+      - type
+      - title
+      - status
+      - detail
+      - reason
+      - trace_id
+      properties:
+        type:
+          type: string
+          examples:
+          - urn:ant-secretariat:problem:rate_limited
+        title:
+          type: string
+        status:
+          type: integer
+          description: HTTP 상태 코드
+        detail:
+          type: string
+          description: reason.message와 같습니다
+        instance:
+          type:
+          - string
+          - 'null'
+        reason:
+          $ref: '#/components/schemas/Reason'
+        trace_id:
+          type: string
+    JobRef:
+      type: object
+      required:
+      - job_id
+      - reused
+      properties:
+        job_id:
+          type: string
+        reused:
+          type: boolean
+          default: false
+          description: 진행 중인 기존 작업을 재사용했는지 여부
+    Clarification:
+      type: object
+      required:
+      - conversation_id
+      - ambiguous
+      description: 필드 구조는 PendingClarification 기반 제안입니다. 후보는 채팅 5개가 상한입니다.
+      properties:
+        conversation_id:
+          type: string
+        ambiguous:
+          type: object
+          additionalProperties:
+            type: array
+            maxItems: 5
+            items:
+              $ref: '#/components/schemas/Candidate'
+    RejectedResponse:
+      type: object
+      required:
+      - status
+      - reason
+      - meta
+      properties:
+        status:
+          const: rejected
+        reason:
+          $ref: '#/components/schemas/Reason'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+    ClarificationResponse:
+      type: object
+      required:
+      - status
+      - clarification
+      - meta
+      properties:
+        status:
+          const: clarification_needed
+        clarification:
+          $ref: '#/components/schemas/Clarification'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+    JobStartedResponse:
+      type: object
+      required:
+      - status
+      - job
+      - meta
+      properties:
+        status:
+          const: job_started
+        job:
+          $ref: '#/components/schemas/JobRef'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+    OkInsightBoard:
+      type: object
+      required:
+      - status
+      - data
+      - meta
+      properties:
+        status:
+          const: ok
+        data:
+          $ref: '#/components/schemas/InsightBoardResult'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+    PartialInsightBoard:
+      type: object
+      required:
+      - status
+      - data
+      - reason
+      - meta
+      properties:
+        status:
+          const: partial
+        data:
+          $ref: '#/components/schemas/InsightBoardResult'
+        reason:
+          $ref: '#/components/schemas/Reason'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+    InsightBoardEnvelope:
+      oneOf:
+      - $ref: '#/components/schemas/OkInsightBoard'
+      - $ref: '#/components/schemas/PartialInsightBoard'
+      - $ref: '#/components/schemas/RejectedResponse'
+      discriminator:
+        propertyName: status
+        mapping:
+          ok: '#/components/schemas/OkInsightBoard'
+          partial: '#/components/schemas/PartialInsightBoard'
+          rejected: '#/components/schemas/RejectedResponse'
+    OkTrendReport:
+      type: object
+      required:
+      - status
+      - data
+      - meta
+      properties:
+        status:
+          const: ok
+        data:
+          $ref: '#/components/schemas/TrendReportResult'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+    PartialTrendReport:
+      type: object
+      required:
+      - status
+      - data
+      - reason
+      - meta
+      properties:
+        status:
+          const: partial
+        data:
+          $ref: '#/components/schemas/TrendReportResult'
+        reason:
+          $ref: '#/components/schemas/Reason'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+    TrendReportEnvelope:
+      oneOf:
+      - $ref: '#/components/schemas/OkTrendReport'
+      - $ref: '#/components/schemas/PartialTrendReport'
+      - $ref: '#/components/schemas/RejectedResponse'
+      discriminator:
+        propertyName: status
+        mapping:
+          ok: '#/components/schemas/OkTrendReport'
+          partial: '#/components/schemas/PartialTrendReport'
+          rejected: '#/components/schemas/RejectedResponse'
+    DebateStartEnvelope:
+      oneOf:
+      - $ref: '#/components/schemas/JobStartedResponse'
+      - $ref: '#/components/schemas/RejectedResponse'
+      discriminator:
+        propertyName: status
+        mapping:
+          job_started: '#/components/schemas/JobStartedResponse'
+          rejected: '#/components/schemas/RejectedResponse'
+    OkChat:
+      type: object
+      required:
+      - status
+      - data
+      - meta
+      properties:
+        status:
+          const: ok
+        data:
+          $ref: '#/components/schemas/ChatAnswer'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+    ChatEnvelope:
+      oneOf:
+      - $ref: '#/components/schemas/OkChat'
+      - $ref: '#/components/schemas/RejectedResponse'
+      - $ref: '#/components/schemas/ClarificationResponse'
+      - $ref: '#/components/schemas/JobStartedResponse'
+      discriminator:
+        propertyName: status
+        mapping:
+          ok: '#/components/schemas/OkChat'
+          rejected: '#/components/schemas/RejectedResponse'
+          clarification_needed: '#/components/schemas/ClarificationResponse'
+          job_started: '#/components/schemas/JobStartedResponse'
+    AnyEnvelope:
+      anyOf:
+      - $ref: '#/components/schemas/InsightBoardEnvelope'
+      - $ref: '#/components/schemas/TrendReportEnvelope'
+      - $ref: '#/components/schemas/DebateStartEnvelope'
+      - $ref: '#/components/schemas/ChatEnvelope'
+    CompanyContext:
+      type: object
+      required:
+      - ticker
+      - company
+      properties:
+        ticker:
+          $ref: '#/components/schemas/TickerValue'
+        company:
+          type: string
+        sector:
+          type: string
+          default: ''
+        tier:
+          allOf:
+          - $ref: '#/components/schemas/Tier'
+          default: T1
+    CompanySummary:
+      allOf:
+      - $ref: '#/components/schemas/CompanyContext'
+      - type: object
+        properties:
+          aliases:
+            type: array
+            items:
+              type: string
+    Candidate:
+      type: object
+      required:
+      - ticker
+      - company
+      properties:
+        ticker:
+          $ref: '#/components/schemas/TickerValue'
+        company:
+          type: string
+        sector:
+          type: string
+        market_cap:
+          type:
+          - number
+          - 'null'
+    DataStatus:
+      type: object
+      required:
+      - ticker
+      - report_count
+      - news_count
+      - disclosure_count
+      - derived_snapshot_available
+      properties:
+        ticker:
+          $ref: '#/components/schemas/TickerValue'
+        report_count:
+          type: integer
+          minimum: 0
+        news_count:
+          type: integer
+          minimum: 0
+        disclosure_count:
+          type: integer
+          minimum: 0
+        derived_snapshot_available:
+          type: boolean
+        collection_job_status:
+          type:
+          - string
+          - 'null'
+          description: 진행 중인 수집 작업 상태
+        simulation_ready:
+          type: boolean
+          description: sim_params 존재 여부. 제안 필드입니다(OQ-4).
+    ResolvedCompany:
+      type: object
+      required:
+      - status
+      properties:
+        status:
+          type: string
+          enum:
+          - exact
+          - ambiguous
+          - not_found
+        matched:
+          type: boolean
+          deprecated: true
+          description: 이행 기간에만 반환합니다
+        ticker:
+          $ref: '#/components/schemas/TickerValue'
+        company:
+          type: string
+        sector:
+          type: string
+        market_cap:
+          type:
+          - number
+          - 'null'
+        tier:
+          $ref: '#/components/schemas/Tier'
+        data_status:
+          $ref: '#/components/schemas/DataStatus'
+        candidates:
+          type: array
+          items:
+            $ref: '#/components/schemas/Candidate'
+    TargetPriceData:
+      type: object
+      required:
+      - ticker
+      - records
+      - consensus
+      properties:
+        ticker:
+          $ref: '#/components/schemas/TickerValue'
+        records:
+          type: array
+          items:
+            type: object
+            properties:
+              hts_goal_prc:
+                type:
+                - number
+                - 'null'
+                description: 목표주가
+              invt_opnn:
+                type:
+                - string
+                - 'null'
+                description: 투자의견
+              rgbf_invt_opnn:
+                type:
+                - string
+                - 'null'
+                description: 직전 투자의견
+              mbcr_name:
+                type:
+                - string
+                - 'null'
+                description: 증권사
+        consensus:
+          type: object
+          description: 증권사별 최신 1건 기준입니다.
+          properties:
+            avg_target_price:
+              type:
+              - number
+              - 'null'
+            max_target_price:
+              type:
+              - number
+              - 'null'
+            min_target_price:
+              type:
+              - number
+              - 'null'
+    PriceData:
+      type: object
+      required:
+      - prices
+      - latest
+      properties:
+        prices:
+          type: array
+          items:
+            type: object
+            required:
+            - price_date
+            - close
+            - volume
+            additionalProperties: true
+            properties:
+              price_date:
+                type: string
+                format: date
+              close:
+                type:
+                - number
+                - 'null'
+              volume:
+                type:
+                - integer
+                - 'null'
+        latest:
+          type: object
+          required:
+          - current_price
+          additionalProperties: true
+          properties:
+            current_price:
+              type:
+              - number
+              - 'null'
+    DerivedSnapshot:
+      type: object
+      required:
+      - valuation
+      - price_trend
+      - fundamental_trend
+      - flow
+      properties:
+        valuation:
+          type: object
+          additionalProperties: true
+          description: PER·PBR 과거 백분위와 업종 평균 대비
+        price_trend:
+          type: object
+          additionalProperties: true
+          properties:
+            volatility_1m:
+              type:
+              - number
+              - 'null'
+            volatility_3m:
+              type:
+              - number
+              - 'null'
+            volatility_1m_market_threshold:
+              type:
+              - number
+              - 'null'
+              description: 그날 T0 분포 상위 20% 값
+        fundamental_trend:
+          type: object
+          additionalProperties: true
+          description: 최근 분기 매출·영업이익 YoY·QoQ
+        flow:
+          type: object
+          additionalProperties: true
+          description: 기관·외국인 순매수 동향
+    MetricValue:
+      type: object
+      required:
+      - ticker
+      - metric_id
+      - value
+      - unit
+      - basis
+      - as_of
+      - source
+      properties:
+        ticker:
+          $ref: '#/components/schemas/TickerValue'
+        metric_id:
+          type: string
+        value:
+          type:
+          - number
+          - 'null'
+        unit:
+          type: string
+        basis:
+          type: string
+        as_of:
+          type: string
+          format: date
+        source:
+          type: array
+          items:
+            type: string
+        reason:
+          type:
+          - string
+          - 'null'
+          description: 계산 불가 사유
+    Evidence:
+      type: object
+      required:
+      - evidence_id
+      - chunk_id
+      - document_type
+      - title
+      - source
+      - date
+      - content_preview
+      properties:
+        evidence_id:
+          type: string
+          examples:
+          - S1
+        chunk_id:
+          type: string
+        document_type:
+          type: string
+          enum:
+          - report
+          - news
+          - disclosure
+          - macro
+          - structured
+        title:
+          type: string
+        source:
+          type: string
+        author_org:
+          type:
+          - string
+          - 'null'
+        date:
+          type: string
+        url:
+          type:
+          - string
+          - 'null'
+        content_preview:
+          type: string
+        evidence_source:
+          type: string
+          enum:
+          - original
+          - gap_fill
+          default: original
+    Claim:
+      type: object
+      required:
+      - claim_id
+      - text
+      - claim_type
+      - evidence_ids
+      properties:
+        claim_id:
+          type: string
+        text:
+          type: string
+          description: 숫자는 자리표시자로 쓰고 코드가 치환합니다
+        claim_type:
+          type: string
+          enum:
+          - numeric
+          - event
+          - opinion
+          - table
+        evidence_ids:
+          type: array
+          items:
+            type: string
+    EntityResolution:
+      type: object
+      required:
+      - status
+      - companies
+      - ambiguous
+      - uncovered
+      - mode
+      properties:
+        status:
+          type: string
+          enum:
+          - ok
+          - ambiguous
+          - not_found
+          - uncovered
+          - too_many
+          - partial_covered
+        companies:
+          type: array
+          maxItems: 2
+          items:
+            $ref: '#/components/schemas/CompanyContext'
+        ambiguous:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              $ref: '#/components/schemas/Candidate'
+        uncovered:
+          type: array
+          items:
+            type: string
+        mode:
+          type: string
+          enum:
+          - single
+          - compare
+    OrchestratorRequest:
+      type: object
+      required:
+      - request_type
+      - user_id
+      - companies
+      properties:
+        request_type:
+          type: string
+          enum:
+          - insight_board
+          - debate
+          - trend_report
+          - chat
+        user_id:
+          type: string
+          description: 인증 계층이 주입합니다
+        companies:
+          type: array
+          items:
+            $ref: '#/components/schemas/CompanyContext'
+        feature:
+          oneOf:
+          - $ref: '#/components/schemas/InsightBoardFeature'
+          - type: 'null'
+        date_from:
+          $ref: '#/components/schemas/NullableDate'
+        date_to:
+          $ref: '#/components/schemas/NullableDate'
+        query:
+          type:
+          - string
+          - 'null'
+        conversation_id:
+          type:
+          - string
+          - 'null'
+    UncoveredQueryEvent:
+      type: object
+      required:
+      - user_hash
+      - query_masked
+      - gate
+      - reason_code
+      properties:
+        user_hash:
+          type: string
+        query_masked:
+          type: string
+        gate:
+          type: integer
+          enum:
+          - 1
+          - 2
+          - 3
+        reason_code:
+          $ref: '#/components/schemas/ReasonCode'
+        entity:
+          type:
+          - string
+          - 'null'
+        sector:
+          type:
+          - string
+          - 'null'
+    Plan:
+      type: object
+      required:
+      - intent
+      - mode
+      - steps
+      - rationale
+      properties:
+        intent:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgendaId'
+        mode:
+          type: string
+          enum:
+          - single
+          - compare
+        steps:
+          type: array
+          items:
+            type: object
+            required:
+            - step_id
+            - tool
+            - args
+            properties:
+              step_id:
+                type: string
+              tool:
+                type: string
+              args:
+                type: object
+                additionalProperties: true
+              depends_on:
+                type: array
+                items:
+                  type: string
+                default: []
+        rationale:
+          type: string
+          description: 로그용이며 사용자에게 노출하지 않습니다
+    ChatAnswer:
+      type: object
+      required:
+      - text
+      - claims
+      - evidence
+      - disclaimer
+      properties:
+        text:
+          type: string
+        claims:
+          type: array
+          items:
+            $ref: '#/components/schemas/Claim'
+        evidence:
+          type: array
+          items:
+            $ref: '#/components/schemas/Evidence'
+        disclaimer:
+          type: string
+    CompanyData:
+      type: object
+      required:
+      - ticker
+      - company
+      - status
+      properties:
+        ticker:
+          $ref: '#/components/schemas/TickerValue'
+        company:
+          type: string
+        status:
+          type: string
+          enum:
+          - ok
+          - empty
+          - error
+        data:
+          type:
+          - object
+          - 'null'
+          additionalProperties: true
+        error:
+          type:
+          - string
+          - 'null'
+    Badge:
+      type: object
+      required:
+      - type
+      - label
+      properties:
+        type:
+          type: string
+          enum:
+          - price_change
+          - volatility_high
+          - disclosure_count
+          - macro_direction
+        ticker:
+          type:
+          - string
+          - 'null'
+        label:
+          type: string
+        value:
+          type:
+          - number
+          - 'null'
+        direction:
+          type:
+          - string
+          - 'null'
+          enum:
+          - up
+          - down
+          - flat
+          - null
+    InsightBoardResult:
+      type: object
+      required:
+      - status
+      - feature
+      - items
+      - badges
+      - comment
+      - meta
+      properties:
+        status:
+          type: string
+          enum:
+          - ok
+          - partial
+        feature:
+          $ref: '#/components/schemas/InsightBoardFeature'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CompanyData'
+        badges:
+          type: array
+          items:
+            $ref: '#/components/schemas/Badge'
+        comment:
+          type: object
+          required:
+          - text
+          - verified
+          properties:
+            text:
+              type: string
+              description: 검증 실패 또는 LLM 오류 시 빈 문자열
+            verified:
+              type: boolean
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+    TrendReportApiRequest:
+      type: object
+      required:
+      - company
+      properties:
+        company:
+          type: string
+        query:
+          type:
+          - string
+          - 'null'
+        date_from:
+          $ref: '#/components/schemas/NullableDate'
+        date_to:
+          $ref: '#/components/schemas/NullableDate'
+    TrendReportRequest:
+      type: object
+      required:
+      - ticker
+      - company
+      properties:
+        ticker:
+          $ref: '#/components/schemas/TickerValue'
+        company:
+          type: string
+        sector:
+          type: string
+          default: ''
+        tier:
+          allOf:
+          - $ref: '#/components/schemas/Tier'
+          default: T1
+        query:
+          type:
+          - string
+          - 'null'
+        intent:
+          type:
+          - array
+          - 'null'
+          items:
+            $ref: '#/components/schemas/AgendaId'
+        date_from:
+          $ref: '#/components/schemas/NullableDate'
+        date_to:
+          $ref: '#/components/schemas/NullableDate'
+        as_of_date:
+          $ref: '#/components/schemas/NullableDate'
+    TargetPriceTrend:
+      type: object
+      required:
+      - direction
+      - broker_count
+      - comment
+      properties:
+        direction:
+          type: string
+          enum:
+          - 상향
+          - 하향
+          - 혼조
+          - 유지
+          - 근거 부족
+          description: 코드가 계산합니다
+        avg_target_price:
+          type:
+          - integer
+          - 'null'
+        min_target_price:
+          type:
+          - integer
+          - 'null'
+        max_target_price:
+          type:
+          - integer
+          - 'null'
+        broker_count:
+          type: integer
+        comment:
+          type: string
+          description: LLM이 작성합니다
+    TrendCards:
+      type: object
+      required:
+      - summary
+      - positive_factors
+      - risk_factors
+      - broker_differences
+      - target_price_trend
+      - news_issue_cards
+      properties:
+        summary:
+          type: array
+          items:
+            $ref: '#/components/schemas/Claim'
+        positive_factors:
+          type: array
+          items:
+            $ref: '#/components/schemas/Claim'
+        risk_factors:
+          type: array
+          items:
+            $ref: '#/components/schemas/Claim'
+        broker_differences:
+          type: array
+          description: BrokerView 필드는 시그니처 계약에 정의되어 있지 않습니다.
+          items:
+            type: object
+            additionalProperties: true
+        target_price_trend:
+          $ref: '#/components/schemas/TargetPriceTrend'
+        news_issue_cards:
+          type: array
+          items:
+            $ref: '#/components/schemas/Claim'
+        macro_comment:
+          oneOf:
+          - $ref: '#/components/schemas/Claim'
+          - type: 'null'
+    TrendReportResult:
+      type: object
+      required:
+      - status
+      - ticker
+      - company
+      - as_of_date
+      - data_tier
+      - cards
+      - evidence
+      - data_status
+      - verification
+      - meta
+      properties:
+        status:
+          type: string
+          enum:
+          - ok
+          - partial
+          - empty
+          description: 요약·리스크가 모두 비면 ok가 될 수 없습니다
+        ticker:
+          $ref: '#/components/schemas/TickerValue'
+        company:
+          type: string
+        as_of_date:
+          type: string
+        data_tier:
+          $ref: '#/components/schemas/DataTier'
+        cards:
+          $ref: '#/components/schemas/TrendCards'
+        evidence:
+          type: array
+          items:
+            $ref: '#/components/schemas/Evidence'
+        data_status:
+          $ref: '#/components/schemas/DataStatus'
+        verification:
+          type: object
+          description: 검사 수, 철회 수, gap_fill 수입니다.
+          additionalProperties: true
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+    PrecheckResult:
+      type: object
+      required:
+      - verdict
+      - allowed_agendas
+      - excluded
+      - selection_reason
+      - matched_intents
+      - flags
+      - dictionary_version
+      properties:
+        verdict:
+          type: string
+          enum:
+          - full
+          - reduced
+          - reject
+        reject_reason:
+          oneOf:
+          - $ref: '#/components/schemas/ReasonCode'
+          - type: 'null'
+        allowed_agendas:
+          type: array
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/AgendaId'
+        excluded:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExcludedAgenda'
+        selection_reason:
+          type: string
+        matched_intents:
+          type: array
+          items:
+            type: string
+        flags:
+          type: array
+          items:
+            type: string
+            enum:
+            - investment_advice_request
+            - stale_data
+        dictionary_version:
+          type: string
+    ExcludedAgenda:
+      type: object
+      required:
+      - agenda_id
+      - reason
+      properties:
+        agenda_id:
+          $ref: '#/components/schemas/AgendaId'
+        reason:
+          type: string
+    DebateAgenda:
+      type: object
+      required:
+      - id
+      - title
+      - bull
+      - bear
+      - verdict
+      - rebuttal_round
+      properties:
+        id:
+          $ref: '#/components/schemas/AgendaId'
+        title:
+          type: string
+        bull:
+          type: object
+          required:
+          - claims
+          - confidence
+          properties:
+            claims:
+              type: array
+              items:
+                $ref: '#/components/schemas/Claim'
+            confidence:
+              type: string
+        bear:
+          type: object
+          required:
+          - bull_claim_ref
+          - agreed_points
+          - claims
+          - confidence
+          properties:
+            bull_claim_ref:
+              type: string
+              description: 인용한 Bull claim_id
+            agreed_points:
+              type: array
+              items:
+                type: string
+            claims:
+              type: array
+              items:
+                $ref: '#/components/schemas/Claim'
+            confidence:
+              type: string
+        verdict:
+          type: object
+          required:
+          - winner
+          - reason
+          - score
+          properties:
+            winner:
+              type: string
+              enum:
+              - bull
+              - bear
+              - neutral
+            reason:
+              type: string
+            score:
+              type: object
+              required:
+              - bull
+              - bear
+              properties:
+                bull:
+                  type: integer
+                bear:
+                  type: integer
+        rebuttal_round:
+          type: boolean
+    DebateResult:
+      type: object
+      required:
+      - meta
+      - scope
+      - flags
+      - selected_agendas
+      - agendas
+      - evidence
+      - judge
+      description: '`simulation_handoff`는 최종 설계 8장에 따라 삭제했습니다.'
+      properties:
+        meta:
+          allOf:
+          - $ref: '#/components/schemas/ResponseMeta'
+          - type: object
+            required:
+            - ticker
+            - company
+            - sector
+            - data_richness
+            properties:
+              ticker:
+                $ref: '#/components/schemas/TickerValue'
+              company:
+                type: string
+              sector:
+                type: string
+              data_richness:
+                type: string
+                enum:
+                - rich
+                - limited
+        scope:
+          type: object
+          required:
+          - verdict
+          - excluded
+          - selection_reason
+          properties:
+            verdict:
+              type: string
+              enum:
+              - full
+              - reduced
+            excluded:
+              type: array
+              items:
+                $ref: '#/components/schemas/ExcludedAgenda'
+            selection_reason:
+              type: string
+        flags:
+          type: array
+          items:
+            type: string
+            enum:
+            - investment_advice_request
+            - stale_data
+        selected_agendas:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgendaId'
+        agendas:
+          type: array
+          items:
+            $ref: '#/components/schemas/DebateAgenda'
+        evidence:
+          type: array
+          items:
+            $ref: '#/components/schemas/Evidence'
+        ontology:
+          type: array
+          description: 아젠다별 관계 컨텍스트 캐시입니다. 필드 위치는 제안입니다.
+          items:
+            $ref: '#/components/schemas/OntologyContext'
+        judge:
+          type: object
+          required:
+          - user_profile
+          - overall_verdict
+          properties:
+            user_profile:
+              type: object
+              properties:
+                risk_profile:
+                  $ref: '#/components/schemas/RiskProfile'
+                investment_goal:
+                  type:
+                  - string
+                  - 'null'
+            overall_verdict:
+              type: object
+              required:
+              - stance
+              - confidence
+              - bull_score
+              - bear_score
+              - final_brief
+              - caution
+              - points_to_check
+              properties:
+                stance:
+                  type: string
+                  enum:
+                  - bullish
+                  - neutral
+                  - bearish
+                confidence:
+                  type: string
+                bull_score:
+                  type: integer
+                bear_score:
+                  type: integer
+                final_brief:
+                  type: string
+                caution:
+                  type: string
+                points_to_check:
+                  type: array
+                  items:
+                    type: string
+                  description: 매매 판단이 아닌 확인 포인트
+    Relation:
+      type: object
+      required:
+      - src
+      - relation
+      - dst
+      - source
+      - method
+      - as_of
+      description: 엣지 공통 메타데이터는 제안입니다.
+      properties:
+        src:
+          type: string
+          examples:
+          - 005930
+        relation:
+          type: string
+          enum:
+          - BELONGS_TO
+          - SENSITIVE_TO
+          - BENEFITS
+          - HURTS
+          - COMPETES_WITH
+        dst:
+          type: string
+          examples:
+          - usd_krw
+        weight:
+          type:
+          - number
+          - 'null'
+          description: 상관 기반 민감도 또는 겹침 정도
+        strength:
+          type:
+          - string
+          - 'null'
+          enum:
+          - low
+          - mid
+          - high
+          - null
+        source:
+          type: string
+          description: placeholder 값은 시연 전 실제 값으로 교체해야 합니다
+          examples:
+          - simulation_regression
+          - manual
+        method:
+          type: string
+        as_of:
+          type: string
+          format: date
+        valid_from:
+          type:
+          - string
+          - 'null'
+          format: date
+        valid_to:
+          type:
+          - string
+          - 'null'
+          format: date
+        evidence_ids:
+          type: array
+          items:
+            type: string
+    OntologyContext:
+      type: object
+      required:
+      - ticker
+      - agenda_id
+      - relations
+      - evidence_coverage
+      - path_summary
+      - as_of
+      description: 원본 계약의 신뢰도 곱과 성향별 필터는 최종 설계 5.3에 따라 제거했습니다.
+      properties:
+        ticker:
+          $ref: '#/components/schemas/TickerValue'
+        agenda_id:
+          $ref: '#/components/schemas/AgendaId'
+        relations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Relation'
+        evidence_coverage:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: 근거 있는 단계 ÷ 전체 단계
+        path_summary:
+          type: string
+          description: 프롬프트 앞단에 넣는 한 줄 요약
+        as_of:
+          type: string
+          format: date
+    SimulationFailure:
+      type: object
+      required:
+      - ticker
+      - error_code
+      - message
+      properties:
+        ticker:
+          $ref: '#/components/schemas/TickerValue'
+        error_code:
+          type: string
+          enum:
+          - insufficient_history
+          - timeout
+          - worker_lost
+          - internal_error
+        message:
+          type: string
+    SimulationWhatIf:
+      type: object
+      required:
+      - variable
+      - direction
+      - impact_pct
+      - ci_low
+      - ci_high
+      - significant
+      properties:
+        variable:
+          type: string
+          examples:
+          - usd_krw
+        direction:
+          type: string
+        shock_sigma:
+          type: number
+          description: 과거 30일 변화 폭 표준편차의 배수
+        impact_pct:
+          type: number
+        ci_low:
+          type: number
+        ci_high:
+          type: number
+        significant:
+          type: boolean
+          description: 신뢰구간이 0을 포함하면 false이며 방향 불확실로 표시합니다
+    SimulationResult:
+      type: object
+      required:
+      - ticker
+      - current_price
+      - summary
+      - quantiles
+      - what_if
+      - seed
+      - model_id
+      - data_as_of
+      description: 일부 필드명은 제안입니다(OQ-5). 투자 권유로 읽히는 문구는 금지합니다.
+      properties:
+        ticker:
+          $ref: '#/components/schemas/TickerValue'
+        current_price:
+          type: number
+        summary:
+          type: object
+          required:
+          - median_return_pct
+          - expected_volatility_annualized
+          - var95_pct
+          - prob_loss_10pct
+          properties:
+            median_return_pct:
+              type: number
+            expected_volatility_annualized:
+              type: number
+              description: 예상 변동성(모형). σ_30일 × √(252/30)
+            var95_pct:
+              type: number
+            prob_loss_10pct:
+              type: number
+              description: 30일 내 -10% 이하 확률
+        quantiles:
+          type: object
+          required:
+          - p5
+          - p25
+          - p50
+          - p75
+          - p95
+          properties:
+            p5:
+              type: number
+            p25:
+              type: number
+            p50:
+              type: number
+            p75:
+              type: number
+            p95:
+              type: number
+        fan_chart:
+          type: object
+          description: 일자별 분위수 경로입니다.
+          additionalProperties:
+            type: array
+            items:
+              type: number
+        what_if:
+          type: array
+          items:
+            $ref: '#/components/schemas/SimulationWhatIf'
+        historical_volatility_1m:
+          type:
+          - number
+          - 'null'
+          description: 과거 변동성(실현). get_derived_snapshot 값을 그대로 사용합니다
+        seed:
+          type: integer
+        model_id:
+          type: string
+        data_as_of:
+          type: string
+          format: date
+    Job:
+      type: object
+      required:
+      - job_id
+      - user_id
+      - job_type
+      - ticker
+      - company
+      - status
+      - created_at
+      - updated_at
+      properties:
+        job_id:
+          type: string
+        user_id:
+          type: string
+        job_type:
+          type: string
+          enum:
+          - debate
+          - simulation
+        ticker:
+          $ref: '#/components/schemas/TickerValue'
+        company:
+          type: string
+        sector:
+          type: string
+        status:
+          $ref: '#/components/schemas/JobStatus'
+        error_code:
+          type:
+          - string
+          - 'null'
+        failed_stage:
+          type:
+          - string
+          - 'null'
+        partial_result:
+          type:
+          - object
+          - 'null'
+          additionalProperties: true
+          description: 폴링·새로고침 복구용 최신 스냅샷
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    JobEvent:
+      type: object
+      required:
+      - seq
+      - type
+      - payload
+      properties:
+        seq:
+          type: integer
+          description: SSE id로 사용합니다
+        type:
+          type: string
+          enum:
+          - job_started
+          - data_collected
+          - bull_completed
+          - round2_started
+          - bear_completed
+          - verifying
+          - judge_completed
+          - completed
+          - failed
+          - simulation_started
+          - simulation_completed
+          - simulation_failed
+          description: simulation_* 세부 이름은 Design Doc의 와일드카드를 구체화한 제안입니다.
+        payload:
+          type: object
+          additionalProperties: true
+    OnboardingSubmission:
+      type: object
+      required:
+      - answers
+      - interest_sectors
+      - scoring_version
+      - privacy_consent_version
+      description: 스토리형 문항의 응답입니다. 환산표는 기능 명세서에서 확정합니다.
+      properties:
+        answers:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required:
+            - question_id
+            - option_id
+            properties:
+              question_id:
+                type: string
+                examples:
+                - loss_reaction
+              option_id:
+                type: string
+                examples:
+                - hold
+        interest_sectors:
+          type: array
+          maxItems: 3
+          items:
+            type: string
+        scoring_version:
+          type: string
+          description: 결과를 재현하기 위한 환산표 버전
+        privacy_consent_version:
+          type: string
+          description: 사용자가 동의한 개인정보 수집·이용 안내의 버전입니다. 제안 필드입니다.
+        interest_tickers:
+          type: array
+          maxItems: 5
+          items:
+            $ref: '#/components/schemas/TickerValue'
+          description: 선택 입력인 관심 종목입니다. 트렌드 리포트 카드 목록에 사용합니다. 제안 필드입니다.
+    UserContext:
+      type: object
+      required:
+      - user_id
+      - onboarding_done
+      properties:
+        user_id:
+          type: string
+        risk_profile:
+          oneOf:
+          - $ref: '#/components/schemas/RiskProfile'
+          - type: 'null'
+        investment_goal:
+          type:
+          - string
+          - 'null'
+          enum:
+          - short_term
+          - mid_term
+          - long_term
+          - null
+        investment_amount_range:
+          type:
+          - string
+          - 'null'
+          enum:
+          - under_500
+          - 5002000
+          - 20005000
+          - over_5000
+          - null
+        investment_experience:
+          type:
+          - string
+          - 'null'
+          enum:
+          - beginner
+          - intermediate
+          - advanced
+          - null
+        interest_sectors:
+          type: array
+          maxItems: 3
+          items:
+            type: string
+        onboarding_done:
+          type: boolean
+        scoring_version:
+          type:
+          - string
+          - 'null'
+        interest_tickers:
+          type: array
+          maxItems: 5
+          items:
+            $ref: '#/components/schemas/TickerValue'
+    FeedbackRequest:
+      type: object
+      required:
+      - rating
+      properties:
+        rating:
+          type: string
+          enum:
+          - up
+          - down
+        reason_tags:
+          type: array
+          items:
+            type: string
+            enum:
+            - factual_error
+            - no_evidence
+            - stale_info
+            - hard_to_understand
+        agenda_id:
+          oneOf:
+          - $ref: '#/components/schemas/AgendaId'
+          - type: 'null'
+    ResolveCompanyInput:
+      type: object
+      required:
+      - company_input
+      properties:
+        company_input:
+          type: string
+    SearchCompaniesInput:
+      type: object
+      required:
+      - query
+      properties:
+        query:
+          type: string
+        limit:
+          type: integer
+          default: 10
+          description: 채팅 5개
+          자동완성 10개: null
+    SearchCompaniesOutput:
+      type: array
+      items:
+        $ref: '#/components/schemas/Candidate'
+    ExtractCompanyMentionsInput:
+      type: object
+      required:
+      - text
+      properties:
+        text:
+          type: string
+    ExtractCompanyMentionsOutput:
+      type: array
+      items:
+        allOf:
+        - $ref: '#/components/schemas/ResolvedCompany'
+        - type: object
+          required:
+          - mention
+          properties:
+            mention:
+              type: string
+    SearchDocumentsInput:
+      type: object
+      required:
+      - query
+      - ticker
+      properties:
+        query:
+          type: string
+        ticker:
+          $ref: '#/components/schemas/TickerValue'
+        date_from:
+          $ref: '#/components/schemas/NullableDate'
+        date_to:
+          $ref: '#/components/schemas/NullableDate'
+        document_type:
+          type:
+          - string
+          - 'null'
+        report_type:
+          type:
+          - string
+          - 'null'
+        source:
+          type:
+          - string
+          - 'null'
+        top_k:
+          type: integer
+          default: 5
+    GetReportMetadataInput:
+      type: object
+      required:
+      - ticker
+      additionalProperties: true
+      properties:
+        ticker:
+          $ref: '#/components/schemas/TickerValue'
+        date_from:
+          $ref: '#/components/schemas/NullableDate'
+        date_to:
+          $ref: '#/components/schemas/NullableDate'
+    GetReportChunksInput:
+      type: object
+      required:
+      - report_id
+      properties:
+        report_id:
+          type: string
+        page:
+          type:
+          - integer
+          - 'null'
+    GetTargetPriceDataInput:
+      type: object
+      required:
+      - ticker
+      additionalProperties: true
+      properties:
+        ticker:
+          $ref: '#/components/schemas/TickerValue'
+        date_from:
+          $ref: '#/components/schemas/NullableDate'
+        date_to:
+          $ref: '#/components/schemas/NullableDate'
+    GetPriceDataInput:
+      type: object
+      required:
+      - ticker
+      additionalProperties: true
+      properties:
+        ticker:
+          $ref: '#/components/schemas/TickerValue'
+        date_from:
+          $ref: '#/components/schemas/NullableDate'
+        date_to:
+          $ref: '#/components/schemas/NullableDate'
+    GetMacroDataInput:
+      type: object
+      properties:
+        indicators:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+        date_from:
+          $ref: '#/components/schemas/NullableDate'
+        date_to:
+          $ref: '#/components/schemas/NullableDate'
+    GetDisclosureDataInput:
+      type: object
+      required:
+      - ticker
+      additionalProperties: true
+      properties:
+        ticker:
+          $ref: '#/components/schemas/TickerValue'
+        date_from:
+          $ref: '#/components/schemas/NullableDate'
+        date_to:
+          $ref: '#/components/schemas/NullableDate'
+    GetAvailableDataStatusInput:
+      type: object
+      required:
+      - ticker
+      properties:
+        ticker:
+          $ref: '#/components/schemas/TickerValue'
+    GetAgentContextInput:
+      type: object
+      required:
+      - ticker
+      - agent_type
+      properties:
+        ticker:
+          $ref: '#/components/schemas/TickerValue'
+        agent_type:
+          type: string
+          examples:
+          - debate
+          - simulation
+          - trend_report
+          description: trend_report·insight_board 지원 여부 확인 필요
+        query:
+          type:
+          - string
+          - 'null'
+        intent:
+          oneOf:
+          - $ref: '#/components/schemas/AgendaId'
+          - type: 'null'
+    GetAgentContextOutput:
+      type: object
+      required:
+      - data_tier
+      additionalProperties: true
+      properties:
+        data_tier:
+          $ref: '#/components/schemas/DataTier'
+    GetFinancialsInput:
+      type: object
+      required:
+      - ticker
+      properties:
+        ticker:
+          $ref: '#/components/schemas/TickerValue'
+        period_type:
+          type: string
+          default: quarter
+        date_from:
+          $ref: '#/components/schemas/NullableDate'
+        date_to:
+          $ref: '#/components/schemas/NullableDate'
+    GetMarketSnapshotInput:
+      type: object
+      properties:
+        sector:
+          type:
+          - string
+          - 'null'
+        top_n:
+          type: integer
+          default: 20
+        sort_by:
+          type: string
+          default: market_cap
+    EnsureCompanyDataInput:
+      type: object
+      required:
+      - ticker
+      properties:
+        ticker:
+          $ref: '#/components/schemas/TickerValue'
+        user_id:
+          type:
+          - string
+          - 'null'
+    EnsureCompanyDataOutput:
+      type: object
+      required:
+      - job_id
+      - status
+      properties:
+        job_id:
+          type: string
+        status:
+          type: string
+          examples:
+          - queued
+    GetDerivedSnapshotInput:
+      type: object
+      required:
+      - ticker
+      properties:
+        ticker:
+          $ref: '#/components/schemas/TickerValue'
+        as_of:
+          $ref: '#/components/schemas/NullableDate'
+    GetMetricInput:
+      type: object
+      required:
+      - ticker
+      - metric_id
+      - as_of
+      properties:
+        ticker:
+          $ref: '#/components/schemas/TickerValue'
+        metric_id:
+          type: string
+          examples:
+          - per_ttm
+        as_of:
+          type: string
+          format: date
+    RunSimulationInput:
+      type: object
+      required:
+      - ticker
+      - user_id
+      - job_id
+      properties:
+        ticker:
+          $ref: '#/components/schemas/TickerValue'
+        user_id:
+          type: string
+        job_id:
+          type: string
+    RunSimulationOutput:
+      oneOf:
+      - $ref: '#/components/schemas/SimulationResult'
+      - $ref: '#/components/schemas/SimulationFailure'
+    ResolveEntitiesInput:
+      type: object
+      required:
+      - text
+      properties:
+        text:
+          type: string
+        max_companies:
+          type: integer
+          default: 2
+    MakePlanInput:
+      type: object
+      required:
+      - query
+      - entities
+      properties:
+        query:
+          type: string
+        entities:
+          $ref: '#/components/schemas/EntityResolution'
+        precheck:
+          oneOf:
+          - $ref: '#/components/schemas/PrecheckResult'
+          - type: 'null'
+    RunInsightBoardInput:
+      type: object
+      required:
+      - companies
+      - feature
+      properties:
+        companies:
+          type: array
+          minItems: 1
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/CompanyContext'
+        feature:
+          $ref: '#/components/schemas/InsightBoardFeature'
+        date_from:
+          $ref: '#/components/schemas/NullableDate'
+        date_to:
+          $ref: '#/components/schemas/NullableDate'
+    PrecheckInput:
+      type: object
+      required:
+      - query
+      - companies
+      properties:
+        query:
+          type: string
+        companies:
+          type: array
+          items:
+            $ref: '#/components/schemas/CompanyContext'
+    RunDebateInput:
+      type: object
+      required:
+      - companies
+      - user_id
+      - query
+      - precheck
+      - job_id
+      properties:
+        companies:
+          type: array
+          minItems: 1
+          maxItems: 1
+          items:
+            $ref: '#/components/schemas/CompanyContext'
+        user_id:
+          type: string
+        query:
+          type: string
+        precheck:
+          $ref: '#/components/schemas/PrecheckResult'
+        job_id:
+          type: string
+    GetOntologyContextInput:
+      type: object
+      required:
+      - ticker
+      - agenda_id
+      properties:
+        ticker:
+          $ref: '#/components/schemas/TickerValue'
+        agenda_id:
+          $ref: '#/components/schemas/AgendaId'
+    DataRecord:
+      type: object
+      additionalProperties: true
+      description: 데이터 조회 결과입니다. 세부 컬럼은 구현 시 pykrx·dart-fss 반환값과 대조해 확정합니다.

@@ -1,16 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, ThumbsDown, ThumbsUp, X } from "lucide-react";
+import { ThumbsDown, ThumbsUp } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client";
+import { DebateChat, plainNames } from "../components/DebateChat";
 import { SimulationChart, simulationStats } from "../components/SimulationChart";
 import {
   AiNote,
   Ant,
-  Badge,
   Button,
   Chip,
-  Confidence,
   DebateStepper,
   Disclaimer,
   ErrorText,
@@ -20,9 +19,9 @@ import {
   TopBar,
 } from "../components/ui";
 import { profiles, sectorLabel } from "../data/onboarding";
-import { debateStep, isOutOfScope, stepHeadline } from "../lib/debate";
+import { debateStep, isOutOfScope, stepBanner, stepHeadline } from "../lib/debate";
 import { useAppStore } from "../store/appStore";
-import type { Company, DebateArgument, DebateJob, SimulationResult } from "../types";
+import type { Company, DebateJob, SimulationResult } from "../types";
 
 const terminal = new Set(["completed", "failed"]);
 const topics = ["목표주가가 오른 근거", "최근 쟁점", "위험 요인"];
@@ -218,8 +217,16 @@ function JobView({ jobId }: { jobId: string }) {
 function ProgressView({ job }: { job: DebateJob }) {
   const step = debateStep(job);
   const seconds = useElapsed(job.created_at);
-  const bull = job.partial_result?.bull_output;
-  const bear = job.partial_result?.bear_output;
+  const bulls = job.partial_result?.bull_output?.agendas ?? [];
+  const bears = job.partial_result?.bear_output?.agendas ?? [];
+  // 반대 측이 첫 주장부터 차례로 답하도록, 그 전에는 첫 아젠다만 보여 준다.
+  const agendas = (bears.length ? bulls : bulls.slice(0, 1)).map((a, i) => ({
+    id: a.agenda_id,
+    title: a.agenda_title,
+    bull: a,
+    bear: bears[i],
+  }));
+  const typing = step === 1 ? "bull" : step === 2 ? "bear" : step >= 3 ? "judge" : undefined;
 
   return (
     <div className="screen">
@@ -229,59 +236,23 @@ function ProgressView({ job }: { job: DebateJob }) {
         <ErrorText>분석을 마치지 못했어요. 이력에서 다시 시도해 주세요.</ErrorText>
       ) : (
         <>
-          <div className="hero-row">
-            <Ant kind="analysis" size={84} />
-            <div>
+          {step === 0 ? (
+            <div className="hero-row">
+              <Ant kind="analysis" size={84} />
               <h2 className="display">{stepHeadline[step]}</h2>
-              <p className="caption">
-                {Math.floor(seconds / 60)}분 {seconds % 60}초 지났어요. 보통 2~3분 걸려요.
-              </p>
             </div>
-          </div>
-          <SideCard title="찬성 측 의견" summary={bull?.overall_summary ?? bull?.agendas?.[0]?.summary} args={bull?.agendas?.[0]?.arguments} active={step >= 1} />
-          <SideCard title="반대 측 의견" summary={bear?.overall_summary ?? bear?.agendas?.[0]?.summary} args={bear?.agendas?.[0]?.arguments} active={step >= 2} />
+          ) : (
+            <h2 className="chat-status">{stepBanner[step]}</h2>
+          )}
+          <p className="caption">
+            {Math.floor(seconds / 60)}분 {seconds % 60}초 지났어요. 보통 2~3분 걸려요.
+          </p>
+          <DebateChat agendas={agendas} typing={typing} live />
           <Tip>다른 화면을 봐도 분석은 계속돼요. 이력에서 다시 열 수 있어요.</Tip>
         </>
       )}
       <Disclaimer />
     </div>
-  );
-}
-
-function SideCard({
-  title,
-  summary,
-  args,
-  active,
-}: {
-  title: string;
-  summary?: string;
-  args?: DebateArgument[];
-  active: boolean;
-}) {
-  const source = args?.[0];
-  return (
-    <section className="card side">
-      <div className="side-head">
-        <h3>{title}</h3>
-        {summary ? <Badge tone="success">완료</Badge> : null}
-      </div>
-      {summary ? (
-        <>
-          <p>{summary}</p>
-          {source?.source_title ? (
-            <span className="source">
-              {source.source_title}
-              {source.source_date ? `, ${source.source_date}` : ""}
-            </span>
-          ) : null}
-        </>
-      ) : active ? (
-        <Skeleton />
-      ) : (
-        <p className="caption">차례를 기다리고 있어요.</p>
-      )}
-    </section>
   );
 }
 
@@ -298,7 +269,7 @@ function ResultView({ job }: { job: DebateJob }) {
   const [showSim, setShowSim] = useState(false);
   const debate = job.debate_result?.debate_result;
   const verdict = debate?.judge?.overall_verdict ?? {};
-  const brief = String(verdict.final_brief ?? "");
+  const brief = plainNames(String(verdict.final_brief ?? ""));
   const [headline, ...rest] = brief.split(/(?<=[.!?요다])\s+/);
   const agendas = debate?.agendas ?? [];
   const simulation = job.simulation_result as SimulationResult | undefined;
@@ -345,53 +316,21 @@ function ResultView({ job }: { job: DebateJob }) {
         </section>
       ) : null}
 
-      {agendas.map((a) => (
-        <section key={a.agenda_id}>
-          <h2 className="section-title">{a.agenda_title}</h2>
-          <ArgumentCard tone="강세" side={a.bull} />
-          <ArgumentCard tone="약세" side={a.bear} />
-          <div className="judge">
-            <h4>판정</h4>
-            <p>{a.verdict?.reasoning}</p>
-          </div>
-        </section>
-      ))}
+      <h2 className="section-title">토론 내용</h2>
+      <DebateChat
+        agendas={agendas.map((a) => ({
+          id: a.agenda_id,
+          title: a.agenda_title,
+          bull: a.bull,
+          bear: a.bear,
+          reasoning: a.verdict?.reasoning,
+        }))}
+      />
 
       <FeedbackCard jobId={job.job_id} />
       <AiNote />
       <Disclaimer />
     </div>
-  );
-}
-
-function ArgumentCard({ tone, side }: { tone: string; side: { summary: string; arguments: DebateArgument[] } }) {
-  const [open, setOpen] = useState(tone === "강세" ? 0 : -1);
-  const a = side.arguments?.[0];
-  const relation = a?.relation_evidence ?? [];
-  return (
-    <article className="card argument">
-      <div className="argument-head">
-        <span>{tone}</span>
-        <Confidence value={a?.confidence} />
-      </div>
-      <h3>{a?.title ?? side.summary}</h3>
-      <p>{a?.content ?? side.summary}</p>
-      {a?.source_title ? (
-        <span className="source">
-          {a.source_title}
-          {a.source_date ? `, ${a.source_date}` : ""}
-        </span>
-      ) : null}
-      {relation.map((r, i) => (
-        <div className="relation" key={r.title}>
-          <button type="button" aria-expanded={open === i} onClick={() => setOpen(open === i ? -1 : i)}>
-            관계 근거: {r.title}
-            {open === i ? <X size={20} aria-hidden /> : <ChevronDown size={20} aria-hidden />}
-          </button>
-          {open === i ? <p>{r.body}</p> : null}
-        </div>
-      ))}
-    </article>
   );
 }
 

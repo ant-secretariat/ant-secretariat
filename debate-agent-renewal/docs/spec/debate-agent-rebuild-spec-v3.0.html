@@ -1,0 +1,598 @@
+<title>토론 에이전트 리빌드 기획서</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+:root {
+  --bg:#0A0A0F;--bg1:#13131F;--bg2:#0F0F1A;
+  --blue:#4F8EF7;--blue-dark:#2563EB;--blue-bg:#1A2744;--blue-light:#93C5FD;
+  --white:#FFFFFF;--gray:#9CA3AF;--gray-light:#D1D5DB;
+  --border:#1E2A45;--red:#F87171;--red-bg:#2A1515;
+  --green:#34D399;--green-bg:#0D2E1F;--amber:#FBBF24;--amber-bg:#2A2010;
+  --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans KR',system-ui,sans-serif;
+  --serif:'Noto Serif KR',serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--white);font-family:var(--sans);font-size:14px;line-height:1.7;padding:0 16px 80px}
+.wrap{max-width:920px;margin:0 auto;padding-top:40px}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--blue);margin-bottom:12px;text-transform:uppercase}
+h1.title{font-family:var(--serif);font-size:clamp(22px,4vw,34px);font-weight:700;margin-bottom:10px;line-height:1.2}
+.lede{color:var(--gray);font-size:15px;margin-bottom:20px;max-width:60ch}
+.meta-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:20px}
+.meta-cell{background:var(--bg1);padding:10px 14px}
+.meta-cell dt{font-size:11px;color:var(--gray);font-family:var(--mono);margin-bottom:2px}
+.meta-cell dd{font-size:13px;color:var(--white);font-weight:500}
+.decided-box{background:var(--green-bg);border:1px solid var(--green);border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13.5px;color:var(--gray-light)}
+.decided-box strong{color:var(--green)}
+.rejected-box{background:var(--red-bg);border:1px solid var(--red);border-radius:8px;padding:14px 18px;margin-bottom:28px}
+.rejected-box h3{font-size:13px;color:var(--red);font-family:var(--mono);letter-spacing:.05em;margin-bottom:10px}
+.rejected-item{margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--red-bg)}
+.rejected-item:last-child{margin-bottom:0;padding-bottom:0;border-bottom:none}
+.rejected-item .ri-title{font-size:13px;font-weight:600;color:var(--white);margin-bottom:3px}
+.rejected-item .ri-reason{font-size:12.5px;color:var(--gray-light)}
+nav.toc{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px;margin-bottom:44px}
+nav.toc a{display:block;text-decoration:none;color:var(--gray);background:var(--bg1);border:1px solid var(--border);border-radius:6px;padding:7px 11px;font-size:12px;transition:border-color .15s,color .15s}
+nav.toc a:hover{border-color:var(--blue);color:var(--white)}
+nav.toc .num{font-family:var(--mono);color:var(--blue);margin-right:5px;font-size:10px}
+section{margin-top:48px;scroll-margin-top:20px}
+.sec-head{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.sec-num{font-family:var(--mono);font-size:11px;color:var(--blue);background:var(--blue-bg);border-radius:5px;padding:3px 8px;white-space:nowrap}
+h2.sec-title{font-size:19px;font-weight:700;font-family:var(--serif)}
+.sec-sub{color:var(--gray);font-size:13px;margin:5px 0 18px}
+h3.sub{font-size:14px;font-weight:600;margin:24px 0 9px;color:var(--blue-light)}
+.card{background:var(--bg1);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:12px}
+dl.f{display:grid;grid-template-columns:100px 1fr;gap:7px 12px}
+@media(max-width:520px){dl.f{grid-template-columns:1fr}}
+dl.f dt{font-size:11.5px;font-weight:600;color:var(--gray);font-family:var(--mono);padding-top:2px}
+dl.f dd{font-size:13.5px;color:var(--gray-light)}
+dl.f dd strong{color:var(--white)}
+.tbl{overflow-x:auto;margin:10px 0 14px;border:1px solid var(--border);border-radius:8px;background:var(--bg1)}
+table{border-collapse:collapse;width:100%;font-size:13px;min-width:480px}
+th{text-align:left;font-weight:600;color:var(--gray);font-size:11px;padding:8px 12px;border-bottom:1px solid var(--border);white-space:nowrap;font-family:var(--mono)}
+td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top;color:var(--gray-light);line-height:1.5}
+tr:last-child td{border-bottom:none}
+td code,.mono{font-family:var(--mono);font-size:12px;color:var(--blue-light);background:var(--blue-bg);padding:1px 5px;border-radius:3px}
+.badge{font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:999px;white-space:nowrap;display:inline-block}
+.b-new{background:var(--blue-bg);color:var(--blue-light);border:1px solid var(--blue)}
+.b-fix{background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber)}
+.b-keep{background:var(--bg2);color:var(--gray);border:1px solid var(--border)}
+.b-red{background:var(--red-bg);color:var(--red);border:1px solid var(--red)}
+.b-green{background:var(--green-bg);color:var(--green);border:1px solid var(--green)}
+pre{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;overflow-x:auto;font-family:var(--mono);font-size:12px;line-height:1.65;color:var(--gray-light);margin:10px 0 14px}
+pre .kw{color:var(--blue)}pre .str{color:var(--green)}pre .cm{color:var(--gray)}pre .fn{color:var(--amber)}
+.prob{border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:18px}
+.prob-hd{background:var(--red-bg);border-bottom:1px solid var(--red);padding:9px 14px;display:flex;align-items:center;gap:8px}
+.prob-hd span{font-weight:700;font-size:14px}
+.prob-body{background:var(--bg1);padding:14px 16px}
+.prob-lbl{font-family:var(--mono);font-size:10.5px;color:var(--blue);letter-spacing:.06em;margin-bottom:4px}
+.prob-text{font-size:13.5px;color:var(--gray-light);margin-bottom:12px}
+.opts{display:flex;flex-direction:column;gap:5px;margin:6px 0}
+.opt{display:flex;gap:7px;align-items:flex-start;padding:7px 11px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;font-size:13px;color:var(--gray)}
+.opt.sel{background:var(--blue-bg);border-color:var(--blue);color:var(--white)}
+.opt .oid{font-family:var(--mono);font-size:10.5px;color:var(--blue);flex:none;margin-top:2px}
+.reason{background:var(--green-bg);border:1px solid var(--green);border-radius:6px;padding:9px 13px;font-size:13px;color:var(--green);margin-top:7px}
+.reason strong{color:var(--white)}
+.flow{display:flex;flex-direction:column;margin:14px 0}
+.flow-item{display:flex;align-items:flex-start;gap:10px;padding:9px 13px;background:var(--bg1);border:1px solid var(--border);border-radius:0}
+.flow-item:first-child{border-radius:8px 8px 0 0}
+.flow-item:last-child{border-radius:0 0 8px 8px}
+.flow-item:not(:last-child){border-bottom:none}
+.flow-item.hl{background:var(--blue-bg);border-color:var(--blue)}
+.flow-item.hl2{background:var(--green-bg);border-color:var(--green)}
+.flow-item.hl3{background:var(--amber-bg);border-color:var(--amber)}
+.flow-step{font-family:var(--mono);font-size:10px;color:var(--blue);background:var(--bg);border:1px solid var(--blue);border-radius:4px;padding:2px 6px;white-space:nowrap;flex:none;margin-top:2px}
+.flow-step.new{background:var(--blue);color:var(--bg);border-color:var(--blue)}
+.flow-step.out{background:var(--green);color:var(--bg);border-color:var(--green)}
+.flow-title{font-weight:600;font-size:13px;color:var(--white);margin-bottom:2px}
+.flow-desc{font-size:12px;color:var(--gray)}
+.metrics{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:9px;margin:12px 0}
+.mc{background:var(--bg1);border:1px solid var(--border);border-radius:8px;padding:12px 15px}
+.mc-name{font-size:11.5px;color:var(--gray);font-family:var(--mono);margin-bottom:3px}
+.mc-val{font-size:20px;font-weight:700;color:var(--blue);font-family:var(--mono);margin-bottom:2px}
+.mc-desc{font-size:11.5px;color:var(--gray)}
+.mc.removed{opacity:.4;text-decoration:line-through}
+.onto-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:9px;margin:12px 0}
+.onto-card{background:var(--bg1);border:1px solid var(--border);border-radius:8px;padding:12px 14px}
+.onto-type{font-size:10.5px;color:var(--blue);font-family:var(--mono);letter-spacing:.05em;margin-bottom:7px}
+.onto-tags{display:flex;flex-wrap:wrap;gap:5px}
+.onto-tag{font-size:11.5px;padding:2px 8px;background:var(--blue-bg);color:var(--blue-light);border-radius:999px;font-family:var(--mono)}
+.gwt{border-left:3px solid var(--blue);background:var(--bg2);border-radius:0 6px 6px 0;padding:11px 14px;margin-top:12px}
+.gwt-lbl{font-size:10.5px;color:var(--blue);font-family:var(--mono);letter-spacing:.05em;margin-bottom:7px}
+.gwt ol{padding-left:17px}
+.gwt li{font-size:13px;color:var(--gray-light);margin-bottom:5px}
+.gwt .kw{color:var(--blue);font-weight:600}
+.dec-box{background:var(--green-bg);border:1px solid var(--green);border-radius:6px;padding:8px 13px;font-size:13px;color:var(--green);margin-bottom:10px}
+.dec-box strong{color:var(--white)}
+.oi{display:flex;align-items:flex-start;gap:9px;padding:9px 13px;background:var(--bg1);border:1px solid var(--border);border-radius:8px;margin-bottom:7px}
+.oi-num{font-family:var(--mono);font-size:11px;color:var(--amber);background:var(--amber-bg);padding:2px 7px;border-radius:4px;flex:none;margin-top:1px}
+.oi-title{font-size:13px;font-weight:600;color:var(--white);margin-bottom:2px}
+.oi-meta{font-size:11.5px;color:var(--gray)}
+.note{background:var(--amber-bg);border:1px solid var(--amber);border-radius:8px;padding:11px 14px;margin:10px 0;font-size:13px;color:var(--amber)}
+.note strong{color:var(--white)}
+.agenda-pool{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;margin:12px 0}
+.agenda-card{background:var(--bg1);border:1px solid var(--border);border-radius:8px;padding:11px 14px}
+.agenda-card.default{border-color:var(--blue)}
+.agenda-name{font-size:13px;font-weight:600;color:var(--white);margin-bottom:4px}
+.agenda-intent{font-size:11.5px;color:var(--gray);margin-bottom:6px}
+.agenda-badge{font-size:10px;padding:2px 7px;border-radius:999px}
+.ag-def{background:var(--blue-bg);color:var(--blue-light);border:1px solid var(--blue)}
+.ag-opt{background:var(--bg2);color:var(--gray);border:1px solid var(--border)}
+.ag-off{background:var(--red-bg);color:var(--red);border:1px solid var(--red)}
+.rt-title{font-weight:600;color:var(--white)}
+:root{color-scheme:dark}
+.prob-hd span{min-width:0}
+</style>
+<div class="wrap">
+
+<header style="border-bottom:1px solid var(--border);padding-bottom:26px;margin-bottom:28px;">
+  <div class="eyebrow">ant-secretariat · Agent F · rebuild spec · v3.0</div>
+  <h1 class="title">토론 에이전트 (Agent F)<br>리빌드 기획서</h1>
+  <p class="lede">Bull/Bear/Judge 토론 파이프라인 리빌드 설계. 멀티에이전트 설계 최종본(10/14)의 팀 간 계약을 반영해 단일·비교 모드, 작업 큐 실행, 공용 계약 정렬까지 확정한 버전.</p>
+  <div class="decided-box">
+    <strong>✅ 확정 기준</strong> — 멀티에이전트 설계 최종본(태은, 10/14)의 5.1 확정 계약 · 5.2 논의 이슈 Q1~Q14 결론 · 8장 수정안 대조 결과를 반영. 온톨로지 상세는 「온톨로지 프로덕트 기획서 v1.2」를 따름.
+  </div>
+  <dl class="meta-grid">
+    <div class="meta-cell"><dt>에이전트 ID</dt><dd>Agent F</dd></div>
+    <div class="meta-cell"><dt>담당자</dt><dd>이유민</dd></div>
+    <div class="meta-cell"><dt>버전</dt><dd>v3.0</dd></div>
+    <div class="meta-cell"><dt>작성일</dt><dd>2026-10-21</dd></div>
+    <div class="meta-cell"><dt>상태</dt><dd>설계 확정 · 구현 착수 대기</dd></div>
+    <div class="meta-cell"><dt>일정</dt><dd>팀 협의 후 재확정</dd></div>
+  </dl>
+
+  <div class="note" style="margin-bottom:16px;">
+    <strong>v2.3 → v3.0 주요 변경</strong><br>
+    ① D3 비교 모드를 이번 범위에 포함 (보류 1 해소) · ② Judge 적합도 label 미노출, 성향은 <code>points_to_check</code>·<code>caution</code>에만 반영 (보류 2 해소) · ③ 실행은 fire-and-forget 대신 Postgres 작업 큐 + 체크포인트 · ④ 데이터는 도구 레지스트리 경유 · ⑤ 사유 코드·다음 행동을 <code>envelope.py</code> 이름으로 정렬, <code>AgendaId</code>·<code>ReasonCode</code> 공용 열거형 import · ⑥ <code>simulation_handoff</code> 필드 삭제 · ⑦ 벡터 저장소 pgvector, 목표주가 KIS 컨센서스 · ⑧ 검증 레이어(L1 → 근거 부족 루프 → 1회 수정) 추가 · ⑨ 온톨로지 절은 온톨로지 기획서 참조로 교체
+  </div>
+
+  <div class="rejected-box">
+    <h3>⚠️ 최종본 중 수정을 요청하는 항목</h3>
+    <div class="rejected-item">
+      <div class="ri-title">요청 1 — SSE 이벤트 단위: 토큰 대신 노드·주장 단위로</div>
+      <div class="ri-reason">최종본은 LangGraph <code>stream_mode="messages"</code>를 중계하되 워커 간 전달은 <code>job_events</code> 테이블 + <code>pg_notify</code>로 한다고 되어 있음. 이 구조에서 토큰 하나하나를 테이블에 쓰면 토론 1건에 수천 행이 생기고 DB 쓰기가 병목이 됨. 게다가 Bull·Bear·Judge 출력은 <code>json_schema</code> strict JSON이라 토큰 조각을 FE가 그대로 렌더링할 수도 없음. → 이벤트를 <code>node_started</code>·<code>claim_completed</code>·<code>agenda_completed</code>·<code>node_completed</code> 단위로 적재하고, FE는 주장 단위로 화면을 채우는 방식을 제안함 (D8).</div>
+    </div>
+    <div class="rejected-item">
+      <div class="ri-title">요청 2 — 연동 계약 표(6장)의 <code>get_ontology_context</code> 반환값 정정</div>
+      <div class="ri-reason">표에는 <code>get_ontology_context</code>가 "관계 경로·<code>evidence_coverage</code>"를 반환한다고 되어 있으나, <code>evidence_coverage</code>는 Phase B <code>get_reasoning_path</code>의 <code>ReasoningPath</code> 필드임. Phase A 반환은 <code>OntologyContext</code>(관계·매크로 노출·이슈·경쟁사·요약)이므로 표 수정 필요.</div>
+    </div>
+  </div>
+</header>
+
+<nav class="toc">
+  <a href="#s1"><span class="num">01</span>역할 및 인터페이스</a>
+  <a href="#s2"><span class="num">02</span>AS-IS vs TO-BE</a>
+  <a href="#s3"><span class="num">D1</span>사전 판정 흐름</a>
+  <a href="#s4"><span class="num">D2</span>아젠다 풀</a>
+  <a href="#s4b"><span class="num">D3</span>비교 모드</a>
+  <a href="#s5"><span class="num">D4</span>거절 유형</a>
+  <a href="#s6"><span class="num">D5·6</span>라운드·반박</a>
+  <a href="#s7"><span class="num">D7·8</span>출력·스트리밍</a>
+  <a href="#s8"><span class="num">D9</span>비용 상한</a>
+  <a href="#s8b"><span class="num">검증</span>검증 레이어</a>
+  <a href="#s9"><span class="num">온톨로지</span>연동 방식</a>
+  <a href="#s10"><span class="num">D10</span>평가셋 & 지표</a>
+  <a href="#s11"><span class="num">흐름</span>실행 흐름</a>
+  <a href="#s12"><span class="num">미결</span>미결 사항</a>
+</nav>
+
+<!-- 01 -->
+<section id="s1">
+  <div class="sec-head"><span class="sec-num">01</span><h2 class="sec-title">역할 및 인터페이스</h2></div>
+  <p class="sec-sub">에이전트 책임 범위, 실행 위치, 입출력 계약.</p>
+
+  <h3 class="sub">1.1 에이전트 역할</h3>
+  <p style="color:var(--gray-light);margin-bottom:14px;">선택된 종목에 대해 Bull·Bear·Judge가 아젠다별 순차 토론을 수행하고 최종 브리핑을 생성. 종목이 1개면 <strong style="color:var(--white);">단일 모드</strong>, 2개면 <strong style="color:var(--white);">비교 모드</strong>(D3). 근거와 판정(<code>verdict</code>·<code>stance</code>)은 사용자 성향과 무관하게 동일하고(사실 층), 성향은 Judge의 <code>points_to_check</code>·<code>caution</code> 강조에만 반영함(판단 층). 적합/부적합 label은 노출하지 않음.</p>
+  <div class="dec-box" style="margin-bottom:14px;"><strong>job 상태:</strong> <code>queued</code> → <code>running</code> → <code>debate_completed</code> → (단일 모드) <code>simulation_pending</code> → <code>simulation_running</code> → <code>completed</code> / <code>failed</code>. 토론은 검증 레이어 통과 후 <code>simulation_pending</code>으로 바꾸고 끝남. 시뮬레이션은 사용자가 버튼을 누르면 오케스트레이터가 <code>run_simulation(ticker, user_id, job_id)</code>를 큐에 등록하고, 시뮬레이션이 <code>job_id</code>로 토론 결과를 조회해 <code>macro</code>·<code>risk</code> 아젠다를 ID로 꺼냄. 비교 모드는 <code>debate_completed</code>에서 종료(시뮬레이션 없음).</div>
+
+  <h3 class="sub">1.2 실행 위치와 호출 방식</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>구분</th><th>방식</th><th>비고</th></tr></thead>
+    <tbody>
+      <tr><td class="rt-title">precheck</td><td>오케스트레이터가 job 생성 전 동기 호출</td><td>룰 기반 순수 함수, 수 ms. LLM 없음</td></tr>
+      <tr><td class="rt-title">run_debate</td><td>Postgres 작업 큐 워커가 실행</td><td>PgQueuer 1순위·Procrastinate 대안(스파이크 후 결정). LangGraph <code>PostgresSaver</code> 체크포인트로 재시작 시 이어서 실행</td></tr>
+      <tr><td class="rt-title">데이터 접근</td><td>도구 레지스트리 <code>invoke()</code></td><td>직접 import 금지. 인자 검증·권한·Langfuse span이 레지스트리에서 처리됨</td></tr>
+      <tr><td class="rt-title">진행 상황</td><td><code>job_events</code> + <code>pg_notify</code> → SSE</td><td>보조 경로 <code>GET /debate/jobs/{id}</code> 폴링</td></tr>
+      <tr><td class="rt-title">LLM</td><td>Upstage Solar, OpenAI 호환 API</td><td><code>json_schema</code> strict 출력</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3 class="sub">1.3 시그니처</h3>
+  <pre><span class="cm"># 공용 열거형 — data-pipeline 제공, 문자열 하드코딩 금지</span>
+<span class="kw">from</span> data_pipeline.contracts <span class="kw">import</span> AgendaId, DataTier
+<span class="cm"># backend 내부 계약 — backend/contracts/</span>
+<span class="kw">from</span> backend.contracts <span class="kw">import</span> ReasonCode, NextAction, EntityResolution, PrecheckResult, Evidence, Claim, ResponseMeta
+
+<span class="cm"># 관문2·3 — 토론 에이전트 소유. 오케스트레이터가 job 생성 전 동기 호출</span>
+<span class="kw">def</span> <span class="fn">precheck</span>(query: str, companies: list[CompanyContext]) -> <span class="fn">PrecheckResult</span>:
+    <span class="cm"># 관문2: 아젠다 풀 키워드 사전 매핑 (룰). 매핑 실패 → reject(out_of_scope_topic)</span>
+    <span class="cm"># 관문3: intent_data_sources.json(시작 시 1회 로드) 기준 아젠다별 데이터 확인</span>
+    <span class="cm">#        tier·data_tier 확인 → T2는 reject(data_collecting), T0은 reduced</span>
+    <span class="cm"># 비교 모드: 두 종목 모두 데이터가 있는 아젠다만 축으로 허용</span>
+    ...
+
+<span class="kw">class</span> <span class="fn">PrecheckResult</span>(BaseModel):
+    verdict: <span class="fn">Literal</span>[<span class="str">"full"</span>, <span class="str">"reduced"</span>, <span class="str">"reject"</span>]
+    reject_reason: ReasonCode | <span class="kw">None</span>        <span class="cm"># envelope.py 이름 그대로</span>
+    mode: <span class="fn">Literal</span>[<span class="str">"single"</span>, <span class="str">"compare"</span>]   <span class="cm"># EntityResolution.mode 승계</span>
+    allowed_agendas: list[AgendaId]          <span class="cm"># 목표 3개 (비교 모드에서는 축)</span>
+    excluded: list[ExcludedAgenda]           <span class="cm"># 범위 축소 고지용 (agenda_id, reason)</span>
+    selection_reason: str                    <span class="cm"># FE 상단 한 줄</span>
+    matched_intents: list[AgendaId]          <span class="cm"># 아젠다 선택셋 평가용</span>
+    flags: list[<span class="fn">Literal</span>[<span class="str">"investment_advice_request"</span>, <span class="str">"stale_data"</span>]]
+    dictionary_version: str                  <span class="cm"># 키워드 사전 + intent_data_sources 버전</span>
+
+<span class="cm"># 토론 진입점 — 작업 큐 워커가 호출. 모드는 precheck.mode로 결정, 내부 재판정 없음</span>
+<span class="kw">async def</span> <span class="fn">run_debate</span>(
+    companies: list[CompanyContext],   <span class="cm"># 1개(single) 또는 2개(compare)</span>
+    user_id: str,                      <span class="cm"># 세션에서 주입, 클라이언트 값 신뢰 안 함</span>
+    query: str,
+    precheck: PrecheckResult,
+    job_id: str,
+) -> DebateResult</pre>
+  <p style="color:var(--gray);font-size:13px;">관문1 <code>EntityResolution</code>은 오케스트레이터(태은) 소유이며 공용 계약 정의를 그대로 사용함: <code>status</code>(ok·ambiguous·not_found·uncovered·too_many·partial_covered), <code>companies</code>(최대 2), <code>ambiguous</code>(후보: 섹터·시총), <code>uncovered</code>, <code>mode</code>.</p>
+
+  <h3 class="sub">1.4 공용 계약 위치 (최종본 8장 제안안)</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>위치</th><th>타입</th></tr></thead>
+    <tbody>
+      <tr><td><code>backend/contracts/</code></td><td><code>ReasonCode</code> · <code>NextAction</code> · <code>EntityResolution</code> · <code>PrecheckResult</code> · <code>Evidence</code> · <code>Claim</code> · <code>ResponseMeta</code></td></tr>
+      <tr><td>data-pipeline</td><td><code>AgendaId</code> · <code>resolve_company</code> 반환 모델 · <code>data_tier</code> (backend가 import, 기존 의존 방향 유지)</td></tr>
+      <tr><td>FE ↔ API</td><td>FastAPI OpenAPI 스키마에서 TS 타입 생성</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3 class="sub">1.5 거절 응답 봉투</h3>
+  <pre><span class="cm"># precheck verdict=reject 시 오케스트레이터가 반환 (job 생성 없음)</span>
+{
+  <span class="str">"status"</span>: <span class="str">"rejected"</span>,
+  <span class="str">"reason"</span>: { <span class="str">"code"</span>: ReasonCode, <span class="str">"message"</span>: str },
+  <span class="str">"next_action"</span>: { <span class="str">"type"</span>: NextAction, <span class="str">"payload"</span>: any },
+  <span class="str">"meta"</span>: ResponseMeta
+}</pre>
+  <div class="note"><strong>이름 정렬:</strong> v2.3의 <code>out_of_scope</code>·<code>not_found</code>·<code>suggest_alternatives</code>·<code>narrow_scope</code> 등 자체 이름은 폐기하고 <code>envelope.py</code>의 이름(<code>out_of_scope_topic</code>, <code>company_not_found</code>, <code>choose_supported_topic</code>, <code>check_back_later</code> 등)을 그대로 씀. 전체 대응표는 D4.</div>
+
+  <h3 class="sub">1.6 공통 타입 (변경 없음)</h3>
+  <pre><span class="kw">class</span> <span class="fn">Evidence</span>(BaseModel):
+    evidence_id: str                 <span class="cm"># "S1" — 본문 [S숫자]와 대응</span>
+    chunk_id: str
+    document_type: <span class="fn">Literal</span>[<span class="str">"report"</span>,<span class="str">"news"</span>,<span class="str">"disclosure"</span>,<span class="str">"macro"</span>,<span class="str">"structured"</span>]
+    title: str; source: str; author_org: str | <span class="kw">None</span>
+    date: str; url: str | <span class="kw">None</span>
+    content_preview: str
+    evidence_source: <span class="fn">Literal</span>[<span class="str">"original"</span>, <span class="str">"gap_fill"</span>] = <span class="str">"original"</span>
+
+<span class="kw">class</span> <span class="fn">Claim</span>(BaseModel):
+    claim_id: str
+    text: str                        <span class="cm"># 숫자는 {{placeholder}}, 코드가 get_metric 값으로 치환</span>
+    claim_type: <span class="fn">Literal</span>[<span class="str">"numeric"</span>, <span class="str">"event"</span>, <span class="str">"opinion"</span>, <span class="str">"table"</span>]
+    evidence_ids: list[str]
+
+<span class="kw">class</span> <span class="fn">ResponseMeta</span>(BaseModel):
+    trace_id: str; data_as_of: str; generated_at: str
+    prompt_version: str | <span class="kw">None</span> = <span class="kw">None</span>; model: str | <span class="kw">None</span> = <span class="kw">None</span></pre>
+
+  <h3 class="sub">1.7 출력 스키마 (DebateResult)</h3>
+  <pre>{
+  <span class="str">"meta"</span>: ResponseMeta + { <span class="str">"mode"</span>: <span class="str">"single"</span>|<span class="str">"compare"</span>, <span class="str">"companies"</span>: [{ticker, company, sector, data_tier}] },
+  <span class="str">"scope"</span>: { <span class="str">"verdict"</span>: <span class="str">"full"</span>|<span class="str">"reduced"</span>, <span class="str">"excluded"</span>: [{agenda_id, reason}], <span class="str">"selection_reason"</span>: str },
+  <span class="str">"flags"</span>: [<span class="str">"investment_advice_request"</span>|<span class="str">"stale_data"</span>],
+  <span class="str">"selected_agendas"</span>: list[AgendaId],
+
+  <span class="cm"># 단일 모드</span>
+  <span class="str">"agendas"</span>: [{
+    <span class="str">"id"</span>: AgendaId, <span class="str">"title"</span>: str,
+    <span class="str">"bull"</span>: { <span class="str">"claims"</span>: list[Claim], <span class="str">"confidence"</span>: str },
+    <span class="str">"bear"</span>: { <span class="str">"bull_claim_ref"</span>: str, <span class="str">"agreed_points"</span>: list[str], <span class="str">"claims"</span>: list[Claim], <span class="str">"confidence"</span>: str },
+    <span class="str">"verdict"</span>: { <span class="str">"winner"</span>: <span class="str">"bull"</span>|<span class="str">"bear"</span>|<span class="str">"neutral"</span>, <span class="str">"reason"</span>: str, <span class="str">"score"</span>: {bull, bear} },
+    <span class="str">"rebuttal_round"</span>: bool
+  }],
+
+  <span class="cm"># 비교 모드 (D3) — mode="compare"일 때만</span>
+  <span class="str">"comparison"</span>: { <span class="str">"axes"</span>: [{
+    <span class="str">"agenda_id"</span>: AgendaId, <span class="str">"comparable"</span>: bool, <span class="str">"not_comparable_reason"</span>: str | <span class="kw">null</span>,
+    <span class="str">"as_of_dates"</span>: {ticker_a, ticker_b}, <span class="str">"as_of_gap_warning"</span>: bool,
+    <span class="str">"per_company"</span>: { ticker: { <span class="str">"bull"</span>: {...}, <span class="str">"bear"</span>: {...} } },
+    <span class="str">"axis_verdict"</span>: { <span class="str">"stronger"</span>: ticker|<span class="str">"tie"</span>, <span class="str">"reason"</span>: str }
+  }] },
+
+  <span class="str">"evidence"</span>: list[Evidence],
+  <span class="str">"judge"</span>: {
+    <span class="str">"user_profile"</span>: { <span class="str">"risk_profile"</span>, <span class="str">"investment_goal"</span> },
+    <span class="str">"overall_verdict"</span>: {
+      <span class="str">"stance"</span>: <span class="str">"bullish"</span>|<span class="str">"neutral"</span>|<span class="str">"bearish"</span>,   <span class="cm"># 성향 불변 (사실 층)</span>
+      <span class="str">"confidence"</span>, <span class="str">"bull_score"</span>, <span class="str">"bear_score"</span>,
+      <span class="str">"final_brief"</span>: str,
+      <span class="str">"caution"</span>: str,                 <span class="cm"># 성향 반영 강조 (판단 층)</span>
+      <span class="str">"points_to_check"</span>: list[str]      <span class="cm"># 성향 반영 강조, 매매 판단 없음</span>
+    }
+  }
+}
+<span class="cm"># 삭제: simulation_handoff — 시뮬레이션이 job_id로 직접 조회하므로 중복 관리하지 않음</span></pre>
+</section>
+
+<!-- 02 -->
+<section id="s2">
+  <div class="sec-head"><span class="sec-num">02</span><h2 class="sec-title">AS-IS vs TO-BE</h2></div>
+  <p class="sec-sub">1차 구현(7월) 대비 무엇이 바뀌는가.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>항목</th><th>AS-IS</th><th>TO-BE</th><th>상태</th></tr></thead>
+    <tbody>
+      <tr><td class="rt-title">사전 판정</td><td>없음, 항상 실행</td><td>job 생성 전 관문1(오케스트레이터) + precheck(토론) (D1)</td><td><span class="badge b-new">신규</span></td></tr>
+      <tr><td class="rt-title">아젠다 구성</td><td>고정 3개</td><td>아젠다 풀 6개(<code>AgendaId</code>) 중 질의 기반 3개 (D2)</td><td><span class="badge b-new">신규</span></td></tr>
+      <tr><td class="rt-title">다종목 비교</td><td>없음 (1종목만)</td><td>최대 2종목, 축 단위 대칭 검색 + 종목별 Bull·Bear + Judge 축별 비교 (D3)</td><td><span class="badge b-new">신규</span></td></tr>
+      <tr><td class="rt-title">Bear 반박</td><td>Bull 출력 주입만</td><td>Bull Claim 인용 반박 + 인정 여지 <code>agreed_points</code> (D6)</td><td><span class="badge b-fix">개선</span></td></tr>
+      <tr><td class="rt-title">라운드 수</td><td>1회 고정</td><td>기본 1회 + 점수차 작은 아젠다만 2라운드 (D5, 단일 모드)</td><td><span class="badge b-new">신규</span></td></tr>
+      <tr><td class="rt-title">실행 인프라</td><td>asyncio fire-and-forget (재시작 시 유실)</td><td>Postgres 작업 큐 + <code>PostgresSaver</code> 체크포인트</td><td><span class="badge b-fix">개선</span></td></tr>
+      <tr><td class="rt-title">데이터 접근</td><td>함수 직접 import, Pinecone</td><td>도구 레지스트리 경유, pgvector, 지표는 <code>get_metric(as_of)</code></td><td><span class="badge b-fix">개선</span></td></tr>
+      <tr><td class="rt-title">출력·검증</td><td>json.loads, 검증 없음</td><td>Pydantic + strict 출력 (D7), 검증 레이어 L1 → 근거 부족 루프 → 1회 수정</td><td><span class="badge b-new">신규</span></td></tr>
+      <tr><td class="rt-title">진행 표시</td><td>2.5초 폴링</td><td>SSE (<code>job_events</code> 경유, 노드·주장 단위) (D8)</td><td><span class="badge b-fix">개선</span></td></tr>
+      <tr><td class="rt-title">개인화</td><td>성향별로 결론 톤 변경</td><td>사실 층 불변, 성향은 <code>points_to_check</code>·<code>caution</code>에만</td><td><span class="badge b-fix">개선</span></td></tr>
+      <tr><td class="rt-title">온톨로지</td><td>없음</td><td>기능 플래그 뒤에서 아젠다별 1회 조회·공유 (기본 꺼짐)</td><td><span class="badge b-new">신규</span></td></tr>
+      <tr><td class="rt-title">평가 체계</td><td>없음</td><td>기준선 비교 실험 · 거절셋 · 골든셋 등 7종 (D10)</td><td><span class="badge b-new">신규</span></td></tr>
+      <tr><td class="rt-title">시뮬레이션 연동</td><td><code>agendas[1]</code> 인덱스 자동 전달</td><td><code>simulation_pending</code> + 버튼 → <code>run_simulation(ticker, user_id, job_id)</code></td><td><span class="badge b-fix">개선</span></td></tr>
+      <tr><td class="rt-title">지원 종목</td><td>7개 하드코딩</td><td>T1 전체 실행 / T0 범위 축소 / T2 수집 중 거절</td><td><span class="badge b-fix">개선</span></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- D1 -->
+<section id="s3">
+  <div class="sec-head"><span class="sec-num">D1</span><h2 class="sec-title">사전 판정 흐름</h2></div>
+  <p class="sec-sub">job을 만들기 전에 답할 수 있는 질의인지 결정적으로 판정.</p>
+  <div class="dec-box"><strong>확정:</strong> 판정 로직 소유(토론 에이전트)와 실행 시점(job 생성 전)을 분리. 오케스트레이터는 라우팅만 하고 토론 도메인 지식은 갖지 않음. 관문2는 LLM 없이 룰 + 키워드 사전으로 판정하며, 경량 모델은 거절셋 측정 결과 룰이 놓치는 비율이 높을 때만 승격.</div>
+  <div class="flow">
+    <div class="flow-item"><span class="flow-step">INPUT</span><div><div class="flow-title">사용자 질의 수신 (오케스트레이터, job 생성 전)</div><div class="flow-desc">버튼 경로 <code>POST /orchestrate/debate</code> 또는 채팅 경로 <code>POST /orchestrate/chat</code></div></div></div>
+    <div class="flow-item"><span class="flow-step">관문1</span><div><div class="flow-title">종목 확정 — 오케스트레이터 (태은)</div><div class="flow-desc"><code>extract_company_mentions</code>로 종목 식별, 커버 여부·비교 개수 판별. 애매하면 <code>clarification_needed</code>로 후보(채팅 5개, 섹터·시총 포함)를 되묻고 자동 추측하지 않음. → <code>EntityResolution</code></div></div></div>
+    <div class="flow-item hl"><span class="flow-step new">precheck</span><div><div class="flow-title">관문2 + 관문3 — 토론 에이전트 (유민)</div><div class="flow-desc">관문2: 아젠다 풀 키워드 사전 매핑 → 실패 시 <code>out_of_scope_topic</code><br>관문3: <code>intent_data_sources.json</code> 기준 아젠다별 데이터·신선도·<code>data_tier</code> 확인 → T1 full / T0 reduced / T2 <code>data_collecting</code> 거절 / 노후 데이터는 <code>stale_data</code> flag → <code>PrecheckResult</code></div></div></div>
+    <div class="flow-item hl2"><span class="flow-step out">분기</span><div><div class="flow-title">세 가지 결과 — 모두 job 생성 전</div><div class="flow-desc">🟢 full — job 생성 → 큐 등록 → <code>job_started</code> · 🟡 reduced — 같은 흐름 + <code>scope</code> 고지 · 🔴 reject — job 없이 <code>rejected</code> + <code>next_action</code> 즉시 반환, 미커버 로그 적재. T2는 거절과 동시에 오케스트레이터가 <code>ensure_company_data</code>로 수집 예약(중복 예약 방지)</div></div></div>
+  </div>
+  <div class="tbl"><table>
+    <thead><tr><th>컴포넌트</th><th>소유</th><th>담당</th></tr></thead>
+    <tbody>
+      <tr><td>관문1 · <code>EntityResolution</code> · 되묻기 상태 <code>pending_clarification</code></td><td>오케스트레이터</td><td>태은</td></tr>
+      <tr><td><code>precheck()</code> · 키워드 사전 · <code>PrecheckResult</code></td><td>토론 에이전트</td><td>유민</td></tr>
+      <tr><td><code>intent_data_sources.json</code> · <code>ensure_company_data</code></td><td>데이터 에이전트</td><td>수경</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- D2 -->
+<section id="s4">
+  <div class="sec-head"><span class="sec-num">D2</span><h2 class="sec-title">아젠다 풀 + 질의 기반 선택</h2></div>
+  <p class="sec-sub">고정 3개는 질문을 반영하지 못하고, 완전 가변은 버전 간 비교가 불가능함. 유한한 풀에서 고르는 방식으로 평가셋 구축이 가능해짐.</p>
+  <div class="dec-box"><strong>확정 (최종본 5.2 Q12):</strong> 아젠다 ID = <code>intent</code> 값. <code>AgendaId</code> 열거형 하나를 precheck 키워드 사전·<code>intent</code> 매핑·온톨로지 경로·시뮬레이션 상수·플래너가 모두 import함.</div>
+  <div class="agenda-pool">
+    <div class="agenda-card default"><div class="agenda-name">valuation · 실적 및 밸류에이션</div><div class="agenda-intent">비싼가·싼가, 실적, 목표주가(KIS 컨센서스)</div><span class="agenda-badge ag-def">기본 포함</span></div>
+    <div class="agenda-card default"><div class="agenda-name">macro · 산업 및 매크로 환경</div><div class="agenda-intent">업황, 금리·환율, 경쟁 구도</div><span class="agenda-badge ag-def">기본 포함</span></div>
+    <div class="agenda-card default"><div class="agenda-name">risk · 리스크 요인</div><div class="agenda-intent">위험, 하락 가능성, 우려</div><span class="agenda-badge ag-def">기본 포함</span></div>
+    <div class="agenda-card"><div class="agenda-name">growth · 성장 동력</div><div class="agenda-intent">신사업, 수주, 증설, 신제품</div><span class="agenda-badge ag-opt">선택 포함</span></div>
+    <div class="agenda-card"><div class="agenda-name">shareholder_return · 주주환원</div><div class="agenda-intent">배당, 자사주</div><span class="agenda-badge ag-opt">선택 포함</span></div>
+    <div class="agenda-card"><div class="agenda-name">flow · 수급·투자자 동향</div><div class="agenda-intent">외국인·기관 매매</div><span class="agenda-badge ag-off">재확인 중</span></div>
+  </div>
+  <p style="color:var(--gray);font-size:13px;">선택 규칙: 기본 3개가 기본값. "배당·자사주" 언급 시 <code>shareholder_return</code>이 <code>valuation</code>을 대체, "신사업·증설" 언급 시 <code>growth</code> 추가, 최대 3개 유지. <code>flow</code>는 <code>investor_flow_daily</code> 확보로 활성화 여부를 수경과 재확인함.</p>
+</section>
+
+<!-- D3 -->
+<section id="s4b">
+  <div class="sec-head"><span class="sec-num">D3</span><h2 class="sec-title">비교 모드 (2종목)</h2></div>
+  <p class="sec-sub">최종본 5.1에서 이번 범위로 재확정(10/14). 비교 모드 상세 설계는 이 기획서가 소유함.</p>
+
+  <div class="prob">
+    <div class="prob-hd"><span>P-D3 · 두 종목을 비교하면 Bull/Bear 역할이 깨진다</span></div>
+    <div class="prob-body">
+      <div class="prob-lbl">문제 정의</div>
+      <div class="prob-text">단일 종목 토론은 Bull=강세론자, Bear=약세론자로 역할이 명확함. A vs B를 한 토론으로 돌리면 "A의 강세 = B의 약세"가 되어 무엇에 대한 강세인지 모호해지고, 순서·서술량에 따라 한쪽이 유리해지는 편향도 생김.</div>
+      <div class="prob-lbl">OPTIONS</div>
+      <div class="opts">
+        <div class="opt"><span class="oid">A</span>한 토론 안에서 Bull=A 옹호, Bear=B 옹호</div>
+        <div class="opt sel"><span class="oid">B ✓</span>종목마다 같은 축의 Bull·Bear를 따로 실행하고, Judge가 축 단위로 두 종목을 비교</div>
+        <div class="opt"><span class="oid">C</span>토론 없이 축별 비교 리포트만 생성</div>
+      </div>
+      <div class="reason"><strong>B 선택:</strong> A는 역할 붕괴 문제를 그대로 안고 감. C는 서비스의 핵심인 교차 검증이 사라짐. B는 단일 모드의 Bull→Bear 구조를 종목별로 재사용하므로 프롬프트·스키마·평가셋을 그대로 쓸 수 있고, 비교 판단은 Judge 한 곳에만 둠. C는 B의 한쪽 실행이 실패했을 때 쓰는 대체 경로가 아니라 단일 분석 전환으로 처리함(아래 부분 실패).</div>
+    </div>
+  </div>
+
+  <h3 class="sub">실행 구조 — 축 단위 병렬 팬아웃</h3>
+  <div class="flow">
+    <div class="flow-item"><span class="flow-step">축 선택</span><div><div class="flow-title">precheck가 비교 축 3개 결정</div><div class="flow-desc">같은 아젠다 풀·키워드 사전 사용. 두 종목 모두 데이터가 있는 아젠다만 축으로 허용(티어가 다르면 교집합)</div></div></div>
+    <div class="flow-item"><span class="flow-step">대칭 검색</span><div><div class="flow-title">축마다 같은 질의 템플릿으로 A·B를 함께 검색</div><div class="flow-desc">기업당 청크 예산 고정. 한쪽 근거가 없으면 해당 축은 <code>comparable=false</code>로 표기하고 비교하지 않음</div></div></div>
+    <div class="flow-item hl"><span class="flow-step new">병렬</span><div><div class="flow-title">종목별 Bull → Bear (종목 간 동시 실행)</div><div class="flow-desc">종목 안에서는 Bear가 Bull을 인용하므로 순차, 종목끼리는 병렬로 지연 단축</div></div></div>
+    <div class="flow-item"><span class="flow-step">JUDGE</span><div><div class="flow-title">축별 비교 판정 + 종합</div><div class="flow-desc">축마다 <code>axis_verdict.stronger</code>(A·B·tie)와 근거. A·B 제시 순서는 무작위화. "어느 쪽을 사라"가 아니라 "이 축에서 근거가 더 강한 쪽"만 판정</div></div></div>
+  </div>
+  <div class="tbl"><table>
+    <thead><tr><th>규칙</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr><td class="rt-title">기준일 격차</td><td>축마다 두 종목의 <code>as_of</code>를 나란히 표기, 격차가 임계값을 넘으면 <code>as_of_gap_warning</code></td></tr>
+      <tr><td class="rt-title">지표 기준 불일치</td><td>연결/별도, 추정/확정이 다르면 수치 비교 대신 서술로 처리</td></tr>
+      <tr><td class="rt-title">부분 실패</td><td>한쪽 검색·생성이 실패하면 비교를 만들지 않고 성공한 종목의 단일 분석으로 전환 + 사유 고지</td></tr>
+      <tr><td class="rt-title">범위 제한</td><td>조건부 2라운드(D5) 끔, 시뮬레이션 버튼 없음(<code>debate_completed</code>에서 종료), 온톨로지 플래그는 단일 모드에서 효과 확인 후 별도로 켬</td></tr>
+      <tr><td class="rt-title">거절</td><td>3종목 이상·한쪽 미커버는 관문1에서 거절 (D4)</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- D4 -->
+<section id="s5">
+  <div class="sec-head"><span class="sec-num">D4</span><h2 class="sec-title">거절·축소 유형과 응답 코드</h2></div>
+  <p class="sec-sub">거절도 품질 지표 — 오답변율 ≤5%, 과잉거절률 모니터링. 코드 이름은 <code>envelope.py</code>를 기준으로 함.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>상황</th><th>판정 지점</th><th>동작</th><th><code>reason.code</code> / <code>next_action</code></th></tr></thead>
+    <tbody>
+      <tr><td>종목 식별 실패</td><td>관문1</td><td>job 생성 안 함</td><td><code>company_not_found</code> / 후보 선택</td></tr>
+      <tr><td>종목 애매</td><td>관문1</td><td>거절이 아니라 되묻기</td><td><code>clarification_needed</code> 봉투</td></tr>
+      <tr><td>미커버 종목</td><td>관문1</td><td>job 생성 안 함 · 미커버 로그</td><td>envelope.py 이름 확인 필요 / 대안 종목 제시</td></tr>
+      <tr><td>비교 3종목 이상</td><td>관문1</td><td>job 생성 안 함</td><td>envelope.py 이름 확인 필요 / 두 개 선택</td></tr>
+      <tr><td>비교 한쪽만 커버</td><td>관문1</td><td>job 생성 안 함</td><td>envelope.py 이름 확인 필요 / 커버된 쪽 단일 분석 제안</td></tr>
+      <tr><td>주제 범위 밖</td><td>precheck 관문2</td><td>job 생성 안 함 · 로그</td><td><code>out_of_scope_topic</code> / <code>choose_supported_topic</code></td></tr>
+      <tr><td>T2 수집 중</td><td>precheck 관문3</td><td>job 생성 안 함 · 오케스트레이터가 <code>ensure_company_data</code> 예약</td><td><code>data_collecting</code> / <code>check_back_later</code> (알림·ETA 없음)</td></tr>
+      <tr><td>데이터 부족</td><td>precheck 관문3</td><td>reduced, 남는 아젠다가 없으면 reject</td><td>reject 시 envelope.py 이름 확인 필요</td></tr>
+      <tr><td>T0 종목</td><td>precheck 관문3</td><td>derived 기반 reduced 실행</td><td>— (<code>scope.excluded</code>로 고지)</td></tr>
+      <tr><td>데이터 노후</td><td>precheck 관문3</td><td>실행 + <code>stale_data</code> flag</td><td>— ("N일 전 자료 기준" 배지)</td></tr>
+      <tr><td>투자 권유 요청</td><td>precheck 관문2</td><td>실행 + <code>investment_advice_request</code> flag → Judge 답변 범위 제한</td><td>— (매매 판단 안 함 고지)</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note"><strong>새 거절 상황</strong>이 생기면 유민이 제안하고 응답 계약(<code>ReasonCode</code>)에 추가한 뒤 사용함 (최종본 5.2 Q3).</div>
+</section>
+
+<!-- D5 D6 -->
+<section id="s6">
+  <div class="sec-head"><span class="sec-num">D5·D6</span><h2 class="sec-title">라운드 수 & Bear 반박 강도</h2></div>
+  <p class="sec-sub">순차 + 생성자–비평자 구조, 2라운드는 제한된 루프.</p>
+  <div class="card"><dl class="f">
+    <dt>D5 변경</dt><dd>기본 1라운드 + Judge의 <code>bull_score</code>/<code>bear_score</code> 차이가 임계값 이하인 아젠다만 재반박. 단일 모드에만 적용.</dd>
+    <dt>D5 근거</dt><dd>라운드를 늘린 이득은 3라운드 부근에서 포화. 필요한 아젠다에만 적용해 비용 통제. 라운드 수별 루브릭 점수·토큰·지연을 기록해 비용–품질 곡선으로 임계값 결정.</dd>
+    <dt>D6 결정</dt><dd>"근거가 부족하면 Bull 주장을 일부 인정해도 된다"를 Bear 프롬프트에 명시, <code>agreed_points</code>로 기록. 억지 반박 강제는 정확도를 낮춤.</dd>
+    <dt>모니터링</dt><dd>Judge의 <code>neutral</code> 판정이 한 번도 나오지 않으면 판정이 형식적이라는 신호 → 프롬프트 조정.</dd>
+  </dl></div>
+</section>
+
+<!-- D7 D8 -->
+<section id="s7">
+  <div class="sec-head"><span class="sec-num">D7·D8</span><h2 class="sec-title">구조화 출력 & 진행 스트리밍</h2></div>
+  <p class="sec-sub">출력 형식 보장과 진행 상황 전달.</p>
+  <div class="prob">
+    <div class="prob-hd"><span>P-D7 · json.loads 단일 재시도로는 부분 실패·Rate Limit을 처리하지 못함</span></div>
+    <div class="prob-body">
+      <div class="opts">
+        <div class="opt"><span class="oid">A</span>현행 유지</div>
+        <div class="opt sel"><span class="oid">B ✓</span>Pydantic 스키마 + Solar <code>json_schema</code> strict + 에러 유형별 재시도</div>
+        <div class="opt"><span class="oid">C</span>Pydantic AI 전면 도입</div>
+      </div>
+      <div class="reason"><strong>B 선택:</strong> 429·5xx·타임아웃만 지수 백오프+지터, 4xx는 즉시 실패. 스키마 검증 실패 시 부분 결과를 보존. strict 출력도 필드 의미까지 보장하지 않으므로 Pydantic 검증은 별도로 유지. C는 의존성 대비 제어권이 줄어듦.</div>
+    </div>
+  </div>
+  <div class="prob">
+    <div class="prob-hd"><span>P-D8 · 수 분짜리 토론을 폴링으로 보여주면 대기 구간이 길다</span></div>
+    <div class="prob-body">
+      <div class="opts">
+        <div class="opt"><span class="oid">A</span>폴링 간격 단축</div>
+        <div class="opt"><span class="oid">B</span>SSE로 토큰 단위 중계</div>
+        <div class="opt sel"><span class="oid">C ✓</span>SSE로 노드·주장 단위 이벤트 중계 (<code>job_events</code> + <code>pg_notify</code>)</div>
+      </div>
+      <div class="reason"><strong>C 선택:</strong> 워커와 API가 분리돼 이벤트가 <code>job_events</code> 테이블을 거치므로, 토큰 단위로 쓰면 토론 1건에 수천 행이 생김. 출력이 strict JSON이라 토큰 조각은 화면에 그대로 쓸 수도 없음. 이벤트는 <code>node_started</code> · <code>claim_completed</code> · <code>agenda_completed</code> · <code>node_completed</code> · <code>job_status_changed</code>로 정의하고, FE는 주장 카드를 하나씩 채움. 화면 순서는 Bull 완료 → Bear → Judge (Bear가 Bull을 입력으로 받는 구조적 순차). 최종본의 토큰 중계와 다르므로 태은 확인 필요(미결 Q2).</div>
+    </div>
+  </div>
+</section>
+
+<!-- D9 -->
+<section id="s8">
+  <div class="sec-head"><span class="sec-num">D9</span><h2 class="sec-title">비용 상한</h2></div>
+  <p class="sec-sub">측정 먼저, 상한은 그 다음.</p>
+  <div class="card"><dl class="f">
+    <dt>추적</dt><dd>Langfuse Cloud Hobby (무료, 셀프호스팅 서버 불필요, 공통 인프라 담당 태은). 모든 LLM·도구 호출에 span, 응답 <code>meta.trace_id</code>로 연결.</dd>
+    <dt>실측 시점</dt><dd>토론이 처음부터 끝까지 동작하는 시점. 생략하지 않음 — 큐 동시 실행 수와 토론당 토큰 상한의 근거가 됨.</dd>
+    <dt>정할 값</dt><dd>① 토론 1건당 토큰 상한(단일·비교 따로) ② 사용자당 일일 실행 횟수 ③ 큐 동시 실행 수 ④ 초과 시 동작(대기 또는 거절)</dd>
+    <dt>모델 분리</dt><dd>Judge → 상위 모델 / 요약·분류 → 경량 모델 / precheck → LLM 없음(룰).</dd>
+  </dl></div>
+</section>
+
+<!-- 검증 -->
+<section id="s8b">
+  <div class="sec-head"><span class="sec-num">검증</span><h2 class="sec-title">검증 레이어</h2></div>
+  <p class="sec-sub">생성 결과를 사용자에게 내보내기 전에 결정적으로 거르는 게이트.</p>
+  <div class="flow">
+    <div class="flow-item"><span class="flow-step">L1</span><div><div class="flow-title">결정적 검사</div><div class="flow-desc">스키마 일치 · 모든 Claim의 <code>evidence_ids</code>가 실제 Evidence에 존재 · <code>{{placeholder}}</code> 숫자를 <code>get_metric</code> 값으로 치환했는지 · Bear의 <code>bull_claim_ref</code>가 실존 claim_id인지 · 매매 권유 표현 금지어</div></div></div>
+    <div class="flow-item"><span class="flow-step">루프</span><div><div class="flow-title">근거 부족 루프</div><div class="flow-desc">근거 없는 Claim만 골라 추가 검색, 보완 근거는 <code>evidence_source="gap_fill"</code>로 표기</div></div></div>
+    <div class="flow-item hl2"><span class="flow-step out">수정</span><div><div class="flow-title">1회 수정</div><div class="flow-desc">그래도 실패한 항목만 1회 재생성. 여전히 실패하면 해당 Claim을 제외하고 <code>partial</code>로 고지</div></div></div>
+  </div>
+</section>
+
+<!-- 온톨로지 -->
+<section id="s9">
+  <div class="sec-head"><span class="sec-num">온톨로지</span><h2 class="sec-title">온톨로지 연동 방식</h2></div>
+  <p class="sec-sub">노드·엣지·평가 등 내부 설계는 「온톨로지 프로덕트 기획서 v1.2」가 원본. 여기에는 토론 에이전트가 지켜야 할 연동 규칙만 둠.</p>
+  <div class="card"><dl class="f">
+    <dt>호출</dt><dd>도구 레지스트리의 <code>get_ontology_context(ticker, agenda_id)</code>. 토론 job에서 아젠다별 1회 호출 후 그래프 상태에 캐시, Bull·Bear·Judge가 같은 결과 공유. 입장별 필터링 없음, 역할 차이는 프롬프트로 반영.</dd>
+    <dt>플래그</dt><dd>기본 꺼짐. 꺼져 있으면 호출하지 않음. 관계 종류 × 에이전트 단위로 꺼짐 → 그림자 모드 → 켜짐 순서.</dd>
+    <dt>weight</dt><dd>실제 회귀 계수가 들어오기 전까지 <code>source="placeholder"</code>이며 플래그를 켜지 않음. 프롬프트에는 "상관 기반 민감도"로만 표현하고 인과로 쓰지 않음.</dd>
+    <dt>지표</dt><dd>PER·PBR·ROE·부채비율 등 매일 바뀌는 값은 그래프에서 읽지 않고 <code>get_metric(ticker, metric_id, as_of)</code>로 조회.</dd>
+    <dt>성향</dt><dd>탐색 결과는 성향과 무관. Judge가 성향으로 채점을 바꾸지 않음.</dd>
+  </dl></div>
+</section>
+
+<!-- D10 -->
+<section id="s10">
+  <div class="sec-head"><span class="sec-num">D10</span><h2 class="sec-title">평가셋 & 측정 지표</h2></div>
+  <p class="sec-sub">"왜 멀티에이전트 토론인가"에 데이터로 답할 수 있어야 함.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>평가셋</th><th>구성</th><th>지표</th><th>우선순위</th></tr></thead>
+    <tbody>
+      <tr><td class="rt-title">기준선 비교 실험 ★</td><td>같은 질문·같은 근거·같은 모델(Solar)로 (a) 토론 (b) 단일 LLM 장단점 요약 생성. 공통 이진 루브릭 5~6항목, 아젠다별로 고르게 30~50문항, 순서 무작위 블라인드, 가능하면 채점자 2명</td><td>루브릭 점수 이득 ÷ 토큰·지연 배수, 채점자 일치율</td><td>1순위</td></tr>
+      <tr><td class="rt-title">거절셋 ★</td><td>라벨은 <code>ReasonCode</code>. 사유별 10~20건 + 과잉 거절 확인용 정상 경계 질의</td><td>오답변율 ≤5% · 과잉거절률</td><td>1순위</td></tr>
+      <tr><td class="rt-title">검색 골든셋</td><td>수경 마스터(<code>search_golden_set</code>), 스냅샷 태그로 고정해 결과와 함께 기록. <code>agenda_id</code>·<code>reviewed</code>·<code>is_active</code>, 미검토 행 제외</td><td>Recall@5/20 · nDCG@10</td><td>2순위</td></tr>
+      <tr><td class="rt-title">토론 루브릭셋</td><td>완료 토론 50~100건 사람 채점. 관계 질문 하위셋은 온톨로지 켬/끔 비교에 사용</td><td>근거 인용·수치 정확성·반론 대응</td><td>2순위</td></tr>
+      <tr><td class="rt-title">비교셋</td><td>같은 섹터 종목 쌍 + 축별 기대 근거</td><td>축 충족률 · 순서 뒤집힘률 · 근거 대칭성</td><td>2순위</td></tr>
+      <tr><td class="rt-title">아젠다 선택셋</td><td>질의 100건 + 정답 <code>AgendaId</code> 조합</td><td>선택 정확도</td><td>3순위</td></tr>
+      <tr><td class="rt-title">성향 정합성 테스트</td><td>Bull/Bear 고정, 성향만 바꿔 Judge 재실행 (메타모픽)</td><td>사실 불변성 · 방향 단조성 · 판단 근거 연결률</td><td>3순위</td></tr>
+    </tbody>
+  </table></div>
+  <h3 class="sub">핵심 지표</h3>
+  <div class="metrics">
+    <div class="mc"><div class="mc-name">사실 정확도</div><div class="mc-val">≥ 80%</div><div class="mc-desc">골든셋 정답 수 / 전체</div></div>
+    <div class="mc"><div class="mc-name">Bull 인용 반박률</div><div class="mc-val">≥ 70%</div><div class="mc-desc">유효한 bull_claim_ref 비율</div></div>
+    <div class="mc"><div class="mc-name">아젠다 선택 정확도</div><div class="mc-val">≥ 80%</div><div class="mc-desc">질의 → AgendaId 매핑</div></div>
+    <div class="mc"><div class="mc-name">거절 오답변율</div><div class="mc-val">≤ 5%</div><div class="mc-desc">답하면 안 되는데 답한 비율</div></div>
+    <div class="mc"><div class="mc-name">사실 불변성</div><div class="mc-val">≥ 95%</div><div class="mc-desc">성향 바꿔도 verdict·stance 동일</div></div>
+    <div class="mc"><div class="mc-name">방향 단조성 위반율</div><div class="mc-val">≤ 5%</div><div class="mc-desc">안정형에 더 공격적 강조 금지</div></div>
+    <div class="mc"><div class="mc-name">판단 근거 연결률</div><div class="mc-val">≥ 90%</div><div class="mc-desc">points_to_check ↔ evidence_ids</div></div>
+    <div class="mc"><div class="mc-name">순서 뒤집힘률</div><div class="mc-val">측정</div><div class="mc-desc">A·B 순서 바꿨을 때 axis_verdict 변화</div></div>
+    <div class="mc"><div class="mc-name">생성 지연 p95</div><div class="mc-val">≤ 180s</div><div class="mc-desc">단일 모드. 비교 모드는 실측 후</div></div>
+    <div class="mc"><div class="mc-name">neutral 판정율</div><div class="mc-val">모니터링</div><div class="mc-desc">0이면 판정 형식적 신호</div></div>
+  </div>
+</section>
+
+<!-- 흐름 -->
+<section id="s11">
+  <div class="sec-head"><span class="sec-num">흐름</span><h2 class="sec-title">전체 실행 흐름</h2></div>
+  <p class="sec-sub">버튼 경로 기준. 채팅 경로는 precheck 뒤에 플래너가 계획을 1회 세우고 코드가 실행함.</p>
+  <div class="flow">
+    <div class="flow-item"><span class="flow-step">INPUT</span><div><div class="flow-title">FE → <code>POST /orchestrate/debate</code></div><div class="flow-desc">API가 세션에서 <code>user_id</code> 주입</div></div></div>
+    <div class="flow-item"><span class="flow-step">관문1</span><div><div class="flow-title">오케스트레이터 <code>resolve_entities</code></div><div class="flow-desc">애매하면 <code>clarification_needed</code></div></div></div>
+    <div class="flow-item hl"><span class="flow-step new">precheck</span><div><div class="flow-title">토론 에이전트 룰 판정</div><div class="flow-desc">reject면 즉시 <code>rejected</code> 반환 (T2는 수집 예약)</div></div></div>
+    <div class="flow-item"><span class="flow-step">JOB</span><div><div class="flow-title">job 생성(중복이면 기존 job 재사용) → 작업 큐 등록 → <code>job_started</code></div><div class="flow-desc">precheck 결과를 큐 페이로드에 포함</div></div></div>
+    <div class="flow-item"><span class="flow-step">워커</span><div><div class="flow-title"><code>run_debate</code> 실행, 체크포인트 저장</div><div class="flow-desc">진행 이벤트는 <code>job_events</code> → SSE</div></div></div>
+    <div class="flow-item"><span class="flow-step">근거</span><div><div class="flow-title">레지스트리 경유 조회</div><div class="flow-desc"><code>get_agent_context(ticker, "debate", query, intent)</code> · <code>get_metric(…, as_of)</code> · (플래그 켜짐) <code>get_ontology_context</code> 아젠다별 1회. 비교 모드는 축 단위 대칭 검색</div></div></div>
+    <div class="flow-item hl"><span class="flow-step">토론</span><div><div class="flow-title">Bull → Bear → Judge</div><div class="flow-desc">단일: 조건부 2라운드 / 비교: 종목별 Bull·Bear 병렬 → Judge 축별 비교</div></div></div>
+    <div class="flow-item"><span class="flow-step">검증</span><div><div class="flow-title">L1 → 근거 부족 루프 → 1회 수정</div><div class="flow-desc">실패 Claim은 제외하고 partial 고지</div></div></div>
+    <div class="flow-item hl2"><span class="flow-step out">OUT</span><div><div class="flow-title"><code>DebateResult</code> 저장 · 상태 전이</div><div class="flow-desc">단일: <code>simulation_pending</code> (사용자가 <code>POST /orchestrate/debate/{job_id}/simulate</code>를 누르면 시뮬레이션 큐 등록, <code>sim_params</code> 없는 종목은 FE가 버튼 비활성화) / 비교: <code>debate_completed</code></div></div></div>
+  </div>
+</section>
+
+<!-- 미결 -->
+<section id="s12">
+  <div class="sec-head"><span class="sec-num">미결</span><h2 class="sec-title">미결 사항</h2></div>
+  <p class="sec-sub">일정은 팀 협의 후 재확정. 아래는 담당과 결정이 필요한 내용만 기록.</p>
+  <div class="oi"><span class="oi-num">Q1</span><div><div class="oi-title"><code>ReasonCode</code>·<code>NextAction</code> 전체 이름 확정 → precheck·D4 대응표 채우기</div><div class="oi-meta">미커버·3종목 이상·한쪽 미커버·데이터 부족 거절의 envelope.py 이름 확인 · 태은 + 유민</div></div></div>
+  <div class="oi"><span class="oi-num">Q2</span><div><div class="oi-title">SSE 이벤트 단위 — 토큰 vs 노드·주장 (수정 요청 1)</div><div class="oi-meta">job_events 쓰기량과 strict JSON 렌더링 문제 · 태은</div></div></div>
+  <div class="oi"><span class="oi-num">Q3</span><div><div class="oi-title">배포 방식과 Lovable 구현 범위 재정의</div><div class="oi-meta">최종본 7장은 상시 서버(Python API·워커) 권장. 백엔드가 Python·LangGraph라 Lovable 함수(BE)로 옮길 수 없으므로, 9/19 역할 분담의 "유민이 Lovable로 BE 구성"을 "Lovable로 FE 구성 + 상시 서버 API 연결"로 바꿀지 결정 필요 · 전원</div></div></div>
+  <div class="oi"><span class="oi-num">Q4</span><div><div class="oi-title">비교 모드 지연 목표·토큰 상한</div><div class="oi-meta">Langfuse 실측 후 · 유민</div></div></div>
+  <div class="oi"><span class="oi-num">Q5</span><div><div class="oi-title">조건부 2라운드 점수차 임계값</div><div class="oi-meta">비용–품질 곡선 실측 후 · 유민</div></div></div>
+  <div class="oi"><span class="oi-num">Q6</span><div><div class="oi-title"><code>stock_risk_grade</code>(사실 지표) 표시 주체</div><div class="oi-meta">변동성 등 사실 지표로만 표시하기로 확정됨. <code>get_derived_snapshot</code> 값을 FE가 직접 쓸지, DebateResult에 넣을지 · 태은 + 수경</div></div></div>
+  <div class="oi"><span class="oi-num">Q7</span><div><div class="oi-title"><code>flow</code> 아젠다 활성화</div><div class="oi-meta"><code>investor_flow_daily</code> 확보 여부 · 수경</div></div></div>
+  <div class="oi"><span class="oi-num">Q8</span><div><div class="oi-title">작업 큐 라이브러리 (PgQueuer vs Procrastinate)</div><div class="oi-meta">스파이크 후 결정. run_debate 체크포인트 연동 방식이 달라짐 · 태은</div></div></div>
+  <div class="oi"><span class="oi-num">Q9</span><div><div class="oi-title">공용 계약 패키지 위치 확정</div><div class="oi-meta">최종본 8장 제안(backend/contracts + data-pipeline) 그대로 갈지 · 태은 + 수경</div></div></div>
+
+  <h3 class="sub">v2.3 미결 중 종결된 것</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>v2.3</th><th>결론</th></tr></thead>
+    <tbody>
+      <tr><td>Q2 온톨로지 구현체</td><td>Supabase <code>ontology_nodes</code>·<code>ontology_edges</code> 원본, 메모리 로드, Phase B networkx, Neo4j는 전환 조건 충족 시 (5.2 Q9)</td></tr>
+      <tr><td>Q3 거절셋·기준선 실험</td><td>방식 확정(D10) → 구현 착수 시 작업 항목으로 전환</td></tr>
+      <tr><td>Q5 Langfuse 실측</td><td>Cloud Hobby, 태은 담당, 토론 종단 동작 시점에 측정 (5.2 Q6)</td></tr>
+      <tr><td>Q6 fire-and-forget</td><td>작업 큐 + 체크포인트로 교체, 오케스트레이터가 기다리지 않는 성격은 유지 (5.2 Q10)</td></tr>
+      <tr><td>Q8 적합도 매트릭스</td><td>label 미노출, 성향은 points_to_check·caution에만, 법률 검토 후 재검토 (5.2 Q14)</td></tr>
+      <tr><td>보류 1 D3</td><td>이번 범위 포함. 종목마다 같은 축의 Bull·Bear를 따로 돌리고 Judge가 축별로 비교하는 구조(5.1)라 역할 붕괴 문제가 해소됨 (D3)</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3 class="sub">구현 착수 시 유민 작업 항목</h3>
+  <div class="card"><dl class="f">
+    <dt>1</dt><dd><code>precheck()</code> + 키워드 사전 + <code>intent_data_sources.json</code> 연동 (오케스트레이터 관문1과 병렬 개발)</dd>
+    <dt>2</dt><dd>거절셋(<code>ReasonCode</code> 라벨) 수집 — precheck 구현 전에 먼저</dd>
+    <dt>3</dt><dd>Bull·Bear·Judge 프롬프트 v3 + Pydantic 스키마 (단일 → 비교 순)</dd>
+    <dt>4</dt><dd>검증 레이어 L1 + 근거 부족 루프</dd>
+    <dt>5</dt><dd>기준선 비교 실험 루브릭 5~6항목 + 문항 30~50개</dd>
+    <dt>6</dt><dd>온톨로지 ISSUE 시드 20~30개 (온톨로지 기획서)</dd>
+  </dl></div>
+</section>
+
+<p style="margin-top:48px;color:var(--gray);font-size:12px;font-family:var(--mono);">개미비서단 Agent F 리빌드 기획서 · v3.0 · 2026-10-21 · 이유민 · 멀티에이전트 설계 최종본(10/14) 반영</p>
+</div>

@@ -4,6 +4,9 @@
     python -m crawling.financials_loader --recent            # 작년·올해만 다시 받기 (공시 시즌 갱신)
 
 --all을 붙이면 T1/T2가 아니라 상장 전종목을 대상으로 한다.
+
+같은 접수번호는 덮어쓰고, 정정공시로 접수번호가 바뀌면 새 줄로 쌓는다. DART는 최신
+버전만 주므로 원래 값을 남기려면 공시 시즌에 정정이 나오기 전에 받아 두어야 한다.
 """
 
 from __future__ import annotations
@@ -39,7 +42,7 @@ def load(connection: psycopg.Connection, years: list[int], all_tickers: bool) ->
             connection,
             "financials",
             rows,
-            key_columns=["ticker", "fiscal_year", "quarter", "fs_div", "account"],
+            key_columns=["ticker", "fiscal_year", "quarter", "fs_div", "account", "rcept_no"],
         )
         quarters = Counter(row["quarter"] for row in rows)
         logger.info(

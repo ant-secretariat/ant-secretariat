@@ -82,7 +82,12 @@ class DartFinancialsClient:
 
 
 def financial_rows(raw_rows: list[dict], tickers: set[str]) -> list[dict]:
-    """한 사업연도 원본 행 → financials 행. 4분기 손익 단독값은 연간 − 3분기 누적으로 계산한다."""
+    """한 사업연도 원본 행 → financials 행. 4분기 손익 단독값은 연간 − 3분기 누적으로 계산한다.
+
+    rcept_no는 그 값을 알 수 있게 된 공시의 접수번호다. 4분기 손익은 사업보고서와 3분기
+    보고서 두 공시로 계산하므로 더 늦게 접수된 쪽을 쓴다. 그래야 사업보고서 뒤에 3분기가
+    정정되면 4분기도 새 버전으로 쌓인다.
+    """
     picked: dict[tuple, dict] = {}
     # 같은 계정이 두 번 나오는 경우(당기순이익 등)가 있어 ord가 앞선 것을 쓴다
     for raw in sorted(raw_rows, key=lambda row: int(row.get("ord") or 0)):
@@ -98,12 +103,15 @@ def financial_rows(raw_rows: list[dict], tickers: set[str]) -> list[dict]:
         amount = _amount(raw.get("thstrm_amount"))
         is_income = raw.get("sj_div") != "BS"
         amount_ytd = None
+        rcept_no = raw["rcept_no"]
         if is_income:
             amount_ytd = _amount(raw.get("thstrm_add_amount")) if quarter in (2, 3) else amount
             if quarter == 4:
                 q3 = picked.get((ticker, year, 3, fs_div, account))
                 q3_ytd = _amount(q3.get("thstrm_add_amount")) if q3 else None
                 amount = amount_ytd - q3_ytd if amount_ytd is not None and q3_ytd is not None else None
+                if q3 and amount is not None:
+                    rcept_no = max(rcept_no, q3["rcept_no"])
         rows.append(
             {
                 "ticker": ticker,
@@ -115,7 +123,8 @@ def financial_rows(raw_rows: list[dict], tickers: set[str]) -> list[dict]:
                 "period_end": _period_end(raw.get("thstrm_dt", "")),
                 "amount": amount,
                 "amount_ytd": amount_ytd,
-                "rcept_no": raw["rcept_no"],
+                "rcept_no": rcept_no,
+                "rcept_dt": _rcept_date(rcept_no),
                 "updated_at": datetime.now().astimezone(),
             }
         )
@@ -127,6 +136,11 @@ def _amount(value: str | None) -> int | None:
     if text in ("", "-"):
         return None
     return int(text)
+
+
+def _rcept_date(rcept_no: str) -> date:
+    # DART 접수번호는 앞 8자리가 접수일이다 (예: 20261114000123)
+    return datetime.strptime(rcept_no[:8], "%Y%m%d").date()
 
 
 def _period_end(value: str) -> date:

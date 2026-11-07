@@ -1,0 +1,12 @@
+{
+  "version": "ds-0.1.0-stub",
+  "note": "임시 스텁. 이 파일의 소유자는 데이터 에이전트(수경)이다. 아젠다별 필요 데이터·신선도·T0 가능 여부를 수경과 확정해 교체한다. sources 이름은 get_available_data_status의 키(report, news, disclosure, price, macro, target_price)를 따른다.",
+  "agendas": {
+    "valuation": { "requires_any": ["report", "target_price", "price"], "stale_after_days": 45, "t0_available": true },
+    "macro": { "requires_any": ["macro", "report", "news"], "stale_after_days": 30, "t0_available": true },
+    "risk": { "requires_any": ["report", "news", "disclosure"], "stale_after_days": 30, "t0_available": false },
+    "growth": { "requires_any": ["report", "news", "disclosure"], "stale_after_days": 45, "t0_available": false },
+    "shareholder_return": { "requires_any": ["disclosure", "report"], "stale_after_days": 90, "t0_available": false },
+    "flow": { "requires_any": [], "stale_after_days": 7, "t0_available": false }
+  }
+}

@@ -58,21 +58,11 @@ class MacroDataCollector:
                 date_to,
             )
         if self.settings.macro_data_provider == "ecos":
-            rows = EcosMacroProvider(self.settings).collect(
+            return EcosMacroProvider(self.settings).collect(
                 indicators,
                 date_from,
                 date_to,
             )
-            selected = indicators or list(DEFAULT_ECOS_INDICATORS) + ["USD_KRW"]
-            if "USD_KRW" in selected:
-                rows.extend(
-                    NaverMarketIndexProvider(self.settings).collect(
-                        ["USD_KRW"],
-                        date_from,
-                        date_to,
-                    )
-                )
-            return rows
         raise ValueError(f"unsupported macro data provider: {self.settings.macro_data_provider}")
 
 
@@ -112,7 +102,7 @@ DEFAULT_ECOS_INDICATORS = {
         indicator_name="국고채 10년 금리",
         stat_code="817Y002",
         cycle="D",
-        item_code="010220000",
+        item_code="010210000",
         unit="%",
         frequency="daily",
     ),
@@ -125,7 +115,80 @@ DEFAULT_ECOS_INDICATORS = {
         unit="index",
         frequency="monthly",
     ),
+    "USD_KRW": EcosIndicator(
+        indicator_id="USD_KRW",
+        indicator_name="원/달러 환율",
+        stat_code="731Y001",
+        cycle="D",
+        item_code="0000001",
+        unit="KRW",
+        frequency="daily",
+    ),
+    # 국제상품가격은 ECOS에 월평균만 있다
+    "WTI": EcosIndicator(
+        indicator_id="WTI",
+        indicator_name="WTI 유가",
+        stat_code="902Y003",
+        cycle="M",
+        item_code="010101",
+        unit="USD/bbl",
+        frequency="monthly",
+        country="GLOBAL",
+    ),
+    "DUBAI": EcosIndicator(
+        indicator_id="DUBAI",
+        indicator_name="두바이유 유가",
+        stat_code="902Y003",
+        cycle="M",
+        item_code="010102",
+        unit="USD/bbl",
+        frequency="monthly",
+        country="GLOBAL",
+    ),
+    "BRENT": EcosIndicator(
+        indicator_id="BRENT",
+        indicator_name="브렌트유 유가",
+        stat_code="902Y003",
+        cycle="M",
+        item_code="010103",
+        unit="USD/bbl",
+        frequency="monthly",
+        country="GLOBAL",
+    ),
+    # 통관 기준. ECOS에 무역수지 항목이 없어 수출 − 수입으로 계산한다(TRADE_BALANCE_KR)
+    "EXPORTS_KR": EcosIndicator(
+        indicator_id="EXPORTS_KR",
+        indicator_name="수출금액",
+        stat_code="901Y118",
+        cycle="M",
+        item_code="T002",
+        unit="USD thousand",
+        frequency="monthly",
+    ),
+    "IMPORTS_KR": EcosIndicator(
+        indicator_id="IMPORTS_KR",
+        indicator_name="수입금액",
+        stat_code="901Y118",
+        cycle="M",
+        item_code="T004",
+        unit="USD thousand",
+        frequency="monthly",
+    ),
+    # 항목이 두 단계다. A00 전산업(농림어업 제외) / 2 계절조정
+    "IPI_KR": EcosIndicator(
+        indicator_id="IPI_KR",
+        indicator_name="전산업생산지수(계절조정)",
+        stat_code="901Y033",
+        cycle="M",
+        item_code="A00/2",
+        unit="2020=100",
+        frequency="monthly",
+    ),
 }
+
+ECOS_PAGE_SIZE = 10000
+# 조회 기간에 값이 없을 때 ECOS가 주는 결과 코드
+ECOS_NO_DATA = "INFO-200"
 
 
 class EcosMacroProvider:
@@ -155,16 +218,23 @@ class EcosMacroProvider:
             for indicator_id in selected:
                 indicator = DEFAULT_ECOS_INDICATORS.get(indicator_id)
                 if indicator is None:
-                    if indicator_id != "USD_KRW":
-                        logger.warning("지원하지 않는 ECOS 지표입니다: %s", indicator_id)
+                    logger.warning("지원하지 않는 ECOS 지표입니다: %s", indicator_id)
                     continue
                 try:
                     ecos_rows = self._fetch_indicator(client, indicator, date_from, date_to)
-                    if ecos_rows:
-                        rows.append(self._to_macro_row(indicator, ecos_rows[-1]))
                 except Exception as exc:
-                    logger.warning("ECOS 지표 수집 실패: %s - %s", indicator_id, exc)
-        return rows
+                    logger.warning(
+                        "ECOS 지표 수집 실패: %s - %s",
+                        indicator_id,
+                        self._mask(str(exc)),
+                    )
+                    continue
+                rows.extend(
+                    row
+                    for row in (self._to_macro_row(indicator, ecos_row) for ecos_row in ecos_rows)
+                    if row["value"] is not None
+                )
+        return rows + _trade_balance_rows(rows)
 
     def _fetch_indicator(
         self,
@@ -174,29 +244,43 @@ class EcosMacroProvider:
         date_to: str | None,
     ) -> list[dict]:
         start, end = _ecos_date_range(indicator.cycle, date_from, date_to)
-        url = (
-            "https://ecos.bok.or.kr/api/StatisticSearch/"
-            f"{self.settings.ecos_api_key}/json/kr/1/100/"
-            f"{indicator.stat_code}/{indicator.cycle}/{start}/{end}/{indicator.item_code}"
-        )
-        response = client.get(url)
-        response.raise_for_status()
-        payload = response.json()
-        result = payload.get("StatisticSearch")
-        if not result:
-            message = payload.get("RESULT", {}).get("MESSAGE", "응답 없음")
-            raise RuntimeError(message)
-        rows = result.get("row") or result.get("list") or []
-        rows = sorted(rows, key=lambda row: row.get("TIME", ""))
-        return rows
+        rows: list[dict] = []
+        first = 1
+        while True:
+            last = first + ECOS_PAGE_SIZE - 1
+            url = (
+                "https://ecos.bok.or.kr/api/StatisticSearch/"
+                f"{self.settings.ecos_api_key}/json/kr/{first}/{last}/"
+                f"{indicator.stat_code}/{indicator.cycle}/{start}/{end}/{indicator.item_code}"
+            )
+            response = client.get(url)
+            response.raise_for_status()
+            payload = response.json()
+            result = payload.get("StatisticSearch")
+            if not result:
+                error = payload.get("RESULT", {})
+                if error.get("CODE") == ECOS_NO_DATA:
+                    break
+                raise RuntimeError(error.get("MESSAGE", "응답 없음"))
+            page = result.get("row") or []
+            rows.extend(page)
+            if not page or last >= int(result.get("list_total_count", 0)):
+                break
+            first = last + 1
+        return sorted(rows, key=lambda row: row.get("TIME", ""))
+
+    def _mask(self, text: str) -> str:
+        # httpx 오류 메시지에는 요청 URL이 들어가는데, ECOS는 인증키가 URL에 있다
+        key = self.settings.ecos_api_key
+        return text.replace(key, "***") if key else text
 
     def _to_macro_row(self, indicator: EcosIndicator, row: dict) -> dict:
         return {
             "indicator_id": indicator.indicator_id,
             "indicator_name": indicator.indicator_name,
             "date": _normalize_ecos_time(row.get("TIME", ""), indicator.cycle),
-            "value": _parse_number(row.get("DATA_VALUE", "")),
-            "unit": row.get("UNIT_NAME") or indicator.unit,
+            "value": _parse_optional_number(row.get("DATA_VALUE", "")),
+            "unit": indicator.unit,
             "frequency": indicator.frequency,
             "country": indicator.country,
             "source": self.source,
@@ -315,6 +399,28 @@ def _utc_now() -> str:
 
 def _parse_number(value: str) -> float:
     return float(value.replace(",", "").strip())
+
+
+def _parse_optional_number(value: str | None) -> float | None:
+    try:
+        return _parse_number(value or "")
+    except ValueError:
+        return None
+
+
+def _trade_balance_rows(rows: list[dict]) -> list[dict]:
+    """수출과 수입이 모두 있는 달만 무역수지를 만든다."""
+    imports = {row["date"]: row["value"] for row in rows if row["indicator_id"] == "IMPORTS_KR"}
+    return [
+        {
+            **row,
+            "indicator_id": "TRADE_BALANCE_KR",
+            "indicator_name": "무역수지",
+            "value": row["value"] - imports[row["date"]],
+        }
+        for row in rows
+        if row["indicator_id"] == "EXPORTS_KR" and row["date"] in imports
+    ]
 
 
 def _ecos_date_range(

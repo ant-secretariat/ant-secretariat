@@ -120,6 +120,32 @@ def test_short_balance_skips_unpublished_days(monkeypatch):
     assert connection.queries[0][1] == ("005930", "005930", "2026-11-06", 2)
 
 
+def test_insider_metric_sums_recent_reports(monkeypatch):
+    connection = _use(monkeypatch, FakeConnection((-8499, date(2026, 11, 6), 16, True)))
+
+    result = get_metric("005930", "insider_net_shares_90d", "2026-11-08")
+
+    assert (result["value"], result["unit"], result["as_of"]) == (-8499.0, "주", "2026-11-06")
+    assert result["basis"] == "최근 90일 임원·주요주주 주식수 증감 합계 (보고 16건)"
+    assert connection.queries[0][1] == ("005930", "005930", "insider", "2026-11-08", "2026-11-08", 90)
+
+
+def test_insider_metric_without_reports_is_zero_for_tracked_ticker(monkeypatch):
+    _use(monkeypatch, FakeConnection((None, None, 0, True)))
+
+    result = get_metric("005930", "insider_sell_reports_90d", "2026-11-08")
+
+    assert (result["value"], result["reason"], result["as_of"]) == (0.0, None, "2026-11-08")
+
+
+def test_insider_metric_for_untracked_ticker_is_no_data(monkeypatch):
+    _use(monkeypatch, FakeConnection((None, None, 0, False)))
+
+    result = get_metric("999999", "major_holder_ratio_change_90d", "2026-11-08")
+
+    assert (result["value"], result["reason"]) == (None, "no_data")
+
+
 def test_debt_ratio_is_not_applicable_for_financial_sector(monkeypatch):
     _use(monkeypatch, FakeConnection(("금융",)))
 

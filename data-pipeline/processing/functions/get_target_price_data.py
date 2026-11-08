@@ -34,21 +34,6 @@ def get_target_price_data(
     return _build_result(ticker, rows)
 
 
-def has_target_price_data(ticker: str) -> bool:
-    try:
-        from crawling.db.postgres import connect
-
-        with connect() as connection:
-            row = connection.execute(
-                "select exists (select 1 from broker_opinions where ticker = %s)",
-                (ticker,),
-            ).fetchone()
-    except Exception as exc:
-        logger.error("목표주가 존재 여부 조회 실패: %s(%s)", ticker, type(exc).__name__)
-        return False
-    return bool(row[0])
-
-
 def _fetch_rows(
     ticker: str,
     date_from: Optional[str],

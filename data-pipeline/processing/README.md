@@ -517,7 +517,14 @@ result = get_disclosure_data(
 
 ### get_available_data_status()
 
-해당 기업에 어떤 데이터가 있는지 확인 (실행 Agent 선택 전 데이터 준비 여부 확인)
+해당 기업에 어떤 데이터가 있는지 확인 (실행 Agent 선택 전 데이터 준비 여부 확인). 반환 형식은 API 계약서 `DataStatus`이고, 이전 형식(`available`, `latest`)도 함께 줍니다.
+
+- 정형 데이터(시세·매크로·재무·목표주가·시뮬레이션 파라미터)는 Supabase에서, 리포트·뉴스·공시 건수는 문서 테이블을 옮기기 전까지 `relational_db`(SQLite)에서 셉니다. `relational_db`가 없으면 문서 건수는 0
+- `simulation_ready`: 가장 최근 `sim_params`가 `ok`인지. FE가 시뮬레이션 버튼을 미리 끄는 데 씀
+- `derived_snapshot_available`: `get_derived_snapshot` 구현 전이라 `false`
+- `collection_job_status`: T2 수집이 Post-MVP라 `null`
+- `as_of_dates`: 데이터 종류별 최신 기준일 (오래된 데이터 표시용)
+- Supabase 조회가 실패해도 예외 대신 정형 데이터 항목을 비운 결과를 반환
 
 ```python
 from processing.functions.get_available_data_status import get_available_data_status
@@ -533,6 +540,21 @@ result = get_available_data_status(
 {
   "ticker": "005930",
   "company": "삼성전자",
+  "report_count": 12,
+  "news_count": 30,
+  "disclosure_count": 8,
+  "derived_snapshot_available": false,
+  "collection_job_status": null,
+  "simulation_ready": true,
+  "as_of_dates": {
+    "price": "2026-11-06",
+    "macro": "2026-11-06",
+    "financials": "2026-08-14",
+    "target_price": "2026-11-04",
+    "report": "2026-11-05",
+    "news": "2026-11-06",
+    "disclosure": "2026-11-03"
+  },
   "available": {
     "reports": true,
     "news": true,
@@ -548,6 +570,46 @@ result = get_available_data_status(
     "price_date": "2026-06-21",
     "macro_date": "2026-06-19"
   }
+}
+```
+
+---
+
+### get_metric()
+
+시맨틱 레이어의 단일 정의로 지표 하나를 계산합니다. 반환 형식은 API 계약서 `MetricValue`입니다. PER·PBR·ROE처럼 매일 바뀌는 값은 온톨로지 노드에 저장하지 않고 이 함수로 조회합니다.
+
+- `as_of`는 필수(`YYYY-MM-DD`). 그날까지 공개된 데이터만 씀
+- 시세·밸류에이션 지표: 그날까지의 가장 최근 거래일 값. `as_of`는 그 거래일
+- 재무 지표: `financials_as_of(as_of)`로 그날까지 접수된 공시만 써서 계산. 연결 우선, 없으면 별도. `as_of`는 계산에 쓴 공시의 가장 늦은 접수일, `period`는 대상 분기
+- 값을 낼 수 없으면 `value`는 `null`이고 `reason`에 사유: `unknown_metric`, `no_data`, `no_value`, `not_applicable_financials`(금융 섹터 부채비율), `metric_unavailable`(조회 실패)
+
+| metric_id | 단위 | 출처 |
+|---|---|---|
+| `per`, `pbr` | 배 | `market_daily` |
+| `eps`, `bps`, `dps` | 원 | `market_daily` |
+| `dividend_yield`, `foreign_ratio` | % | `market_daily` |
+| `shares_outstanding` | 주 | `market_daily` |
+| `close`, `market_cap` | 원 | `price_data` |
+| `debt_ratio`, `operating_margin`, `revenue_growth_yoy`, `roe_ttm` | % | `financials` |
+
+```python
+from processing.functions.get_metric import get_metric
+
+result = get_metric(ticker="005930", metric_id="roe_ttm", as_of="2026-09-01")
+```
+
+```json
+{
+  "ticker": "005930",
+  "metric_id": "roe_ttm",
+  "value": 30.79,
+  "unit": "%",
+  "basis": "2026Q2 연결, 최근 4개 분기 순이익 합 / 평균 자본",
+  "as_of": "2026-08-14",
+  "source": ["financials"],
+  "reason": null,
+  "period": "2026Q2"
 }
 ```
 

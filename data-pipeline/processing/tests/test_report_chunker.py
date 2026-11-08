@@ -6,6 +6,8 @@ from processing.processors.report_chunker import (  # noqa: E402
     MAX_CHARS,
     MIN_CHARS,
     ReportMeta,
+    _Block,
+    _sections,
     chunk_report,
     is_prose_box,
     normalize_text,
@@ -91,6 +93,7 @@ def test_chart_axis_numbers_leave_body(tmp_path):
     page.insert_text((40, 80), "헝가리 일회성 비용이 집중되는 4분기", fontname="korea", fontsize=16)
     for index, value in enumerate(["50,000", "100,000", "150,000", "1M -22.5 1.6"]):
         page.insert_text((400, 120 + index * 20), value, fontname="korea", fontsize=8)
+    page.insert_text((470, 120), "주가차트", fontname="korea", fontsize=8)
     page.insert_textbox(pymupdf.Rect(40, 220, 560, 400), BODY * 4, fontname="korea", fontsize=10)
     doc.save(str(path))
     doc.close()
@@ -103,6 +106,9 @@ def test_chart_axis_numbers_leave_body(tmp_path):
     assert "영업이익" in body
     assert numbers and numbers[0].table_structure == "text_only"
     assert "1M -22.5 1.6" in numbers[0].body
+    assert "주가차트" in numbers[0].body and "주가차트" not in body
+    # 차트 옆이어도 본문보다 큰 제목은 본문에 남는다
+    assert "헝가리 일회성 비용이 집중되는 4분기" in body
 
 
 def test_table_structure_detects_stacked_and_repeated_cells():
@@ -131,3 +137,12 @@ def test_prose_box_is_not_a_table():
 def test_normalize_text_joins_split_numbers_and_spaces():
     assert normalize_text("목표주가  140 ,000원\n\n\n괴리율 -6 .2%") == "목표주가 140,000원\n괴리율 -6.2%"
     assert normalize_text("·········") == "···"
+
+
+def test_line_break_keeps_real_word_space():
+    long = "헝가리 3만톤 중 일부는 포항에서 생산하던 유럽향 물량의 이전이라 전사 출하"
+    glued = _sections([_Block(1, long + " 순증은"), _Block(1, "이보다 작다.")], "제목")
+    spaced = _sections([_Block(1, long + " 순증은", trailing_space=True), _Block(1, "이보다 작다.")], "제목")
+
+    assert glued[0].paragraphs == [long + " 순증은이보다 작다."]
+    assert spaced[0].paragraphs == [long + " 순증은 이보다 작다."]

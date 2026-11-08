@@ -47,6 +47,9 @@ CONTINUATION_MIN_CHARS = 25
 NUMERIC_BLOCK_CHARS = 30
 NUMERIC_BLOCK_RATIO = 0.6
 NUMBERS_TITLE = "차트·소형 표 수치"
+# 숫자 덩어리에서 이 거리(pt) 안에 있는 짧은 글은 차트 제목·범례·축 이름으로 보고 숫자 청크로 옮긴다
+CHART_LABEL_GAP = 15
+CHART_LABEL_CHARS = 40
 SENTENCE_END = re.compile(r"(?<=[.!?。])\s+")
 NUMBERED_HEADING = re.compile(r"^\s*(?:[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+|\d{1,2}|[①-⑳])[.)]?\s+\S")
 
@@ -84,6 +87,10 @@ class _Block:
     heading: bool = False
     disclaimer: bool = False
     numeric: bool = False  # 차트 축 값, 작은 수익률 표처럼 짧은 숫자 덩어리
+    bbox: tuple = (0, 0, 0, 0)
+    large: bool = False  # 본문보다 큰 글자 (리포트 제목·소제목). 차트 라벨로 보지 않는다
+    # 원문 마지막 줄이 공백으로 끝났는지. 공백이 있으면 줄바꿈 자리가 진짜 띄어쓰기다
+    trailing_space: bool = False
 
 
 @dataclass
@@ -122,6 +129,7 @@ def chunk_report(pdf_path: str, meta: ReportMeta) -> list[ReportChunk]:
     finally:
         doc.close()
 
+    _mark_chart_labels(blocks)
     # 짧은 숫자 덩어리는 본문 흐름에서 빼고 쪽마다 숫자 청크 하나로 모은다
     numbers_by_page: dict[int, list[str]] = {}
     for block in blocks:
@@ -260,16 +268,19 @@ def _page_blocks(page, body_size: float, repeated: set[str], table_boxes) -> lis
         if any(center in box for box in table_boxes):
             continue
         text = ""
+        trailing_space = False
         for line in lines:
-            line_text = "".join(span["text"] for span in line["spans"]).strip()
+            raw = "".join(span["text"] for span in line["spans"])
+            line_text = raw.strip()
             if not line_text:
                 continue
             if not text:
                 text = line_text
-            elif _HANGUL_END.search(text) and _HANGUL_START.match(line_text):
-                text += line_text  # 단어 중간 줄바꿈 (수 / 량)
+            elif _HANGUL_END.search(text) and _HANGUL_START.match(line_text) and not trailing_space:
+                text += line_text  # 단어 중간 줄바꿈 (수 / 량). 앞줄이 공백으로 끝났으면 띄어쓴다
             else:
                 text += " " + line_text
+            trailing_space = raw != raw.rstrip()
         if not text or re.fullmatch(r"[-\s\d/·|]*", text):
             continue
         in_margin = rect.y1 < height * MARGIN_RATIO or rect.y0 > height * (1 - MARGIN_RATIO)
@@ -284,6 +295,9 @@ def _page_blocks(page, body_size: float, repeated: set[str], table_boxes) -> lis
                 heading=not numeric and _is_heading(text, spans, len(lines), body_size),
                 disclaimer=bool(DISCLAIMER_PATTERNS.search(text)),
                 numeric=numeric,
+                bbox=tuple(rect),
+                large=bool(spans) and max(span["size"] for span in spans) >= body_size * HEADING_SIZE_RATIO,
+                trailing_space=trailing_space,
             )
         )
     return blocks
@@ -299,9 +313,32 @@ def _is_heading(text: str, spans: list[dict], line_count: int, body_size: float)
     return larger or bold or bool(NUMBERED_HEADING.match(text) and len(text) <= 30)
 
 
+def _mark_chart_labels(blocks: list[_Block]) -> None:
+    """숫자 덩어리 바로 옆의 짧고 문장이 아닌 글(차트 제목·범례·축 이름)도 숫자로 표시한다."""
+    numeric_boxes: dict[int, list[tuple]] = {}
+    for block in blocks:
+        if block.numeric:
+            numeric_boxes.setdefault(block.page, []).append(block.bbox)
+    for block in blocks:
+        boxes = numeric_boxes.get(block.page)
+        if block.numeric or block.large or not boxes or len(block.text) > CHART_LABEL_CHARS:
+            continue
+        if block.disclaimer or re.search(r"[.!?]$|다\.?$", block.text) or SENTENCE_LIKE.search(block.text + " "):
+            continue
+        if any(_box_gap(block.bbox, box) <= CHART_LABEL_GAP for box in boxes):
+            block.numeric, block.heading = True, False
+
+
+def _box_gap(a: tuple, b: tuple) -> float:
+    dx = max(b[0] - a[2], a[0] - b[2], 0)
+    dy = max(b[1] - a[3], a[1] - b[3], 0)
+    return max(dx, dy)
+
+
 def _sections(blocks: list[_Block], default_title: str) -> list[_Section]:
     sections: list[_Section] = []
     current = _Section(title=default_title, page_start=1, page_end=1)
+    previous_block: _Block | None = None
     for block in blocks:
         if block.heading:
             if current.paragraphs:
@@ -311,6 +348,7 @@ def _sections(blocks: list[_Block], default_title: str) -> list[_Section]:
                 title=block.text, page_start=block.page, page_end=block.page, paragraphs=[block.text]
             )
             current.disclaimer = block.disclaimer
+            previous_block = block
             continue
         if block.disclaimer and not current.disclaimer and current.paragraphs:
             # 소제목 없이 고지 문구가 이어 나와도 앞 본문까지 면책으로 표시되지 않게 나눈다
@@ -319,7 +357,8 @@ def _sections(blocks: list[_Block], default_title: str) -> list[_Section]:
         previous = current.paragraphs[-1] if current.paragraphs else ""
         if _continues(previous, block.text) and current.page_end == block.page:
             # 한국어 리포트는 글자 단위로 줄을 바꿔서 단어 중간에서 끊긴다 (확대됐 / 다)
-            joiner = "" if _HANGUL_END.search(previous) and _HANGUL_START.match(block.text) else " "
+            glued = _HANGUL_END.search(previous) and _HANGUL_START.match(block.text)
+            joiner = "" if glued and not (previous_block and previous_block.trailing_space) else " "
             current.paragraphs[-1] = previous + joiner + block.text
         else:
             current.paragraphs.append(block.text)
@@ -327,6 +366,7 @@ def _sections(blocks: list[_Block], default_title: str) -> list[_Section]:
         if not current.paragraphs[:-1]:
             current.page_start = block.page
         current.disclaimer = current.disclaimer or block.disclaimer
+        previous_block = block
     if current.paragraphs:
         sections.append(current)
     return sections

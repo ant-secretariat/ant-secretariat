@@ -219,6 +219,17 @@ python -m crawling.investor_flow_loader --recent     # T1/T2, 최근 14일 다�
 - 공매도 조회는 1년이 넘는 기간을 한 번에 요청하면 실패해서 180일씩 나눠 받는다
 - 2023-11-06 ~ 2025-03-30은 공매도 전면 금지 기간이라 공매도 수치가 매우 작다(시장조성 등 예외 거래만 있음)
 
+대주주·임원 지분 변동(`insider_holdings`) 적재(DART 지분공시 종합정보, `DART_API_KEY` 필요):
+
+```bash
+python -m crawling.insider_holdings_loader                     # T1/T2 보통주 전체 (매일)
+python -m crawling.insider_holdings_loader --tickers 005930
+```
+
+- `report_kind`: `major`(대량보유 상황보고, 5% 이상) / `insider`(임원·주요주주 소유보고)
+- DART는 날짜를 고르는 조회가 없고 최근 약 2년 치를 한 번에 주므로, 매번 전체를 받아 덮어쓴다
+- 접수일(`rcept_dt`) 기준으로 시점 조회한다. 임원 보고에는 주식 보상 같은 소액 변동도 들어 있다
+
 KIS 목표주가·투자의견(`broker_opinions`) 적재(`KIS_APP_KEY`, `KIS_APP_SECRET` 필요). 조회 API만 호출합니다:
 
 ```bash

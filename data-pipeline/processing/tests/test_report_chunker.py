@@ -84,6 +84,27 @@ def test_chunk_ids_are_stable_and_unique(report_pdf):
     assert all(chunk_id.startswith("R1:") for chunk_id in first)
 
 
+def test_chart_axis_numbers_leave_body(tmp_path):
+    path = tmp_path / "chart.pdf"
+    doc = pymupdf.open()
+    page = doc.new_page()
+    page.insert_text((40, 80), "헝가리 일회성 비용이 집중되는 4분기", fontname="korea", fontsize=16)
+    for index, value in enumerate(["50,000", "100,000", "150,000", "1M -22.5 1.6"]):
+        page.insert_text((400, 120 + index * 20), value, fontname="korea", fontsize=8)
+    page.insert_textbox(pymupdf.Rect(40, 220, 560, 400), BODY * 4, fontname="korea", fontsize=10)
+    doc.save(str(path))
+    doc.close()
+
+    chunks = chunk_report(str(path), META)
+    body = " ".join(c.body for c in chunks if c.chunk_type == "text")
+    numbers = [c for c in chunks if c.section_title == "차트·소형 표 수치"]
+
+    assert "100,000" not in body
+    assert "영업이익" in body
+    assert numbers and numbers[0].table_structure == "text_only"
+    assert "1M -22.5 1.6" in numbers[0].body
+
+
 def test_table_structure_detects_stacked_and_repeated_cells():
     intact = [["구분", "2025", "2026F"], ["매출액", "2,534", "2,258"], ["영업이익", "143", "56"]]
     stacked = [["구분", "값"], ["매출액\n영업이익", "2,766.8\n2,531.6\n143.3"], ["순이익", "41.3\n86.0"]]

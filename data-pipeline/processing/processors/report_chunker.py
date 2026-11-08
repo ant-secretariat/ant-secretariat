@@ -43,6 +43,10 @@ PREFIX_TITLE_CHARS = 60
 DISCLAIMER_TITLE = "고지 사항"
 # 이보다 짧은 줄(사이드바 항목, 표 칸 등)은 다음 줄과 이어 붙이지 않는다
 CONTINUATION_MIN_CHARS = 25
+# 이 길이 이하이고 숫자 비율이 이 이상인 덩어리는 본문에서 빼서 숫자 청크로 모은다 (차트 축 값 등)
+NUMERIC_BLOCK_CHARS = 30
+NUMERIC_BLOCK_RATIO = 0.6
+NUMBERS_TITLE = "차트·소형 표 수치"
 SENTENCE_END = re.compile(r"(?<=[.!?。])\s+")
 NUMBERED_HEADING = re.compile(r"^\s*(?:[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+|\d{1,2}|[①-⑳])[.)]?\s+\S")
 
@@ -79,6 +83,7 @@ class _Block:
     text: str
     heading: bool = False
     disclaimer: bool = False
+    numeric: bool = False  # 차트 축 값, 작은 수익률 표처럼 짧은 숫자 덩어리
 
 
 @dataclass
@@ -117,6 +122,15 @@ def chunk_report(pdf_path: str, meta: ReportMeta) -> list[ReportChunk]:
     finally:
         doc.close()
 
+    # 짧은 숫자 덩어리는 본문 흐름에서 빼고 쪽마다 숫자 청크 하나로 모은다
+    numbers_by_page: dict[int, list[str]] = {}
+    for block in blocks:
+        if block.numeric:
+            numbers_by_page.setdefault(block.page, []).append(block.text)
+    blocks = [block for block in blocks if not block.numeric]
+    for page, values in numbers_by_page.items():
+        tables.append((page, NUMBERS_TITLE, [[value] for value in values], "text_only"))
+
     sections = _merge_tiny_sections(_sections(blocks, meta.title))
     text_pieces: list[list] = []
     for section in sections:
@@ -129,8 +143,8 @@ def chunk_report(pdf_path: str, meta: ReportMeta) -> list[ReportChunk]:
         if _numeric_ratio(piece[5]) >= NUMERIC_TEXT_RATIO:
             piece[0], piece[6] = "table", "text_only"
         pieces.append(tuple(piece))
-    for page, caption, rows in tables:
-        structure = table_structure(rows)
+    for page, caption, rows, *forced in tables:
+        structure = forced[0] if forced else table_structure(rows)
         text = _table_text(rows, structure)
         if not text.strip():
             continue
@@ -262,12 +276,14 @@ def _page_blocks(page, body_size: float, repeated: set[str], table_boxes) -> lis
         if in_margin and _margin_key(text) in repeated:
             continue
         spans = [span for line in lines for span in line["spans"] if span["text"].strip()]
+        numeric = len(text) <= NUMERIC_BLOCK_CHARS and _numeric_ratio(text) >= NUMERIC_BLOCK_RATIO
         blocks.append(
             _Block(
                 page=page.number + 1,
                 text=text,
-                heading=_is_heading(text, spans, len(lines), body_size),
+                heading=not numeric and _is_heading(text, spans, len(lines), body_size),
                 disclaimer=bool(DISCLAIMER_PATTERNS.search(text)),
+                numeric=numeric,
             )
         )
     return blocks

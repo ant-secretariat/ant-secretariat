@@ -582,6 +582,8 @@ result = get_available_data_status(
 - `as_of`는 필수(`YYYY-MM-DD`). 그날까지 공개된 데이터만 씀
 - 시세·밸류에이션 지표: 그날까지의 가장 최근 거래일 값. `as_of`는 그 거래일
 - 재무 지표: `financials_as_of(as_of)`로 그날까지 접수된 공시만 써서 계산. 연결 우선, 없으면 별도. `as_of`는 계산에 쓴 공시의 가장 늦은 접수일, `period`는 대상 분기
+- 수급 지표: 그날까지 최근 20거래일 합계(순매수) 또는 평균(공매도 비중). 20일보다 적으면 `basis`에 실제 일수를 적음
+- 공매도 잔고 비중: KRX가 약 2거래일 늦게 공개하므로 그날 기준 2거래일 전까지의 값만 씀
 - 값을 낼 수 없으면 `value`는 `null`이고 `reason`에 사유: `unknown_metric`, `no_data`, `no_value`, `not_applicable_financials`(금융 섹터 부채비율), `metric_unavailable`(조회 실패)
 
 | metric_id | 단위 | 출처 |
@@ -592,6 +594,8 @@ result = get_available_data_status(
 | `shares_outstanding` | 주 | `market_daily` |
 | `close`, `market_cap` | 원 | `price_data` |
 | `debt_ratio`, `operating_margin`, `revenue_growth_yoy`, `roe_ttm` | % | `financials` |
+| `foreign_net_buy_20d`, `inst_net_buy_20d`, `individual_net_buy_20d` | 원 | `investor_flow_daily` |
+| `short_volume_ratio_20d`, `short_balance_ratio` | % | `investor_flow_daily` |
 
 ```python
 from processing.functions.get_metric import get_metric

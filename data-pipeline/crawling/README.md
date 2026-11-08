@@ -207,6 +207,18 @@ python -m crawling.market_loader --sectors
 
 wiseindex.com의 robots.txt는 일반 크롤러를 허용하지 않으므로 팀 내부 테스트 범위에서만 사용합니다. 우선주는 보통주 분류를 따르고, 코넥스·외국기업 등 WICS 미편입 종목은 비워 둡니다.
 
+투자자별 순매수·공매도(`investor_flow_daily`) 적재(pykrx, KRX 로그인 필요):
+
+```bash
+python -m crawling.investor_flow_loader --backfill   # T1/T2, 최근 3년
+python -m crawling.investor_flow_loader --recent     # T1/T2, 최근 14일 다시 받기 (매일)
+```
+
+- 기관합계·외국인합계·개인·기타법인의 순매수 금액(원)과 수량(주), 공매도 거래량·거래대금·비중, 공매도 잔고 수량·금액·비중
+- 공매도 거래량과 비중은 당일 값이 나오지만, 공매도 거래대금과 잔고는 KRX가 약 2거래일 늦게 공개해 최근 며칠은 비어 있다가 다음 `--recent` 때 채워진다
+- 공매도 조회는 1년이 넘는 기간을 한 번에 요청하면 실패해서 180일씩 나눠 받는다
+- 2023-11-06 ~ 2025-03-30은 공매도 전면 금지 기간이라 공매도 수치가 매우 작다(시장조성 등 예외 거래만 있음)
+
 KIS 목표주가·투자의견(`broker_opinions`) 적재(`KIS_APP_KEY`, `KIS_APP_SECRET` 필요). 조회 API만 호출합니다:
 
 ```bash

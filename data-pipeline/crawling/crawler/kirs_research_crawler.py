@@ -5,7 +5,7 @@ import hashlib
 import logging
 import re
 import urllib.robotparser
-from datetime import datetime
+from datetime import date, datetime
 from urllib.parse import parse_qsl, urlencode, urljoin, urlparse, urlunparse
 
 import httpx
@@ -13,7 +13,7 @@ from bs4 import BeautifulSoup, Tag
 
 from crawling.config.report_type_codes import normalize_report_type
 from crawling.crawler.config import SELECTORS, Settings
-from crawling.crawler.base_crawler import generate_report_id
+from crawling.crawler.base_crawler import generate_report_id, parse_date, subtract_months
 from crawling.crawler.http import create_ssl_context
 from crawling.crawler.models import ReportMetadata
 
@@ -37,15 +37,27 @@ class KirsResearchCrawler:
         ) as client:
             await self._ensure_robots_allowed(client)
             reports: list[ReportMetadata] = []
+            cutoff = subtract_months(date.today(), self.settings.months)
 
+            # 목록은 최신순이라 수집 기간을 벗어난 페이지가 나오면 멈춘다. max_pages는 안전장치
             for page_number in range(1, self.settings.max_pages + 1):
                 url = self._page_url(page_number)
                 logger.info("목록 페이지 수집: %s", url)
                 response = await client.get(url)
                 response.raise_for_status()
-                reports.extend(self.parse_list_html(response.text, url))
+                page_reports = self.parse_list_html(response.text, url)
+                reports.extend(
+                    report for report in page_reports if self._published_on_or_after(report, cutoff)
+                )
+                if not page_reports or not self._published_on_or_after(page_reports[-1], cutoff):
+                    break
                 if page_number < self.settings.max_pages:
                     await asyncio.sleep(self.settings.request_delay_seconds)
+            else:
+                logger.warning(
+                    "MAX_PAGES(%s)에 도달해 수집 기간 일부를 받지 못했을 수 있습니다",
+                    self.settings.max_pages,
+                )
 
         return self._deduplicate_page_results(reports)
 
@@ -123,8 +135,15 @@ class KirsResearchCrawler:
         return pdf_link.get("data-no", "").strip() if pdf_link else ""
 
     @staticmethod
+    def _published_on_or_after(report: ReportMetadata, cutoff: date) -> bool:
+        published = parse_date(report.published_at)
+        # 날짜를 못 읽은 행은 버리지 않는다
+        return published is None or published >= cutoff
+
+    @staticmethod
     def _parse_company(value: str) -> tuple[str, str]:
-        match = re.match(r"^(.*?)\s*\(\s*(\d{6})\s*\)\s*$", value)
+        # 최근 상장 종목은 코드에 영문이 섞이기도 한다 (예: 0008Z0)
+        match = re.match(r"^(.*?)\s*\(\s*([0-9A-Z]{6})\s*\)\s*$", value)
         if not match:
             return value.strip(), ""
         return match.group(1).strip(), match.group(2)

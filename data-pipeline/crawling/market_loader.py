@@ -3,6 +3,7 @@
     python -m crawling.market_loader --master          # 종목 마스터 갱신, 최초 1회 T1 지정
     python -m crawling.market_loader --backfill        # T1 종목 3년치 적재
     python -m crawling.market_loader --daily           # 오늘(또는 --date) 하루치 적재
+    python -m crawling.market_loader --sectors         # WICS 섹터 분류 갱신 (주 1회)
 
 --all을 붙이면 T1/T2가 아니라 상장 전종목을 대상으로 한다.
 """
@@ -22,6 +23,7 @@ import psycopg
 
 from crawling.collectors import krx_collector as krx
 from crawling.collectors.disclosure_collector import DartDisclosureProvider
+from crawling.collectors.wics_collector import fetch_wics_classification
 from crawling.config.settings import SETTINGS
 from crawling.db.postgres import connect, upsert
 
@@ -32,6 +34,7 @@ CORE_COUNT = 100
 PRICE_COLUMNS = ("open", "high", "low", "close", "volume")
 SNAPSHOT_PRICE_COLUMNS = ("trading_value", "market_cap")
 PRICE_BATCH_TICKERS = 20
+WICS_LOOKBACK_DAYS = 3
 
 
 def refresh_companies(connection: psycopg.Connection, day: date) -> None:
@@ -111,6 +114,37 @@ def _assign_core(connection: psycopg.Connection, day: date) -> None:
         (core,),
     )
     logger.info("시가총액 상위 %s개 보통주를 T1 핵심 종목으로 지정", len(core))
+
+
+def refresh_sectors(connection: psycopg.Connection, day: date) -> None:
+    # 장중이나 장 마감 직후에는 WICS에 그날 자료가 없어 직전 거래일로 내려간다
+    candidates = krx.fetch_trading_days(day - timedelta(days=14), day)[::-1][:WICS_LOOKBACK_DAYS]
+    for day in candidates:
+        classification = fetch_wics_classification(day)
+        if classification:
+            break
+    else:
+        logger.warning("최근 %s거래일 WICS 자료가 없어 섹터를 갱신하지 않습니다", WICS_LOOKBACK_DAYS)
+        return
+
+    tickers = [ticker for (ticker,) in connection.execute("select ticker from companies where listed")]
+    # WICS는 보통주만 분류하므로 우선주는 보통주(끝자리 0) 분류를 따른다
+    rows = [
+        (*(classification.get(ticker) or classification.get(ticker[:-1] + "0") or (None, None)), ticker)
+        for ticker in tickers
+    ]
+    with connection.transaction(), connection.cursor() as cursor:
+        cursor.executemany(
+            "update companies set sector_l1 = %s, sector_l2 = %s, updated_at = now() where ticker = %s",
+            rows,
+        )
+    logger.info(
+        "WICS 섹터 갱신(%s): 분류 %s종목, 상장 %s종목 중 미분류 %s종목",
+        day,
+        len(classification),
+        len(rows),
+        sum(1 for row in rows if row[0] is None),
+    )
 
 
 def backfill(
@@ -267,6 +301,7 @@ def parse_args() -> argparse.Namespace:
     mode.add_argument("--master", action="store_true", help="종목 마스터 갱신")
     mode.add_argument("--backfill", action="store_true", help="과거 데이터 적재")
     mode.add_argument("--daily", action="store_true", help="하루치 적재")
+    mode.add_argument("--sectors", action="store_true", help="WICS 섹터 분류 갱신")
     parser.add_argument("--date", type=date.fromisoformat, default=None, help="기준일 YYYY-MM-DD")
     parser.add_argument("--years", type=int, default=3, help="과거 적재 기간(년)")
     parser.add_argument("--all", action="store_true", help="T1/T2가 아니라 상장 전종목 대상")
@@ -286,6 +321,8 @@ def main() -> None:
     with connect() as connection:
         if args.master:
             refresh_companies(connection, _latest_trading_day(day))
+        elif args.sectors:
+            refresh_sectors(connection, day)
         elif args.backfill:
             backfill(connection, args.years, args.all, args.force)
         else:

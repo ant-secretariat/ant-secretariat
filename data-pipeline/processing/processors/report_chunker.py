@@ -14,6 +14,9 @@ import re
 from collections import Counter
 from dataclasses import dataclass, field
 
+# 청킹 규칙을 바꾸면 올린다. 적재기가 이 값이 다른 리포트를 다시 자른다
+CHUNKER_VERSION = "2026-11-08"
+
 # 한국어 기준 대략 300~600토큰, 상한 약 1,000토큰에 맞춘 글자 수
 MIN_CHARS = 400
 MAX_CHARS = 1200

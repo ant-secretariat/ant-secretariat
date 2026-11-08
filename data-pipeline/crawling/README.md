@@ -230,6 +230,21 @@ python -m crawling.insider_holdings_loader --tickers 005930
 - DART는 날짜를 고르는 조회가 없고 최근 약 2년 치를 한 번에 주므로, 매번 전체를 받아 덮어쓴다
 - 접수일(`rcept_dt`) 기준으로 시점 조회한다. 임원 보고에는 주식 보상 같은 소액 변동도 들어 있다
 
+증권사 리포트 청크(`report_metadata`, `document_chunks`) 적재. 청커는 `processing/processors/report_chunker.py`:
+
+```bash
+python -m crawling.report_chunks_loader --backfill               # T1, 최근 3개월
+python -m crawling.report_chunks_loader --recent                 # T1, 최근 14일 (매일)
+python -m crawling.report_chunks_loader --backfill --rechunk     # 이미 자른 리포트도 다시 자름
+```
+
+- 네이버 리서치 목록을 `report_metadata`에 넣고, 아직 안 잘랐거나 실패했거나 청커 버전(`CHUNKER_VERSION`)이 바뀐 리포트만 PDF를 받아 자른다
+- PDF는 임시 폴더에 받아 자른 뒤 바로 지운다. 다시 자를 때는 그 리포트의 기존 청크를 지우고 새로 넣는다
+- `chunk_status`: `chunked` / `failed`(다음 실행 때 다시 시도) / `no_pdf`(PDF 주소 없음) / `no_text`(글자를 그림으로 그린 PDF라 OCR 없이는 못 읽음. 미래에셋증권 등)
+- 임베딩(`embedding`)은 비워 두고 나중에 채운다. 임베딩 입력(머리말 + 본문)은 저장하지 않고 그때 만든다
+- `mentioned_tickers`는 지금은 리포트 대상 종목 하나만 넣는다. 다른 종목 언급은 온톨로지 연결 단계에서 채운다
+- 청커가 PyMuPDF 레이아웃 모델로 표를 찾아서 리포트 1건에 약 10초 걸린다(모델을 끄면 7배 빠르지만 본문이 표로 잘못 잡힘)
+
 KIS 목표주가·투자의견(`broker_opinions`) 적재(`KIS_APP_KEY`, `KIS_APP_SECRET` 필요). 조회 API만 호출합니다:
 
 ```bash

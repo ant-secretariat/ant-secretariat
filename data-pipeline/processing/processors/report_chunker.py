@@ -15,7 +15,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 
 # 청킹 규칙을 바꾸면 올린다. 적재기가 이 값이 다른 리포트를 다시 자른다
-CHUNKER_VERSION = "2026-11-08"
+CHUNKER_VERSION = "2026-11-08.2"
 
 # 한국어 기준 대략 300~600토큰, 상한 약 1,000토큰에 맞춘 글자 수
 MIN_CHARS = 400
@@ -42,6 +42,8 @@ SENTENCE_LIKE = re.compile(r"(다|음|함|임|됨|전망|예상)[.\s]|[.!?]\s")
 PROSE_LINE_CHARS = 30
 # 숫자가 이 비율 이상인 글 조각은 표로 잡히지 않은 숫자 표(재무제표 등)로 본다
 NUMERIC_TEXT_RATIO = 0.35
+# 숫자가 많아도 문장이 이만큼 있으면 본문으로 둔다 (표지의 요약 문단 + 주가·재무 박스)
+PROSE_SENTENCES = 3
 PREFIX_TITLE_CHARS = 60
 DISCLAIMER_TITLE = "고지 사항"
 # 이보다 짧은 줄(사이드바 항목, 표 칸 등)은 다음 줄과 이어 붙이지 않는다
@@ -50,6 +52,22 @@ CONTINUATION_MIN_CHARS = 25
 NUMERIC_BLOCK_CHARS = 30
 NUMERIC_BLOCK_RATIO = 0.6
 NUMBERS_TITLE = "차트·소형 표 수치"
+# 쪽의 숫자 조각을 다 모아도 이보다 짧으면 버린다 (회사명·날짜·전화번호만 남은 조각)
+# 단, '매출액 31조 5,970억원'처럼 이름 붙은 값이 있으면 남긴다
+NUMBERS_MIN_CHARS = 60
+LABELED_VALUE = re.compile(r"[가-힣A-Za-z]{2,}[^\n]{0,12}?(?<![\d,.])\d[\d,.]*\s*(조|억|만|천|원|%|배|bp|달러)")
+TABLE_MIN_CHARS = 20
+# 표 제목은 표 바로 위의 짧은 글에서만 고른다. 문장·축 값·출처 줄·고지 문구는 제목이 아니다
+CAPTION_MAX_CHARS = 80
+CAPTION_SKIP = re.compile(r"^\s*(자료|출처|주\s*[:)\d]|source\b|note\b)", re.IGNORECASE)
+CAPTION_LEAD = re.compile(
+    r"^\s*[\[<【]?\s*(표|그림|도표|차트|figure|table|exhibit|fig\.)\s*\d|\((단위|십억원|억원|백만원|원|%)", re.IGNORECASE
+)
+# 짧은 섹션을 합치며 소제목을 이을 때의 상한
+TITLE_MAX_CHARS = 120
+# 한국어 문장 끝 (~다. ~음. ~임.)
+KOREAN_END = re.compile(r"(다|음|임|함|됨)\.$")
+KOREAN_SENTENCE = re.compile(r"(?<=[다음임함됨]\.)\s+")
 # 숫자 덩어리에서 이 거리(pt) 안에 있는 짧은 글은 차트 제목·범례·축 이름으로 보고 숫자 청크로 옮긴다
 CHART_LABEL_GAP = 15
 CHART_LABEL_CHARS = 40
@@ -127,7 +145,7 @@ def chunk_report(pdf_path: str, meta: ReportMeta) -> list[ReportChunk]:
             page_tables = [(table, rows) for table, rows in page_tables if not is_prose_box(rows)]
             table_boxes = [pymupdf.Rect(table.bbox) for table, _ in page_tables]
             for table, rows in page_tables:
-                tables.append((page.number + 1, _caption_above(page, pymupdf.Rect(table.bbox)), rows))
+                tables.append((page.number + 1, _caption_above(page, pymupdf.Rect(table.bbox), body_size), rows))
             blocks.extend(_page_blocks(page, body_size, repeated, table_boxes))
     finally:
         doc.close()
@@ -140,6 +158,8 @@ def chunk_report(pdf_path: str, meta: ReportMeta) -> list[ReportChunk]:
             numbers_by_page.setdefault(block.page, []).append(block.text)
     blocks = [block for block in blocks if not block.numeric]
     for page, values in numbers_by_page.items():
+        if len("".join(values)) < NUMBERS_MIN_CHARS and not LABELED_VALUE.search(" ".join(values)):
+            continue
         tables.append((page, NUMBERS_TITLE, [[value] for value in values], "text_only"))
 
     sections = _merge_tiny_sections(_sections(blocks, meta.title))
@@ -150,14 +170,20 @@ def chunk_report(pdf_path: str, meta: ReportMeta) -> list[ReportChunk]:
             text_pieces.append(["text", section.title, section_type, section.page_start, section.page_end, text, None])
     pieces = []
     for piece in _merge_short_pieces(text_pieces):
+        # 앞뒤와 합쳐지지 못한 짧은 제목 줄(표 바로 위 '추정 재무제표' 등)은 버린다
+        if len(piece[5]) < NUMBERS_MIN_CHARS and not _sentence_count(piece[5]):
+            continue
         # 표로 잡히지 않은 숫자 덩어리(재무제표 등)는 글로만 쓰는 표로 분류한다
-        if _numeric_ratio(piece[5]) >= NUMERIC_TEXT_RATIO:
+        if _numeric_ratio(piece[5]) >= NUMERIC_TEXT_RATIO and _sentence_count(piece[5]) < PROSE_SENTENCES:
             piece[0], piece[6] = "table", "text_only"
         pieces.append(tuple(piece))
     for page, caption, rows, *forced in tables:
         structure = forced[0] if forced else table_structure(rows)
         text = _table_text(rows, structure)
-        if not text.strip():
+        # 제목 줄만 잡힌 빈 표(머리글뿐인 재무제표 틀, '특이사항없음' 등)는 버린다
+        filled_rows = sum(1 for row in rows if any(cell not in (None, "") for cell in row))
+        content_chars = len(re.sub(r"[|\-\s]", "", text))
+        if content_chars < TABLE_MIN_CHARS or (filled_rows < 2 and content_chars < NUMBERS_MIN_CHARS):
             continue
         body = f"{caption}\n{text}".strip() if caption else text
         section_type = "disclaimer" if DISCLAIMER_PATTERNS.search(body) else "body"
@@ -394,7 +420,7 @@ def _merge_tiny_sections(sections: list[_Section]) -> list[_Section]:
     for section in sections:
         if pending is not None:
             section = _Section(
-                title=f"{pending.title} / {section.title}" if pending.title != section.title else section.title,
+                title=_join_titles(pending.title, section.title),
                 page_start=pending.page_start,
                 page_end=section.page_end,
                 paragraphs=pending.paragraphs + section.paragraphs,
@@ -461,8 +487,7 @@ def _merge_short_pieces(pieces: list[list]) -> list[list]:
             and len(previous[5]) < MIN_CHARS
             and len(previous[5]) + len(piece[5]) + 1 <= MAX_CHARS
         ):
-            if piece[1] != previous[1]:
-                previous[1] = f"{previous[1]} / {piece[1]}"
+            previous[1] = _join_titles(previous[1], piece[1])
             previous[4] = piece[4]
             previous[5] = f"{previous[5]}\n{piece[5]}"
         else:
@@ -470,12 +495,42 @@ def _merge_short_pieces(pieces: list[list]) -> list[list]:
     return merged
 
 
-def _caption_above(page, bbox, limit: float = 60) -> str:
+def _caption_above(page, bbox, body_size: float, limit: float = 60) -> str:
     lines = []
-    for x0, y0, x1, y1, text, *_ in page.get_text("blocks"):
-        if y1 <= bbox.y0 + 2 and bbox.y0 - y1 < limit and x1 > bbox.x0 - 10 and x0 < bbox.x1 + 10:
-            lines.append((y1, " ".join(text.split())))
-    return " / ".join(text for _, text in sorted(lines)[-2:] if text)
+    for block in page.get_text("dict")["blocks"]:
+        x0, y0, x1, y1 = block["bbox"]
+        if not (y1 <= bbox.y0 + 2 and bbox.y0 - y1 < limit and x1 > bbox.x0 - 10 and x0 < bbox.x1 + 10):
+            continue
+        spans = [span for line in block.get("lines", []) for span in line["spans"] if span["text"].strip()]
+        text = " ".join(" ".join(span["text"] for span in spans).split())
+        if spans and _is_caption(text, spans, body_size):
+            lines.append((y1, text))
+    return " / ".join(text for _, text in sorted(lines)[-2:])
+
+
+def _is_caption(text: str, spans: list[dict], body_size: float) -> bool:
+    if not text or len(text) > CAPTION_MAX_CHARS or re.search(r"[.!?]$|다\.?$", text):
+        return False
+    if CAPTION_SKIP.match(text) or DISCLAIMER_PATTERNS.search(text) or _numeric_ratio(text) >= NUMERIC_BLOCK_RATIO:
+        return False
+    # 표 위의 본문 줄 조각과 구분: 굵거나 크거나, 표·그림 번호나 단위 표기가 있어야 제목으로 본다
+    larger = max(span["size"] for span in spans) >= body_size * HEADING_SIZE_RATIO
+    bold = all(span["flags"] & BOLD_FLAG for span in spans)
+    return larger or bold or bool(CAPTION_LEAD.search(text))
+
+
+def _join_titles(first: str, second: str) -> str:
+    """짧은 섹션을 합칠 때 소제목을 잇는다. 너무 길어지면 앞 제목만 둔다."""
+    if second == first or second in first:
+        return first
+    if len(first) + len(second) + 3 > TITLE_MAX_CHARS:
+        return first
+    return f"{first} / {second}"
+
+
+def _sentence_count(text: str) -> int:
+    """'~다.'처럼 한국어 문장으로 끝나는 마디 수. 한 줄로 이어 쓴 재무표에는 거의 없다."""
+    return sum(1 for segment in KOREAN_SENTENCE.split(" ".join(text.split())) if KOREAN_END.search(segment))
 
 
 def _table_text(rows: list[list], structure: str) -> str:

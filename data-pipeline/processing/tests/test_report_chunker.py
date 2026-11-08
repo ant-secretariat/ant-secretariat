@@ -7,7 +7,10 @@ from processing.processors.report_chunker import (  # noqa: E402
     MIN_CHARS,
     ReportMeta,
     _Block,
+    _is_caption,
+    _join_titles,
     _sections,
+    _sentence_count,
     chunk_report,
     is_prose_box,
     normalize_text,
@@ -91,7 +94,8 @@ def test_chart_axis_numbers_leave_body(tmp_path):
     doc = pymupdf.open()
     page = doc.new_page()
     page.insert_text((40, 80), "헝가리 일회성 비용이 집중되는 4분기", fontname="korea", fontsize=16)
-    for index, value in enumerate(["50,000", "100,000", "150,000", "1M -22.5 1.6"]):
+    values = ["50,000", "100,000", "150,000", "200,000", "250,000", "300,000", "1M -22.5 1.6", "3M 4.8 -1.2"]
+    for index, value in enumerate(values):
         page.insert_text((400, 120 + index * 20), value, fontname="korea", fontsize=8)
     page.insert_text((470, 120), "주가차트", fontname="korea", fontsize=8)
     page.insert_textbox(pymupdf.Rect(40, 220, 560, 400), BODY * 4, fontname="korea", fontsize=10)
@@ -146,3 +150,56 @@ def test_line_break_keeps_real_word_space():
 
     assert glued[0].paragraphs == [long + " 순증은이보다 작다."]
     assert spaced[0].paragraphs == [long + " 순증은 이보다 작다."]
+
+
+def test_numeric_cover_summary_stays_text(tmp_path):
+    """표지의 요약 문단이 주가·재무 숫자와 한 조각이어도 문장이 여럿이면 본문이다."""
+    path = tmp_path / "cover.pdf"
+    doc = pymupdf.open()
+    page = doc.new_page()
+    summary = (
+        "목표주가 25만원을 유지한다. 3분기 영업이익은 5,301억원으로 13.9% 늘었다. "
+        "배당수익률은 4% 수준이다. 2026F 2027F 매출액 6,919 7,253 영업이익 1,508 1,624 "
+        "영업이익률 21.8 22.4 EPS 9,120 9,870 PER 12.1 11.2 PBR 1.4 1.3 ROE 11.5 11.9"
+    )
+    page.insert_textbox(pymupdf.Rect(40, 80, 560, 300), summary, fontname="korea", fontsize=10)
+    doc.save(str(path))
+    doc.close()
+
+    chunks = chunk_report(str(path), META)
+
+    summary_chunk = next(c for c in chunks if "목표주가 25만원" in c.body)
+    assert summary_chunk.chunk_type == "text"
+
+
+def test_sentence_count_ignores_flattened_tables():
+    assert _sentence_count("목표주가를 유지한다. 이익이 늘었다. 배당은 4%다.") == 3
+    assert _sentence_count("영업 실적 추이 및 전망 (십억원) 1Q25 2Q25 매출액 1,200 1,350") == 0
+
+
+def test_caption_rejects_axis_source_and_prose_lines():
+    plain = [{"size": 10, "flags": 0}]
+    bold = [{"size": 10, "flags": 16}]
+    assert _is_caption("표3. 실적 추정치 변경", plain, 10)
+    assert _is_caption("주요 투자지표 (단위: 십억원)", plain, 10)
+    assert _is_caption("ESG 최근 이슈", bold, 10)
+    assert not _is_caption("25.10 26.1 26.4 26.7 26.10", bold, 10)
+    assert not _is_caption("자료: 에프앤가이드 QuantiWise, 신한투자증권", bold, 10)
+    assert not _is_caption("원가 경쟁력과 스마트카 기술을 동시에 확보하는", plain, 10)
+    assert not _is_caption("목표주가를 유지한다.", bold, 10)
+
+
+def test_join_titles_caps_length():
+    assert _join_titles("A", "B") == "A / B"
+    assert _join_titles("A", "A") == "A"
+    assert _join_titles("가" * 100, "나" * 30) == "가" * 100
+
+
+def test_short_numbers_keep_only_labeled_values():
+    from processing.processors.report_chunker import LABELED_VALUE
+
+    assert LABELED_VALUE.search("[실적 요약] • 매출액 31조 5,970억원(+10.1%)")
+    assert LABELED_VALUE.search("SK텔레콤 (017670) 목표주가(12M) 140,000원")
+    assert not LABELED_VALUE.search("카카오 (035720)")
+    assert not LABELED_VALUE.search("2026년 11월 2일 기업 코멘트")
+    assert not LABELED_VALUE.search("이현욱 02-6915-5659 (원)")

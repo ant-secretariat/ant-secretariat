@@ -59,3 +59,18 @@ def test_text_chars_per_page_spots_pdfs_without_text(tmp_path):
 
     assert text_chars_per_page(str(blank)) < MIN_TEXT_CHARS_PER_PAGE
     assert text_chars_per_page(str(prose)) >= MIN_TEXT_CHARS_PER_PAGE
+
+
+def test_chunk_worker_survives_crashing_process():
+    import os
+
+    from crawling.report_chunks_loader import ChunkWorker
+
+    worker = ChunkWorker(timeout=60)
+    try:
+        assert worker.run(abs, -3) == 3
+        with pytest.raises(RuntimeError, match="프로세스가 죽음"):
+            worker.run(os._exit, 3)  # 세그폴트처럼 예외 없이 프로세스가 끝나는 경우
+        assert worker.run(abs, -5) == 5  # 새 프로세스로 다시 이어 간다
+    finally:
+        worker.close()

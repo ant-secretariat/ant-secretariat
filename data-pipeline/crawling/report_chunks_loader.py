@@ -16,6 +16,9 @@ import argparse
 import logging
 import sys
 import tempfile
+from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeout
+from concurrent.futures.process import BrokenProcessPool
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
@@ -38,6 +41,8 @@ BACKFILL_MONTHS = 3
 PROGRESS_EVERY = 20
 # 쪽당 글자가 이보다 적으면 글자를 그림으로 그린 PDF로 보고 자르지 않는다 (미래에셋증권 등)
 MIN_TEXT_CHARS_PER_PAGE = 200
+# 리포트 하나를 자르는 데 이보다 오래 걸리면 멈춘 것으로 보고 실패 처리한다
+CHUNK_TIMEOUT_SECONDS = 300
 METADATA_COLUMNS = [
     "ticker", "company", "title", "source", "broker", "published_at", "original_url", "pdf_url",
 ]
@@ -111,7 +116,49 @@ def pending(connection: psycopg.Connection, tickers: set[str], start: date, end:
         return cursor.execute(query, (list(tickers), start, end, rechunk, CHUNKER_VERSION)).fetchall()
 
 
-def chunk_one(connection: psycopg.Connection, downloader: PdfDownloader, report: dict, folder: Path) -> int:
+class ChunkWorker:
+    """PDF 자르기를 별도 프로세스에서 돌린다.
+
+    PyMuPDF가 일부 PDF에서 프로세스째 죽어서(세그폴트) 파이썬 예외로 잡을 수 없다.
+    따로 돌리면 그 리포트만 실패 처리하고 적재기는 계속 간다.
+    """
+
+    def __init__(self, timeout: float = CHUNK_TIMEOUT_SECONDS):
+        self.timeout = timeout
+        self._pool: ProcessPoolExecutor | None = None
+
+    def run(self, function, *args):
+        if self._pool is None:
+            self._pool = ProcessPoolExecutor(max_workers=1)
+        future = self._pool.submit(function, *args)
+        try:
+            return future.result(timeout=self.timeout)
+        except BrokenProcessPool:
+            self.close()
+            raise RuntimeError("PDF를 자르던 프로세스가 죽음 (PyMuPDF 오류)") from None
+        except FutureTimeout:
+            self.close()
+            raise RuntimeError(f"PDF 자르기가 {self.timeout:.0f}초 안에 끝나지 않음") from None
+
+    def close(self) -> None:
+        pool, self._pool = self._pool, None
+        if pool is None:
+            return
+        for process in list(getattr(pool, "_processes", {}).values()):
+            process.kill()
+        pool.shutdown(wait=False, cancel_futures=True)
+
+
+def split_pdf(pdf_path: str, meta: ReportMeta) -> tuple[bool, list[ReportChunk]]:
+    """(글자가 뽑히는지, 청크). ChunkWorker 프로세스 안에서 돈다."""
+    if text_chars_per_page(pdf_path) < MIN_TEXT_CHARS_PER_PAGE:
+        return False, []
+    return True, chunk_report(pdf_path, meta)
+
+
+def chunk_one(
+    connection: psycopg.Connection, downloader: PdfDownloader, worker: ChunkWorker, report: dict, folder: Path
+) -> int:
     pdf_path = folder / f"{report['report_id']}.pdf"
     try:
         result = downloader.download_to_temp(report["pdf_url"], pdf_path)
@@ -119,8 +166,8 @@ def chunk_one(connection: psycopg.Connection, downloader: PdfDownloader, report:
             doc_id=report["report_id"], ticker=report["ticker"], company=report["company"],
             broker=report["broker"], published_at=report["published_at"].isoformat(), title=report["title"],
         )
-        has_text = text_chars_per_page(result.temp_path) >= MIN_TEXT_CHARS_PER_PAGE
-        rows = chunk_rows(chunk_report(result.temp_path, meta), report) if has_text else []
+        has_text, chunks = worker.run(split_pdf, str(result.temp_path), meta)
+        rows = chunk_rows(chunks, report)
     finally:
         for leftover in folder.glob(f"{report['report_id']}*"):
             leftover.unlink(missing_ok=True)
@@ -159,11 +206,12 @@ def load(connection: psycopg.Connection, reports: list[dict]) -> int:
     failed = 0
     total = 0
     downloader = PdfDownloader(SETTINGS)
+    worker = ChunkWorker()
     try:
         with tempfile.TemporaryDirectory(prefix="report_pdf_") as folder:
             for position, report in enumerate(reports, start=1):
                 try:
-                    total += chunk_one(connection, downloader, report, Path(folder))
+                    total += chunk_one(connection, downloader, worker, report, Path(folder))
                 except Exception as exc:  # 다운로드·PDF 파손·적재 오류 모두 그 리포트만 실패 처리
                     if isinstance(exc, psycopg.OperationalError):
                         raise  # DB 연결이 끊기면 계속해도 소용없다
@@ -176,6 +224,7 @@ def load(connection: psycopg.Connection, reports: list[dict]) -> int:
                 if position % PROGRESS_EVERY == 0 or position == len(reports):
                     logger.info("진행 %s/%s, 누적 청크 %s개, 실패 %s건", position, len(reports), total, failed)
     finally:
+        worker.close()
         downloader.close()
     return failed
 

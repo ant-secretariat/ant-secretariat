@@ -323,12 +323,14 @@ result = get_report_metadata(
 
 ### get_target_price_data()
 
-목표주가 및 투자의견 조회. Supabase `broker_opinions_adjusted`(KIS 종목투자의견)를 읽으며 `SUPABASE_DB_URL`이 필요합니다.
+목표주가 및 투자의견 조회. Supabase `broker_opinions_adjusted`(KIS 종목투자의견)를 읽으며 `SUPABASE_DB_URL`이 필요합니다. 반환 형식은 API 계약서(`docs/api/openapi.yaml`)의 `TargetPriceData`를 따릅니다.
 
-- `target_price`: 액면분할을 환산한 값 (현재 수정주가와 같은 기준)
-- `investment_opinion`: 매수 / 중립 / 매도 또는 `null`(NotRated 등). 증권사 원래 표기는 `opinion_raw`
-- `report_id`, `title`, `report_type`, `original_url`, `pdf_url`: KIS 데이터는 리포트와 연결되지 않아 빈 문자열
-- `report_type`, `relational_db` 인자: 기존 호출과의 호환을 위해 받기만 하고 쓰지 않음
+- `records`: 계약서 필드 `hts_goal_prc`(목표가), `invt_opnn`(투자의견), `rgbf_invt_opnn`(직전 투자의견), `mbcr_name`(증권사)은 KIS 원래 값 그대로
+- `records` 추가 필드: `published_at`(발표일), `target_price_adjusted`(액면분할 환산 목표가), `opinion_norm`(매수 / 중립 / 매도 또는 `null`), `valid_from`(발표일), `superseded_at`(같은 증권사의 다음 발표일, 아직 없으면 `null`)
+- `consensus`: 증권사마다 가장 최근 의견 1건의 환산 목표가로 계산한 평균·최고·최저. 최근 의견에 목표가가 없는 증권사는 빼고, `broker_count`에 계산에 쓴 증권사 수를 담음
+- `as_of`: 주면 그날까지 발표된 의견만 쓰고, 그 뒤에 나온 의견은 `superseded_at`에도 드러내지 않음. 기본값은 오늘
+- `target_prices`, `summary`: 트렌드 리포트가 계약서 형식으로 옮겨 갈 때까지 함께 주는 이전 형식(`summary`는 기간 안 모든 의견의 환산 목표가 기준)
+- `relational_db` 인자: 기존 호출과의 호환을 위해 받기만 하고 쓰지 않음. `report_type` 인자는 계약서대로 삭제
 - 조회 실패 시 예외 대신 빈 결과와 `"error": "target_price_unavailable"`을 반환
 - 현재 T1/T2만 적재되어 있어 그 외 종목은 빈 결과
 
@@ -339,6 +341,7 @@ result = get_target_price_data(
     ticker="005930",
     date_from="2026-01-01",
     date_to="2026-06-21",
+    as_of="2026-06-21",
 )
 ```
 
@@ -346,6 +349,26 @@ result = get_target_price_data(
 {
   "ticker": "005930",
   "company": "삼성전자",
+  "records": [
+    {
+      "hts_goal_prc": 95000,
+      "invt_opnn": "BUY",
+      "rgbf_invt_opnn": "BUY",
+      "mbcr_name": "삼성",
+      "published_at": "2026-06-15",
+      "target_price_adjusted": 95000,
+      "opinion_norm": "매수",
+      "valid_from": "2026-06-15",
+      "superseded_at": null
+    }
+  ],
+  "consensus": {
+    "avg_target_price": 95000,
+    "max_target_price": 95000,
+    "min_target_price": 95000,
+    "broker_count": 1,
+    "basis": "증권사별 최신 1건"
+  },
   "target_prices": [
     {
       "report_id": "",

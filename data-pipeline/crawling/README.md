@@ -185,6 +185,17 @@ python -m crawling.macro_loader --backfill   # 2000년부터 전체 이력
 python -m crawling.macro_loader --daily      # 최근 구간(일별 45일, 월별 400일) 갱신
 ```
 
+DART 주요 재무계정(`financials`)과 파생 지표 뷰(`financial_metrics`: 부채비율, 영업이익률, 매출 성장률 YoY, ROE TTM) 적재:
+
+```bash
+python -m crawling.financials_loader --backfill   # 최근 3개 사업연도 + 올해
+python -m crawling.financials_loader --recent     # 작년·올해 다시 받기 (분기 공시 시즌에 주 1회)
+```
+
+- 손익 항목의 `amount`는 분기 단독(3개월), `amount_ytd`는 연초부터 누적. 4분기 단독은 연간 − 3분기 누적
+- 지표는 연결재무제표 우선, 없으면 별도. ROE는 지배주주 귀속분이 아닌 전체 당기순이익 기준
+- 은행·보험·증권은 DART 주요계정에 매출액이 없어 매출 관련 지표가 비고, 부채비율은 업종 특성상 1,000%를 넘는다
+
 WICS 섹터 분류(`companies.sector_l1` 대분류, `sector_l2` 중분류) 갱신. 분류는 자주 바뀌지 않아 주 1회면 충분합니다:
 
 ```bash

@@ -83,6 +83,43 @@ def test_roe_basis_explains_ttm(monkeypatch):
     assert "최근 4개 분기" in result["basis"]
 
 
+def test_flow_metric_sums_recent_trading_days(monkeypatch):
+    connection = _use(monkeypatch, FakeConnection((-1500000000000, date(2026, 11, 6), 20)))
+
+    result = get_metric("005930", "foreign_net_buy_20d", "2026-11-08")
+
+    assert (result["value"], result["unit"]) == (-1500000000000.0, "원")
+    assert result["basis"] == "최근 20거래일 합계"
+    assert result["as_of"] == "2026-11-06"
+    assert result["source"] == ["investor_flow_daily"]
+    assert connection.queries[0][1] == ("005930", "2026-11-08", 20)
+
+
+def test_flow_metric_notes_short_history(monkeypatch):
+    _use(monkeypatch, FakeConnection((2.123456, date(2026, 11, 6), 5)))
+
+    result = get_metric("005930", "short_volume_ratio_20d", "2026-11-08")
+
+    assert result["value"] == 2.1235
+    assert result["basis"] == "최근 20거래일 평균 (값이 있는 날 5일)"
+
+
+def test_flow_metric_without_rows_is_no_data(monkeypatch):
+    _use(monkeypatch, FakeConnection((None, None, 0)))
+
+    assert get_metric("999999", "inst_net_buy_20d", "2026-11-08")["reason"] == "no_data"
+
+
+def test_short_balance_skips_unpublished_days(monkeypatch):
+    connection = _use(monkeypatch, FakeConnection((0.11, date(2026, 11, 4))))
+
+    result = get_metric("005930", "short_balance_ratio", "2026-11-06")
+
+    assert (result["value"], result["as_of"]) == (0.11, "2026-11-04")
+    assert "offset" in connection.queries[0][0]
+    assert connection.queries[0][1] == ("005930", "005930", "2026-11-06", 2)
+
+
 def test_debt_ratio_is_not_applicable_for_financial_sector(monkeypatch):
     _use(monkeypatch, FakeConnection(("금융",)))
 

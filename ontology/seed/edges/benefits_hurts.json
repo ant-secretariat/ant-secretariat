@@ -1,0 +1,786 @@
+[
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_AI_MEMORY_DEMAND",
+    "from_type": "ISSUE",
+    "to_node": "000660",
+    "to_type": "COMPANY",
+    "strength": "high"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_AI_MEMORY_DEMAND",
+    "from_type": "ISSUE",
+    "to_node": "005930",
+    "to_type": "COMPANY",
+    "strength": "high"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_AI_MEMORY_DEMAND",
+    "from_type": "ISSUE",
+    "to_node": "042700",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_AI_MEMORY_DEMAND",
+    "from_type": "ISSUE",
+    "to_node": "402340",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_AI_MEMORY_DEMAND",
+    "from_type": "ISSUE",
+    "to_node": "SEC_IT",
+    "to_type": "SECTOR",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_MEMORY_PRICE_CYCLE",
+    "from_type": "ISSUE",
+    "to_node": "005930",
+    "to_type": "COMPANY",
+    "strength": "high"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_MEMORY_PRICE_CYCLE",
+    "from_type": "ISSUE",
+    "to_node": "000660",
+    "to_type": "COMPANY",
+    "strength": "high"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_MEMORY_PRICE_CYCLE",
+    "from_type": "ISSUE",
+    "to_node": "402340",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "HURTS",
+    "from_node": "ISS_SEMI_EXPORT_CONTROL",
+    "from_type": "ISSUE",
+    "to_node": "005930",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "HURTS",
+    "from_node": "ISS_SEMI_EXPORT_CONTROL",
+    "from_type": "ISSUE",
+    "to_node": "000660",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "HURTS",
+    "from_node": "ISS_FOUNDRY_COMPETITION",
+    "from_type": "ISSUE",
+    "to_node": "005930",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_AI_POWER_INFRA",
+    "from_type": "ISSUE",
+    "to_node": "267260",
+    "to_type": "COMPANY",
+    "strength": "high"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_AI_POWER_INFRA",
+    "from_type": "ISSUE",
+    "to_node": "298040",
+    "to_type": "COMPANY",
+    "strength": "high"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_AI_POWER_INFRA",
+    "from_type": "ISSUE",
+    "to_node": "010120",
+    "to_type": "COMPANY",
+    "strength": "high"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_AI_POWER_INFRA",
+    "from_type": "ISSUE",
+    "to_node": "062040",
+    "to_type": "COMPANY",
+    "strength": "high"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_AI_POWER_INFRA",
+    "from_type": "ISSUE",
+    "to_node": "000500",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_AI_POWER_INFRA",
+    "from_type": "ISSUE",
+    "to_node": "034020",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_AI_POWER_INFRA",
+    "from_type": "ISSUE",
+    "to_node": "006260",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_AI_PCB_DEMAND",
+    "from_type": "ISSUE",
+    "to_node": "007660",
+    "to_type": "COMPANY",
+    "strength": "high"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_AI_PCB_DEMAND",
+    "from_type": "ISSUE",
+    "to_node": "353200",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_AI_PCB_DEMAND",
+    "from_type": "ISSUE",
+    "to_node": "009150",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_AI_PCB_DEMAND",
+    "from_type": "ISSUE",
+    "to_node": "011070",
+    "to_type": "COMPANY",
+    "strength": "low"
+  },
+  {
+    "edge_type": "HURTS",
+    "from_node": "ISS_AUTO_US_TARIFF",
+    "from_type": "ISSUE",
+    "to_node": "005380",
+    "to_type": "COMPANY",
+    "strength": "high"
+  },
+  {
+    "edge_type": "HURTS",
+    "from_node": "ISS_AUTO_US_TARIFF",
+    "from_type": "ISSUE",
+    "to_node": "000270",
+    "to_type": "COMPANY",
+    "strength": "high"
+  },
+  {
+    "edge_type": "HURTS",
+    "from_node": "ISS_AUTO_US_TARIFF",
+    "from_type": "ISSUE",
+    "to_node": "012330",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "HURTS",
+    "from_node": "ISS_AUTO_US_TARIFF",
+    "from_type": "ISSUE",
+    "to_node": "161390",
+    "to_type": "COMPANY",
+    "strength": "low"
+  },
+  {
+    "edge_type": "HURTS",
+    "from_node": "ISS_AUTO_US_TARIFF",
+    "from_type": "ISSUE",
+    "to_node": "086280",
+    "to_type": "COMPANY",
+    "strength": "low"
+  },
+  {
+    "edge_type": "HURTS",
+    "from_node": "ISS_EV_DEMAND_SLOWDOWN",
+    "from_type": "ISSUE",
+    "to_node": "373220",
+    "to_type": "COMPANY",
+    "strength": "high"
+  },
+  {
+    "edge_type": "HURTS",
+    "from_node": "ISS_EV_DEMAND_SLOWDOWN",
+    "from_type": "ISSUE",
+    "to_node": "006400",
+    "to_type": "COMPANY",
+    "strength": "high"
+  },
+  {
+    "edge_type": "HURTS",
+    "from_node": "ISS_EV_DEMAND_SLOWDOWN",
+    "from_type": "ISSUE",
+    "to_node": "003670",
+    "to_type": "COMPANY",
+    "strength": "high"
+  },
+  {
+    "edge_type": "HURTS",
+    "from_node": "ISS_EV_DEMAND_SLOWDOWN",
+    "from_type": "ISSUE",
+    "to_node": "005380",
+    "to_type": "COMPANY",
+    "strength": "low"
+  },
+  {
+    "edge_type": "HURTS",
+    "from_node": "ISS_BATTERY_CHINA_COMPETITION",
+    "from_type": "ISSUE",
+    "to_node": "373220",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "HURTS",
+    "from_node": "ISS_BATTERY_CHINA_COMPETITION",
+    "from_type": "ISSUE",
+    "to_node": "006400",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "HURTS",
+    "from_node": "ISS_BATTERY_CHINA_COMPETITION",
+    "from_type": "ISSUE",
+    "to_node": "003670",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_ESS_DEMAND",
+    "from_type": "ISSUE",
+    "to_node": "373220",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_ESS_DEMAND",
+    "from_type": "ISSUE",
+    "to_node": "006400",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_SHIPBUILDING_UPCYCLE",
+    "from_type": "ISSUE",
+    "to_node": "329180",
+    "to_type": "COMPANY",
+    "strength": "high"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_SHIPBUILDING_UPCYCLE",
+    "from_type": "ISSUE",
+    "to_node": "009540",
+    "to_type": "COMPANY",
+    "strength": "high"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_SHIPBUILDING_UPCYCLE",
+    "from_type": "ISSUE",
+    "to_node": "042660",
+    "to_type": "COMPANY",
+    "strength": "high"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_SHIPBUILDING_UPCYCLE",
+    "from_type": "ISSUE",
+    "to_node": "010140",
+    "to_type": "COMPANY",
+    "strength": "high"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_SHIPBUILDING_UPCYCLE",
+    "from_type": "ISSUE",
+    "to_node": "443060",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_US_SHIPBUILDING_COOP",
+    "from_type": "ISSUE",
+    "to_node": "042660",
+    "to_type": "COMPANY",
+    "strength": "high"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_US_SHIPBUILDING_COOP",
+    "from_type": "ISSUE",
+    "to_node": "329180",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_US_SHIPBUILDING_COOP",
+    "from_type": "ISSUE",
+    "to_node": "009540",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_DEFENSE_EXPORT",
+    "from_type": "ISSUE",
+    "to_node": "012450",
+    "to_type": "COMPANY",
+    "strength": "high"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_DEFENSE_EXPORT",
+    "from_type": "ISSUE",
+    "to_node": "064350",
+    "to_type": "COMPANY",
+    "strength": "high"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_DEFENSE_EXPORT",
+    "from_type": "ISSUE",
+    "to_node": "079550",
+    "to_type": "COMPANY",
+    "strength": "high"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_DEFENSE_EXPORT",
+    "from_type": "ISSUE",
+    "to_node": "047810",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_DEFENSE_EXPORT",
+    "from_type": "ISSUE",
+    "to_node": "272210",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_NUCLEAR_EXPORT",
+    "from_type": "ISSUE",
+    "to_node": "034020",
+    "to_type": "COMPANY",
+    "strength": "high"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_NUCLEAR_EXPORT",
+    "from_type": "ISSUE",
+    "to_node": "000720",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_NUCLEAR_EXPORT",
+    "from_type": "ISSUE",
+    "to_node": "015760",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "HURTS",
+    "from_node": "ISS_RATE_CUT_NIM",
+    "from_type": "ISSUE",
+    "to_node": "SEC_FIN",
+    "to_type": "SECTOR",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "HURTS",
+    "from_node": "ISS_RATE_CUT_NIM",
+    "from_type": "ISSUE",
+    "to_node": "105560",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "HURTS",
+    "from_node": "ISS_RATE_CUT_NIM",
+    "from_type": "ISSUE",
+    "to_node": "055550",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "HURTS",
+    "from_node": "ISS_RATE_CUT_NIM",
+    "from_type": "ISSUE",
+    "to_node": "086790",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "HURTS",
+    "from_node": "ISS_RATE_CUT_NIM",
+    "from_type": "ISSUE",
+    "to_node": "316140",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "HURTS",
+    "from_node": "ISS_RATE_CUT_NIM",
+    "from_type": "ISSUE",
+    "to_node": "024110",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "HURTS",
+    "from_node": "ISS_PF_CREDIT_RISK",
+    "from_type": "ISSUE",
+    "to_node": "000720",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "HURTS",
+    "from_node": "ISS_PF_CREDIT_RISK",
+    "from_type": "ISSUE",
+    "to_node": "047040",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "HURTS",
+    "from_node": "ISS_PF_CREDIT_RISK",
+    "from_type": "ISSUE",
+    "to_node": "028050",
+    "to_type": "COMPANY",
+    "strength": "low"
+  },
+  {
+    "edge_type": "HURTS",
+    "from_node": "ISS_PF_CREDIT_RISK",
+    "from_type": "ISSUE",
+    "to_node": "SEC_FIN",
+    "to_type": "SECTOR",
+    "strength": "low"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_TRADING_VOLUME_BOOM",
+    "from_type": "ISSUE",
+    "to_node": "006800",
+    "to_type": "COMPANY",
+    "strength": "high"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_TRADING_VOLUME_BOOM",
+    "from_type": "ISSUE",
+    "to_node": "039490",
+    "to_type": "COMPANY",
+    "strength": "high"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_TRADING_VOLUME_BOOM",
+    "from_type": "ISSUE",
+    "to_node": "005940",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_TRADING_VOLUME_BOOM",
+    "from_type": "ISSUE",
+    "to_node": "016360",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_TRADING_VOLUME_BOOM",
+    "from_type": "ISSUE",
+    "to_node": "071050",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_VALUEUP_POLICY",
+    "from_type": "ISSUE",
+    "to_node": "SEC_FIN",
+    "to_type": "SECTOR",
+    "strength": "high"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_VALUEUP_POLICY",
+    "from_type": "ISSUE",
+    "to_node": "105560",
+    "to_type": "COMPANY",
+    "strength": "high"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_VALUEUP_POLICY",
+    "from_type": "ISSUE",
+    "to_node": "055550",
+    "to_type": "COMPANY",
+    "strength": "high"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_VALUEUP_POLICY",
+    "from_type": "ISSUE",
+    "to_node": "086790",
+    "to_type": "COMPANY",
+    "strength": "high"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_VALUEUP_POLICY",
+    "from_type": "ISSUE",
+    "to_node": "138040",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_VALUEUP_POLICY",
+    "from_type": "ISSUE",
+    "to_node": "033780",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_VALUEUP_POLICY",
+    "from_type": "ISSUE",
+    "to_node": "000810",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_GOVERNANCE_REFORM",
+    "from_type": "ISSUE",
+    "to_node": "034730",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_GOVERNANCE_REFORM",
+    "from_type": "ISSUE",
+    "to_node": "003550",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_GOVERNANCE_REFORM",
+    "from_type": "ISSUE",
+    "to_node": "000880",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_GOVERNANCE_REFORM",
+    "from_type": "ISSUE",
+    "to_node": "402340",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_GOVERNANCE_REFORM",
+    "from_type": "ISSUE",
+    "to_node": "028260",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_GOVERNANCE_REFORM",
+    "from_type": "ISSUE",
+    "to_node": "267250",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "HURTS",
+    "from_node": "ISS_CHINA_CHEM_OVERCAPACITY",
+    "from_type": "ISSUE",
+    "to_node": "051910",
+    "to_type": "COMPANY",
+    "strength": "high"
+  },
+  {
+    "edge_type": "HURTS",
+    "from_node": "ISS_CHINA_CHEM_OVERCAPACITY",
+    "from_type": "ISSUE",
+    "to_node": "009830",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "HURTS",
+    "from_node": "ISS_CHINA_CHEM_OVERCAPACITY",
+    "from_type": "ISSUE",
+    "to_node": "096770",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "HURTS",
+    "from_node": "ISS_CHINA_CHEM_OVERCAPACITY",
+    "from_type": "ISSUE",
+    "to_node": "SEC_MATERIAL",
+    "to_type": "SECTOR",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "HURTS",
+    "from_node": "ISS_PLATFORM_REGULATION",
+    "from_type": "ISSUE",
+    "to_node": "035420",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "HURTS",
+    "from_node": "ISS_PLATFORM_REGULATION",
+    "from_type": "ISSUE",
+    "to_node": "035720",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "HURTS",
+    "from_node": "ISS_PLATFORM_REGULATION",
+    "from_type": "ISSUE",
+    "to_node": "323410",
+    "to_type": "COMPANY",
+    "strength": "low"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_KBEAUTY_EXPORT",
+    "from_type": "ISSUE",
+    "to_node": "278470",
+    "to_type": "COMPANY",
+    "strength": "high"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_KBEAUTY_EXPORT",
+    "from_type": "ISSUE",
+    "to_node": "090430",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_KFOOD_EXPORT",
+    "from_type": "ISSUE",
+    "to_node": "003230",
+    "to_type": "COMPANY",
+    "strength": "high"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_BIO_CDMO_DEMAND",
+    "from_type": "ISSUE",
+    "to_node": "207940",
+    "to_type": "COMPANY",
+    "strength": "high"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_BIO_CDMO_DEMAND",
+    "from_type": "ISSUE",
+    "to_node": "068270",
+    "to_type": "COMPANY",
+    "strength": "high"
+  },
+  {
+    "edge_type": "BENEFITS",
+    "from_node": "ISS_BIO_CDMO_DEMAND",
+    "from_type": "ISSUE",
+    "to_node": "0126Z0",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "HURTS",
+    "from_node": "ISS_PHARMA_US_TARIFF",
+    "from_type": "ISSUE",
+    "to_node": "068270",
+    "to_type": "COMPANY",
+    "strength": "mid"
+  },
+  {
+    "edge_type": "HURTS",
+    "from_node": "ISS_PHARMA_US_TARIFF",
+    "from_type": "ISSUE",
+    "to_node": "207940",
+    "to_type": "COMPANY",
+    "strength": "low"
+  },
+  {
+    "edge_type": "HURTS",
+    "from_node": "ISS_PHARMA_US_TARIFF",
+    "from_type": "ISSUE",
+    "to_node": "326030",
+    "to_type": "COMPANY",
+    "strength": "low"
+  },
+  {
+    "edge_type": "HURTS",
+    "from_node": "ISS_FREIGHT_NORMALIZATION",
+    "from_type": "ISSUE",
+    "to_node": "011200",
+    "to_type": "COMPANY",
+    "strength": "high"
+  },
+  {
+    "edge_type": "HURTS",
+    "from_node": "ISS_FREIGHT_NORMALIZATION",
+    "from_type": "ISSUE",
+    "to_node": "086280",
+    "to_type": "COMPANY",
+    "strength": "low"
+  }
+]

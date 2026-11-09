@@ -160,7 +160,7 @@ def test_three_companies_raise():
 
 
 def test_result_carries_dictionary_version():
-    assert run("").dictionary_version == "kw-0.1.0+ds-0.1.0-stub"
+    assert run("").dictionary_version == "kw-0.2.0+ds-0.1.0-stub"
 
 
 def test_flow_net_buy_is_not_investment_advice():
@@ -173,3 +173,19 @@ def test_explicit_buy_question_is_advice():
 
 def test_vague_request_words_alone_do_not_pass_scope_gate():
     assert run("점심 메뉴 알려줘").reject_reason == ReasonCode.out_of_scope_topic
+
+
+# ── 범위 밖 단어 (kw-0.2.0) ──────────────────────────────
+def test_out_of_scope_word_overrides_generic_keyword():
+    r = run("내일 서울 날씨 어때")  # "어때"는 일반 분석 표현이지만 "날씨"가 이긴다
+    assert r.reject_reason == ReasonCode.out_of_scope_topic
+
+
+def test_out_of_scope_word_overrides_agenda_keyword():
+    assert run("금리 낮은 적금 상품 추천해줘").reject_reason == ReasonCode.out_of_scope_topic
+
+
+def test_stock_price_and_holding_questions_pass_scope_gate():
+    assert run("삼성전자 주가가 왜 떨어졌어?").verdict == "full"
+    r = run("삼성전자 계속 들고 있어도 돼?")
+    assert r.verdict == "full" and r.flags == ["investment_advice_request"]

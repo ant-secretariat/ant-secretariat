@@ -160,7 +160,7 @@ def test_three_companies_raise():
 
 
 def test_result_carries_dictionary_version():
-    assert run("").dictionary_version == "kw-0.2.0+ds-0.1.0-stub"
+    assert run("").dictionary_version == "kw-0.3.0+ds-0.1.0-stub"
 
 
 def test_flow_net_buy_is_not_investment_advice():
@@ -188,4 +188,27 @@ def test_out_of_scope_word_overrides_agenda_keyword():
 def test_stock_price_and_holding_questions_pass_scope_gate():
     assert run("삼성전자 주가가 왜 떨어졌어?").verdict == "full"
     r = run("삼성전자 계속 들고 있어도 돼?")
+    assert r.verdict == "full" and r.flags == ["investment_advice_request"]
+
+
+# ── 약한 신호는 종목명이 있어야 통과 (kw-0.3.0) ───────────────
+def test_weak_signal_without_company_name_is_rejected():
+    assert run("고양이 사료 추천해줘").reject_reason == ReasonCode.out_of_scope_topic
+
+
+def test_weak_signal_with_company_name_passes_with_advice_flag():
+    r = run("삼성전자 추천해줘")
+    assert r.verdict == "full" and r.flags == ["investment_advice_request"]
+
+
+def test_generic_word_without_company_name_is_rejected():
+    assert run("내 연봉 전망 어때?").reject_reason == ReasonCode.out_of_scope_topic
+
+
+def test_company_name_is_matched_for_either_compared_company():
+    assert run("SK하이닉스 어때", companies=(SAMSUNG, HYNIX)).verdict == "full"
+
+
+def test_strong_trade_phrase_passes_without_company_name():
+    r = run("지금 팔아야 돼?")
     assert r.verdict == "full" and r.flags == ["investment_advice_request"]

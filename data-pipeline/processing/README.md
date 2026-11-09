@@ -483,12 +483,10 @@ result = get_price_data(
 
 금리, 환율, CPI 등 매크로 숫자 데이터 조회. Supabase `macro_data`(ECOS)를 읽습니다(`SUPABASE_DB_URL` 필요).
 
-- 지표: `BASE_RATE_KR`, `KTB_3Y_KR`, `KTB_10Y_KR`, `USD_KRW`(일별), `CPI_KR`, `IPI_KR`, `EXPORTS_KR`, `IMPORTS_KR`, `TRADE_BALANCE_KR`(월별, KR), `BRENT`, `WTI`, `DUBAI`(월별, `country='GLOBAL'`)
+- 지표: `BASE_RATE_KR`, `KTB_3Y_KR`, `KTB_10Y_KR`, `USD_KRW`(일별), `CPI_KR`, `IPI_KR`, `EXPORTS_KR`, `IMPORTS_KR`, `TRADE_BALANCE_KR`, `DRAM_EXPORT_PRICE`(D램 수출물가지수, 달러기준)(월별, KR), `BRENT`, `WTI`, `DUBAI`(월별, `country='GLOBAL'`)
 - `indicators` 없이 부르면 `country`(기본 `KR`) 지표만, `indicators`를 주면 국가와 상관없이 그 지표를 줌
 - 월간 지표의 `date`는 해당 월 1일이고 발표일은 따로 두지 않음. `as_of`를 주면 그날까지의 값만
 - `relational_db` 인자는 기존 호출 호환용으로 받기만 함. 조회 실패 시 빈 결과와 `"error": "macro_unavailable"`
-
-- Supabase `macro_data`에는 D램 수출물가지수 `DRAM_EXPORT_PRICE`(한국은행 수출물가지수 D램, 달러기준, 월별)도 있음
 
 ```python
 from processing.functions.get_macro_data import get_macro_data

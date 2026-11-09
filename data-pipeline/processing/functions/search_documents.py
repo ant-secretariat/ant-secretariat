@@ -32,7 +32,7 @@ def search_documents(
     """문서 조각 검색. 반환 형식은 {"query", "ticker", "results": [...]}로 기존과 같다.
 
     - vector_db를 넘기면 예전 Pinecone 검색을 그대로 쓴다(호출부가 바꿀 때까지 결과가 말없이 바뀌지 않게)
-    - 넘기지 않으면 Supabase document_chunks를 검색한다. mode는 bm25(기본) / vector / hybrid
+    - 넘기지 않으면 Supabase document_chunks를 검색한다. mode는 hybrid(기본) / bm25 / vector
     - report_type은 계약서 인자라 받지만, 지금 청크에는 리포트 유형이 없어 거르지 않는다
     - as_of를 넘기면 그날까지 게시된 문서만, 면책 문구는 include_disclaimer=True일 때만 포함
     """

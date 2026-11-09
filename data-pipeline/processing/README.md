@@ -229,7 +229,7 @@ result = search_documents(
     broker=None,                 # 증권사로 거르기
     include_disclaimer=False,    # 면책 문구는 기본 제외
     top_k=5,
-    mode="bm25",                 # bm25(기본) / vector / hybrid
+    mode="hybrid",               # hybrid(기본) / bm25 / vector
 )
 # → {"query", "ticker", "mode", "results": [{chunk_id, report_id, ticker, company, date, source,
 #    author_org, document_type, title, page_start, page_end, content, score, url,
@@ -240,7 +240,7 @@ result = search_documents(
 - **bm25**: 질문과 청크를 같은 Kiwi 규칙(`processing/search/korean_tokens.py`)으로 잘라 BM25(k1=1.2, b=0.75)로 점수. 외부 API 없음. 청크 색인은 `search_tokens`(적재기가 채움, 처음 한 번은 `python -m crawling.chunk_indexer`)
 - **vector**: 질문을 `solar-embedding-2-query`로 임베딩해 코사인 유사도 순. 같은 질문은 한 번만 임베딩
 - **hybrid**: 두 방식 상위 50개를 RRF(k=60)로 합침. 질문 임베딩이 실패하면 BM25로 대신하고 `mode`에 실제 쓴 방식을 남김
-- 기본값이 BM25인 이유: 기획서 v2 6절대로 골든셋으로 비교한 뒤 하이브리드를 기본으로 할지 정한다
+- 기본값은 하이브리드: 골든셋 30문항 비교(2026-11-09)에서 nDCG@10 BM25 0.51 / 의미 0.52 / 하이브리드 0.59, Hit@10 0.90 / 0.90 / 0.97. 의미 검색까지 쓰려면 호출하는 환경에 `UPSTAGE_API_KEY`가 필요하고, 없으면 BM25로 대신한다
 - `report_type`은 계약서 인자라 받지만 지금 청크에 리포트 유형이 없어 거르지 않는다
 - 조회 실패 시 예외 대신 빈 `results`와 `reason: "search_unavailable"`
 

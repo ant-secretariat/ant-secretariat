@@ -4,7 +4,7 @@
 1. 필터 먼저: 활성 청크, 종목, 기간(as_of 포함), 문서 종류, 면책 제외를 먼저 걸고 그 안에서만 점수를 낸다
 2. BM25가 기준선: 질문을 청크와 같은 Kiwi 규칙으로 잘라 BM25로 점수를 낸다(외부 API 없음)
 3. 의미 검색: 질문을 solar-embedding-2-query로 임베딩해 코사인 거리로 정렬(필터 뒤 정확 계산)
-4. 하이브리드: 두 순위를 RRF로 합친다. 기본값으로 쓸지는 골든셋 비교 뒤에 정한다
+4. 하이브리드(기본값): 두 순위를 RRF로 합친다. 골든셋 30문항(2026-11-09)에서 세 방식 중 가장 좋았다
 """
 
 from __future__ import annotations
@@ -22,8 +22,10 @@ from processing.search.korean_tokens import terms
 logger = logging.getLogger(__name__)
 
 MODES = ("bm25", "vector", "hybrid")
-# 골든셋 비교 전까지는 기획서대로 BM25가 기본값
-DEFAULT_MODE = "bm25"
+# 골든셋 30문항 비교(2026-11-09) 결과 하이브리드가 가장 좋아 기본값으로 쓴다
+# (nDCG@10 BM25 0.51 / 의미 0.52 / 하이브리드 0.59, Hit@10 0.90 / 0.90 / 0.97)
+# 질문 임베딩이 실패하면 BM25로 대신한다
+DEFAULT_MODE = "hybrid"
 QUERY_MODEL = "solar-embedding-2-query"
 UPSTAGE_BASE_URL = "https://api.upstage.ai/v1"
 DIMENSION = 1024

@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import html
 import logging
+import re
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 
@@ -151,10 +152,27 @@ class NaverNewsProvider:
         return _extract_article_text(response.text)
 
 
+# 종목명 바로 뒤에 붙어도 같은 회사로 보는 조사·기호 ("카카오가", "LG는"). 그 밖의 글자가 붙으면 다른 회사 ("LG전자", "카카오뱅크")
+_PARTICLES = ("은", "는", "이", "가", "을", "를", "의", "에", "와", "과", "도", "로", "으로", "만", "측", "보다", "까지")
+
+
 def mentions_company(text: str, names: list[str]) -> bool:
-    """띄어쓰기를 무시하고 종목명(또는 별칭)이 들어 있는지. 'SK 하이닉스'도 'SK하이닉스'로 본다."""
-    compact = "".join(text.split()).lower()
-    return any(name and "".join(name.split()).lower() in compact for name in names)
+    """종목명(또는 별칭)이 다른 회사 이름의 일부가 아닌 형태로 들어 있는지. 이름 안의 띄어쓰기는 무시한다("SK 하이닉스")."""
+    lowered = (text or "").lower()
+    for name in names:
+        chars = [char for char in (name or "").lower() if not char.isspace()]
+        if not chars:
+            continue
+        for match in re.finditer(r"\s*".join(map(re.escape, chars)), lowered):
+            before = lowered[match.start() - 1] if match.start() else ""
+            after = lowered[match.end():]
+            if not _is_word_char(before) and (not after or not _is_word_char(after[0]) or after.startswith(_PARTICLES)):
+                return True
+    return False
+
+
+def _is_word_char(char: str) -> bool:
+    return bool(char) and (char.isalnum() or "가" <= char <= "힣" or char == "&")
 
 
 def _title_key(title: str) -> str:

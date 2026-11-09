@@ -248,6 +248,21 @@ python -m crawling.report_chunks_loader --backfill --rechunk     # 이미 자른
 - PDF 자르기는 별도 프로세스에서 돈다. PyMuPDF가 죽거나 5분을 넘기면 그 리포트만 `failed`로 남기고 이어 간다
 - 청커가 PyMuPDF 레이아웃 모델로 표를 찾아서 리포트 1건에 약 10초 걸린다(모델을 끄면 7배 빠르지만 본문이 표로 잘못 잡힘)
 
+뉴스 청크 적재 (`news_metadata`, `document_chunks` document_type='news'):
+
+```bash
+python -m crawling.news_chunks_loader                  # 최근 3일, 매일 실행
+python -m crawling.news_chunks_loader --days 90 --embed # 첫 적재 + 임베딩
+python -m crawling.news_chunks_loader --tickers 005930 --limit 30
+```
+
+- 네이버 **API HUB** 뉴스 검색만 쓴다(`naverapihub.apigw.ntruss.com/search/v1/news`, 헤더 `X-NCP-APIGW-API-KEY-ID/KEY`). 키는 NCP 콘솔 > NAVER API HUB > Application > 인증 정보의 Client ID/Secret(`NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET`). NCP 계정 Access Key(`ncp_iam_…`)는 안 된다
+- API가 검색어당 최신 1,100건까지만 줘서 과거 뉴스는 나중에 받을 수 없다. 대형주는 하루치도 다 안 받힌다 → 매일(가능하면 하루 여러 번) 돌려 쌓는다
+- 제목에 종목명이 있고(다른 회사 이름의 일부가 아닌 형태, 조사는 허용) 허용 언론사(`PRESS_ALLOWLIST`: 주요 일간지·경제지·통신사·방송 + 업종 전문지)인 기사만 남긴다. 기사에서 쓰는 이름이 다른 종목은 `NEWS_NAMES`(네이버, 에쓰오일, 기아차 등)
+- 같은 기사가 여러 종목에 걸리면 한 행으로 두고 `mentioned_tickers`에 모은다
+- 본문은 원문 페이지에서 받고(시험 48건 중 85% 성공, 평균 약 1,700자), 못 받으면 검색 API 요약문을 쓴다(`extraction_method='summary'`)
+- 90일(`--expire-days`)보다 오래된 뉴스 청크는 `is_active=false`(행과 임베딩은 남김)
+
 청크 임베딩과 BM25 색인:
 
 ```bash

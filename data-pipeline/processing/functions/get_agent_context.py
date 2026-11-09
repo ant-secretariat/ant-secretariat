@@ -13,10 +13,10 @@ def get_agent_context(
     embedding_model: BaseEmbeddingModel = None,
     vector_db: BaseVectorDB = None,
 ) -> dict:
+    """에이전트별 데이터 묶음. 시세·매크로·목표주가는 모두 Supabase에서 읽는다.
 
-    if relational_db is None:
-        raise ValueError("relational_db는 필수입니다.")
-
+    relational_db 인자는 기존 호출을 깨지 않으려고 받기만 한다(없어도 된다).
+    """
     from processing.functions.get_target_price_data import get_target_price_data
     from processing.functions.get_price_data import get_price_data
     from processing.functions.get_macro_data import get_macro_data

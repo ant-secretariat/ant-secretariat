@@ -243,6 +243,8 @@ python -m crawling.report_chunks_loader --backfill --rechunk     # 이미 자른
 - `chunk_status`: `chunked` / `failed`(다음 실행 때 다시 시도) / `no_pdf`(PDF 주소 없음) / `no_text`(글자를 그림으로 그린 PDF라 OCR 없이는 못 읽음. 미래에셋증권 등)
 - 임베딩(`embedding`)은 비워 두고 나중에 채운다. 임베딩 입력(머리말 + 본문)은 저장하지 않고 그때 만든다
 - `mentioned_tickers`는 지금은 리포트 대상 종목 하나만 넣는다. 다른 종목 언급은 온톨로지 연결 단계에서 채운다
+- 다시 자를 때 본문이 같은 청크는 그대로 두어 임베딩을 지키고, 사라진 청크는 지우지 않고 `is_active=false`로 남긴다(토론 근거·온톨로지 ISSUE의 청크 ID 링크 유지). 검색은 활성 청크만, 청크 ID로 여는 근거 조회는 비활성도 포함
+- PDF 자르기는 별도 프로세스에서 돈다. PyMuPDF가 죽거나 5분을 넘기면 그 리포트만 `failed`로 남기고 이어 간다
 - 청커가 PyMuPDF 레이아웃 모델로 표를 찾아서 리포트 1건에 약 10초 걸린다(모델을 끄면 7배 빠르지만 본문이 표로 잘못 잡힘)
 
 KIS 목표주가·투자의견(`broker_opinions`) 적재(`KIS_APP_KEY`, `KIS_APP_SECRET` 필요). 조회 API만 호출합니다:

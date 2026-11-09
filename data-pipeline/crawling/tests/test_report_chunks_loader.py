@@ -41,6 +41,7 @@ def test_chunk_rows_carry_contract_fields_and_drop_empty_bodies():
     assert row["title"] == REPORT["title"] and row["url"] == REPORT["original_url"]
     assert row["broker"] == "신한투자증권"
     assert row["mentioned_tickers"] == ["247540"]
+    assert row["is_active"] is True
     assert "content" not in row  # 머리말 붙인 글은 저장하지 않고 임베딩할 때 만든다
 
 

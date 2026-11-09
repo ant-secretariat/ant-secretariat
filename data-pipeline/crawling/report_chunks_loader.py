@@ -7,7 +7,8 @@
 
 1. 네이버 리서치에서 기간 내 리포트 목록을 받아 report_metadata에 넣는다 (청킹 상태는 유지)
 2. 아직 안 잘랐거나 실패했거나 청커 버전이 바뀐 리포트만 PDF를 임시 폴더에 받는다
-3. 청커로 자른 뒤 그 리포트의 청크를 바꾼다. 본문이 그대로인 청크는 임베딩을 지킨다. PDF는 바로 지운다
+3. 청커로 자른 뒤 그 리포트의 청크를 바꾼다. 본문이 그대로인 청크는 임베딩을 지키고,
+   사라진 청크는 지우지 않고 비활성(is_active=false)으로 남긴다. PDF는 바로 지운다
 """
 
 from __future__ import annotations
@@ -87,6 +88,8 @@ def chunk_rows(chunks: list[ReportChunk], report: dict) -> list[dict]:
             "extraction_method": chunk.extraction_method,
             # 다른 종목 언급은 온톨로지 연결 단계에서 채운다
             "mentioned_tickers": [report["ticker"]],
+            # 예전에 비활성이 된 청크가 다시 나오면 되살린다
+            "is_active": True,
         }
         for chunk in chunks
         if chunk.body.strip()
@@ -192,7 +195,8 @@ def chunk_one(
 def replace_chunks(connection: psycopg.Connection, doc_id: str, rows: list[dict]) -> None:
     """리포트의 청크를 새로 자른 결과로 바꾸되, 내용이 그대로인 청크의 임베딩은 지킨다.
 
-    청크 ID는 본문 해시라서 본문이 같으면 ID도 같다. 새 결과에 없는 청크만 지우고,
+    청크 ID는 본문 해시라서 본문이 같으면 ID도 같다. 새 결과에 없는 청크는 지우지 않고
+    is_active=false로 남긴다(토론 근거·온톨로지 ISSUE가 청크 ID를 저장하므로).
     나머지는 upsert로 메타데이터만 고친다(행에 embedding 칸이 없어 기존 값이 남는다).
     """
     existing = dict(
@@ -201,7 +205,7 @@ def replace_chunks(connection: psycopg.Connection, doc_id: str, rows: list[dict]
         ).fetchall()
     )
     connection.execute(
-        "delete from document_chunks where doc_id = %s and not (chunk_id = any(%s))",
+        "update document_chunks set is_active = false where doc_id = %s and is_active and not (chunk_id = any(%s))",
         (doc_id, [row["chunk_id"] for row in rows]),
     )
     upsert(connection, "document_chunks", rows, key_columns=["chunk_id"])

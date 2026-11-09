@@ -10,6 +10,7 @@
 | `precheck()` 관문2·3 엔진 + 테스트 24개 | 다음 PR (이 PR 위에 쌓임) |
 | Pydantic 스키마 (Bull·Bear·Judge·DebateResult) | 예정 |
 | 거절셋 v0 (47문항) + 측정기 | 완료 — `python -m agents.debate_renewal.eval.refusal` |
+| 기준선 비교 실험 루브릭(6항목)·문항(40개)·블라인드 채점 집계 | 완료 (테스트 8개) — 실험 실행은 출력 생성 후 |
 | 프롬프트 v3, 검증 레이어, 비교 모드 | 예정 |
 
 ## 실행

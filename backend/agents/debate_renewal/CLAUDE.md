@@ -70,7 +70,7 @@
 | 3 | Pydantic 스키마: Evidence·Claim·DebateResult(단일→비교), Bull·Bear·Judge 출력 | **다음** |
 | 3b | Bull·Bear·Judge 프롬프트 v3 (D6 `agreed_points`, Bear의 Bull Claim 인용) | 예정 |
 | 4 | 검증 레이어 L1 + 근거 부족 루프(1회 수정) | 예정 |
-| 5 | 기준선 비교 실험 루브릭 5~6항목 + 문항 30~50개 | 예정 |
+| 5 | 기준선 비교 실험 루브릭 5~6항목 + 문항 30~50개 | 루브릭 6항목·문항 40개·블라인드 채점 집계 도구 완료 (`eval/baseline/`, 8 tests). 실제 실험은 토론·단일 출력 생성 후 |
 | 6 | 온톨로지 ISSUE 시드 20~30개 | 예정 (온톨로지 기획서) |
 
 ## 확정 필요한 임시값 (코드 곳곳에 TODO)
@@ -78,6 +78,7 @@
 - `ReasonCode.insufficient_data` — `envelope.py` 확정 이름으로 교체 (`contracts.py`). 3종목·한쪽 미커버 등 관문1 코드도 같음
 - 관문1 거절 코드(미커버 종목·3종목 이상·비교 한쪽 미커버)의 `envelope.py` 이름. 11/9 기준 회의에서 확정되지 않았다. precheck 밖이라 이 패키지는 정의하지 않고, 확정되면 `ReasonCode`에 추가한다
 - 거절셋 기준선(rs-0.1.0, 사전 kw-0.1.0): 오답변율 35%(목표 ≤5%), 과잉거절률 22%. 주가 변동 이유("주가가 왜 떨어졌어?")·보유 여부("들고 있어도 돼?")처럼 `valuation`·`risk`로 볼 만한 질의를 범위 안으로 볼지, 키워드 사전을 어디까지 넓힐지 확정 필요
+- 기준선 실험 `rubric.json`(rb-0.1.0)은 초안이다. 시험 채점 후 채점자 일치율이 낮은 항목부터 다듬는다. 채점자 2명이 누구인지, 문항마다 "같은 근거" 검색 결과를 스냅샷으로 고정하는 방식(수경의 골든셋 스냅샷 태그와 연동)은 확정 필요
 - 공용 계약 위치(`backend/contracts`, data-pipeline)가 생기면 `contracts.py`를 import로 교체하고 파일 삭제
 - `data/intent_data_sources.json` — 수경과 아젠다별 필요 데이터·신선도·T0 가능 여부 확정
 - 아젠다 대체 우선순위(`data/keyword_dictionary.json`의 `selection_rules`) — 기획서에 "최대 3개 유지"만 있음

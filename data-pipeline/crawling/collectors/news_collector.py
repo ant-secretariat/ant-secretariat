@@ -15,6 +15,13 @@ from crawling.crawler.http import create_ssl_context
 logger = logging.getLogger(__name__)
 
 
+# 네이버 검색 API는 네이버 클라우드 플랫폼의 NAVER API HUB로만 부른다 (개발자센터 openapi는 쓰지 않음)
+# 키는 API HUB > Application > 인증 정보의 Client ID / Client Secret (NCP 계정 Access Key 아님)
+HUB_NEWS_URL = "https://naverapihub.apigw.ntruss.com/search/v1/news"
+PAGE_SIZE = 100          # display 최대값
+MAX_START = 1000         # start 최대값 → 검색어 하나로 최신 기사 최대 1,100건까지
+
+
 class NewsCollector:
     def __init__(self, settings: Settings | None = None):
         self.settings = settings or SETTINGS
@@ -25,6 +32,8 @@ class NewsCollector:
         company: str,
         date_from: str | None = None,
         date_to: str | None = None,
+        aliases: list[str] | None = None,
+        fetch_content: bool = True,
     ) -> list[dict]:
         if self.settings.news_data_provider != "naver":
             raise ValueError(f"unsupported news data provider: {self.settings.news_data_provider}")
@@ -32,10 +41,7 @@ class NewsCollector:
             logger.warning("NAVER_CLIENT_ID/SECRET이 없어 뉴스 수집을 건너뜁니다.")
             return []
         return NaverNewsProvider(self.settings).collect(
-            ticker,
-            company,
-            date_from,
-            date_to,
+            ticker, company, date_from, date_to, aliases=aliases, fetch_content=fetch_content
         )
 
 
@@ -51,38 +57,38 @@ class NaverNewsProvider:
         company: str,
         date_from: str | None,
         date_to: str | None,
+        aliases: list[str] | None = None,
+        fetch_content: bool = True,
     ) -> list[dict]:
+        """최신순으로 페이지를 넘기며 기간 안의 기사를 모은다. 제목·요약에 종목명이 없는 기사는 버린다."""
         headers = {
-            "X-Naver-Client-Id": self.settings.naver_client_id,
-            "X-Naver-Client-Secret": self.settings.naver_client_secret,
+            "X-NCP-APIGW-API-KEY-ID": self.settings.naver_client_id,
+            "X-NCP-APIGW-API-KEY": self.settings.naver_client_secret,
             "User-Agent": self.settings.user_agent,
         }
-        params = {
-            "query": company,
-            "display": 30,
-            "sort": "date",
-        }
+        items: list[dict] = []
         with httpx.Client(
             headers=headers,
             timeout=self.settings.request_timeout_seconds,
             follow_redirects=True,
             verify=create_ssl_context(),
         ) as client:
-            response = client.get(
-                "https://openapi.naver.com/v1/search/news.json",
-                params=params,
+            for start in range(1, MAX_START + 1, PAGE_SIZE):
+                response = client.get(
+                    HUB_NEWS_URL, params={"query": company, "display": PAGE_SIZE, "start": start, "sort": "date"}
+                )
+                response.raise_for_status()
+                page = response.json().get("items", [])
+                items.extend(page)
+                oldest = _normalize_pub_date(page[-1].get("pubDate", "")) if page else ""
+                if len(page) < PAGE_SIZE or (date_from and oldest and oldest[:10] < date_from):
+                    break
+            # 기사 본문은 API가 아니라 원문 페이지에서 가져오므로 인증 헤더를 빼고 요청한다
+            client.headers.pop("X-NCP-APIGW-API-KEY-ID", None)
+            client.headers.pop("X-NCP-APIGW-API-KEY", None)
+            return self._build_rows(
+                client, items, ticker, company, date_from, date_to, aliases or [], fetch_content
             )
-            response.raise_for_status()
-
-            rows = self._build_rows(
-                client,
-                response.json().get("items", []),
-                ticker,
-                company,
-                date_from,
-                date_to,
-            )
-        return rows
 
     def _build_rows(
         self,
@@ -92,8 +98,12 @@ class NaverNewsProvider:
         company: str,
         date_from: str | None,
         date_to: str | None,
+        aliases: list[str] | None = None,
+        fetch_content: bool = True,
     ) -> list[dict]:
         rows: list[dict] = []
+        seen_titles: set[str] = set()
+        names = [company, *(aliases or [])]
         for item in items:
             published_at = _normalize_pub_date(item.get("pubDate", ""))
             if not _in_range(published_at, date_from, date_to):
@@ -101,7 +111,13 @@ class NaverNewsProvider:
             original_url = item.get("originallink") or item.get("link") or ""
             title = _clean_html(item.get("title", ""))
             summary = _clean_html(item.get("description", ""))
-            content = self._fetch_article_content(client, original_url)
+            if not mentions_company(f"{title} {summary}", names):
+                continue
+            title_key = _title_key(title)
+            if title_key in seen_titles:  # 같은 기사를 여러 매체가 실은 경우
+                continue
+            seen_titles.add(title_key)
+            content = self._fetch_article_content(client, original_url) if fetch_content else ""
             news_id = hashlib.sha256(
                 f"{ticker}|{published_at}|{title}|{original_url}".encode("utf-8")
             ).hexdigest()[:24]
@@ -115,6 +131,7 @@ class NaverNewsProvider:
                     "content": content,
                     "published_at": published_at,
                     "original_url": original_url,
+                    "press": _press_domain(original_url),
                     "source": self.source,
                     "provider": "naver",
                     "created_at": _utc_now(),
@@ -132,6 +149,23 @@ class NaverNewsProvider:
             logger.debug("뉴스 본문 수집 실패: url=%s error=%s", url, exc)
             return ""
         return _extract_article_text(response.text)
+
+
+def mentions_company(text: str, names: list[str]) -> bool:
+    """띄어쓰기를 무시하고 종목명(또는 별칭)이 들어 있는지. 'SK 하이닉스'도 'SK하이닉스'로 본다."""
+    compact = "".join(text.split()).lower()
+    return any(name and "".join(name.split()).lower() in compact for name in names)
+
+
+def _title_key(title: str) -> str:
+    return "".join(ch for ch in title.lower() if ch.isalnum())
+
+
+def _press_domain(url: str) -> str:
+    from urllib.parse import urlparse
+
+    host = urlparse(url).netloc.lower()
+    return host[4:] if host.startswith("www.") else host
 
 
 def _clean_html(value: str) -> str:

@@ -1,0 +1,839 @@
+[
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "000660",
+    "from_type": "COMPANY",
+    "to_node": "ISS_AI_MEMORY_DEMAND",
+    "to_type": "ISSUE",
+    "exposure": 0.9,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "005930",
+    "from_type": "COMPANY",
+    "to_node": "ISS_AI_MEMORY_DEMAND",
+    "to_type": "ISSUE",
+    "exposure": 0.9,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "042700",
+    "from_type": "COMPANY",
+    "to_node": "ISS_AI_MEMORY_DEMAND",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "402340",
+    "from_type": "COMPANY",
+    "to_node": "ISS_AI_MEMORY_DEMAND",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "005930",
+    "from_type": "COMPANY",
+    "to_node": "ISS_MEMORY_PRICE_CYCLE",
+    "to_type": "ISSUE",
+    "exposure": 0.9,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "000660",
+    "from_type": "COMPANY",
+    "to_node": "ISS_MEMORY_PRICE_CYCLE",
+    "to_type": "ISSUE",
+    "exposure": 0.9,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "402340",
+    "from_type": "COMPANY",
+    "to_node": "ISS_MEMORY_PRICE_CYCLE",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "005930",
+    "from_type": "COMPANY",
+    "to_node": "ISS_SEMI_EXPORT_CONTROL",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "000660",
+    "from_type": "COMPANY",
+    "to_node": "ISS_SEMI_EXPORT_CONTROL",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "005930",
+    "from_type": "COMPANY",
+    "to_node": "ISS_FOUNDRY_COMPETITION",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "267260",
+    "from_type": "COMPANY",
+    "to_node": "ISS_AI_POWER_INFRA",
+    "to_type": "ISSUE",
+    "exposure": 0.9,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "298040",
+    "from_type": "COMPANY",
+    "to_node": "ISS_AI_POWER_INFRA",
+    "to_type": "ISSUE",
+    "exposure": 0.9,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "010120",
+    "from_type": "COMPANY",
+    "to_node": "ISS_AI_POWER_INFRA",
+    "to_type": "ISSUE",
+    "exposure": 0.9,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "062040",
+    "from_type": "COMPANY",
+    "to_node": "ISS_AI_POWER_INFRA",
+    "to_type": "ISSUE",
+    "exposure": 0.9,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "000500",
+    "from_type": "COMPANY",
+    "to_node": "ISS_AI_POWER_INFRA",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "034020",
+    "from_type": "COMPANY",
+    "to_node": "ISS_AI_POWER_INFRA",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "006260",
+    "from_type": "COMPANY",
+    "to_node": "ISS_AI_POWER_INFRA",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "007660",
+    "from_type": "COMPANY",
+    "to_node": "ISS_AI_PCB_DEMAND",
+    "to_type": "ISSUE",
+    "exposure": 0.9,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "353200",
+    "from_type": "COMPANY",
+    "to_node": "ISS_AI_PCB_DEMAND",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "009150",
+    "from_type": "COMPANY",
+    "to_node": "ISS_AI_PCB_DEMAND",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "011070",
+    "from_type": "COMPANY",
+    "to_node": "ISS_AI_PCB_DEMAND",
+    "to_type": "ISSUE",
+    "exposure": 0.3,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "005380",
+    "from_type": "COMPANY",
+    "to_node": "ISS_AUTO_US_TARIFF",
+    "to_type": "ISSUE",
+    "exposure": 0.9,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "000270",
+    "from_type": "COMPANY",
+    "to_node": "ISS_AUTO_US_TARIFF",
+    "to_type": "ISSUE",
+    "exposure": 0.9,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "012330",
+    "from_type": "COMPANY",
+    "to_node": "ISS_AUTO_US_TARIFF",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "161390",
+    "from_type": "COMPANY",
+    "to_node": "ISS_AUTO_US_TARIFF",
+    "to_type": "ISSUE",
+    "exposure": 0.3,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "086280",
+    "from_type": "COMPANY",
+    "to_node": "ISS_AUTO_US_TARIFF",
+    "to_type": "ISSUE",
+    "exposure": 0.3,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "373220",
+    "from_type": "COMPANY",
+    "to_node": "ISS_EV_DEMAND_SLOWDOWN",
+    "to_type": "ISSUE",
+    "exposure": 0.9,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "006400",
+    "from_type": "COMPANY",
+    "to_node": "ISS_EV_DEMAND_SLOWDOWN",
+    "to_type": "ISSUE",
+    "exposure": 0.9,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "003670",
+    "from_type": "COMPANY",
+    "to_node": "ISS_EV_DEMAND_SLOWDOWN",
+    "to_type": "ISSUE",
+    "exposure": 0.9,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "005380",
+    "from_type": "COMPANY",
+    "to_node": "ISS_EV_DEMAND_SLOWDOWN",
+    "to_type": "ISSUE",
+    "exposure": 0.3,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "373220",
+    "from_type": "COMPANY",
+    "to_node": "ISS_BATTERY_CHINA_COMPETITION",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "006400",
+    "from_type": "COMPANY",
+    "to_node": "ISS_BATTERY_CHINA_COMPETITION",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "003670",
+    "from_type": "COMPANY",
+    "to_node": "ISS_BATTERY_CHINA_COMPETITION",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "373220",
+    "from_type": "COMPANY",
+    "to_node": "ISS_ESS_DEMAND",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "006400",
+    "from_type": "COMPANY",
+    "to_node": "ISS_ESS_DEMAND",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "329180",
+    "from_type": "COMPANY",
+    "to_node": "ISS_SHIPBUILDING_UPCYCLE",
+    "to_type": "ISSUE",
+    "exposure": 0.9,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "009540",
+    "from_type": "COMPANY",
+    "to_node": "ISS_SHIPBUILDING_UPCYCLE",
+    "to_type": "ISSUE",
+    "exposure": 0.9,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "042660",
+    "from_type": "COMPANY",
+    "to_node": "ISS_SHIPBUILDING_UPCYCLE",
+    "to_type": "ISSUE",
+    "exposure": 0.9,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "010140",
+    "from_type": "COMPANY",
+    "to_node": "ISS_SHIPBUILDING_UPCYCLE",
+    "to_type": "ISSUE",
+    "exposure": 0.9,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "443060",
+    "from_type": "COMPANY",
+    "to_node": "ISS_SHIPBUILDING_UPCYCLE",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "042660",
+    "from_type": "COMPANY",
+    "to_node": "ISS_US_SHIPBUILDING_COOP",
+    "to_type": "ISSUE",
+    "exposure": 0.9,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "329180",
+    "from_type": "COMPANY",
+    "to_node": "ISS_US_SHIPBUILDING_COOP",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "009540",
+    "from_type": "COMPANY",
+    "to_node": "ISS_US_SHIPBUILDING_COOP",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "012450",
+    "from_type": "COMPANY",
+    "to_node": "ISS_DEFENSE_EXPORT",
+    "to_type": "ISSUE",
+    "exposure": 0.9,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "064350",
+    "from_type": "COMPANY",
+    "to_node": "ISS_DEFENSE_EXPORT",
+    "to_type": "ISSUE",
+    "exposure": 0.9,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "079550",
+    "from_type": "COMPANY",
+    "to_node": "ISS_DEFENSE_EXPORT",
+    "to_type": "ISSUE",
+    "exposure": 0.9,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "047810",
+    "from_type": "COMPANY",
+    "to_node": "ISS_DEFENSE_EXPORT",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "272210",
+    "from_type": "COMPANY",
+    "to_node": "ISS_DEFENSE_EXPORT",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "034020",
+    "from_type": "COMPANY",
+    "to_node": "ISS_NUCLEAR_EXPORT",
+    "to_type": "ISSUE",
+    "exposure": 0.9,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "000720",
+    "from_type": "COMPANY",
+    "to_node": "ISS_NUCLEAR_EXPORT",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "015760",
+    "from_type": "COMPANY",
+    "to_node": "ISS_NUCLEAR_EXPORT",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "105560",
+    "from_type": "COMPANY",
+    "to_node": "ISS_RATE_CUT_NIM",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "055550",
+    "from_type": "COMPANY",
+    "to_node": "ISS_RATE_CUT_NIM",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "086790",
+    "from_type": "COMPANY",
+    "to_node": "ISS_RATE_CUT_NIM",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "316140",
+    "from_type": "COMPANY",
+    "to_node": "ISS_RATE_CUT_NIM",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "024110",
+    "from_type": "COMPANY",
+    "to_node": "ISS_RATE_CUT_NIM",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "000720",
+    "from_type": "COMPANY",
+    "to_node": "ISS_PF_CREDIT_RISK",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "047040",
+    "from_type": "COMPANY",
+    "to_node": "ISS_PF_CREDIT_RISK",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "028050",
+    "from_type": "COMPANY",
+    "to_node": "ISS_PF_CREDIT_RISK",
+    "to_type": "ISSUE",
+    "exposure": 0.3,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "006800",
+    "from_type": "COMPANY",
+    "to_node": "ISS_TRADING_VOLUME_BOOM",
+    "to_type": "ISSUE",
+    "exposure": 0.9,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "039490",
+    "from_type": "COMPANY",
+    "to_node": "ISS_TRADING_VOLUME_BOOM",
+    "to_type": "ISSUE",
+    "exposure": 0.9,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "005940",
+    "from_type": "COMPANY",
+    "to_node": "ISS_TRADING_VOLUME_BOOM",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "016360",
+    "from_type": "COMPANY",
+    "to_node": "ISS_TRADING_VOLUME_BOOM",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "071050",
+    "from_type": "COMPANY",
+    "to_node": "ISS_TRADING_VOLUME_BOOM",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "105560",
+    "from_type": "COMPANY",
+    "to_node": "ISS_VALUEUP_POLICY",
+    "to_type": "ISSUE",
+    "exposure": 0.9,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "055550",
+    "from_type": "COMPANY",
+    "to_node": "ISS_VALUEUP_POLICY",
+    "to_type": "ISSUE",
+    "exposure": 0.9,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "086790",
+    "from_type": "COMPANY",
+    "to_node": "ISS_VALUEUP_POLICY",
+    "to_type": "ISSUE",
+    "exposure": 0.9,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "138040",
+    "from_type": "COMPANY",
+    "to_node": "ISS_VALUEUP_POLICY",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "033780",
+    "from_type": "COMPANY",
+    "to_node": "ISS_VALUEUP_POLICY",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "000810",
+    "from_type": "COMPANY",
+    "to_node": "ISS_VALUEUP_POLICY",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "034730",
+    "from_type": "COMPANY",
+    "to_node": "ISS_GOVERNANCE_REFORM",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "003550",
+    "from_type": "COMPANY",
+    "to_node": "ISS_GOVERNANCE_REFORM",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "000880",
+    "from_type": "COMPANY",
+    "to_node": "ISS_GOVERNANCE_REFORM",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "402340",
+    "from_type": "COMPANY",
+    "to_node": "ISS_GOVERNANCE_REFORM",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "028260",
+    "from_type": "COMPANY",
+    "to_node": "ISS_GOVERNANCE_REFORM",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "267250",
+    "from_type": "COMPANY",
+    "to_node": "ISS_GOVERNANCE_REFORM",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "051910",
+    "from_type": "COMPANY",
+    "to_node": "ISS_CHINA_CHEM_OVERCAPACITY",
+    "to_type": "ISSUE",
+    "exposure": 0.9,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "009830",
+    "from_type": "COMPANY",
+    "to_node": "ISS_CHINA_CHEM_OVERCAPACITY",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "096770",
+    "from_type": "COMPANY",
+    "to_node": "ISS_CHINA_CHEM_OVERCAPACITY",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "035420",
+    "from_type": "COMPANY",
+    "to_node": "ISS_PLATFORM_REGULATION",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "035720",
+    "from_type": "COMPANY",
+    "to_node": "ISS_PLATFORM_REGULATION",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "323410",
+    "from_type": "COMPANY",
+    "to_node": "ISS_PLATFORM_REGULATION",
+    "to_type": "ISSUE",
+    "exposure": 0.3,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "278470",
+    "from_type": "COMPANY",
+    "to_node": "ISS_KBEAUTY_EXPORT",
+    "to_type": "ISSUE",
+    "exposure": 0.9,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "090430",
+    "from_type": "COMPANY",
+    "to_node": "ISS_KBEAUTY_EXPORT",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "003230",
+    "from_type": "COMPANY",
+    "to_node": "ISS_KFOOD_EXPORT",
+    "to_type": "ISSUE",
+    "exposure": 0.9,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "207940",
+    "from_type": "COMPANY",
+    "to_node": "ISS_BIO_CDMO_DEMAND",
+    "to_type": "ISSUE",
+    "exposure": 0.9,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "068270",
+    "from_type": "COMPANY",
+    "to_node": "ISS_BIO_CDMO_DEMAND",
+    "to_type": "ISSUE",
+    "exposure": 0.9,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "0126Z0",
+    "from_type": "COMPANY",
+    "to_node": "ISS_BIO_CDMO_DEMAND",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "068270",
+    "from_type": "COMPANY",
+    "to_node": "ISS_PHARMA_US_TARIFF",
+    "to_type": "ISSUE",
+    "exposure": 0.6,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "207940",
+    "from_type": "COMPANY",
+    "to_node": "ISS_PHARMA_US_TARIFF",
+    "to_type": "ISSUE",
+    "exposure": 0.3,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "326030",
+    "from_type": "COMPANY",
+    "to_node": "ISS_PHARMA_US_TARIFF",
+    "to_type": "ISSUE",
+    "exposure": 0.3,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "011200",
+    "from_type": "COMPANY",
+    "to_node": "ISS_FREIGHT_NORMALIZATION",
+    "to_type": "ISSUE",
+    "exposure": 0.9,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  },
+  {
+    "edge_type": "EXPOSED_TO",
+    "from_node": "086280",
+    "from_type": "COMPANY",
+    "to_node": "ISS_FREIGHT_NORMALIZATION",
+    "to_type": "ISSUE",
+    "exposure": 0.3,
+    "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+  }
+]

@@ -1,0 +1,137 @@
+[
+  {
+    "edge_type": "IMPACTS",
+    "from_node": "US_FFR",
+    "from_type": "MACRO",
+    "to_node": "US_10Y_YIELD",
+    "to_type": "MACRO",
+    "relation": "same",
+    "rationale": "정책금리→장기금리"
+  },
+  {
+    "edge_type": "IMPACTS",
+    "from_node": "US_FFR",
+    "from_type": "MACRO",
+    "to_node": "USD_KRW",
+    "to_type": "MACRO",
+    "relation": "same",
+    "rationale": "미 금리↑ 달러 강세"
+  },
+  {
+    "edge_type": "IMPACTS",
+    "from_node": "US_10Y_YIELD",
+    "from_type": "MACRO",
+    "to_node": "KTB_10Y_KR",
+    "to_type": "MACRO",
+    "relation": "same",
+    "rationale": "장기금리 동조화"
+  },
+  {
+    "edge_type": "IMPACTS",
+    "from_node": "BASE_RATE_KR",
+    "from_type": "MACRO",
+    "to_node": "KTB_3Y_KR",
+    "to_type": "MACRO",
+    "relation": "same",
+    "rationale": "정책금리→단기 시장금리"
+  },
+  {
+    "edge_type": "IMPACTS",
+    "from_node": "BASE_RATE_KR",
+    "from_type": "MACRO",
+    "to_node": "KTB_10Y_KR",
+    "to_type": "MACRO",
+    "relation": "same",
+    "rationale": "기간 구조"
+  },
+  {
+    "edge_type": "IMPACTS",
+    "from_node": "BASE_RATE_KR",
+    "from_type": "MACRO",
+    "to_node": "USD_KRW",
+    "to_type": "MACRO",
+    "relation": "opposite",
+    "rationale": "금리차 축소 시 원화 약세"
+  },
+  {
+    "edge_type": "IMPACTS",
+    "from_node": "BRENT",
+    "from_type": "MACRO",
+    "to_node": "PPI_KR",
+    "to_type": "MACRO",
+    "relation": "same",
+    "rationale": "원자재 원가"
+  },
+  {
+    "edge_type": "IMPACTS",
+    "from_node": "PPI_KR",
+    "from_type": "MACRO",
+    "to_node": "CPI_KR",
+    "to_type": "MACRO",
+    "relation": "same",
+    "rationale": "생산자→소비자 물가 전가"
+  },
+  {
+    "edge_type": "IMPACTS",
+    "from_node": "USD_KRW",
+    "from_type": "MACRO",
+    "to_node": "CPI_KR",
+    "to_type": "MACRO",
+    "relation": "same",
+    "rationale": "수입물가"
+  },
+  {
+    "edge_type": "IMPACTS",
+    "from_node": "CPI_KR",
+    "from_type": "MACRO",
+    "to_node": "BASE_RATE_KR",
+    "to_type": "MACRO",
+    "relation": "same",
+    "rationale": "물가 대응 통화정책"
+  },
+  {
+    "edge_type": "IMPACTS",
+    "from_node": "VIX",
+    "from_type": "MACRO",
+    "to_node": "USD_KRW",
+    "to_type": "MACRO",
+    "relation": "same",
+    "rationale": "위험회피 시 원화 약세"
+  },
+  {
+    "edge_type": "IMPACTS",
+    "from_node": "VIX",
+    "from_type": "MACRO",
+    "to_node": "KOSPI",
+    "to_type": "MACRO",
+    "relation": "opposite",
+    "rationale": "위험회피 매도"
+  },
+  {
+    "edge_type": "IMPACTS",
+    "from_node": "USD_CNY",
+    "from_type": "MACRO",
+    "to_node": "USD_KRW",
+    "to_type": "MACRO",
+    "relation": "same",
+    "rationale": "위안-원 동조화"
+  },
+  {
+    "edge_type": "IMPACTS",
+    "from_node": "CHINA_PMI_MFG",
+    "from_type": "MACRO",
+    "to_node": "KOSPI",
+    "to_type": "MACRO",
+    "relation": "same",
+    "rationale": "수출 경기"
+  },
+  {
+    "edge_type": "IMPACTS",
+    "from_node": "DRAM_PRICE",
+    "from_type": "MACRO",
+    "to_node": "KOSPI",
+    "to_type": "MACRO",
+    "relation": "same",
+    "rationale": "반도체 지수 비중"
+  }
+]

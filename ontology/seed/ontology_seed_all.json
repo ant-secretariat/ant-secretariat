@@ -1,0 +1,5252 @@
+{
+  "meta": {
+    "version": "seed-v0.3",
+    "generated": "2026-11-10",
+    "spec": "온톨로지 기획서 v1.2",
+    "t1_definition": "KOSPI+KOSDAQ 통합 시가총액 상위 100 보통주(우선주 제외). 수경 파이프라인 companies.is_core, 2026-10-22 지정 후 고정",
+    "core_export": "2026-11-09",
+    "tier_assigned_on": "2026-10-22",
+    "sensitivities_latest_as_of": "2026-11-06",
+    "dropped_issue_edges": [
+      [
+        "ISS_PLATFORM_REGULATION",
+        "377300"
+      ],
+      [
+        "ISS_KFOOD_EXPORT",
+        "271560"
+      ]
+    ],
+    "not_included": [
+      "COMPETES_WITH (COMPETITOR→COMPANY 통합 여부 미결)"
+    ]
+  },
+  "nodes": {
+    "sectors": [
+      {
+        "sector_id": "SEC_IT",
+        "name": "정보기술",
+        "name_en": "Information Technology",
+        "gics_code": "45",
+        "cycle_type": "growth",
+        "rate_sensitivity": "high",
+        "fx_sensitivity": "positive",
+        "notes": "반도체·전자부품·IT서비스. 수출 비중 최대.",
+        "source": "claude_draft",
+        "wics_code": "G45",
+        "wics_name": "IT"
+      },
+      {
+        "sector_id": "SEC_COMM",
+        "name": "커뮤니케이션서비스",
+        "name_en": "Communication Services",
+        "gics_code": "50",
+        "cycle_type": "growth",
+        "rate_sensitivity": "medium",
+        "fx_sensitivity": "neutral",
+        "notes": "통신·인터넷 플랫폼·게임·엔터.",
+        "source": "claude_draft",
+        "wics_code": "G50",
+        "wics_name": "커뮤니케이션서비스"
+      },
+      {
+        "sector_id": "SEC_CONS_DISC",
+        "name": "경기소비재",
+        "name_en": "Consumer Discretionary",
+        "gics_code": "25",
+        "cycle_type": "cyclical",
+        "rate_sensitivity": "high",
+        "fx_sensitivity": "positive",
+        "notes": "자동차·부품·가전·타이어. 완성차 수출 비중 큼.",
+        "source": "claude_draft",
+        "wics_code": "G25",
+        "wics_name": "경기관련소비재"
+      },
+      {
+        "sector_id": "SEC_CONS_STAP",
+        "name": "필수소비재",
+        "name_en": "Consumer Staples",
+        "gics_code": "30",
+        "cycle_type": "defensive",
+        "rate_sensitivity": "low",
+        "fx_sensitivity": "negative",
+        "notes": "식품·담배·화장품. 원재료 수입 비중 높음(화장품 수출주는 예외적으로 환율 수혜).",
+        "source": "claude_draft",
+        "wics_code": "G30",
+        "wics_name": "필수소비재"
+      },
+      {
+        "sector_id": "SEC_HEALTH",
+        "name": "헬스케어",
+        "name_en": "Health Care",
+        "gics_code": "35",
+        "cycle_type": "defensive",
+        "rate_sensitivity": "medium",
+        "fx_sensitivity": "positive",
+        "notes": "제약·바이오·CDMO. 대형 바이오는 성장주 성격.",
+        "source": "claude_draft",
+        "wics_code": "G35",
+        "wics_name": "건강관리"
+      },
+      {
+        "sector_id": "SEC_FIN",
+        "name": "금융",
+        "name_en": "Financials",
+        "gics_code": "40",
+        "cycle_type": "cyclical",
+        "rate_sensitivity": "medium",
+        "fx_sensitivity": "neutral",
+        "notes": "은행·보험·증권·카드. 금리↑ NIM 개선 vs 건전성 악화.",
+        "source": "claude_draft",
+        "wics_code": "G40",
+        "wics_name": "금융"
+      },
+      {
+        "sector_id": "SEC_INDUS",
+        "name": "산업재",
+        "name_en": "Industrials",
+        "gics_code": "20",
+        "cycle_type": "cyclical",
+        "rate_sensitivity": "medium",
+        "fx_sensitivity": "positive",
+        "notes": "조선·방산·전력기기·기계·건설·운송·지주사.",
+        "source": "claude_draft",
+        "wics_code": "G20",
+        "wics_name": "산업재"
+      },
+      {
+        "sector_id": "SEC_MATERIAL",
+        "name": "소재",
+        "name_en": "Materials",
+        "gics_code": "15",
+        "cycle_type": "cyclical",
+        "rate_sensitivity": "medium",
+        "fx_sensitivity": "neutral",
+        "notes": "철강·비철·화학·양극재. 중국 경기 연동.",
+        "source": "claude_draft",
+        "wics_code": "G15",
+        "wics_name": "소재"
+      },
+      {
+        "sector_id": "SEC_ENERGY",
+        "name": "에너지",
+        "name_en": "Energy",
+        "gics_code": "10",
+        "cycle_type": "cyclical",
+        "rate_sensitivity": "low",
+        "fx_sensitivity": "negative",
+        "notes": "정유. 원유 순수입 구조.",
+        "source": "claude_draft",
+        "wics_code": "G10",
+        "wics_name": "에너지"
+      },
+      {
+        "sector_id": "SEC_UTIL",
+        "name": "유틸리티",
+        "name_en": "Utilities",
+        "gics_code": "55",
+        "cycle_type": "defensive",
+        "rate_sensitivity": "high",
+        "fx_sensitivity": "negative",
+        "notes": "전력·가스. 규제 요금 + 연료 수입.",
+        "source": "claude_draft",
+        "wics_code": "G55",
+        "wics_name": "유틸리티"
+      }
+    ],
+    "macros": [
+      {
+        "indicator_id": "BASE_RATE_KR",
+        "name": "한국 기준금리",
+        "category": "rate",
+        "direction": "up_negative",
+        "unit": "%",
+        "source": "ECOS",
+        "source_code": "722Y001",
+        "update_freq": "daily",
+        "in_pipeline": true,
+        "notes": "통화정책 결정 시 변경. 파이프라인은 일별로 저장.",
+        "pipeline_status": "collecting",
+        "pipeline_table": "macro_data",
+        "pipeline_key": "BASE_RATE_KR",
+        "pipeline_item_code": "0101000"
+      },
+      {
+        "indicator_id": "KTB_3Y_KR",
+        "name": "국고채 3년",
+        "category": "rate",
+        "direction": "up_negative",
+        "unit": "%",
+        "source": "ECOS",
+        "source_code": "817Y002",
+        "update_freq": "daily",
+        "in_pipeline": true,
+        "notes": "단기 금리 기대 반영.",
+        "pipeline_status": "collecting",
+        "pipeline_table": "macro_data",
+        "pipeline_key": "KTB_3Y_KR",
+        "pipeline_item_code": "010200000"
+      },
+      {
+        "indicator_id": "KTB_10Y_KR",
+        "name": "국고채 10년",
+        "category": "rate",
+        "direction": "up_negative",
+        "unit": "%",
+        "source": "ECOS",
+        "source_code": "817Y002",
+        "update_freq": "daily",
+        "in_pipeline": true,
+        "notes": "장기 할인율.",
+        "pipeline_status": "collecting",
+        "pipeline_table": "macro_data",
+        "pipeline_key": "KTB_10Y_KR",
+        "pipeline_item_code": "010210000"
+      },
+      {
+        "indicator_id": "US_FFR",
+        "name": "미국 연방기금금리",
+        "category": "rate",
+        "direction": "up_negative",
+        "unit": "%",
+        "source": "FRED",
+        "source_code": "FEDFUNDS",
+        "update_freq": "monthly",
+        "in_pipeline": false,
+        "notes": "글로벌 유동성. 수집 계획 없음(수경 2026-11-10) — 필요하면 추가 요청.",
+        "pipeline_status": "not_planned",
+        "pipeline_table": null,
+        "pipeline_key": null,
+        "pipeline_item_code": null
+      },
+      {
+        "indicator_id": "US_10Y_YIELD",
+        "name": "미국채 10년",
+        "category": "rate",
+        "direction": "up_negative",
+        "unit": "%",
+        "source": "FRED",
+        "source_code": "DGS10",
+        "update_freq": "daily",
+        "in_pipeline": false,
+        "notes": "글로벌 성장주 할인율. 수집 계획 없음(수경 2026-11-10) — 필요하면 추가 요청.",
+        "pipeline_status": "not_planned",
+        "pipeline_table": null,
+        "pipeline_key": null,
+        "pipeline_item_code": null
+      },
+      {
+        "indicator_id": "USD_KRW",
+        "name": "원/달러 환율",
+        "category": "fx",
+        "direction": "mixed",
+        "unit": "KRW",
+        "source": "ECOS",
+        "source_code": "731Y001",
+        "update_freq": "daily",
+        "in_pipeline": true,
+        "notes": "상승=원화약세. 수출주↑ 수입원가↑ 외국인 수급↓.",
+        "pipeline_status": "collecting",
+        "pipeline_table": "macro_data",
+        "pipeline_key": "USD_KRW",
+        "pipeline_item_code": "0000001"
+      },
+      {
+        "indicator_id": "USD_CNY",
+        "name": "달러/위안 환율",
+        "category": "fx",
+        "direction": "mixed",
+        "unit": "CNY",
+        "source": "FRED",
+        "source_code": "DEXCHUS",
+        "update_freq": "daily",
+        "in_pipeline": false,
+        "notes": "위안 약세 시 중국산 가격경쟁력↑. 수집 계획 없음(수경 2026-11-10) — 필요하면 추가 요청.",
+        "pipeline_status": "not_planned",
+        "pipeline_table": null,
+        "pipeline_key": null,
+        "pipeline_item_code": null
+      },
+      {
+        "indicator_id": "CPI_KR",
+        "name": "한국 CPI",
+        "category": "inflation",
+        "direction": "up_negative",
+        "unit": "YoY%",
+        "source": "ECOS",
+        "source_code": "901Y009",
+        "update_freq": "monthly",
+        "in_pipeline": true,
+        "notes": "금리 경로 기대에 영향.",
+        "pipeline_status": "collecting",
+        "pipeline_table": "macro_data",
+        "pipeline_key": "CPI_KR",
+        "pipeline_item_code": "0"
+      },
+      {
+        "indicator_id": "PPI_KR",
+        "name": "한국 PPI",
+        "category": "inflation",
+        "direction": "up_negative",
+        "unit": "YoY%",
+        "source": "ECOS",
+        "source_code": null,
+        "update_freq": "monthly",
+        "in_pipeline": false,
+        "notes": "source_code 확인 필요. 수집 계획 없음(수경 2026-11-10) — 필요하면 추가 요청.",
+        "pipeline_status": "not_planned",
+        "pipeline_table": null,
+        "pipeline_key": null,
+        "pipeline_item_code": null
+      },
+      {
+        "indicator_id": "BRENT",
+        "name": "브렌트유",
+        "category": "commodity",
+        "direction": "mixed",
+        "unit": "USD/bbl",
+        "source": "ECOS",
+        "source_code": "902Y003",
+        "update_freq": "monthly",
+        "in_pipeline": true,
+        "notes": "ECOS 월평균(일별 아님). 정유 마진·운송 원가.",
+        "pipeline_status": "collecting",
+        "pipeline_table": "macro_data",
+        "pipeline_key": "BRENT",
+        "pipeline_item_code": "010103"
+      },
+      {
+        "indicator_id": "DRAM_PRICE",
+        "name": "DRAM 가격",
+        "category": "commodity",
+        "direction": "up_positive",
+        "unit": "USD",
+        "source": "TrendForce",
+        "source_code": null,
+        "update_freq": "weekly/monthly",
+        "in_pipeline": false,
+        "notes": "유료 소스. 대체 지표 협의 필요. 수집 계획 없음(수경 2026-11-10) — 필요하면 추가 요청.",
+        "pipeline_status": "not_planned",
+        "pipeline_table": null,
+        "pipeline_key": null,
+        "pipeline_item_code": null
+      },
+      {
+        "indicator_id": "CHINA_PMI_MFG",
+        "name": "중국 제조업 PMI",
+        "category": "sentiment",
+        "direction": "up_positive",
+        "unit": "index",
+        "source": "NBS",
+        "source_code": null,
+        "update_freq": "monthly",
+        "in_pipeline": false,
+        "notes": "50 기준. 소재·산업재 수요. 수집 계획 없음(수경 2026-11-10) — 필요하면 추가 요청.",
+        "pipeline_status": "not_planned",
+        "pipeline_table": null,
+        "pipeline_key": null,
+        "pipeline_item_code": null
+      },
+      {
+        "indicator_id": "VIX",
+        "name": "VIX",
+        "category": "sentiment",
+        "direction": "up_negative",
+        "unit": "index",
+        "source": "FRED",
+        "source_code": "VIXCLS",
+        "update_freq": "daily",
+        "in_pipeline": false,
+        "notes": "위험회피 심리. 수집 계획 없음(수경 2026-11-10) — 필요하면 추가 요청.",
+        "pipeline_status": "not_planned",
+        "pipeline_table": null,
+        "pipeline_key": null,
+        "pipeline_item_code": null
+      },
+      {
+        "indicator_id": "KOSPI",
+        "name": "KOSPI",
+        "category": "market",
+        "direction": "up_positive",
+        "unit": "pt",
+        "source": "KRX(pykrx)",
+        "source_code": "1001",
+        "update_freq": "daily",
+        "in_pipeline": true,
+        "notes": "시장 베타 기준. macro_data가 아니라 index_daily(index_code 1001). 민감도 요인명도 KOSPI.",
+        "pipeline_status": "collecting",
+        "pipeline_table": "index_daily",
+        "pipeline_key": "1001",
+        "pipeline_item_code": null
+      }
+    ],
+    "issues": [
+      {
+        "issue_id": "ISS_AI_MEMORY_DEMAND",
+        "name": "AI 서버용 HBM·고용량 메모리 수요 확대",
+        "type": "industry",
+        "polarity": "positive",
+        "duration": "persistent",
+        "agenda_ids": [
+          "growth",
+          "valuation"
+        ],
+        "notes": "AI 가속기 탑재 HBM 수요. 공급사 점유율 경쟁이 핵심 변수.",
+        "evidence_chunk_ids": [],
+        "valid_from": null,
+        "valid_until": null,
+        "review_cycle_days": 180,
+        "status": "draft",
+        "labeled_by": "claude_draft"
+      },
+      {
+        "issue_id": "ISS_MEMORY_PRICE_CYCLE",
+        "name": "메모리 가격 상승 사이클",
+        "type": "industry",
+        "polarity": "positive",
+        "duration": "cyclical",
+        "agenda_ids": [
+          "valuation",
+          "growth"
+        ],
+        "notes": "DRAM·NAND 가격 반등 국면. 사이클 피크 논쟁이 Bear 논거.",
+        "evidence_chunk_ids": [],
+        "valid_from": null,
+        "valid_until": null,
+        "review_cycle_days": 90,
+        "status": "draft",
+        "labeled_by": "claude_draft"
+      },
+      {
+        "issue_id": "ISS_SEMI_EXPORT_CONTROL",
+        "name": "미국 대중 반도체 수출 통제",
+        "type": "policy",
+        "polarity": "negative",
+        "duration": "persistent",
+        "agenda_ids": [
+          "risk",
+          "macro"
+        ],
+        "notes": "중국 공장 장비 반입·고성능 칩 판매 제한.",
+        "evidence_chunk_ids": [],
+        "valid_from": null,
+        "valid_until": null,
+        "review_cycle_days": 180,
+        "status": "draft",
+        "labeled_by": "claude_draft"
+      },
+      {
+        "issue_id": "ISS_FOUNDRY_COMPETITION",
+        "name": "파운드리 선단공정 경쟁 열위",
+        "type": "company",
+        "polarity": "negative",
+        "duration": "persistent",
+        "agenda_ids": [
+          "risk",
+          "growth"
+        ],
+        "notes": "선단공정 수율·고객 확보에서 경쟁사 대비 열위.",
+        "evidence_chunk_ids": [],
+        "valid_from": null,
+        "valid_until": null,
+        "review_cycle_days": 180,
+        "status": "draft",
+        "labeled_by": "claude_draft"
+      },
+      {
+        "issue_id": "ISS_AI_POWER_INFRA",
+        "name": "AI 데이터센터·전력망 투자 확대",
+        "type": "industry",
+        "polarity": "positive",
+        "duration": "persistent",
+        "agenda_ids": [
+          "growth",
+          "valuation"
+        ],
+        "notes": "변압기·전선·발전설비 수요. 수주잔고가 실적 가시성 근거.",
+        "evidence_chunk_ids": [],
+        "valid_from": null,
+        "valid_until": null,
+        "review_cycle_days": 180,
+        "status": "draft",
+        "labeled_by": "claude_draft"
+      },
+      {
+        "issue_id": "ISS_AI_PCB_DEMAND",
+        "name": "AI 서버용 고다층 기판·부품 수요",
+        "type": "industry",
+        "polarity": "positive",
+        "duration": "persistent",
+        "agenda_ids": [
+          "growth"
+        ],
+        "notes": "AI 가속기·네트워크 장비용 MLB·기판.",
+        "evidence_chunk_ids": [],
+        "valid_from": null,
+        "valid_until": null,
+        "review_cycle_days": 180,
+        "status": "draft",
+        "labeled_by": "claude_draft"
+      },
+      {
+        "issue_id": "ISS_AUTO_US_TARIFF",
+        "name": "미국 수입차 관세",
+        "type": "policy",
+        "polarity": "negative",
+        "duration": "persistent",
+        "agenda_ids": [
+          "risk",
+          "macro"
+        ],
+        "notes": "대미 수출 완성차·부품 마진 압박. 현지 생산 확대로 대응.",
+        "evidence_chunk_ids": [],
+        "valid_from": null,
+        "valid_until": null,
+        "review_cycle_days": 180,
+        "status": "draft",
+        "labeled_by": "claude_draft"
+      },
+      {
+        "issue_id": "ISS_EV_DEMAND_SLOWDOWN",
+        "name": "전기차 수요 둔화(캐즘)",
+        "type": "industry",
+        "polarity": "negative",
+        "duration": "cyclical",
+        "agenda_ids": [
+          "risk",
+          "growth"
+        ],
+        "notes": "보조금 축소·가격 부담으로 EV 판매 성장 둔화.",
+        "evidence_chunk_ids": [],
+        "valid_from": null,
+        "valid_until": null,
+        "review_cycle_days": 90,
+        "status": "draft",
+        "labeled_by": "claude_draft"
+      },
+      {
+        "issue_id": "ISS_BATTERY_CHINA_COMPETITION",
+        "name": "중국 배터리 저가 경쟁",
+        "type": "industry",
+        "polarity": "negative",
+        "duration": "persistent",
+        "agenda_ids": [
+          "risk",
+          "valuation"
+        ],
+        "notes": "LFP 중심 중국 업체의 가격 경쟁.",
+        "evidence_chunk_ids": [],
+        "valid_from": null,
+        "valid_until": null,
+        "review_cycle_days": 180,
+        "status": "draft",
+        "labeled_by": "claude_draft"
+      },
+      {
+        "issue_id": "ISS_ESS_DEMAND",
+        "name": "ESS(에너지저장장치) 수요 확대",
+        "type": "industry",
+        "polarity": "positive",
+        "duration": "persistent",
+        "agenda_ids": [
+          "growth"
+        ],
+        "notes": "데이터센터·재생에너지 연계 ESS. EV 둔화 상쇄 논거.",
+        "evidence_chunk_ids": [],
+        "valid_from": null,
+        "valid_until": null,
+        "review_cycle_days": 180,
+        "status": "draft",
+        "labeled_by": "claude_draft"
+      },
+      {
+        "issue_id": "ISS_SHIPBUILDING_UPCYCLE",
+        "name": "조선 수주 업사이클",
+        "type": "industry",
+        "polarity": "positive",
+        "duration": "cyclical",
+        "agenda_ids": [
+          "growth",
+          "valuation"
+        ],
+        "notes": "선가 상승·수주잔고 확대. 인도 시점부터 이익 반영.",
+        "evidence_chunk_ids": [],
+        "valid_from": null,
+        "valid_until": null,
+        "review_cycle_days": 90,
+        "status": "draft",
+        "labeled_by": "claude_draft"
+      },
+      {
+        "issue_id": "ISS_US_SHIPBUILDING_COOP",
+        "name": "한미 조선 협력(MRO·현지 투자)",
+        "type": "policy",
+        "polarity": "positive",
+        "duration": "persistent",
+        "agenda_ids": [
+          "growth",
+          "macro"
+        ],
+        "notes": "미 해군 MRO·현지 조선소 투자 협력.",
+        "evidence_chunk_ids": [],
+        "valid_from": null,
+        "valid_until": null,
+        "review_cycle_days": 180,
+        "status": "draft",
+        "labeled_by": "claude_draft"
+      },
+      {
+        "issue_id": "ISS_DEFENSE_EXPORT",
+        "name": "K-방산 수출 확대",
+        "type": "industry",
+        "polarity": "positive",
+        "duration": "persistent",
+        "agenda_ids": [
+          "growth",
+          "valuation"
+        ],
+        "notes": "지상무기·항공·유도무기 수출 계약.",
+        "evidence_chunk_ids": [],
+        "valid_from": null,
+        "valid_until": null,
+        "review_cycle_days": 180,
+        "status": "draft",
+        "labeled_by": "claude_draft"
+      },
+      {
+        "issue_id": "ISS_NUCLEAR_EXPORT",
+        "name": "원전 수주·수출",
+        "type": "industry",
+        "polarity": "positive",
+        "duration": "persistent",
+        "agenda_ids": [
+          "growth"
+        ],
+        "notes": "해외 원전·SMR 프로젝트.",
+        "evidence_chunk_ids": [],
+        "valid_from": null,
+        "valid_until": null,
+        "review_cycle_days": 180,
+        "status": "draft",
+        "labeled_by": "claude_draft"
+      },
+      {
+        "issue_id": "ISS_RATE_CUT_NIM",
+        "name": "금리 인하에 따른 은행 NIM 축소",
+        "type": "macro",
+        "polarity": "negative",
+        "duration": "cyclical",
+        "agenda_ids": [
+          "valuation",
+          "macro"
+        ],
+        "notes": "예대마진 축소. 비이자이익·주주환원이 방어 논거.",
+        "evidence_chunk_ids": [],
+        "valid_from": null,
+        "valid_until": null,
+        "review_cycle_days": 90,
+        "status": "draft",
+        "labeled_by": "claude_draft"
+      },
+      {
+        "issue_id": "ISS_PF_CREDIT_RISK",
+        "name": "부동산 PF 부실·건전성 리스크",
+        "type": "macro",
+        "polarity": "negative",
+        "duration": "cyclical",
+        "agenda_ids": [
+          "risk"
+        ],
+        "notes": "PF 연체·충당금 부담.",
+        "evidence_chunk_ids": [],
+        "valid_from": null,
+        "valid_until": null,
+        "review_cycle_days": 90,
+        "status": "draft",
+        "labeled_by": "claude_draft"
+      },
+      {
+        "issue_id": "ISS_TRADING_VOLUME_BOOM",
+        "name": "증시 거래대금 증가",
+        "type": "market",
+        "polarity": "positive",
+        "duration": "cyclical",
+        "agenda_ids": [
+          "growth",
+          "valuation"
+        ],
+        "notes": "브로커리지 수수료·IB 실적 개선.",
+        "evidence_chunk_ids": [],
+        "valid_from": null,
+        "valid_until": null,
+        "review_cycle_days": 90,
+        "status": "draft",
+        "labeled_by": "claude_draft"
+      },
+      {
+        "issue_id": "ISS_VALUEUP_POLICY",
+        "name": "밸류업·주주환원 정책",
+        "type": "policy",
+        "polarity": "positive",
+        "duration": "persistent",
+        "agenda_ids": [
+          "shareholder_return",
+          "valuation"
+        ],
+        "notes": "자사주 소각·배당 확대 압력. 저PBR 업종 재평가.",
+        "evidence_chunk_ids": [],
+        "valid_from": null,
+        "valid_until": null,
+        "review_cycle_days": 180,
+        "status": "draft",
+        "labeled_by": "claude_draft"
+      },
+      {
+        "issue_id": "ISS_GOVERNANCE_REFORM",
+        "name": "상법 개정·지배구조 개선",
+        "type": "policy",
+        "polarity": "positive",
+        "duration": "persistent",
+        "agenda_ids": [
+          "shareholder_return",
+          "valuation"
+        ],
+        "notes": "이사 충실의무 확대 등. 지주사 할인 축소 논거.",
+        "evidence_chunk_ids": [],
+        "valid_from": null,
+        "valid_until": null,
+        "review_cycle_days": 180,
+        "status": "draft",
+        "labeled_by": "claude_draft"
+      },
+      {
+        "issue_id": "ISS_CHINA_CHEM_OVERCAPACITY",
+        "name": "중국 석유화학 공급 과잉",
+        "type": "industry",
+        "polarity": "negative",
+        "duration": "persistent",
+        "agenda_ids": [
+          "risk",
+          "valuation"
+        ],
+        "notes": "범용 석화 스프레드 약세. 구조조정 여부가 변수.",
+        "evidence_chunk_ids": [],
+        "valid_from": null,
+        "valid_until": null,
+        "review_cycle_days": 180,
+        "status": "draft",
+        "labeled_by": "claude_draft"
+      },
+      {
+        "issue_id": "ISS_PLATFORM_REGULATION",
+        "name": "플랫폼 규제",
+        "type": "policy",
+        "polarity": "negative",
+        "duration": "persistent",
+        "agenda_ids": [
+          "risk"
+        ],
+        "notes": "수수료·광고·결제 규제.",
+        "evidence_chunk_ids": [],
+        "valid_from": null,
+        "valid_until": null,
+        "review_cycle_days": 180,
+        "status": "draft",
+        "labeled_by": "claude_draft"
+      },
+      {
+        "issue_id": "ISS_KBEAUTY_EXPORT",
+        "name": "K-뷰티 수출 확대",
+        "type": "industry",
+        "polarity": "positive",
+        "duration": "persistent",
+        "agenda_ids": [
+          "growth"
+        ],
+        "notes": "미국·일본 등 채널 다변화.",
+        "evidence_chunk_ids": [],
+        "valid_from": null,
+        "valid_until": null,
+        "review_cycle_days": 180,
+        "status": "draft",
+        "labeled_by": "claude_draft"
+      },
+      {
+        "issue_id": "ISS_KFOOD_EXPORT",
+        "name": "K-푸드 수출 확대",
+        "type": "industry",
+        "polarity": "positive",
+        "duration": "persistent",
+        "agenda_ids": [
+          "growth"
+        ],
+        "notes": "라면·스낵 해외 매출 비중 확대.",
+        "evidence_chunk_ids": [],
+        "valid_from": null,
+        "valid_until": null,
+        "review_cycle_days": 180,
+        "status": "draft",
+        "labeled_by": "claude_draft"
+      },
+      {
+        "issue_id": "ISS_BIO_CDMO_DEMAND",
+        "name": "바이오시밀러·CDMO 수요 확대",
+        "type": "industry",
+        "polarity": "positive",
+        "duration": "persistent",
+        "agenda_ids": [
+          "growth",
+          "valuation"
+        ],
+        "notes": "특허 만료 사이클·위탁생산 수요.",
+        "evidence_chunk_ids": [],
+        "valid_from": null,
+        "valid_until": null,
+        "review_cycle_days": 180,
+        "status": "draft",
+        "labeled_by": "claude_draft"
+      },
+      {
+        "issue_id": "ISS_PHARMA_US_TARIFF",
+        "name": "미국 의약품 관세",
+        "type": "policy",
+        "polarity": "negative",
+        "duration": "event_driven",
+        "agenda_ids": [
+          "risk",
+          "macro"
+        ],
+        "notes": "현지 생산 여부가 노출도 결정.",
+        "evidence_chunk_ids": [],
+        "valid_from": null,
+        "valid_until": null,
+        "review_cycle_days": 30,
+        "status": "draft",
+        "labeled_by": "claude_draft"
+      },
+      {
+        "issue_id": "ISS_FREIGHT_NORMALIZATION",
+        "name": "컨테이너 운임 하락",
+        "type": "industry",
+        "polarity": "negative",
+        "duration": "cyclical",
+        "agenda_ids": [
+          "risk",
+          "valuation"
+        ],
+        "notes": "선복 공급 증가로 운임 정상화.",
+        "evidence_chunk_ids": [],
+        "valid_from": null,
+        "valid_until": null,
+        "review_cycle_days": 90,
+        "status": "draft",
+        "labeled_by": "claude_draft"
+      }
+    ],
+    "companies_t1": [
+      {
+        "ticker": "000250",
+        "name": "삼천당제약",
+        "market": "KOSDAQ",
+        "sector_id": "SEC_HEALTH",
+        "sector_l1": "건강관리",
+        "sector_l2": "제약과생물공학",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "028300",
+        "name": "HLB",
+        "market": "KOSDAQ",
+        "sector_id": "SEC_HEALTH",
+        "sector_l1": "건강관리",
+        "sector_l2": "건강관리장비와서비스",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "036930",
+        "name": "주성엔지니어링",
+        "market": "KOSDAQ",
+        "sector_id": "SEC_IT",
+        "sector_l1": "IT",
+        "sector_l2": "반도체와반도체장비",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "039030",
+        "name": "이오테크닉스",
+        "market": "KOSDAQ",
+        "sector_id": "SEC_IT",
+        "sector_l1": "IT",
+        "sector_l2": "반도체와반도체장비",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "058470",
+        "name": "리노공업",
+        "market": "KOSDAQ",
+        "sector_id": "SEC_IT",
+        "sector_l1": "IT",
+        "sector_l2": "반도체와반도체장비",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "086520",
+        "name": "에코프로",
+        "market": "KOSDAQ",
+        "sector_id": "SEC_MATERIAL",
+        "sector_l1": "소재",
+        "sector_l2": "소재",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "196170",
+        "name": "알테오젠",
+        "market": "KOSDAQ",
+        "sector_id": "SEC_HEALTH",
+        "sector_l1": "건강관리",
+        "sector_l2": "제약과생물공학",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "240810",
+        "name": "원익IPS",
+        "market": "KOSDAQ",
+        "sector_id": "SEC_IT",
+        "sector_l1": "IT",
+        "sector_l2": "반도체와반도체장비",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "247540",
+        "name": "에코프로비엠",
+        "market": "KOSDAQ",
+        "sector_id": "SEC_IT",
+        "sector_l1": "IT",
+        "sector_l2": "전자와 전기제품",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "277810",
+        "name": "레인보우로보틱스",
+        "market": "KOSDAQ",
+        "sector_id": "SEC_INDUS",
+        "sector_l1": "산업재",
+        "sector_l2": "자본재",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "000100",
+        "name": "유한양행",
+        "market": "KOSPI",
+        "sector_id": "SEC_HEALTH",
+        "sector_l1": "건강관리",
+        "sector_l2": "제약과생물공학",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "000150",
+        "name": "두산",
+        "market": "KOSPI",
+        "sector_id": "SEC_INDUS",
+        "sector_l1": "산업재",
+        "sector_l2": "자본재",
+        "sub_industry": null,
+        "is_holding": true,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "000270",
+        "name": "기아",
+        "market": "KOSPI",
+        "sector_id": "SEC_CONS_DISC",
+        "sector_l1": "경기관련소비재",
+        "sector_l2": "자동차와부품",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "000500",
+        "name": "가온전선",
+        "market": "KOSPI",
+        "sector_id": "SEC_INDUS",
+        "sector_l1": "산업재",
+        "sector_l2": "자본재",
+        "sub_industry": "전선",
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "000660",
+        "name": "SK하이닉스",
+        "market": "KOSPI",
+        "sector_id": "SEC_IT",
+        "sector_l1": "IT",
+        "sector_l2": "반도체와반도체장비",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "000720",
+        "name": "현대건설",
+        "market": "KOSPI",
+        "sector_id": "SEC_INDUS",
+        "sector_l1": "산업재",
+        "sector_l2": "자본재",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "000810",
+        "name": "삼성화재",
+        "market": "KOSPI",
+        "sector_id": "SEC_FIN",
+        "sector_l1": "금융",
+        "sector_l2": "보험",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "000880",
+        "name": "한화",
+        "market": "KOSPI",
+        "sector_id": "SEC_INDUS",
+        "sector_l1": "산업재",
+        "sector_l2": "자본재",
+        "sub_industry": null,
+        "is_holding": true,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "003230",
+        "name": "삼양식품",
+        "market": "KOSPI",
+        "sector_id": "SEC_CONS_STAP",
+        "sector_l1": "필수소비재",
+        "sector_l2": "식품,음료,담배",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "003490",
+        "name": "대한항공",
+        "market": "KOSPI",
+        "sector_id": "SEC_INDUS",
+        "sector_l1": "산업재",
+        "sector_l2": "운송",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "003550",
+        "name": "LG",
+        "market": "KOSPI",
+        "sector_id": "SEC_INDUS",
+        "sector_l1": "산업재",
+        "sector_l2": "자본재",
+        "sub_industry": null,
+        "is_holding": true,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "003670",
+        "name": "포스코퓨처엠",
+        "market": "KOSPI",
+        "sector_id": "SEC_MATERIAL",
+        "sector_l1": "소재",
+        "sector_l2": "소재",
+        "sub_industry": "양극재",
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "005380",
+        "name": "현대차",
+        "market": "KOSPI",
+        "sector_id": "SEC_CONS_DISC",
+        "sector_l1": "경기관련소비재",
+        "sector_l2": "자동차와부품",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "005490",
+        "name": "POSCO홀딩스",
+        "market": "KOSPI",
+        "sector_id": "SEC_MATERIAL",
+        "sector_l1": "소재",
+        "sector_l2": "소재",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "005830",
+        "name": "DB손해보험",
+        "market": "KOSPI",
+        "sector_id": "SEC_FIN",
+        "sector_l1": "금융",
+        "sector_l2": "보험",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "005930",
+        "name": "삼성전자",
+        "market": "KOSPI",
+        "sector_id": "SEC_IT",
+        "sector_l1": "IT",
+        "sector_l2": "반도체와반도체장비",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "005940",
+        "name": "NH투자증권",
+        "market": "KOSPI",
+        "sector_id": "SEC_FIN",
+        "sector_l1": "금융",
+        "sector_l2": "증권",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "006260",
+        "name": "LS",
+        "market": "KOSPI",
+        "sector_id": "SEC_INDUS",
+        "sector_l1": "산업재",
+        "sector_l2": "자본재",
+        "sub_industry": null,
+        "is_holding": true,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "006400",
+        "name": "삼성SDI",
+        "market": "KOSPI",
+        "sector_id": "SEC_IT",
+        "sector_l1": "IT",
+        "sector_l2": "전자와 전기제품",
+        "sub_industry": "2차전지",
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "006800",
+        "name": "미래에셋증권",
+        "market": "KOSPI",
+        "sector_id": "SEC_FIN",
+        "sector_l1": "금융",
+        "sector_l2": "증권",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "007660",
+        "name": "이수페타시스",
+        "market": "KOSPI",
+        "sector_id": "SEC_IT",
+        "sector_l1": "IT",
+        "sector_l2": "반도체와반도체장비",
+        "sub_industry": "PCB",
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "009150",
+        "name": "삼성전기",
+        "market": "KOSPI",
+        "sector_id": "SEC_IT",
+        "sector_l1": "IT",
+        "sector_l2": "기술하드웨어와장비",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "009540",
+        "name": "HD한국조선해양",
+        "market": "KOSPI",
+        "sector_id": "SEC_INDUS",
+        "sector_l1": "산업재",
+        "sector_l2": "자본재",
+        "sub_industry": "조선 중간지주",
+        "is_holding": true,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "009830",
+        "name": "한화솔루션",
+        "market": "KOSPI",
+        "sector_id": "SEC_ENERGY",
+        "sector_l1": "에너지",
+        "sector_l2": "에너지",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "010120",
+        "name": "LS ELECTRIC",
+        "market": "KOSPI",
+        "sector_id": "SEC_INDUS",
+        "sector_l1": "산업재",
+        "sector_l2": "자본재",
+        "sub_industry": "전력기기",
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "010130",
+        "name": "고려아연",
+        "market": "KOSPI",
+        "sector_id": "SEC_MATERIAL",
+        "sector_l1": "소재",
+        "sector_l2": "소재",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "010140",
+        "name": "삼성중공업",
+        "market": "KOSPI",
+        "sector_id": "SEC_INDUS",
+        "sector_l1": "산업재",
+        "sector_l2": "자본재",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "010950",
+        "name": "S-Oil",
+        "market": "KOSPI",
+        "sector_id": "SEC_ENERGY",
+        "sector_l1": "에너지",
+        "sector_l2": "에너지",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "011070",
+        "name": "LG이노텍",
+        "market": "KOSPI",
+        "sector_id": "SEC_IT",
+        "sector_l1": "IT",
+        "sector_l2": "기술하드웨어와장비",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "011200",
+        "name": "HMM",
+        "market": "KOSPI",
+        "sector_id": "SEC_INDUS",
+        "sector_l1": "산업재",
+        "sector_l2": "운송",
+        "sub_industry": "컨테이너 해운",
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "012330",
+        "name": "현대모비스",
+        "market": "KOSPI",
+        "sector_id": "SEC_CONS_DISC",
+        "sector_l1": "경기관련소비재",
+        "sector_l2": "자동차와부품",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "012450",
+        "name": "한화에어로스페이스",
+        "market": "KOSPI",
+        "sector_id": "SEC_INDUS",
+        "sector_l1": "산업재",
+        "sector_l2": "자본재",
+        "sub_industry": "방산·항공엔진",
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "0126Z0",
+        "name": "삼성에피스홀딩스",
+        "market": "KOSPI",
+        "sector_id": "SEC_HEALTH",
+        "sector_l1": "건강관리",
+        "sector_l2": "제약과생물공학",
+        "sub_industry": "삼성바이오에피스 지주",
+        "is_holding": true,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "015760",
+        "name": "한국전력",
+        "market": "KOSPI",
+        "sector_id": "SEC_UTIL",
+        "sector_l1": "유틸리티",
+        "sector_l2": "유틸리티",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "016360",
+        "name": "삼성증권",
+        "market": "KOSPI",
+        "sector_id": "SEC_FIN",
+        "sector_l1": "금융",
+        "sector_l2": "증권",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "017670",
+        "name": "SK텔레콤",
+        "market": "KOSPI",
+        "sector_id": "SEC_COMM",
+        "sector_l1": "커뮤니케이션서비스",
+        "sector_l2": "전기통신서비스",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "018260",
+        "name": "삼성에스디에스",
+        "market": "KOSPI",
+        "sector_id": "SEC_IT",
+        "sector_l1": "IT",
+        "sector_l2": "소프트웨어와서비스",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "021240",
+        "name": "코웨이",
+        "market": "KOSPI",
+        "sector_id": "SEC_CONS_DISC",
+        "sector_l1": "경기관련소비재",
+        "sector_l2": "내구소비재와의류",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "024110",
+        "name": "기업은행",
+        "market": "KOSPI",
+        "sector_id": "SEC_FIN",
+        "sector_l1": "금융",
+        "sector_l2": "은행",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "028050",
+        "name": "삼성E&A",
+        "market": "KOSPI",
+        "sector_id": "SEC_INDUS",
+        "sector_l1": "산업재",
+        "sector_l2": "자본재",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "028260",
+        "name": "삼성물산",
+        "market": "KOSPI",
+        "sector_id": "SEC_INDUS",
+        "sector_l1": "산업재",
+        "sector_l2": "자본재",
+        "sub_industry": null,
+        "is_holding": true,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "030200",
+        "name": "KT",
+        "market": "KOSPI",
+        "sector_id": "SEC_COMM",
+        "sector_l1": "커뮤니케이션서비스",
+        "sector_l2": "전기통신서비스",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "032640",
+        "name": "LG유플러스",
+        "market": "KOSPI",
+        "sector_id": "SEC_COMM",
+        "sector_l1": "커뮤니케이션서비스",
+        "sector_l2": "전기통신서비스",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "032830",
+        "name": "삼성생명",
+        "market": "KOSPI",
+        "sector_id": "SEC_FIN",
+        "sector_l1": "금융",
+        "sector_l2": "보험",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "033780",
+        "name": "KT&G",
+        "market": "KOSPI",
+        "sector_id": "SEC_CONS_STAP",
+        "sector_l1": "필수소비재",
+        "sector_l2": "식품,음료,담배",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "034020",
+        "name": "두산에너빌리티",
+        "market": "KOSPI",
+        "sector_id": "SEC_INDUS",
+        "sector_l1": "산업재",
+        "sector_l2": "자본재",
+        "sub_industry": "원전·발전설비",
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "034730",
+        "name": "SK",
+        "market": "KOSPI",
+        "sector_id": "SEC_ENERGY",
+        "sector_l1": "에너지",
+        "sector_l2": "에너지",
+        "sub_industry": null,
+        "is_holding": true,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "035420",
+        "name": "NAVER",
+        "market": "KOSPI",
+        "sector_id": "SEC_COMM",
+        "sector_l1": "커뮤니케이션서비스",
+        "sector_l2": "미디어와엔터테인먼트",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "035720",
+        "name": "카카오",
+        "market": "KOSPI",
+        "sector_id": "SEC_COMM",
+        "sector_l1": "커뮤니케이션서비스",
+        "sector_l2": "미디어와엔터테인먼트",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "039490",
+        "name": "키움증권",
+        "market": "KOSPI",
+        "sector_id": "SEC_FIN",
+        "sector_l1": "금융",
+        "sector_l2": "증권",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "042660",
+        "name": "한화오션",
+        "market": "KOSPI",
+        "sector_id": "SEC_INDUS",
+        "sector_l1": "산업재",
+        "sector_l2": "자본재",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "042700",
+        "name": "한미반도체",
+        "market": "KOSPI",
+        "sector_id": "SEC_IT",
+        "sector_l1": "IT",
+        "sector_l2": "반도체와반도체장비",
+        "sub_industry": "반도체 장비",
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "047040",
+        "name": "대우건설",
+        "market": "KOSPI",
+        "sector_id": "SEC_INDUS",
+        "sector_l1": "산업재",
+        "sector_l2": "자본재",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "047050",
+        "name": "포스코인터내셔널",
+        "market": "KOSPI",
+        "sector_id": "SEC_INDUS",
+        "sector_l1": "산업재",
+        "sector_l2": "자본재",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "047810",
+        "name": "한국항공우주",
+        "market": "KOSPI",
+        "sector_id": "SEC_INDUS",
+        "sector_l1": "산업재",
+        "sector_l2": "자본재",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "051910",
+        "name": "LG화학",
+        "market": "KOSPI",
+        "sector_id": "SEC_MATERIAL",
+        "sector_l1": "소재",
+        "sector_l2": "소재",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "055550",
+        "name": "신한지주",
+        "market": "KOSPI",
+        "sector_id": "SEC_FIN",
+        "sector_l1": "금융",
+        "sector_l2": "은행",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "062040",
+        "name": "산일전기",
+        "market": "KOSPI",
+        "sector_id": "SEC_INDUS",
+        "sector_l1": "산업재",
+        "sector_l2": "자본재",
+        "sub_industry": "전력기기(변압기)",
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "064350",
+        "name": "현대로템",
+        "market": "KOSPI",
+        "sector_id": "SEC_INDUS",
+        "sector_l1": "산업재",
+        "sector_l2": "자본재",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "064400",
+        "name": "LG씨엔에스",
+        "market": "KOSPI",
+        "sector_id": "SEC_IT",
+        "sector_l1": "IT",
+        "sector_l2": "소프트웨어와서비스",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "066570",
+        "name": "LG전자",
+        "market": "KOSPI",
+        "sector_id": "SEC_IT",
+        "sector_l1": "IT",
+        "sector_l2": "전자와 전기제품",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "068270",
+        "name": "셀트리온",
+        "market": "KOSPI",
+        "sector_id": "SEC_HEALTH",
+        "sector_l1": "건강관리",
+        "sector_l2": "제약과생물공학",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "071050",
+        "name": "한국금융지주",
+        "market": "KOSPI",
+        "sector_id": "SEC_FIN",
+        "sector_l1": "금융",
+        "sector_l2": "증권",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "078930",
+        "name": "GS",
+        "market": "KOSPI",
+        "sector_id": "SEC_ENERGY",
+        "sector_l1": "에너지",
+        "sector_l2": "에너지",
+        "sub_industry": "정유 중심 지주",
+        "is_holding": true,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "079550",
+        "name": "LIG디펜스앤에어로스페이스",
+        "market": "KOSPI",
+        "sector_id": "SEC_INDUS",
+        "sector_l1": "산업재",
+        "sector_l2": "자본재",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "086280",
+        "name": "현대글로비스",
+        "market": "KOSPI",
+        "sector_id": "SEC_INDUS",
+        "sector_l1": "산업재",
+        "sector_l2": "운송",
+        "sub_industry": "자동차 물류",
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "086790",
+        "name": "하나금융지주",
+        "market": "KOSPI",
+        "sector_id": "SEC_FIN",
+        "sector_l1": "금융",
+        "sector_l2": "은행",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "090430",
+        "name": "아모레퍼시픽",
+        "market": "KOSPI",
+        "sector_id": "SEC_CONS_DISC",
+        "sector_l1": "경기관련소비재",
+        "sector_l2": "내구소비재와의류",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "096770",
+        "name": "SK이노베이션",
+        "market": "KOSPI",
+        "sector_id": "SEC_ENERGY",
+        "sector_l1": "에너지",
+        "sector_l2": "에너지",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "105560",
+        "name": "KB금융",
+        "market": "KOSPI",
+        "sector_id": "SEC_FIN",
+        "sector_l1": "금융",
+        "sector_l2": "은행",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "138040",
+        "name": "메리츠금융지주",
+        "market": "KOSPI",
+        "sector_id": "SEC_FIN",
+        "sector_l1": "금융",
+        "sector_l2": "증권",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "161390",
+        "name": "한국타이어앤테크놀로지",
+        "market": "KOSPI",
+        "sector_id": "SEC_CONS_DISC",
+        "sector_l1": "경기관련소비재",
+        "sector_l2": "자동차와부품",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "180640",
+        "name": "한진칼",
+        "market": "KOSPI",
+        "sector_id": "SEC_INDUS",
+        "sector_l1": "산업재",
+        "sector_l2": "운송",
+        "sub_industry": null,
+        "is_holding": true,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "207940",
+        "name": "삼성바이오로직스",
+        "market": "KOSPI",
+        "sector_id": "SEC_HEALTH",
+        "sector_l1": "건강관리",
+        "sector_l2": "제약과생물공학",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "259960",
+        "name": "크래프톤",
+        "market": "KOSPI",
+        "sector_id": "SEC_COMM",
+        "sector_l1": "커뮤니케이션서비스",
+        "sector_l2": "미디어와엔터테인먼트",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "267250",
+        "name": "HD현대",
+        "market": "KOSPI",
+        "sector_id": "SEC_INDUS",
+        "sector_l1": "산업재",
+        "sector_l2": "자본재",
+        "sub_industry": null,
+        "is_holding": true,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "267260",
+        "name": "HD현대일렉트릭",
+        "market": "KOSPI",
+        "sector_id": "SEC_INDUS",
+        "sector_l1": "산업재",
+        "sector_l2": "자본재",
+        "sub_industry": "전력기기",
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "272210",
+        "name": "한화시스템",
+        "market": "KOSPI",
+        "sector_id": "SEC_INDUS",
+        "sector_l1": "산업재",
+        "sector_l2": "자본재",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "278470",
+        "name": "에이피알",
+        "market": "KOSPI",
+        "sector_id": "SEC_CONS_DISC",
+        "sector_l1": "경기관련소비재",
+        "sector_l2": "내구소비재와의류",
+        "sub_industry": "뷰티 디바이스·화장품",
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "298040",
+        "name": "효성중공업",
+        "market": "KOSPI",
+        "sector_id": "SEC_INDUS",
+        "sector_l1": "산업재",
+        "sector_l2": "자본재",
+        "sub_industry": "전력기기",
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "307950",
+        "name": "현대오토에버",
+        "market": "KOSPI",
+        "sector_id": "SEC_IT",
+        "sector_l1": "IT",
+        "sector_l2": "소프트웨어와서비스",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "316140",
+        "name": "우리금융지주",
+        "market": "KOSPI",
+        "sector_id": "SEC_FIN",
+        "sector_l1": "금융",
+        "sector_l2": "은행",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "323410",
+        "name": "카카오뱅크",
+        "market": "KOSPI",
+        "sector_id": "SEC_FIN",
+        "sector_l1": "금융",
+        "sector_l2": "은행",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "326030",
+        "name": "SK바이오팜",
+        "market": "KOSPI",
+        "sector_id": "SEC_HEALTH",
+        "sector_l1": "건강관리",
+        "sector_l2": "제약과생물공학",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "329180",
+        "name": "HD현대중공업",
+        "market": "KOSPI",
+        "sector_id": "SEC_INDUS",
+        "sector_l1": "산업재",
+        "sector_l2": "자본재",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "352820",
+        "name": "하이브",
+        "market": "KOSPI",
+        "sector_id": "SEC_COMM",
+        "sector_l1": "커뮤니케이션서비스",
+        "sector_l2": "미디어와엔터테인먼트",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "353200",
+        "name": "대덕전자",
+        "market": "KOSPI",
+        "sector_id": "SEC_IT",
+        "sector_l1": "IT",
+        "sector_l2": "기술하드웨어와장비",
+        "sub_industry": "PCB",
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "373220",
+        "name": "LG에너지솔루션",
+        "market": "KOSPI",
+        "sector_id": "SEC_IT",
+        "sector_l1": "IT",
+        "sector_l2": "전자와 전기제품",
+        "sub_industry": "2차전지",
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "402340",
+        "name": "SK스퀘어",
+        "market": "KOSPI",
+        "sector_id": "SEC_IT",
+        "sector_l1": "IT",
+        "sector_l2": "반도체와반도체장비",
+        "sub_industry": "SK하이닉스 지분 투자회사",
+        "is_holding": true,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      },
+      {
+        "ticker": "443060",
+        "name": "HD현대마린솔루션",
+        "market": "KOSPI",
+        "sector_id": "SEC_INDUS",
+        "sector_l1": "산업재",
+        "sector_l2": "자본재",
+        "sub_industry": null,
+        "is_holding": false,
+        "tier": "T1",
+        "is_core": true,
+        "tier_assigned_on": "2026-10-22",
+        "sector_source": "pipeline:companies.sector_l1(WICS)",
+        "sub_industry_source": "claude_draft"
+      }
+    ]
+  },
+  "edges": {
+    "belongs_to": [
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "000250",
+        "from_type": "COMPANY",
+        "to_node": "SEC_HEALTH",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "028300",
+        "from_type": "COMPANY",
+        "to_node": "SEC_HEALTH",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "036930",
+        "from_type": "COMPANY",
+        "to_node": "SEC_IT",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "039030",
+        "from_type": "COMPANY",
+        "to_node": "SEC_IT",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "058470",
+        "from_type": "COMPANY",
+        "to_node": "SEC_IT",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "086520",
+        "from_type": "COMPANY",
+        "to_node": "SEC_MATERIAL",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "196170",
+        "from_type": "COMPANY",
+        "to_node": "SEC_HEALTH",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "240810",
+        "from_type": "COMPANY",
+        "to_node": "SEC_IT",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "247540",
+        "from_type": "COMPANY",
+        "to_node": "SEC_IT",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "277810",
+        "from_type": "COMPANY",
+        "to_node": "SEC_INDUS",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "000100",
+        "from_type": "COMPANY",
+        "to_node": "SEC_HEALTH",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "000150",
+        "from_type": "COMPANY",
+        "to_node": "SEC_INDUS",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "000270",
+        "from_type": "COMPANY",
+        "to_node": "SEC_CONS_DISC",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "000500",
+        "from_type": "COMPANY",
+        "to_node": "SEC_INDUS",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "000660",
+        "from_type": "COMPANY",
+        "to_node": "SEC_IT",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "000720",
+        "from_type": "COMPANY",
+        "to_node": "SEC_INDUS",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "000810",
+        "from_type": "COMPANY",
+        "to_node": "SEC_FIN",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "000880",
+        "from_type": "COMPANY",
+        "to_node": "SEC_INDUS",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "003230",
+        "from_type": "COMPANY",
+        "to_node": "SEC_CONS_STAP",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "003490",
+        "from_type": "COMPANY",
+        "to_node": "SEC_INDUS",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "003550",
+        "from_type": "COMPANY",
+        "to_node": "SEC_INDUS",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "003670",
+        "from_type": "COMPANY",
+        "to_node": "SEC_MATERIAL",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "005380",
+        "from_type": "COMPANY",
+        "to_node": "SEC_CONS_DISC",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "005490",
+        "from_type": "COMPANY",
+        "to_node": "SEC_MATERIAL",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "005830",
+        "from_type": "COMPANY",
+        "to_node": "SEC_FIN",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "005930",
+        "from_type": "COMPANY",
+        "to_node": "SEC_IT",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "005940",
+        "from_type": "COMPANY",
+        "to_node": "SEC_FIN",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "006260",
+        "from_type": "COMPANY",
+        "to_node": "SEC_INDUS",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "006400",
+        "from_type": "COMPANY",
+        "to_node": "SEC_IT",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "006800",
+        "from_type": "COMPANY",
+        "to_node": "SEC_FIN",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "007660",
+        "from_type": "COMPANY",
+        "to_node": "SEC_IT",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "009150",
+        "from_type": "COMPANY",
+        "to_node": "SEC_IT",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "009540",
+        "from_type": "COMPANY",
+        "to_node": "SEC_INDUS",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "009830",
+        "from_type": "COMPANY",
+        "to_node": "SEC_ENERGY",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "010120",
+        "from_type": "COMPANY",
+        "to_node": "SEC_INDUS",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "010130",
+        "from_type": "COMPANY",
+        "to_node": "SEC_MATERIAL",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "010140",
+        "from_type": "COMPANY",
+        "to_node": "SEC_INDUS",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "010950",
+        "from_type": "COMPANY",
+        "to_node": "SEC_ENERGY",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "011070",
+        "from_type": "COMPANY",
+        "to_node": "SEC_IT",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "011200",
+        "from_type": "COMPANY",
+        "to_node": "SEC_INDUS",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "012330",
+        "from_type": "COMPANY",
+        "to_node": "SEC_CONS_DISC",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "012450",
+        "from_type": "COMPANY",
+        "to_node": "SEC_INDUS",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "0126Z0",
+        "from_type": "COMPANY",
+        "to_node": "SEC_HEALTH",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "015760",
+        "from_type": "COMPANY",
+        "to_node": "SEC_UTIL",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "016360",
+        "from_type": "COMPANY",
+        "to_node": "SEC_FIN",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "017670",
+        "from_type": "COMPANY",
+        "to_node": "SEC_COMM",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "018260",
+        "from_type": "COMPANY",
+        "to_node": "SEC_IT",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "021240",
+        "from_type": "COMPANY",
+        "to_node": "SEC_CONS_DISC",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "024110",
+        "from_type": "COMPANY",
+        "to_node": "SEC_FIN",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "028050",
+        "from_type": "COMPANY",
+        "to_node": "SEC_INDUS",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "028260",
+        "from_type": "COMPANY",
+        "to_node": "SEC_INDUS",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "030200",
+        "from_type": "COMPANY",
+        "to_node": "SEC_COMM",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "032640",
+        "from_type": "COMPANY",
+        "to_node": "SEC_COMM",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "032830",
+        "from_type": "COMPANY",
+        "to_node": "SEC_FIN",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "033780",
+        "from_type": "COMPANY",
+        "to_node": "SEC_CONS_STAP",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "034020",
+        "from_type": "COMPANY",
+        "to_node": "SEC_INDUS",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "034730",
+        "from_type": "COMPANY",
+        "to_node": "SEC_ENERGY",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "035420",
+        "from_type": "COMPANY",
+        "to_node": "SEC_COMM",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "035720",
+        "from_type": "COMPANY",
+        "to_node": "SEC_COMM",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "039490",
+        "from_type": "COMPANY",
+        "to_node": "SEC_FIN",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "042660",
+        "from_type": "COMPANY",
+        "to_node": "SEC_INDUS",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "042700",
+        "from_type": "COMPANY",
+        "to_node": "SEC_IT",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "047040",
+        "from_type": "COMPANY",
+        "to_node": "SEC_INDUS",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "047050",
+        "from_type": "COMPANY",
+        "to_node": "SEC_INDUS",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "047810",
+        "from_type": "COMPANY",
+        "to_node": "SEC_INDUS",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "051910",
+        "from_type": "COMPANY",
+        "to_node": "SEC_MATERIAL",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "055550",
+        "from_type": "COMPANY",
+        "to_node": "SEC_FIN",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "062040",
+        "from_type": "COMPANY",
+        "to_node": "SEC_INDUS",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "064350",
+        "from_type": "COMPANY",
+        "to_node": "SEC_INDUS",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "064400",
+        "from_type": "COMPANY",
+        "to_node": "SEC_IT",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "066570",
+        "from_type": "COMPANY",
+        "to_node": "SEC_IT",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "068270",
+        "from_type": "COMPANY",
+        "to_node": "SEC_HEALTH",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "071050",
+        "from_type": "COMPANY",
+        "to_node": "SEC_FIN",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "078930",
+        "from_type": "COMPANY",
+        "to_node": "SEC_ENERGY",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "079550",
+        "from_type": "COMPANY",
+        "to_node": "SEC_INDUS",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "086280",
+        "from_type": "COMPANY",
+        "to_node": "SEC_INDUS",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "086790",
+        "from_type": "COMPANY",
+        "to_node": "SEC_FIN",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "090430",
+        "from_type": "COMPANY",
+        "to_node": "SEC_CONS_DISC",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "096770",
+        "from_type": "COMPANY",
+        "to_node": "SEC_ENERGY",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "105560",
+        "from_type": "COMPANY",
+        "to_node": "SEC_FIN",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "138040",
+        "from_type": "COMPANY",
+        "to_node": "SEC_FIN",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "161390",
+        "from_type": "COMPANY",
+        "to_node": "SEC_CONS_DISC",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "180640",
+        "from_type": "COMPANY",
+        "to_node": "SEC_INDUS",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "207940",
+        "from_type": "COMPANY",
+        "to_node": "SEC_HEALTH",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "259960",
+        "from_type": "COMPANY",
+        "to_node": "SEC_COMM",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "267250",
+        "from_type": "COMPANY",
+        "to_node": "SEC_INDUS",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "267260",
+        "from_type": "COMPANY",
+        "to_node": "SEC_INDUS",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "272210",
+        "from_type": "COMPANY",
+        "to_node": "SEC_INDUS",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "278470",
+        "from_type": "COMPANY",
+        "to_node": "SEC_CONS_DISC",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "298040",
+        "from_type": "COMPANY",
+        "to_node": "SEC_INDUS",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "307950",
+        "from_type": "COMPANY",
+        "to_node": "SEC_IT",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "316140",
+        "from_type": "COMPANY",
+        "to_node": "SEC_FIN",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "323410",
+        "from_type": "COMPANY",
+        "to_node": "SEC_FIN",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "326030",
+        "from_type": "COMPANY",
+        "to_node": "SEC_HEALTH",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "329180",
+        "from_type": "COMPANY",
+        "to_node": "SEC_INDUS",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "352820",
+        "from_type": "COMPANY",
+        "to_node": "SEC_COMM",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "353200",
+        "from_type": "COMPANY",
+        "to_node": "SEC_IT",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "373220",
+        "from_type": "COMPANY",
+        "to_node": "SEC_IT",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "402340",
+        "from_type": "COMPANY",
+        "to_node": "SEC_IT",
+        "to_type": "SECTOR"
+      },
+      {
+        "edge_type": "BELONGS_TO",
+        "from_node": "443060",
+        "from_type": "COMPANY",
+        "to_node": "SEC_INDUS",
+        "to_type": "SECTOR"
+      }
+    ],
+    "sensitive_to": [
+      {
+        "edge_type": "SENSITIVE_TO",
+        "from_node": "SEC_IT",
+        "from_type": "SECTOR",
+        "to_node": "BASE_RATE_KR",
+        "to_type": "MACRO",
+        "weight": null,
+        "expected_sign": "-",
+        "weight_source": null,
+        "weight_window": null,
+        "weight_as_of": null,
+        "weight_n_tickers": null,
+        "weight_coverage": "none_planned",
+        "rationale": "성장주 할인율"
+      },
+      {
+        "edge_type": "SENSITIVE_TO",
+        "from_node": "SEC_IT",
+        "from_type": "SECTOR",
+        "to_node": "US_10Y_YIELD",
+        "to_type": "MACRO",
+        "weight": null,
+        "expected_sign": "-",
+        "weight_source": null,
+        "weight_window": null,
+        "weight_as_of": null,
+        "weight_n_tickers": null,
+        "weight_coverage": "none_planned",
+        "rationale": "글로벌 성장주 할인율"
+      },
+      {
+        "edge_type": "SENSITIVE_TO",
+        "from_node": "SEC_IT",
+        "from_type": "SECTOR",
+        "to_node": "USD_KRW",
+        "to_type": "MACRO",
+        "weight": null,
+        "expected_sign": "+",
+        "weight_source": null,
+        "weight_window": null,
+        "weight_as_of": null,
+        "weight_n_tickers": null,
+        "weight_coverage": "planned",
+        "rationale": "수출 환산 이익"
+      },
+      {
+        "edge_type": "SENSITIVE_TO",
+        "from_node": "SEC_IT",
+        "from_type": "SECTOR",
+        "to_node": "DRAM_PRICE",
+        "to_type": "MACRO",
+        "weight": null,
+        "expected_sign": "+",
+        "weight_source": null,
+        "weight_window": null,
+        "weight_as_of": null,
+        "weight_n_tickers": null,
+        "weight_coverage": "none_planned",
+        "rationale": "메모리 실적 직결"
+      },
+      {
+        "edge_type": "SENSITIVE_TO",
+        "from_node": "SEC_IT",
+        "from_type": "SECTOR",
+        "to_node": "VIX",
+        "to_type": "MACRO",
+        "weight": null,
+        "expected_sign": "-",
+        "weight_source": null,
+        "weight_window": null,
+        "weight_as_of": null,
+        "weight_n_tickers": null,
+        "weight_coverage": "none_planned",
+        "rationale": "고베타"
+      },
+      {
+        "edge_type": "SENSITIVE_TO",
+        "from_node": "SEC_COMM",
+        "from_type": "SECTOR",
+        "to_node": "KTB_10Y_KR",
+        "to_type": "MACRO",
+        "weight": null,
+        "expected_sign": "-",
+        "weight_source": null,
+        "weight_window": null,
+        "weight_as_of": null,
+        "weight_n_tickers": null,
+        "weight_coverage": "none_planned",
+        "rationale": "플랫폼 성장주 할인율"
+      },
+      {
+        "edge_type": "SENSITIVE_TO",
+        "from_node": "SEC_CONS_DISC",
+        "from_type": "SECTOR",
+        "to_node": "USD_KRW",
+        "to_type": "MACRO",
+        "weight": null,
+        "expected_sign": "+",
+        "weight_source": null,
+        "weight_window": null,
+        "weight_as_of": null,
+        "weight_n_tickers": null,
+        "weight_coverage": "planned",
+        "rationale": "완성차 수출"
+      },
+      {
+        "edge_type": "SENSITIVE_TO",
+        "from_node": "SEC_CONS_DISC",
+        "from_type": "SECTOR",
+        "to_node": "BASE_RATE_KR",
+        "to_type": "MACRO",
+        "weight": null,
+        "expected_sign": "-",
+        "weight_source": null,
+        "weight_window": null,
+        "weight_as_of": null,
+        "weight_n_tickers": null,
+        "weight_coverage": "none_planned",
+        "rationale": "할부·소비심리"
+      },
+      {
+        "edge_type": "SENSITIVE_TO",
+        "from_node": "SEC_CONS_DISC",
+        "from_type": "SECTOR",
+        "to_node": "CHINA_PMI_MFG",
+        "to_type": "MACRO",
+        "weight": null,
+        "expected_sign": "+",
+        "weight_source": null,
+        "weight_window": null,
+        "weight_as_of": null,
+        "weight_n_tickers": null,
+        "weight_coverage": "none_planned",
+        "rationale": "중국 수요"
+      },
+      {
+        "edge_type": "SENSITIVE_TO",
+        "from_node": "SEC_CONS_DISC",
+        "from_type": "SECTOR",
+        "to_node": "CPI_KR",
+        "to_type": "MACRO",
+        "weight": null,
+        "expected_sign": "-",
+        "weight_source": null,
+        "weight_window": null,
+        "weight_as_of": null,
+        "weight_n_tickers": null,
+        "weight_coverage": "none_planned",
+        "rationale": "소비 여력"
+      },
+      {
+        "edge_type": "SENSITIVE_TO",
+        "from_node": "SEC_CONS_STAP",
+        "from_type": "SECTOR",
+        "to_node": "USD_KRW",
+        "to_type": "MACRO",
+        "weight": null,
+        "expected_sign": "-",
+        "weight_source": null,
+        "weight_window": null,
+        "weight_as_of": null,
+        "weight_n_tickers": null,
+        "weight_coverage": "planned",
+        "rationale": "원재료 수입"
+      },
+      {
+        "edge_type": "SENSITIVE_TO",
+        "from_node": "SEC_CONS_STAP",
+        "from_type": "SECTOR",
+        "to_node": "PPI_KR",
+        "to_type": "MACRO",
+        "weight": null,
+        "expected_sign": "-",
+        "weight_source": null,
+        "weight_window": null,
+        "weight_as_of": null,
+        "weight_n_tickers": null,
+        "weight_coverage": "none_planned",
+        "rationale": "원가 상승"
+      },
+      {
+        "edge_type": "SENSITIVE_TO",
+        "from_node": "SEC_HEALTH",
+        "from_type": "SECTOR",
+        "to_node": "KTB_10Y_KR",
+        "to_type": "MACRO",
+        "weight": null,
+        "expected_sign": "-",
+        "weight_source": null,
+        "weight_window": null,
+        "weight_as_of": null,
+        "weight_n_tickers": null,
+        "weight_coverage": "none_planned",
+        "rationale": "바이오 할인율"
+      },
+      {
+        "edge_type": "SENSITIVE_TO",
+        "from_node": "SEC_HEALTH",
+        "from_type": "SECTOR",
+        "to_node": "USD_KRW",
+        "to_type": "MACRO",
+        "weight": null,
+        "expected_sign": "+",
+        "weight_source": null,
+        "weight_window": null,
+        "weight_as_of": null,
+        "weight_n_tickers": null,
+        "weight_coverage": "planned",
+        "rationale": "수출 환산"
+      },
+      {
+        "edge_type": "SENSITIVE_TO",
+        "from_node": "SEC_FIN",
+        "from_type": "SECTOR",
+        "to_node": "KTB_3Y_KR",
+        "to_type": "MACRO",
+        "weight": null,
+        "expected_sign": "+",
+        "weight_source": null,
+        "weight_window": null,
+        "weight_as_of": null,
+        "weight_n_tickers": null,
+        "weight_coverage": "planned",
+        "rationale": "NIM"
+      },
+      {
+        "edge_type": "SENSITIVE_TO",
+        "from_node": "SEC_FIN",
+        "from_type": "SECTOR",
+        "to_node": "BASE_RATE_KR",
+        "to_type": "MACRO",
+        "weight": null,
+        "expected_sign": "+",
+        "weight_source": null,
+        "weight_window": null,
+        "weight_as_of": null,
+        "weight_n_tickers": null,
+        "weight_coverage": "none_planned",
+        "rationale": "NIM(건전성 악화로 상쇄 가능)"
+      },
+      {
+        "edge_type": "SENSITIVE_TO",
+        "from_node": "SEC_FIN",
+        "from_type": "SECTOR",
+        "to_node": "KOSPI",
+        "to_type": "MACRO",
+        "weight": null,
+        "expected_sign": "+",
+        "weight_source": null,
+        "weight_window": null,
+        "weight_as_of": null,
+        "weight_n_tickers": null,
+        "weight_coverage": "planned",
+        "rationale": "증권 브로커리지"
+      },
+      {
+        "edge_type": "SENSITIVE_TO",
+        "from_node": "SEC_FIN",
+        "from_type": "SECTOR",
+        "to_node": "VIX",
+        "to_type": "MACRO",
+        "weight": null,
+        "expected_sign": "-",
+        "weight_source": null,
+        "weight_window": null,
+        "weight_as_of": null,
+        "weight_n_tickers": null,
+        "weight_coverage": "none_planned",
+        "rationale": "위험회피"
+      },
+      {
+        "edge_type": "SENSITIVE_TO",
+        "from_node": "SEC_INDUS",
+        "from_type": "SECTOR",
+        "to_node": "USD_KRW",
+        "to_type": "MACRO",
+        "weight": null,
+        "expected_sign": "+",
+        "weight_source": null,
+        "weight_window": null,
+        "weight_as_of": null,
+        "weight_n_tickers": null,
+        "weight_coverage": "planned",
+        "rationale": "조선·방산 달러 수주"
+      },
+      {
+        "edge_type": "SENSITIVE_TO",
+        "from_node": "SEC_INDUS",
+        "from_type": "SECTOR",
+        "to_node": "CHINA_PMI_MFG",
+        "to_type": "MACRO",
+        "weight": null,
+        "expected_sign": "+",
+        "weight_source": null,
+        "weight_window": null,
+        "weight_as_of": null,
+        "weight_n_tickers": null,
+        "weight_coverage": "none_planned",
+        "rationale": "산업재 수요"
+      },
+      {
+        "edge_type": "SENSITIVE_TO",
+        "from_node": "SEC_INDUS",
+        "from_type": "SECTOR",
+        "to_node": "BRENT",
+        "to_type": "MACRO",
+        "weight": null,
+        "expected_sign": "-",
+        "weight_source": null,
+        "weight_window": null,
+        "weight_as_of": null,
+        "weight_n_tickers": null,
+        "weight_coverage": "none_planned",
+        "rationale": "운송 원가(해운·항공)"
+      },
+      {
+        "edge_type": "SENSITIVE_TO",
+        "from_node": "SEC_MATERIAL",
+        "from_type": "SECTOR",
+        "to_node": "CHINA_PMI_MFG",
+        "to_type": "MACRO",
+        "weight": null,
+        "expected_sign": "+",
+        "weight_source": null,
+        "weight_window": null,
+        "weight_as_of": null,
+        "weight_n_tickers": null,
+        "weight_coverage": "none_planned",
+        "rationale": "소재 수요"
+      },
+      {
+        "edge_type": "SENSITIVE_TO",
+        "from_node": "SEC_MATERIAL",
+        "from_type": "SECTOR",
+        "to_node": "USD_CNY",
+        "to_type": "MACRO",
+        "weight": null,
+        "expected_sign": "-",
+        "weight_source": null,
+        "weight_window": null,
+        "weight_as_of": null,
+        "weight_n_tickers": null,
+        "weight_coverage": "none_planned",
+        "rationale": "중국산 가격경쟁"
+      },
+      {
+        "edge_type": "SENSITIVE_TO",
+        "from_node": "SEC_MATERIAL",
+        "from_type": "SECTOR",
+        "to_node": "BRENT",
+        "to_type": "MACRO",
+        "weight": null,
+        "expected_sign": "±",
+        "weight_source": null,
+        "weight_window": null,
+        "weight_as_of": null,
+        "weight_n_tickers": null,
+        "weight_coverage": "none_planned",
+        "rationale": "화학 원료·제품가 동반"
+      },
+      {
+        "edge_type": "SENSITIVE_TO",
+        "from_node": "SEC_ENERGY",
+        "from_type": "SECTOR",
+        "to_node": "BRENT",
+        "to_type": "MACRO",
+        "weight": null,
+        "expected_sign": "±",
+        "weight_source": null,
+        "weight_window": null,
+        "weight_as_of": null,
+        "weight_n_tickers": null,
+        "weight_coverage": "none_planned",
+        "rationale": "재고평가이익 vs 원가"
+      },
+      {
+        "edge_type": "SENSITIVE_TO",
+        "from_node": "SEC_ENERGY",
+        "from_type": "SECTOR",
+        "to_node": "USD_KRW",
+        "to_type": "MACRO",
+        "weight": null,
+        "expected_sign": "-",
+        "weight_source": null,
+        "weight_window": null,
+        "weight_as_of": null,
+        "weight_n_tickers": null,
+        "weight_coverage": "planned",
+        "rationale": "원유 수입"
+      },
+      {
+        "edge_type": "SENSITIVE_TO",
+        "from_node": "SEC_UTIL",
+        "from_type": "SECTOR",
+        "to_node": "BRENT",
+        "to_type": "MACRO",
+        "weight": null,
+        "expected_sign": "-",
+        "weight_source": null,
+        "weight_window": null,
+        "weight_as_of": null,
+        "weight_n_tickers": null,
+        "weight_coverage": "none_planned",
+        "rationale": "연료비"
+      },
+      {
+        "edge_type": "SENSITIVE_TO",
+        "from_node": "SEC_UTIL",
+        "from_type": "SECTOR",
+        "to_node": "USD_KRW",
+        "to_type": "MACRO",
+        "weight": null,
+        "expected_sign": "-",
+        "weight_source": null,
+        "weight_window": null,
+        "weight_as_of": null,
+        "weight_n_tickers": null,
+        "weight_coverage": "planned",
+        "rationale": "연료 수입"
+      },
+      {
+        "edge_type": "SENSITIVE_TO",
+        "from_node": "SEC_UTIL",
+        "from_type": "SECTOR",
+        "to_node": "KTB_10Y_KR",
+        "to_type": "MACRO",
+        "weight": null,
+        "expected_sign": "-",
+        "weight_source": null,
+        "weight_window": null,
+        "weight_as_of": null,
+        "weight_n_tickers": null,
+        "weight_coverage": "none_planned",
+        "rationale": "채권 대체재"
+      }
+    ],
+    "impacts": [
+      {
+        "edge_type": "IMPACTS",
+        "from_node": "US_FFR",
+        "from_type": "MACRO",
+        "to_node": "US_10Y_YIELD",
+        "to_type": "MACRO",
+        "relation": "same",
+        "rationale": "정책금리→장기금리"
+      },
+      {
+        "edge_type": "IMPACTS",
+        "from_node": "US_FFR",
+        "from_type": "MACRO",
+        "to_node": "USD_KRW",
+        "to_type": "MACRO",
+        "relation": "same",
+        "rationale": "미 금리↑ 달러 강세"
+      },
+      {
+        "edge_type": "IMPACTS",
+        "from_node": "US_10Y_YIELD",
+        "from_type": "MACRO",
+        "to_node": "KTB_10Y_KR",
+        "to_type": "MACRO",
+        "relation": "same",
+        "rationale": "장기금리 동조화"
+      },
+      {
+        "edge_type": "IMPACTS",
+        "from_node": "BASE_RATE_KR",
+        "from_type": "MACRO",
+        "to_node": "KTB_3Y_KR",
+        "to_type": "MACRO",
+        "relation": "same",
+        "rationale": "정책금리→단기 시장금리"
+      },
+      {
+        "edge_type": "IMPACTS",
+        "from_node": "BASE_RATE_KR",
+        "from_type": "MACRO",
+        "to_node": "KTB_10Y_KR",
+        "to_type": "MACRO",
+        "relation": "same",
+        "rationale": "기간 구조"
+      },
+      {
+        "edge_type": "IMPACTS",
+        "from_node": "BASE_RATE_KR",
+        "from_type": "MACRO",
+        "to_node": "USD_KRW",
+        "to_type": "MACRO",
+        "relation": "opposite",
+        "rationale": "금리차 축소 시 원화 약세"
+      },
+      {
+        "edge_type": "IMPACTS",
+        "from_node": "BRENT",
+        "from_type": "MACRO",
+        "to_node": "PPI_KR",
+        "to_type": "MACRO",
+        "relation": "same",
+        "rationale": "원자재 원가"
+      },
+      {
+        "edge_type": "IMPACTS",
+        "from_node": "PPI_KR",
+        "from_type": "MACRO",
+        "to_node": "CPI_KR",
+        "to_type": "MACRO",
+        "relation": "same",
+        "rationale": "생산자→소비자 물가 전가"
+      },
+      {
+        "edge_type": "IMPACTS",
+        "from_node": "USD_KRW",
+        "from_type": "MACRO",
+        "to_node": "CPI_KR",
+        "to_type": "MACRO",
+        "relation": "same",
+        "rationale": "수입물가"
+      },
+      {
+        "edge_type": "IMPACTS",
+        "from_node": "CPI_KR",
+        "from_type": "MACRO",
+        "to_node": "BASE_RATE_KR",
+        "to_type": "MACRO",
+        "relation": "same",
+        "rationale": "물가 대응 통화정책"
+      },
+      {
+        "edge_type": "IMPACTS",
+        "from_node": "VIX",
+        "from_type": "MACRO",
+        "to_node": "USD_KRW",
+        "to_type": "MACRO",
+        "relation": "same",
+        "rationale": "위험회피 시 원화 약세"
+      },
+      {
+        "edge_type": "IMPACTS",
+        "from_node": "VIX",
+        "from_type": "MACRO",
+        "to_node": "KOSPI",
+        "to_type": "MACRO",
+        "relation": "opposite",
+        "rationale": "위험회피 매도"
+      },
+      {
+        "edge_type": "IMPACTS",
+        "from_node": "USD_CNY",
+        "from_type": "MACRO",
+        "to_node": "USD_KRW",
+        "to_type": "MACRO",
+        "relation": "same",
+        "rationale": "위안-원 동조화"
+      },
+      {
+        "edge_type": "IMPACTS",
+        "from_node": "CHINA_PMI_MFG",
+        "from_type": "MACRO",
+        "to_node": "KOSPI",
+        "to_type": "MACRO",
+        "relation": "same",
+        "rationale": "수출 경기"
+      },
+      {
+        "edge_type": "IMPACTS",
+        "from_node": "DRAM_PRICE",
+        "from_type": "MACRO",
+        "to_node": "KOSPI",
+        "to_type": "MACRO",
+        "relation": "same",
+        "rationale": "반도체 지수 비중"
+      }
+    ],
+    "benefits_hurts": [
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_AI_MEMORY_DEMAND",
+        "from_type": "ISSUE",
+        "to_node": "000660",
+        "to_type": "COMPANY",
+        "strength": "high"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_AI_MEMORY_DEMAND",
+        "from_type": "ISSUE",
+        "to_node": "005930",
+        "to_type": "COMPANY",
+        "strength": "high"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_AI_MEMORY_DEMAND",
+        "from_type": "ISSUE",
+        "to_node": "042700",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_AI_MEMORY_DEMAND",
+        "from_type": "ISSUE",
+        "to_node": "402340",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_AI_MEMORY_DEMAND",
+        "from_type": "ISSUE",
+        "to_node": "SEC_IT",
+        "to_type": "SECTOR",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_MEMORY_PRICE_CYCLE",
+        "from_type": "ISSUE",
+        "to_node": "005930",
+        "to_type": "COMPANY",
+        "strength": "high"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_MEMORY_PRICE_CYCLE",
+        "from_type": "ISSUE",
+        "to_node": "000660",
+        "to_type": "COMPANY",
+        "strength": "high"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_MEMORY_PRICE_CYCLE",
+        "from_type": "ISSUE",
+        "to_node": "402340",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "HURTS",
+        "from_node": "ISS_SEMI_EXPORT_CONTROL",
+        "from_type": "ISSUE",
+        "to_node": "005930",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "HURTS",
+        "from_node": "ISS_SEMI_EXPORT_CONTROL",
+        "from_type": "ISSUE",
+        "to_node": "000660",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "HURTS",
+        "from_node": "ISS_FOUNDRY_COMPETITION",
+        "from_type": "ISSUE",
+        "to_node": "005930",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_AI_POWER_INFRA",
+        "from_type": "ISSUE",
+        "to_node": "267260",
+        "to_type": "COMPANY",
+        "strength": "high"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_AI_POWER_INFRA",
+        "from_type": "ISSUE",
+        "to_node": "298040",
+        "to_type": "COMPANY",
+        "strength": "high"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_AI_POWER_INFRA",
+        "from_type": "ISSUE",
+        "to_node": "010120",
+        "to_type": "COMPANY",
+        "strength": "high"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_AI_POWER_INFRA",
+        "from_type": "ISSUE",
+        "to_node": "062040",
+        "to_type": "COMPANY",
+        "strength": "high"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_AI_POWER_INFRA",
+        "from_type": "ISSUE",
+        "to_node": "000500",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_AI_POWER_INFRA",
+        "from_type": "ISSUE",
+        "to_node": "034020",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_AI_POWER_INFRA",
+        "from_type": "ISSUE",
+        "to_node": "006260",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_AI_PCB_DEMAND",
+        "from_type": "ISSUE",
+        "to_node": "007660",
+        "to_type": "COMPANY",
+        "strength": "high"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_AI_PCB_DEMAND",
+        "from_type": "ISSUE",
+        "to_node": "353200",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_AI_PCB_DEMAND",
+        "from_type": "ISSUE",
+        "to_node": "009150",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_AI_PCB_DEMAND",
+        "from_type": "ISSUE",
+        "to_node": "011070",
+        "to_type": "COMPANY",
+        "strength": "low"
+      },
+      {
+        "edge_type": "HURTS",
+        "from_node": "ISS_AUTO_US_TARIFF",
+        "from_type": "ISSUE",
+        "to_node": "005380",
+        "to_type": "COMPANY",
+        "strength": "high"
+      },
+      {
+        "edge_type": "HURTS",
+        "from_node": "ISS_AUTO_US_TARIFF",
+        "from_type": "ISSUE",
+        "to_node": "000270",
+        "to_type": "COMPANY",
+        "strength": "high"
+      },
+      {
+        "edge_type": "HURTS",
+        "from_node": "ISS_AUTO_US_TARIFF",
+        "from_type": "ISSUE",
+        "to_node": "012330",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "HURTS",
+        "from_node": "ISS_AUTO_US_TARIFF",
+        "from_type": "ISSUE",
+        "to_node": "161390",
+        "to_type": "COMPANY",
+        "strength": "low"
+      },
+      {
+        "edge_type": "HURTS",
+        "from_node": "ISS_AUTO_US_TARIFF",
+        "from_type": "ISSUE",
+        "to_node": "086280",
+        "to_type": "COMPANY",
+        "strength": "low"
+      },
+      {
+        "edge_type": "HURTS",
+        "from_node": "ISS_EV_DEMAND_SLOWDOWN",
+        "from_type": "ISSUE",
+        "to_node": "373220",
+        "to_type": "COMPANY",
+        "strength": "high"
+      },
+      {
+        "edge_type": "HURTS",
+        "from_node": "ISS_EV_DEMAND_SLOWDOWN",
+        "from_type": "ISSUE",
+        "to_node": "006400",
+        "to_type": "COMPANY",
+        "strength": "high"
+      },
+      {
+        "edge_type": "HURTS",
+        "from_node": "ISS_EV_DEMAND_SLOWDOWN",
+        "from_type": "ISSUE",
+        "to_node": "003670",
+        "to_type": "COMPANY",
+        "strength": "high"
+      },
+      {
+        "edge_type": "HURTS",
+        "from_node": "ISS_EV_DEMAND_SLOWDOWN",
+        "from_type": "ISSUE",
+        "to_node": "005380",
+        "to_type": "COMPANY",
+        "strength": "low"
+      },
+      {
+        "edge_type": "HURTS",
+        "from_node": "ISS_BATTERY_CHINA_COMPETITION",
+        "from_type": "ISSUE",
+        "to_node": "373220",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "HURTS",
+        "from_node": "ISS_BATTERY_CHINA_COMPETITION",
+        "from_type": "ISSUE",
+        "to_node": "006400",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "HURTS",
+        "from_node": "ISS_BATTERY_CHINA_COMPETITION",
+        "from_type": "ISSUE",
+        "to_node": "003670",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_ESS_DEMAND",
+        "from_type": "ISSUE",
+        "to_node": "373220",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_ESS_DEMAND",
+        "from_type": "ISSUE",
+        "to_node": "006400",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_SHIPBUILDING_UPCYCLE",
+        "from_type": "ISSUE",
+        "to_node": "329180",
+        "to_type": "COMPANY",
+        "strength": "high"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_SHIPBUILDING_UPCYCLE",
+        "from_type": "ISSUE",
+        "to_node": "009540",
+        "to_type": "COMPANY",
+        "strength": "high"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_SHIPBUILDING_UPCYCLE",
+        "from_type": "ISSUE",
+        "to_node": "042660",
+        "to_type": "COMPANY",
+        "strength": "high"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_SHIPBUILDING_UPCYCLE",
+        "from_type": "ISSUE",
+        "to_node": "010140",
+        "to_type": "COMPANY",
+        "strength": "high"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_SHIPBUILDING_UPCYCLE",
+        "from_type": "ISSUE",
+        "to_node": "443060",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_US_SHIPBUILDING_COOP",
+        "from_type": "ISSUE",
+        "to_node": "042660",
+        "to_type": "COMPANY",
+        "strength": "high"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_US_SHIPBUILDING_COOP",
+        "from_type": "ISSUE",
+        "to_node": "329180",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_US_SHIPBUILDING_COOP",
+        "from_type": "ISSUE",
+        "to_node": "009540",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_DEFENSE_EXPORT",
+        "from_type": "ISSUE",
+        "to_node": "012450",
+        "to_type": "COMPANY",
+        "strength": "high"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_DEFENSE_EXPORT",
+        "from_type": "ISSUE",
+        "to_node": "064350",
+        "to_type": "COMPANY",
+        "strength": "high"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_DEFENSE_EXPORT",
+        "from_type": "ISSUE",
+        "to_node": "079550",
+        "to_type": "COMPANY",
+        "strength": "high"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_DEFENSE_EXPORT",
+        "from_type": "ISSUE",
+        "to_node": "047810",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_DEFENSE_EXPORT",
+        "from_type": "ISSUE",
+        "to_node": "272210",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_NUCLEAR_EXPORT",
+        "from_type": "ISSUE",
+        "to_node": "034020",
+        "to_type": "COMPANY",
+        "strength": "high"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_NUCLEAR_EXPORT",
+        "from_type": "ISSUE",
+        "to_node": "000720",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_NUCLEAR_EXPORT",
+        "from_type": "ISSUE",
+        "to_node": "015760",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "HURTS",
+        "from_node": "ISS_RATE_CUT_NIM",
+        "from_type": "ISSUE",
+        "to_node": "SEC_FIN",
+        "to_type": "SECTOR",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "HURTS",
+        "from_node": "ISS_RATE_CUT_NIM",
+        "from_type": "ISSUE",
+        "to_node": "105560",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "HURTS",
+        "from_node": "ISS_RATE_CUT_NIM",
+        "from_type": "ISSUE",
+        "to_node": "055550",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "HURTS",
+        "from_node": "ISS_RATE_CUT_NIM",
+        "from_type": "ISSUE",
+        "to_node": "086790",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "HURTS",
+        "from_node": "ISS_RATE_CUT_NIM",
+        "from_type": "ISSUE",
+        "to_node": "316140",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "HURTS",
+        "from_node": "ISS_RATE_CUT_NIM",
+        "from_type": "ISSUE",
+        "to_node": "024110",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "HURTS",
+        "from_node": "ISS_PF_CREDIT_RISK",
+        "from_type": "ISSUE",
+        "to_node": "000720",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "HURTS",
+        "from_node": "ISS_PF_CREDIT_RISK",
+        "from_type": "ISSUE",
+        "to_node": "047040",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "HURTS",
+        "from_node": "ISS_PF_CREDIT_RISK",
+        "from_type": "ISSUE",
+        "to_node": "028050",
+        "to_type": "COMPANY",
+        "strength": "low"
+      },
+      {
+        "edge_type": "HURTS",
+        "from_node": "ISS_PF_CREDIT_RISK",
+        "from_type": "ISSUE",
+        "to_node": "SEC_FIN",
+        "to_type": "SECTOR",
+        "strength": "low"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_TRADING_VOLUME_BOOM",
+        "from_type": "ISSUE",
+        "to_node": "006800",
+        "to_type": "COMPANY",
+        "strength": "high"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_TRADING_VOLUME_BOOM",
+        "from_type": "ISSUE",
+        "to_node": "039490",
+        "to_type": "COMPANY",
+        "strength": "high"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_TRADING_VOLUME_BOOM",
+        "from_type": "ISSUE",
+        "to_node": "005940",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_TRADING_VOLUME_BOOM",
+        "from_type": "ISSUE",
+        "to_node": "016360",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_TRADING_VOLUME_BOOM",
+        "from_type": "ISSUE",
+        "to_node": "071050",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_VALUEUP_POLICY",
+        "from_type": "ISSUE",
+        "to_node": "SEC_FIN",
+        "to_type": "SECTOR",
+        "strength": "high"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_VALUEUP_POLICY",
+        "from_type": "ISSUE",
+        "to_node": "105560",
+        "to_type": "COMPANY",
+        "strength": "high"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_VALUEUP_POLICY",
+        "from_type": "ISSUE",
+        "to_node": "055550",
+        "to_type": "COMPANY",
+        "strength": "high"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_VALUEUP_POLICY",
+        "from_type": "ISSUE",
+        "to_node": "086790",
+        "to_type": "COMPANY",
+        "strength": "high"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_VALUEUP_POLICY",
+        "from_type": "ISSUE",
+        "to_node": "138040",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_VALUEUP_POLICY",
+        "from_type": "ISSUE",
+        "to_node": "033780",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_VALUEUP_POLICY",
+        "from_type": "ISSUE",
+        "to_node": "000810",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_GOVERNANCE_REFORM",
+        "from_type": "ISSUE",
+        "to_node": "034730",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_GOVERNANCE_REFORM",
+        "from_type": "ISSUE",
+        "to_node": "003550",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_GOVERNANCE_REFORM",
+        "from_type": "ISSUE",
+        "to_node": "000880",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_GOVERNANCE_REFORM",
+        "from_type": "ISSUE",
+        "to_node": "402340",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_GOVERNANCE_REFORM",
+        "from_type": "ISSUE",
+        "to_node": "028260",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_GOVERNANCE_REFORM",
+        "from_type": "ISSUE",
+        "to_node": "267250",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "HURTS",
+        "from_node": "ISS_CHINA_CHEM_OVERCAPACITY",
+        "from_type": "ISSUE",
+        "to_node": "051910",
+        "to_type": "COMPANY",
+        "strength": "high"
+      },
+      {
+        "edge_type": "HURTS",
+        "from_node": "ISS_CHINA_CHEM_OVERCAPACITY",
+        "from_type": "ISSUE",
+        "to_node": "009830",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "HURTS",
+        "from_node": "ISS_CHINA_CHEM_OVERCAPACITY",
+        "from_type": "ISSUE",
+        "to_node": "096770",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "HURTS",
+        "from_node": "ISS_CHINA_CHEM_OVERCAPACITY",
+        "from_type": "ISSUE",
+        "to_node": "SEC_MATERIAL",
+        "to_type": "SECTOR",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "HURTS",
+        "from_node": "ISS_PLATFORM_REGULATION",
+        "from_type": "ISSUE",
+        "to_node": "035420",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "HURTS",
+        "from_node": "ISS_PLATFORM_REGULATION",
+        "from_type": "ISSUE",
+        "to_node": "035720",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "HURTS",
+        "from_node": "ISS_PLATFORM_REGULATION",
+        "from_type": "ISSUE",
+        "to_node": "323410",
+        "to_type": "COMPANY",
+        "strength": "low"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_KBEAUTY_EXPORT",
+        "from_type": "ISSUE",
+        "to_node": "278470",
+        "to_type": "COMPANY",
+        "strength": "high"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_KBEAUTY_EXPORT",
+        "from_type": "ISSUE",
+        "to_node": "090430",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_KFOOD_EXPORT",
+        "from_type": "ISSUE",
+        "to_node": "003230",
+        "to_type": "COMPANY",
+        "strength": "high"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_BIO_CDMO_DEMAND",
+        "from_type": "ISSUE",
+        "to_node": "207940",
+        "to_type": "COMPANY",
+        "strength": "high"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_BIO_CDMO_DEMAND",
+        "from_type": "ISSUE",
+        "to_node": "068270",
+        "to_type": "COMPANY",
+        "strength": "high"
+      },
+      {
+        "edge_type": "BENEFITS",
+        "from_node": "ISS_BIO_CDMO_DEMAND",
+        "from_type": "ISSUE",
+        "to_node": "0126Z0",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "HURTS",
+        "from_node": "ISS_PHARMA_US_TARIFF",
+        "from_type": "ISSUE",
+        "to_node": "068270",
+        "to_type": "COMPANY",
+        "strength": "mid"
+      },
+      {
+        "edge_type": "HURTS",
+        "from_node": "ISS_PHARMA_US_TARIFF",
+        "from_type": "ISSUE",
+        "to_node": "207940",
+        "to_type": "COMPANY",
+        "strength": "low"
+      },
+      {
+        "edge_type": "HURTS",
+        "from_node": "ISS_PHARMA_US_TARIFF",
+        "from_type": "ISSUE",
+        "to_node": "326030",
+        "to_type": "COMPANY",
+        "strength": "low"
+      },
+      {
+        "edge_type": "HURTS",
+        "from_node": "ISS_FREIGHT_NORMALIZATION",
+        "from_type": "ISSUE",
+        "to_node": "011200",
+        "to_type": "COMPANY",
+        "strength": "high"
+      },
+      {
+        "edge_type": "HURTS",
+        "from_node": "ISS_FREIGHT_NORMALIZATION",
+        "from_type": "ISSUE",
+        "to_node": "086280",
+        "to_type": "COMPANY",
+        "strength": "low"
+      }
+    ],
+    "exposed_to": [
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "000660",
+        "from_type": "COMPANY",
+        "to_node": "ISS_AI_MEMORY_DEMAND",
+        "to_type": "ISSUE",
+        "exposure": 0.9,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "005930",
+        "from_type": "COMPANY",
+        "to_node": "ISS_AI_MEMORY_DEMAND",
+        "to_type": "ISSUE",
+        "exposure": 0.9,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "042700",
+        "from_type": "COMPANY",
+        "to_node": "ISS_AI_MEMORY_DEMAND",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "402340",
+        "from_type": "COMPANY",
+        "to_node": "ISS_AI_MEMORY_DEMAND",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "005930",
+        "from_type": "COMPANY",
+        "to_node": "ISS_MEMORY_PRICE_CYCLE",
+        "to_type": "ISSUE",
+        "exposure": 0.9,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "000660",
+        "from_type": "COMPANY",
+        "to_node": "ISS_MEMORY_PRICE_CYCLE",
+        "to_type": "ISSUE",
+        "exposure": 0.9,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "402340",
+        "from_type": "COMPANY",
+        "to_node": "ISS_MEMORY_PRICE_CYCLE",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "005930",
+        "from_type": "COMPANY",
+        "to_node": "ISS_SEMI_EXPORT_CONTROL",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "000660",
+        "from_type": "COMPANY",
+        "to_node": "ISS_SEMI_EXPORT_CONTROL",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "005930",
+        "from_type": "COMPANY",
+        "to_node": "ISS_FOUNDRY_COMPETITION",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "267260",
+        "from_type": "COMPANY",
+        "to_node": "ISS_AI_POWER_INFRA",
+        "to_type": "ISSUE",
+        "exposure": 0.9,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "298040",
+        "from_type": "COMPANY",
+        "to_node": "ISS_AI_POWER_INFRA",
+        "to_type": "ISSUE",
+        "exposure": 0.9,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "010120",
+        "from_type": "COMPANY",
+        "to_node": "ISS_AI_POWER_INFRA",
+        "to_type": "ISSUE",
+        "exposure": 0.9,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "062040",
+        "from_type": "COMPANY",
+        "to_node": "ISS_AI_POWER_INFRA",
+        "to_type": "ISSUE",
+        "exposure": 0.9,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "000500",
+        "from_type": "COMPANY",
+        "to_node": "ISS_AI_POWER_INFRA",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "034020",
+        "from_type": "COMPANY",
+        "to_node": "ISS_AI_POWER_INFRA",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "006260",
+        "from_type": "COMPANY",
+        "to_node": "ISS_AI_POWER_INFRA",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "007660",
+        "from_type": "COMPANY",
+        "to_node": "ISS_AI_PCB_DEMAND",
+        "to_type": "ISSUE",
+        "exposure": 0.9,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "353200",
+        "from_type": "COMPANY",
+        "to_node": "ISS_AI_PCB_DEMAND",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "009150",
+        "from_type": "COMPANY",
+        "to_node": "ISS_AI_PCB_DEMAND",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "011070",
+        "from_type": "COMPANY",
+        "to_node": "ISS_AI_PCB_DEMAND",
+        "to_type": "ISSUE",
+        "exposure": 0.3,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "005380",
+        "from_type": "COMPANY",
+        "to_node": "ISS_AUTO_US_TARIFF",
+        "to_type": "ISSUE",
+        "exposure": 0.9,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "000270",
+        "from_type": "COMPANY",
+        "to_node": "ISS_AUTO_US_TARIFF",
+        "to_type": "ISSUE",
+        "exposure": 0.9,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "012330",
+        "from_type": "COMPANY",
+        "to_node": "ISS_AUTO_US_TARIFF",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "161390",
+        "from_type": "COMPANY",
+        "to_node": "ISS_AUTO_US_TARIFF",
+        "to_type": "ISSUE",
+        "exposure": 0.3,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "086280",
+        "from_type": "COMPANY",
+        "to_node": "ISS_AUTO_US_TARIFF",
+        "to_type": "ISSUE",
+        "exposure": 0.3,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "373220",
+        "from_type": "COMPANY",
+        "to_node": "ISS_EV_DEMAND_SLOWDOWN",
+        "to_type": "ISSUE",
+        "exposure": 0.9,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "006400",
+        "from_type": "COMPANY",
+        "to_node": "ISS_EV_DEMAND_SLOWDOWN",
+        "to_type": "ISSUE",
+        "exposure": 0.9,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "003670",
+        "from_type": "COMPANY",
+        "to_node": "ISS_EV_DEMAND_SLOWDOWN",
+        "to_type": "ISSUE",
+        "exposure": 0.9,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "005380",
+        "from_type": "COMPANY",
+        "to_node": "ISS_EV_DEMAND_SLOWDOWN",
+        "to_type": "ISSUE",
+        "exposure": 0.3,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "373220",
+        "from_type": "COMPANY",
+        "to_node": "ISS_BATTERY_CHINA_COMPETITION",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "006400",
+        "from_type": "COMPANY",
+        "to_node": "ISS_BATTERY_CHINA_COMPETITION",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "003670",
+        "from_type": "COMPANY",
+        "to_node": "ISS_BATTERY_CHINA_COMPETITION",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "373220",
+        "from_type": "COMPANY",
+        "to_node": "ISS_ESS_DEMAND",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "006400",
+        "from_type": "COMPANY",
+        "to_node": "ISS_ESS_DEMAND",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "329180",
+        "from_type": "COMPANY",
+        "to_node": "ISS_SHIPBUILDING_UPCYCLE",
+        "to_type": "ISSUE",
+        "exposure": 0.9,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "009540",
+        "from_type": "COMPANY",
+        "to_node": "ISS_SHIPBUILDING_UPCYCLE",
+        "to_type": "ISSUE",
+        "exposure": 0.9,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "042660",
+        "from_type": "COMPANY",
+        "to_node": "ISS_SHIPBUILDING_UPCYCLE",
+        "to_type": "ISSUE",
+        "exposure": 0.9,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "010140",
+        "from_type": "COMPANY",
+        "to_node": "ISS_SHIPBUILDING_UPCYCLE",
+        "to_type": "ISSUE",
+        "exposure": 0.9,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "443060",
+        "from_type": "COMPANY",
+        "to_node": "ISS_SHIPBUILDING_UPCYCLE",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "042660",
+        "from_type": "COMPANY",
+        "to_node": "ISS_US_SHIPBUILDING_COOP",
+        "to_type": "ISSUE",
+        "exposure": 0.9,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "329180",
+        "from_type": "COMPANY",
+        "to_node": "ISS_US_SHIPBUILDING_COOP",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "009540",
+        "from_type": "COMPANY",
+        "to_node": "ISS_US_SHIPBUILDING_COOP",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "012450",
+        "from_type": "COMPANY",
+        "to_node": "ISS_DEFENSE_EXPORT",
+        "to_type": "ISSUE",
+        "exposure": 0.9,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "064350",
+        "from_type": "COMPANY",
+        "to_node": "ISS_DEFENSE_EXPORT",
+        "to_type": "ISSUE",
+        "exposure": 0.9,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "079550",
+        "from_type": "COMPANY",
+        "to_node": "ISS_DEFENSE_EXPORT",
+        "to_type": "ISSUE",
+        "exposure": 0.9,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "047810",
+        "from_type": "COMPANY",
+        "to_node": "ISS_DEFENSE_EXPORT",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "272210",
+        "from_type": "COMPANY",
+        "to_node": "ISS_DEFENSE_EXPORT",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "034020",
+        "from_type": "COMPANY",
+        "to_node": "ISS_NUCLEAR_EXPORT",
+        "to_type": "ISSUE",
+        "exposure": 0.9,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "000720",
+        "from_type": "COMPANY",
+        "to_node": "ISS_NUCLEAR_EXPORT",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "015760",
+        "from_type": "COMPANY",
+        "to_node": "ISS_NUCLEAR_EXPORT",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "105560",
+        "from_type": "COMPANY",
+        "to_node": "ISS_RATE_CUT_NIM",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "055550",
+        "from_type": "COMPANY",
+        "to_node": "ISS_RATE_CUT_NIM",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "086790",
+        "from_type": "COMPANY",
+        "to_node": "ISS_RATE_CUT_NIM",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "316140",
+        "from_type": "COMPANY",
+        "to_node": "ISS_RATE_CUT_NIM",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "024110",
+        "from_type": "COMPANY",
+        "to_node": "ISS_RATE_CUT_NIM",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "000720",
+        "from_type": "COMPANY",
+        "to_node": "ISS_PF_CREDIT_RISK",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "047040",
+        "from_type": "COMPANY",
+        "to_node": "ISS_PF_CREDIT_RISK",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "028050",
+        "from_type": "COMPANY",
+        "to_node": "ISS_PF_CREDIT_RISK",
+        "to_type": "ISSUE",
+        "exposure": 0.3,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "006800",
+        "from_type": "COMPANY",
+        "to_node": "ISS_TRADING_VOLUME_BOOM",
+        "to_type": "ISSUE",
+        "exposure": 0.9,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "039490",
+        "from_type": "COMPANY",
+        "to_node": "ISS_TRADING_VOLUME_BOOM",
+        "to_type": "ISSUE",
+        "exposure": 0.9,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "005940",
+        "from_type": "COMPANY",
+        "to_node": "ISS_TRADING_VOLUME_BOOM",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "016360",
+        "from_type": "COMPANY",
+        "to_node": "ISS_TRADING_VOLUME_BOOM",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "071050",
+        "from_type": "COMPANY",
+        "to_node": "ISS_TRADING_VOLUME_BOOM",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "105560",
+        "from_type": "COMPANY",
+        "to_node": "ISS_VALUEUP_POLICY",
+        "to_type": "ISSUE",
+        "exposure": 0.9,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "055550",
+        "from_type": "COMPANY",
+        "to_node": "ISS_VALUEUP_POLICY",
+        "to_type": "ISSUE",
+        "exposure": 0.9,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "086790",
+        "from_type": "COMPANY",
+        "to_node": "ISS_VALUEUP_POLICY",
+        "to_type": "ISSUE",
+        "exposure": 0.9,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "138040",
+        "from_type": "COMPANY",
+        "to_node": "ISS_VALUEUP_POLICY",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "033780",
+        "from_type": "COMPANY",
+        "to_node": "ISS_VALUEUP_POLICY",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "000810",
+        "from_type": "COMPANY",
+        "to_node": "ISS_VALUEUP_POLICY",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "034730",
+        "from_type": "COMPANY",
+        "to_node": "ISS_GOVERNANCE_REFORM",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "003550",
+        "from_type": "COMPANY",
+        "to_node": "ISS_GOVERNANCE_REFORM",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "000880",
+        "from_type": "COMPANY",
+        "to_node": "ISS_GOVERNANCE_REFORM",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "402340",
+        "from_type": "COMPANY",
+        "to_node": "ISS_GOVERNANCE_REFORM",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "028260",
+        "from_type": "COMPANY",
+        "to_node": "ISS_GOVERNANCE_REFORM",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "267250",
+        "from_type": "COMPANY",
+        "to_node": "ISS_GOVERNANCE_REFORM",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "051910",
+        "from_type": "COMPANY",
+        "to_node": "ISS_CHINA_CHEM_OVERCAPACITY",
+        "to_type": "ISSUE",
+        "exposure": 0.9,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "009830",
+        "from_type": "COMPANY",
+        "to_node": "ISS_CHINA_CHEM_OVERCAPACITY",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "096770",
+        "from_type": "COMPANY",
+        "to_node": "ISS_CHINA_CHEM_OVERCAPACITY",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "035420",
+        "from_type": "COMPANY",
+        "to_node": "ISS_PLATFORM_REGULATION",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "035720",
+        "from_type": "COMPANY",
+        "to_node": "ISS_PLATFORM_REGULATION",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "323410",
+        "from_type": "COMPANY",
+        "to_node": "ISS_PLATFORM_REGULATION",
+        "to_type": "ISSUE",
+        "exposure": 0.3,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "278470",
+        "from_type": "COMPANY",
+        "to_node": "ISS_KBEAUTY_EXPORT",
+        "to_type": "ISSUE",
+        "exposure": 0.9,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "090430",
+        "from_type": "COMPANY",
+        "to_node": "ISS_KBEAUTY_EXPORT",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "003230",
+        "from_type": "COMPANY",
+        "to_node": "ISS_KFOOD_EXPORT",
+        "to_type": "ISSUE",
+        "exposure": 0.9,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "207940",
+        "from_type": "COMPANY",
+        "to_node": "ISS_BIO_CDMO_DEMAND",
+        "to_type": "ISSUE",
+        "exposure": 0.9,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "068270",
+        "from_type": "COMPANY",
+        "to_node": "ISS_BIO_CDMO_DEMAND",
+        "to_type": "ISSUE",
+        "exposure": 0.9,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "0126Z0",
+        "from_type": "COMPANY",
+        "to_node": "ISS_BIO_CDMO_DEMAND",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "068270",
+        "from_type": "COMPANY",
+        "to_node": "ISS_PHARMA_US_TARIFF",
+        "to_type": "ISSUE",
+        "exposure": 0.6,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "207940",
+        "from_type": "COMPANY",
+        "to_node": "ISS_PHARMA_US_TARIFF",
+        "to_type": "ISSUE",
+        "exposure": 0.3,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "326030",
+        "from_type": "COMPANY",
+        "to_node": "ISS_PHARMA_US_TARIFF",
+        "to_type": "ISSUE",
+        "exposure": 0.3,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "011200",
+        "from_type": "COMPANY",
+        "to_node": "ISS_FREIGHT_NORMALIZATION",
+        "to_type": "ISSUE",
+        "exposure": 0.9,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      },
+      {
+        "edge_type": "EXPOSED_TO",
+        "from_node": "086280",
+        "from_type": "COMPANY",
+        "to_node": "ISS_FREIGHT_NORMALIZATION",
+        "to_type": "ISSUE",
+        "exposure": 0.3,
+        "exposure_source": "claude_draft (strength 매핑: high .9 / mid .6 / low .3)"
+      }
+    ]
+  }
+}

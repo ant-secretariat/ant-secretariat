@@ -42,7 +42,8 @@ def test_filters_exclude_inactive_and_disclaimer_by_default():
     assert where.startswith("d.is_active")
     assert "d.section_type <> 'disclaimer'" in where
     assert "d.published_at <= %s" in where
-    assert params == ["005930", "005930", "macro", "2026-10-01"]
+    assert params == ["005930", "005930", "macro", "2026-10-01", "차트·소형 표 수치"]
+    assert "d.section_title <> %s" not in build_filters(include_chart_numbers=True)[0]
     assert "disclaimer" not in build_filters(include_disclaimer=True)[0]
 
 

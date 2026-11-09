@@ -203,3 +203,16 @@ def test_short_numbers_keep_only_labeled_values():
     assert not LABELED_VALUE.search("카카오 (035720)")
     assert not LABELED_VALUE.search("2026년 11월 2일 기업 코멘트")
     assert not LABELED_VALUE.search("이현욱 02-6915-5659 (원)")
+
+
+def test_boilerplate_tables_are_disclaimers():
+    from processing.processors.report_chunker import is_boilerplate
+
+    assert is_boilerplate("| 매수 | 중립 | 매도 |\n| 97.09% | 2.43% | 0.48% |", "table")
+    assert is_boilerplate("Buy(매수) 시장대비 +20% 이상 주가 상승 예상", "table")
+    assert is_boilerplate("[ 종목 투자등급 ] 당사는 개별 종목에 대해 의견을 제시합니다.", "text")
+    assert is_boilerplate("일 시 투자의견 목표가격 20261015 Buy 160,000", "table")
+    assert is_boilerplate("MSCI ESG 종합 등급 AA 산업평균 47", "table")
+    # 표지 ESG 칸과 본문 의견이 섞인 글 청크는 남긴다
+    assert not is_boilerplate("ESG 컨센서스 S S S. 투자의견 매수를 유지한다. 실적이 개선됐다. 목표가는 유지한다.", "text")
+    assert not is_boilerplate("투자의견 매수, 목표주가 25만원 유지", "text")

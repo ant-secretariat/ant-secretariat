@@ -34,6 +34,17 @@ DISCLAIMER_PATTERNS = re.compile(
     r"|투자등급\s*(기준|비율)|이\s*자료에\s*게재된\s*내용들은",
     re.IGNORECASE,
 )
+# 표·목록 형태로 반복되는 고지(투자의견 비율표, 등급 기준, 의견·목표가 이력표). 글 위주 고지는 위 패턴이 잡는다
+BOILERPLATE_PATTERNS = re.compile(
+    r"매수\s*\|?\s*중립(\s*\(보유\))?\s*\|?\s*매도"
+    r"|\[\s*(종목\s*투자등급|산업\s*투자의견)\s*\]"
+    r"|시장\s*대비\s*[+-]?\s*\d+\s*%?\s*이상\s*(주가\s*)?(상승|초과)"
+    r"|향후\s*6\s*개월\s*수익률이"
+    r"|일\s*시\s*투자의견\s*목표가격|일자\s*투자의견\s*목표주가",
+    re.IGNORECASE,
+)
+# 모든 리포트에 붙는 ESG 등급표. 문장이 없는 표 청크일 때만 고지로 본다(표지의 ESG 칸과 본문이 섞인 청크는 남김)
+ESG_TABLE_PATTERNS = re.compile(r"MSCI\s*ESG|ESG\s*컨센서스|Sustinvest|산업\s*내?\s*주요\s*경쟁사|주요\s*이슈\s*가중평균", re.IGNORECASE)
 NUMBER = re.compile(r"-?\(?\d[\d,]*\.?\d*\)?%?")
 # 이 길이 이상이고 문장처럼 끝나는 칸이 많으면 표가 아니라 본문 상자로 본다
 PROSE_CELL_CHARS = 80
@@ -193,6 +204,8 @@ def chunk_report(pdf_path: str, meta: ReportMeta) -> list[ReportChunk]:
     seen: Counter = Counter()
     for index, (chunk_type, title, section_type, start, end, body, structure) in enumerate(pieces):
         body = normalize_text(body)
+        if is_boilerplate(body, chunk_type):
+            section_type = "disclaimer"
         chunk_id = _chunk_id(meta.doc_id, body, seen)
         chunks.append(
             ReportChunk(
@@ -210,6 +223,13 @@ def chunk_report(pdf_path: str, meta: ReportMeta) -> list[ReportChunk]:
             )
         )
     return chunks
+
+
+def is_boilerplate(body: str, chunk_type: str) -> bool:
+    """표·목록 형태의 반복 고지(투자의견 비율, 등급 기준, 의견 이력, ESG 등급표)인지."""
+    if BOILERPLATE_PATTERNS.search(body):
+        return True
+    return chunk_type == "table" and bool(ESG_TABLE_PATTERNS.search(body)) and not _sentence_count(body)
 
 
 def is_prose_box(rows: list[list]) -> bool:

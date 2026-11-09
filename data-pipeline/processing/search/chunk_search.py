@@ -17,6 +17,7 @@ from functools import lru_cache
 
 from psycopg.rows import dict_row
 
+from processing.processors.report_chunker import NUMBERS_TITLE
 from processing.search.korean_tokens import terms
 
 logger = logging.getLogger(__name__)
@@ -63,6 +64,7 @@ def search_chunks(
     as_of: str | None = None,
     top_k: int = 5,
     mode: str | None = None,
+    include_chart_numbers: bool = False,
 ) -> tuple[list[dict], str]:
     """(결과, 실제로 쓴 방식). 의미 검색이 실패하면 BM25로 대신한다."""
     mode = mode or DEFAULT_MODE
@@ -71,6 +73,7 @@ def search_chunks(
     where, params = build_filters(
         ticker=ticker, date_from=date_from, date_to=date_to, document_type=document_type, source=source,
         broker=broker, section_type=section_type, include_disclaimer=include_disclaimer, as_of=as_of,
+        include_chart_numbers=include_chart_numbers,
     )
     if mode != "bm25":
         try:
@@ -89,7 +92,7 @@ def search_chunks(
 
 def build_filters(
     ticker=None, date_from=None, date_to=None, document_type=None, source=None, broker=None,
-    section_type=None, include_disclaimer=False, as_of=None,
+    section_type=None, include_disclaimer=False, as_of=None, include_chart_numbers=False,
 ) -> tuple[str, list]:
     """검색 전에 거는 조건(SQL where 조각, 값). 비활성 청크는 항상 뺀다."""
     clauses = ["d.is_active"]
@@ -122,6 +125,10 @@ def build_filters(
         params.append(section_type)
     elif not include_disclaimer:
         clauses.append("d.section_type <> 'disclaimer'")
+    if not include_chart_numbers:
+        # 차트 축 값·범례만 모은 청크는 답이 될 수 없는데 단어가 겹쳐 상위에 올라온다 (골든셋 검토 결과)
+        clauses.append("d.section_title <> %s")
+        params.append(NUMBERS_TITLE)
     return " and ".join(clauses), params
 
 

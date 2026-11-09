@@ -256,6 +256,7 @@ python -m crawling.chunk_embedder --limit 100 # 시험
 python -m crawling.chunk_embedder             # 빈 임베딩 전부 (Upstage solar-embedding-2-passage, 1,024차원)
 python -m crawling.chunk_indexer              # 비어 있는 BM25 색인 채우기 (API 없음)
 python -m crawling.chunk_indexer --all        # 형태소 규칙을 바꾼 뒤 전부 다시
+python -m crawling.chunk_reclassify --dry-run # 청커의 고지 판별 규칙을 기존 청크에 다시 적용 (PDF 다시 안 받음)
 ```
 
 - 임베딩 대상은 활성 청크 중 면책 문구가 아닌 것. 100개씩 보내고 묶음마다 저장해서 끊겨도 다시 실행하면 빈 칸만 채운다

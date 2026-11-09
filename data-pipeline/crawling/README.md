@@ -251,6 +251,7 @@ python -m crawling.sim_loader --tickers 005930    # 특정 종목만
 - `sim_params.params_json`: 계수(omega·alpha·gamma·beta), 다음날 조건부 분산, 표준화 잔차(`std_resid`), 30일 예상 변동성. 경로 생성은 `crawling.analytics.garch.simulate_paths` 참고
 - `status=not_converged`이면 `params_json.status_reason`이 `optimizer_failed`(최적화 실패) 또는 `nonstationary`(지속성 ≥ 1)
 - `sensitivities`: 요인(KOSPI·USD_KRW·KTB_3Y_KR)이 30거래일 동안 1σ 움직일 때 종목 30일 수익률(%) 변화. `multi`는 세 요인 동시 회귀, `simple`은 단일 요인 회귀, `corr_daily`는 일별 상관계수(온톨로지 엣지 가중치)
+- 국고채 10년(`KTB_10Y_KR`)은 `simple`과 `corr_daily`만 낸다. 3년물과 일별 변화 상관이 0.9라 `multi`에 같이 넣으면 계수가 불안정해진다(2026-11-10 추가)
 - 섹터별 묶음은 뷰 `sector_sensitivities`(WICS l1/l2, corr_daily 중앙값·사분위·종목 수, 최신은 `is_latest`)
 
 월별 지표 상관 (`price_monthly`, `monthly_correlations`, 뷰 `sector_monthly_correlations`):

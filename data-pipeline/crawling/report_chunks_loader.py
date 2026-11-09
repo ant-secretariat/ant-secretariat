@@ -34,6 +34,7 @@ from crawling.crawler.naver_research_crawler import NaverResearchCrawler
 from crawling.crawler.pdf_downloader import PdfDownloader
 from crawling.db.postgres import connect, upsert
 from processing.processors.report_chunker import CHUNKER_VERSION, ReportChunk, ReportMeta, chunk_report
+from processing.search.korean_tokens import chunk_search_columns
 
 logger = logging.getLogger(__name__)
 
@@ -65,8 +66,8 @@ def metadata_row(report: dict) -> dict:
 
 
 def chunk_rows(chunks: list[ReportChunk], report: dict) -> list[dict]:
-    """청커 결과 → document_chunks 행."""
-    return [
+    """청커 결과 → document_chunks 행. BM25 색인(search_tokens)도 함께 만든다."""
+    rows = [
         {
             "chunk_id": chunk.chunk_id,
             "doc_id": chunk.doc_id,
@@ -94,6 +95,9 @@ def chunk_rows(chunks: list[ReportChunk], report: dict) -> list[dict]:
         for chunk in chunks
         if chunk.body.strip()
     ]
+    for row in rows:
+        row.update(chunk_search_columns(row))
+    return rows
 
 
 def collect(connection: psycopg.Connection, tickers: set[str], start: date, end: date) -> int:

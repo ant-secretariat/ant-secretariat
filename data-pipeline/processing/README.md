@@ -215,7 +215,36 @@ result = resolve_company(company_input="삼성전자")
 
 ### search_documents()
 
-Vector DB에서 의미 기반 문서 chunk 검색
+문서 조각 검색. `vector_db`를 넘기지 않으면 Supabase `document_chunks`를 검색한다(새 방식).
+
+```python
+from processing.functions.search_documents import search_documents
+
+result = search_documents(
+    query="SK하이닉스 HBM4 출하 전망",
+    ticker="000660",            # 빈 문자열이면 전 종목. mentioned_tickers에 든 문서도 포함
+    date_from=None, date_to=None,
+    document_type="report",      # report / news / disclosure / macro (macro_summary도 받음)
+    as_of="2026-09-30",          # 그날까지 게시된 문서만 (미래 정보 누출 방지)
+    broker=None,                 # 증권사로 거르기
+    include_disclaimer=False,    # 면책 문구는 기본 제외
+    top_k=5,
+    mode="bm25",                 # bm25(기본) / vector / hybrid
+)
+# → {"query", "ticker", "mode", "results": [{chunk_id, report_id, ticker, company, date, source,
+#    author_org, document_type, title, page_start, page_end, content, score, url,
+#    section_title, section_type, chunk_type, table_structure}]}
+```
+
+- **필터 먼저**: 활성 청크(`is_active`)만, 종목·기간·`as_of`·면책 제외를 먼저 걸고 그 안에서 점수를 낸다
+- **bm25**: 질문과 청크를 같은 Kiwi 규칙(`processing/search/korean_tokens.py`)으로 잘라 BM25(k1=1.2, b=0.75)로 점수. 외부 API 없음. 청크 색인은 `search_tokens`(적재기가 채움, 처음 한 번은 `python -m crawling.chunk_indexer`)
+- **vector**: 질문을 `solar-embedding-2-query`로 임베딩해 코사인 유사도 순. 같은 질문은 한 번만 임베딩
+- **hybrid**: 두 방식 상위 50개를 RRF(k=60)로 합침. 질문 임베딩이 실패하면 BM25로 대신하고 `mode`에 실제 쓴 방식을 남김
+- 기본값이 BM25인 이유: 기획서 v2 6절대로 골든셋으로 비교한 뒤 하이브리드를 기본으로 할지 정한다
+- `report_type`은 계약서 인자라 받지만 지금 청크에 리포트 유형이 없어 거르지 않는다
+- 조회 실패 시 예외 대신 빈 `results`와 `reason: "search_unavailable"`
+
+예전 방식(Pinecone): `embedding_model`과 `vector_db`를 넘기면 아래처럼 예전 검색을 그대로 쓴다. 트렌드 리포트가 호출을 바꿀 때까지 결과가 말없이 바뀌지 않게 남겨 둔 것이다.
 
 ```python
 from processing.functions.search_documents import search_documents

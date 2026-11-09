@@ -37,6 +37,9 @@ BASE_URL = "https://api.upstage.ai/v1"
 # 요청 한 번에 100개, 분당 30만 토큰이 상한. 여유를 두고 분당 25만 토큰으로 맞춘다
 BATCH_SIZE = 100
 TOKENS_PER_MINUTE = 250_000
+# 모델 입력 상한은 8,192토큰. 숫자 표는 글자당 약 1토큰이라 여유를 두고 자른다.
+# 본문은 그대로 두고 임베딩 입력만 자른다(큰 표를 행 묶음으로 나누는 건 청커에서 할 일)
+MAX_INPUT_CHARS = 6_000
 
 TARGET_SQL = """
     select chunk_id, ticker, company, broker, published_at, section_title, body
@@ -55,7 +58,7 @@ def embedding_input(chunk: dict) -> str:
         broker=chunk["broker"] or "",
         published_at=chunk["published_at"].isoformat(),
     )
-    return f"{_prefix(meta, chunk['section_title'])}\n{chunk['body']}"
+    return f"{_prefix(meta, chunk['section_title'])}\n{chunk['body']}"[:MAX_INPUT_CHARS]
 
 
 def vector_literal(values: list[float]) -> str:

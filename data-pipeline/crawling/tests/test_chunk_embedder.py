@@ -20,3 +20,14 @@ def test_vector_literal_checks_dimension():
     assert vector_literal([0.5] * DIMENSION).startswith("[0.5,0.5,")
     with pytest.raises(ValueError):
         vector_literal([0.5] * 4096)
+
+
+def test_embedding_input_is_capped_for_model_limit():
+    from crawling.chunk_embedder import MAX_INPUT_CHARS
+
+    chunk = {
+        "ticker": "096770", "company": "SK이노베이션", "broker": "증권사",
+        "published_at": date(2026, 9, 15), "section_title": "표 2", "body": "1,234 " * 3000,
+    }
+
+    assert len(embedding_input(chunk)) == MAX_INPUT_CHARS

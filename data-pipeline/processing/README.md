@@ -344,7 +344,12 @@ result = get_report_chunks(
 
 ### get_report_metadata()
 
-리포트 목록과 메타데이터 조회
+리포트 목록과 메타데이터 조회. Supabase `report_metadata`(네이버·KIRS)를 읽습니다(`SUPABASE_DB_URL` 필요).
+
+- `author_org`는 증권사, `published_at`은 발행일. `as_of`를 주면 그날까지 나온 리포트만
+- Supabase 표에 리포트 유형 칸이 없어 `report_type`은 빈 값이고 `report_type` 인자로 거르지 않음
+- 추가 필드 `chunk_status`, `chunk_count`: 본문이 검색(`search_documents`)에 들어갔는지
+- `relational_db` 인자는 기존 호출 호환용으로 받기만 함. 조회 실패 시 빈 결과와 `"error": "report_metadata_unavailable"`
 
 ```python
 from processing.functions.get_report_metadata import get_report_metadata
@@ -353,8 +358,7 @@ result = get_report_metadata(
     ticker="005930",
     date_from="2026-01-01",
     date_to="2026-06-21",
-    report_type="company_report",
-    relational_db=db,
+    as_of="2026-06-21",
 )
 ```
 
@@ -371,8 +375,11 @@ result = get_report_metadata(
       "source": "KIRS",
       "author_org": "작성 기관",
       "published_at": "2026-06-15",
-      "report_type": "company_report",
-      "original_url": "원문 URL"
+      "report_type": "",
+      "original_url": "원문 URL",
+      "pdf_url": "PDF URL",
+      "chunk_status": "chunked",
+      "chunk_count": 12
     }
   ]
 }
@@ -458,7 +465,13 @@ result = get_target_price_data(
 
 ### get_price_data()
 
-주가, 거래량, 변동성 등 숫자 데이터 조회
+주가, 거래량, 변동성 등 숫자 데이터 조회. Supabase `price_data`(pykrx 수정주가)를 읽습니다(`SUPABASE_DB_URL` 필요).
+
+- `prices`는 최신 날짜부터. `as_of`를 주면 그날까지의 시세만(`date_to`와 `as_of` 중 이른 날)
+- `volatility_30d`: 최근 30거래일 일별 로그수익률의 표준편차(연율화하지 않음, 수익률 20개 미만이면 `null`). 인사이트보드 변동성 배지(0.03 기준)와 시뮬레이션 전처리가 같은 정의를 씀
+- 추가 필드 `trading_value`(거래대금). `source`는 `KRX`
+- 현재 T1만 적재되어 있어 그 외 종목은 빈 결과(`latest: null`)
+- `relational_db` 인자는 기존 호출 호환용으로 받기만 함. 조회 실패 시 빈 결과와 `"error": "price_unavailable"`
 
 ```python
 from processing.functions.get_price_data import get_price_data
@@ -467,7 +480,6 @@ result = get_price_data(
     ticker="005930",
     date_from="2026-01-01",
     date_to="2026-06-21",
-    relational_db=db,
 )
 ```
 
@@ -482,17 +494,23 @@ result = get_price_data(
   "latest": {
     "price_date": "2026-06-21",
     "current_price": 80000,
-    "market_cap": null,
-    "volatility_30d": 0.21
+    "market_cap": 477000000000000,
+    "volatility_30d": 0.021
   },
   "prices": [
     {
+      "ticker": "005930",
+      "company": "삼성전자",
       "price_date": "2026-06-21",
       "open": 79000,
       "high": 81000,
       "low": 78500,
       "close": 80000,
-      "volume": 12345678
+      "volume": 12345678,
+      "trading_value": 987654321000,
+      "market_cap": 477000000000000,
+      "volatility_30d": 0.021,
+      "source": "KRX"
     }
   ]
 }
@@ -502,7 +520,12 @@ result = get_price_data(
 
 ### get_macro_data()
 
-금리, 환율, CPI 등 매크로 숫자 데이터 조회
+금리, 환율, CPI 등 매크로 숫자 데이터 조회. Supabase `macro_data`(ECOS)를 읽습니다(`SUPABASE_DB_URL` 필요).
+
+- 지표: `BASE_RATE_KR`, `KTB_3Y_KR`, `KTB_10Y_KR`, `USD_KRW`(일별), `CPI_KR`, `IPI_KR`, `EXPORTS_KR`, `IMPORTS_KR`, `TRADE_BALANCE_KR`(월별, KR), `BRENT`, `WTI`, `DUBAI`(월별, `country='GLOBAL'`)
+- `indicators` 없이 부르면 `country`(기본 `KR`) 지표만, `indicators`를 주면 국가와 상관없이 그 지표를 줌
+- 월간 지표의 `date`는 해당 월 1일이고 발표일은 따로 두지 않음. `as_of`를 주면 그날까지의 값만
+- `relational_db` 인자는 기존 호출 호환용으로 받기만 함. 조회 실패 시 빈 결과와 `"error": "macro_unavailable"`
 
 - Supabase `macro_data`에는 D램 수출물가지수 `DRAM_EXPORT_PRICE`(한국은행 수출물가지수 D램, 달러기준, 월별)도 있음
 
@@ -513,7 +536,6 @@ result = get_macro_data(
     indicators=["BASE_RATE_KR", "USD_KRW"],
     date_from="2026-01-01",
     date_to="2026-06-21",
-    relational_db=db,
 )
 ```
 
@@ -542,7 +564,13 @@ result = get_macro_data(
 
 ### get_disclosure_data()
 
-공시 데이터 조회
+공시 데이터 조회. Supabase `disclosure_metadata`(DART 수시공시·주요사항보고서)를 읽습니다(`SUPABASE_DB_URL` 필요).
+
+- `disclosure_type`은 공시 분류: `earnings`(실적 잠정), `contract`(공급계약), `shareholder_return`(배당·자사주·소각·밸류업), `capital`(증자·사채), `investment`(출자·시설투자·합병), `risk`(해명·조회공시·소송·중대재해·채무보증), `other`. 같은 이름으로 거를 수 있음
+- 정기보고서·지분공시·증권 발행 서류는 적재 대상이 아니라 나오지 않음(`crawling/README.md` 공시 청크 적재 참고)
+- `summary`는 원문 첫 조각(최대 1,000자). 본문 검색은 `search_documents(document_type="disclosure")`
+- 추가 필드 `rcept_no`(접수번호), `is_correction`(정정 공시), `filer`(제출인), `chunk_ids`(본문 청크 ID)
+- `as_of`를 주면 그날까지 접수된 공시만. `relational_db` 인자는 기존 호출 호환용으로 받기만 함. 조회 실패 시 빈 결과와 `"error": "disclosure_unavailable"`
 
 ```python
 from processing.functions.get_disclosure_data import get_disclosure_data
@@ -551,8 +579,7 @@ result = get_disclosure_data(
     ticker="005930",
     date_from="2026-01-01",
     date_to="2026-06-21",
-    disclosure_type="사업보고서",
-    relational_db=db,
+    disclosure_type="investment",
 )
 ```
 
@@ -562,13 +589,17 @@ result = get_disclosure_data(
   "company": "삼성전자",
   "disclosures": [
     {
-      "disclosure_id": "DART_005930_20260615_001",
+      "disclosure_id": "20260615800123",
       "date": "2026-06-15",
-      "source": "OpenDART",
-      "title": "신규 시설투자 공시",
+      "source": "DART",
+      "title": "신규시설투자등",
       "disclosure_type": "investment",
-      "summary": "고대역폭 메모리 생산설비 증설을 위한 투자 결정",
-      "url": "공시 원문 URL"
+      "summary": "신규시설투자등\n1. 투자구분: 신규시설투자 ...",
+      "url": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260615800123",
+      "rcept_no": "20260615800123",
+      "is_correction": false,
+      "filer": "삼성전자",
+      "chunk_ids": ["DART_20260615800123:3f2a9c1b7d0e"]
     }
   ]
 }
@@ -580,7 +611,8 @@ result = get_disclosure_data(
 
 해당 기업에 어떤 데이터가 있는지 확인 (실행 Agent 선택 전 데이터 준비 여부 확인). 반환 형식은 API 계약서 `DataStatus`이고, 이전 형식(`available`, `latest`)도 함께 줍니다.
 
-- 정형 데이터(시세·매크로·재무·목표주가·시뮬레이션 파라미터)는 Supabase에서, 리포트·뉴스·공시 건수는 문서 테이블을 옮기기 전까지 `relational_db`(SQLite)에서 셉니다. `relational_db`가 없으면 문서 건수는 0
+- 모두 Supabase에서 셉니다. 정형 데이터(시세·매크로·재무·목표주가·시뮬레이션 파라미터)는 최신 기준일, 리포트·뉴스·공시는 `document_chunks`에서 검색에 쓸 수 있는 문서(활성·면책 아닌 청크가 있는 문서) 수와 최신 게시일
+- `relational_db`, `vector_db` 인자는 기존 호출 호환용으로 받기만 함
 - `simulation_ready`: 가장 최근 `sim_params`가 `ok`인지. FE가 시뮬레이션 버튼을 미리 끄는 데 씀
 - `derived_snapshot_available`: `get_derived_snapshot` 구현 전이라 `false`
 - `collection_job_status`: T2 수집이 Post-MVP라 `null`

@@ -239,7 +239,7 @@ python -m crawling.report_chunks_loader --backfill --rechunk     # 이미 자른
 ```
 
 - 네이버 리서치 목록을 `report_metadata`에 넣고, 아직 안 잘랐거나 실패했거나 청커 버전(`CHUNKER_VERSION`)이 바뀐 리포트만 PDF를 받아 자른다
-- PDF는 임시 폴더에 받아 자른 뒤 바로 지운다. 다시 자를 때는 그 리포트의 기존 청크를 지우고 새로 넣는다
+- PDF는 임시 폴더에 받아 자른 뒤 바로 지운다
 - `chunk_status`: `chunked` / `failed`(다음 실행 때 다시 시도) / `no_pdf`(PDF 주소 없음) / `no_text`(글자를 그림으로 그린 PDF라 OCR 없이는 못 읽음. 미래에셋증권 등)
 - 임베딩(`embedding`)은 비워 두고 나중에 채운다. 임베딩 입력(머리말 + 본문)은 저장하지 않고 그때 만든다
 - `mentioned_tickers`는 지금은 리포트 대상 종목 하나만 넣는다. 다른 종목 언급은 온톨로지 연결 단계에서 채운다

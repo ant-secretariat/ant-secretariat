@@ -244,6 +244,18 @@ result = search_documents(
 - `report_type`은 계약서 인자라 받지만 지금 청크에 리포트 유형이 없어 거르지 않는다
 - 조회 실패 시 예외 대신 빈 `results`와 `reason: "search_unavailable"`
 
+**검색 평가(골든셋)**: 질문과 정답 청크 ID를 `search_golden_set` 표에 두고 방식별 점수를 잰다. 청커나 검색을 바꾼 뒤 다시 돌려 비교한다.
+
+```bash
+python -m processing.search.golden_set evaluate --snapshot 2026-11-09-v1                 # 30문항
+python -m processing.search.golden_set evaluate --snapshot 2026-11-09-v1 --reviewed-only # 사람이 검토한 14문항만
+python -m processing.search.golden_set import <golden.json> --snapshot <태그> --reviewed G01-G14
+```
+
+- `2026-11-09-v1`: 리포트 기준 30문항(유형 6가지 × 5). G01~G14는 수경 검토, G15~G30은 Claude 라벨(검토 전)
+- 정답 후보는 세 방식 상위 10개를 모아 만들어서 세 방식이 모두 놓친 정답은 없다. 절대 점수보다 방식끼리 비교에 쓴다
+- 골든셋 JSON과 검토 화면은 리포트 내용이 들어 있어 git에 올리지 않고 `storage/golden/`(무시 폴더)에 둔다
+
 예전 방식(Pinecone): `embedding_model`과 `vector_db`를 넘기면 아래처럼 예전 검색을 그대로 쓴다. 트렌드 리포트가 호출을 바꿀 때까지 결과가 말없이 바뀌지 않게 남겨 둔 것이다.
 
 ```python

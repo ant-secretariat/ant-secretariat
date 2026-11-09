@@ -54,3 +54,22 @@ def test_rrf_rewards_chunks_found_by_both():
 
     assert fused[0]["chunk_id"] == "b"
     assert {result["chunk_id"] for result in fused} == {"a", "b", "c"}
+
+
+def test_golden_metrics_and_rows():
+    from processing.search.golden_set import golden_rows, id_range, metrics
+
+    scores = metrics(["a", "x", "b", "y"], {"b", "c"})
+    assert scores["hit5"] == 1.0 and scores["hit10"] == 1.0
+    assert scores["recall10"] == 0.5 and scores["mrr"] == 1 / 3
+    assert 0 < scores["ndcg10"] < 1
+    assert metrics(["x"], {"a"})["hit10"] == 0.0
+
+    assert id_range("G01-G03,G10") == {"G01", "G02", "G03", "G10"}
+    rows = golden_rows(
+        [{"id": "G01", "question_type": "reason", "query": "q", "ticker": "005930", "as_of": None,
+          "expected_chunk_ids": ["R1:aa", "R1:bb", "R2:cc"], "excluded": True}],
+        "snap", {"G01"}, "수경",
+    )
+    assert rows[0]["expected_doc_ids"] == ["R1", "R2"]
+    assert rows[0]["reviewed"] is True and rows[0]["is_active"] is False and rows[0]["labeled_by"] == "수경"

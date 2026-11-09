@@ -653,6 +653,29 @@ result = get_agent_context(
 
 ---
 
+### get_derived_snapshot()
+
+종목의 계산 근거(시세·재무·수급으로 만든 정량 요약). 반환 형식은 API 계약서 `DerivedSnapshot`(필수 키 `valuation`, `price_trend`, `fundamental_trend`, `flow`)이고 `SUPABASE_DB_URL`이 필요합니다. 리포트·뉴스·공시가 없는 종목의 대체 근거(`data_tier=derived_only`)이며, 새로 수집하지 않고 Supabase 표를 계산만 합니다.
+
+- `as_of`를 주면 그날까지 공개된 데이터만 씀(재무는 공시 접수일, 공매도 잔고는 공개 지연 2거래일 반영). 기본은 오늘
+- `valuation`: PER·PBR, 과거 3년 일별 값 중 백분위(적자 PER 제외), WICS 대분류 중앙값 대비(%)
+- `price_trend`: 1주·1개월·3개월 수익률(%), 코스피·코스닥 대비 초과수익, 52주 위치. 변동성 `volatility_1m`·`volatility_3m`은 일별 로그수익률 표준편차 × √252(연율, 소수)로 계약서상 과거 변동성의 단일 계산 지점. `volatility_1m_market_threshold`는 그날 시세가 있는 종목들의 상위 20% 값(현재 시세는 T1만 적재되어 T1 기준)
+- `fundamental_trend`: 그날까지 공시된 최근 분기 매출·영업이익·순이익(연결 우선)과 전년 동기·직전 분기 대비 증감률. 기준이 적자면 증감률 대신 `…_note`에 흑자전환·적자지속
+- `flow`: 외국인·기관·개인 순매수(5·20거래일 합계, 원), 20일 합계의 시가총액 대비(%), 공매도 거래 비중 평균·잔고 비중
+- 묶음마다 값을 못 내면 값은 `null`이고 `reason`(예: `no_data`)에 사유. 하나라도 값이 있으면 `available: true`
+- 조회 실패 시 예외 대신 네 묶음을 모두 비운 결과와 `"error": "snapshot_unavailable"`. 종목당 약 1초(저장하지 않고 부를 때 계산)
+
+```python
+from processing.functions.get_derived_snapshot import get_derived_snapshot
+
+snapshot = get_derived_snapshot("000660", as_of="2026-11-06")
+snapshot["price_trend"]["volatility_1m"]       # 1.0616 (연율)
+snapshot["valuation"]["per_vs_sector_pct"]     # -36.12 (IT 업종 중앙값보다 36% 낮음)
+snapshot["flow"]["foreign_net_buy_20d"]        # -11690952418000 (최근 20거래일 외국인 순매도)
+```
+
+---
+
 ## 9. 현재 상태 및 제한사항
 
 **리포트 수집 현황**

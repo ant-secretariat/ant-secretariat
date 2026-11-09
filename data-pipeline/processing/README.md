@@ -445,6 +445,8 @@ result = get_price_data(
 
 금리, 환율, CPI 등 매크로 숫자 데이터 조회
 
+- Supabase `macro_data`에는 D램 수출물가지수 `DRAM_EXPORT_PRICE`(한국은행 수출물가지수 D램, 달러기준, 월별)도 있음
+
 ```python
 from processing.functions.get_macro_data import get_macro_data
 

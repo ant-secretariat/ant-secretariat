@@ -184,6 +184,17 @@ DEFAULT_ECOS_INDICATORS = {
         unit="2020=100",
         frequency="monthly",
     ),
+    # D램 가격 대체 지표. TrendForce 현물·고정가는 유료라 한국은행 수출물가지수(품목별) D램을 쓴다.
+    # 항목 두 단계: 30911201AA D램 / D 달러기준. 원화기준은 환율이 섞여(환율은 USD_KRW로 따로 봄) 달러기준을 쓴다
+    "DRAM_EXPORT_PRICE": EcosIndicator(
+        indicator_id="DRAM_EXPORT_PRICE",
+        indicator_name="D램 수출물가지수(달러기준)",
+        stat_code="402Y016",
+        cycle="M",
+        item_code="30911201AA/D",
+        unit="2020=100",
+        frequency="monthly",
+    ),
 }
 
 ECOS_PAGE_SIZE = 10000

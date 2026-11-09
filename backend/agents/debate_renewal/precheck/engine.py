@@ -10,7 +10,7 @@ from typing import Callable, Literal, Optional, Sequence
 
 from pydantic import BaseModel, Field
 
-from debate_agent.contracts import (
+from agents.debate_renewal.contracts import (
     AgendaId,
     CompanyContext,
     DataTier,
@@ -19,7 +19,7 @@ from debate_agent.contracts import (
     PrecheckResult,
     ReasonCode,
 )
-from debate_agent.precheck.config import PrecheckConfig, load_default_config, normalize
+from agents.debate_renewal.precheck.config import PrecheckConfig, load_default_config, normalize
 
 AGENDA_TITLES: dict[AgendaId, str] = {
     AgendaId.valuation: "실적 및 밸류에이션",

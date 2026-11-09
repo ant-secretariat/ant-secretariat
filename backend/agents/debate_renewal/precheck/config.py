@@ -11,7 +11,7 @@ from functools import lru_cache
 from importlib import resources
 from pathlib import Path
 
-from debate_agent.contracts import AgendaId
+from agents.debate_renewal.contracts import AgendaId
 
 
 @dataclass(frozen=True)
@@ -90,7 +90,7 @@ def build_config(keyword_doc: dict, source_doc: dict) -> PrecheckConfig:
 def _read(name: str, base: Path | None) -> dict:
     if base is not None:
         return json.loads((base / name).read_text(encoding="utf-8"))
-    ref = resources.files("debate_agent").joinpath("data", name)
+    ref = resources.files("agents.debate_renewal").joinpath("data", name)
     return json.loads(ref.read_text(encoding="utf-8"))
 
 

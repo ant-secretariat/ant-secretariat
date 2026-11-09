@@ -2,9 +2,9 @@ from datetime import date, timedelta
 
 import pytest
 
-from debate_agent.contracts import AgendaId as A
-from debate_agent.contracts import CompanyContext, DataTier, ReasonCode
-from debate_agent.precheck import SourceStatus, TickerDataStatus, precheck
+from agents.debate_renewal.contracts import AgendaId as A
+from agents.debate_renewal.contracts import CompanyContext, DataTier, ReasonCode
+from agents.debate_renewal.precheck import SourceStatus, TickerDataStatus, precheck
 
 TODAY = date(2026, 11, 7)
 FRESH = TODAY - timedelta(days=3)

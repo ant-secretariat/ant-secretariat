@@ -1,5 +1,5 @@
-from debate_agent.precheck.config import PrecheckConfig, load_default_config
-from debate_agent.precheck.engine import (
+from agents.debate_renewal.precheck.config import PrecheckConfig, load_default_config
+from agents.debate_renewal.precheck.engine import (
     DataStatusProvider,
     SourceStatus,
     TickerDataStatus,

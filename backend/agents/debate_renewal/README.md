@@ -1,6 +1,6 @@
-# debate-agent-renewal
+# agents/debate_renewal
 
-토론 에이전트(Agent F) **리빌드 신규 구현**. 기존 `backend/agents/debate`(1차 프로토타입)를 재활용하지 않고, 토론 에이전트 리빌드 기획서 v3.0 기준으로 처음부터 만든다.
+토론 에이전트(Agent F) **리빌드 신규 구현**. 기존 `backend/agents/debate`(1차 프로토타입, 당분간 병행)를 재활용하지 않고, 토론 에이전트 리빌드 기획서 v3.0 기준으로 처음부터 만든다.
 
 ## 구현 현황
 
@@ -13,15 +13,15 @@
 ## 실행
 
 ```bash
-cd debate-agent-renewal
-pip install -e ".[dev]"
-pytest
+cd backend
+pip install pydantic pytest pytest-asyncio
+pytest tests/test_debate_renewal_precheck.py
 ```
 
 ## 구조
 
 ```
-src/debate_agent/
+backend/agents/debate_renewal/
   contracts.py              # AgendaId·DataTier·ReasonCode·NextAction·PrecheckResult (임시 위치)
   precheck/                 # 규칙 기반 순수 함수, LLM 없음
   data/keyword_dictionary.json

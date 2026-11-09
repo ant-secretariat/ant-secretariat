@@ -1,11 +1,11 @@
-# debate-agent-renewal — Claude Code 작업 지침
+# agents/debate_renewal — Claude Code 작업 지침
 
-토론 에이전트(Agent F) 리빌드의 **신규 구현** 패키지. 담당: 유민(AI PM). 팀: 태은(오케스트레이터), 수경(데이터·인프라).
+토론 에이전트(Agent F) 리빌드의 **신규 구현** 패키지. 위치: `backend/agents/debate_renewal/` (모노레포, 팀 결정: 레포 분리 없이 에이전트 폴더 안에서 작업하고 기능 단위로 PR을 계속 올린다). 담당: 유민(AI PM). 팀: 태은(오케스트레이터), 수경(데이터·인프라).
 
 ## 가장 중요한 규칙
 
-1. **기존 `backend/agents/debate/`는 재활용도 수정도 하지 않는다.** 1차 프로토타입이고, 이 패키지는 처음부터 새로 만든다.
-2. **기준 문서는 `docs/spec/debate-agent-rebuild-spec-v3.0.html`** (토론 에이전트 리빌드 기획서 v3.0). 구현이 기획서와 다르면 코드를 맞추거나, 기획서를 바꿔야 하는 이유를 유민에게 먼저 묻는다. 온톨로지는 `docs/spec/ontology-spec-v1.2.html` (이번 범위에서는 인터페이스 참조용).
+1. **기존 `backend/agents/debate/`는 재활용도 수정도 하지 않는다.** 1차 프로토타입이고 오케스트레이터가 아직 호출하므로 당분간 그대로 병행한다. 교체는 새 버전 완성·연동 후 별도 PR로 한다.
+2. **기준 문서는 `docs/debate-renewal/debate-agent-rebuild-spec-v3.0.html`** (토론 에이전트 리빌드 기획서 v3.0). 구현이 기획서와 다르면 코드를 맞추거나, 기획서를 바꿔야 하는 이유를 유민에게 먼저 묻는다. 온톨로지는 `docs/debate-renewal/ontology-spec-v1.2.html` (이번 범위에서는 인터페이스 참조용).
 3. 내 담당이 아닌 부분은 만들지 않고 인터페이스(Protocol·스텁)만 둔다.
 
 | 소유 | 항목 |
@@ -19,8 +19,16 @@
 - 브랜치 `feat/<로드맵ID>-<설명>`, main 직접 push 금지. 현재 브랜치: `feat/3.x-debate-agent-renewal`
 - 커밋은 `feat: 한 줄 요약` + 한국어 본문, 한 커밋 한 변경. 제목 50자 안쪽, 마침표 없음
 - PR은 400줄 이하, Squash merge, 리뷰어 1명 승인. 본문: 변경 요약·이유·검증·리뷰 포인트·남은 작업
+- **팀 합의(11/9)**: 레포를 분리하지 않는다. 각자 에이전트 브랜치에서 작업하고, 기능 하나가 끝날 때마다 바로 PR을 올려 계속 병합한다(큰 PR 하나 금지). 다른 에이전트·데이터 파이프라인의 입출력을 같은 레포에서 바로 읽으며 맞추기 위함
 - 응답 품질에 영향 주는 변경(프롬프트·모델·검색)은 평가 수치 비교표 없이 병합하지 않는다
 - `.env`, API 키, 수집 원본 데이터는 커밋 금지
+
+## 다른 쪽과 맞춰야 할 때 읽을 곳 (같은 레포)
+
+- 데이터: `data-pipeline/processing/functions/`(get_agent_context, get_available_data_status 등), `data-pipeline/crawling/`, `supabase/migrations/`. 수경의 진행 중인 브랜치 `origin/feat/data-*`(target-price-contract, metric-status, investor-flow, financials-point-in-time, kis-opinions 등)에 아직 main에 없는 계약이 있다. 연동 전에 `git fetch` 후 해당 브랜치 diff를 먼저 본다
+- 오케스트레이터: `backend/orchestrator/`(schemas·graph·service), `backend/api/orchestrator.py`, `backend/api/debate_jobs.py`, `backend/functions/agent_jobs.py`. 기존 debate 호출 방식이 여기 있다(새 버전과 병행 중)
+- 시뮬레이션: `backend/agents/simulation/` — 토론 결과의 macro·risk 아젠다를 `job_id`로 조회해 쓰게 될 대상
+- 남의 파일은 수정하지 않는다. 필요한 변경은 인터페이스(Protocol)로 이 패키지 쪽에서 선언하고 담당자에게 알린다
 
 ## 설계 불변 조건 (기획서 v3.0)
 
@@ -49,7 +57,7 @@
 
 ## 확정 필요한 임시값 (코드 곳곳에 TODO)
 
-- `ReasonCode.insufficient_data` — `envelope.py` 확정 이름으로 교체 (`src/debate_agent/contracts.py`). 3종목·한쪽 미커버 등 관문1 코드도 같음
+- `ReasonCode.insufficient_data` — `envelope.py` 확정 이름으로 교체 (`contracts.py`). 3종목·한쪽 미커버 등 관문1 코드도 같음
 - 공용 계약 위치(`backend/contracts`, data-pipeline)가 생기면 `contracts.py`를 import로 교체하고 파일 삭제
 - `data/intent_data_sources.json` — 수경과 아젠다별 필요 데이터·신선도·T0 가능 여부 확정
 - 아젠다 대체 우선순위(`data/keyword_dictionary.json`의 `selection_rules`) — 기획서에 "최대 3개 유지"만 있음
@@ -59,10 +67,11 @@
 ## 명령
 
 ```bash
-cd debate-agent-renewal
-python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -e ".[dev]"
-pytest
+cd backend
+python -m venv .venv && .venv\Scripts\activate     # macOS/Linux: source .venv/bin/activate
+pip install pydantic pytest pytest-asyncio          # precheck만 돌릴 때는 이것으로 충분
+pytest tests/test_debate_renewal_precheck.py
+# 전체 백엔드 테스트는 requirements.txt 전체 설치 필요 (torch 등 무거움)
 ```
 
 ## 작업 방식

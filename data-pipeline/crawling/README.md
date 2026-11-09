@@ -263,6 +263,21 @@ python -m crawling.news_chunks_loader --tickers 005930 --limit 30
 - 본문은 원문 페이지에서 받고(시험 48건 중 85% 성공, 평균 약 1,700자), 못 받으면 검색 API 요약문을 쓴다(`extraction_method='summary'`)
 - 90일(`--expire-days`)보다 오래된 뉴스 청크는 `is_active=false`(행과 임베딩은 남김)
 
+공시 청크 적재 (`disclosure_metadata`, `document_chunks` document_type='disclosure'):
+
+```bash
+python -m crawling.disclosure_chunks_loader                  # 최근 7일, 매일 실행
+python -m crawling.disclosure_chunks_loader --days 90 --embed # 첫 적재 + 임베딩
+python -m crawling.disclosure_chunks_loader --tickers 000660 --limit 20
+```
+
+- OpenDART `list.json`으로 목록, `document.xml`로 원문을 받는다(`DART_API_KEY`, 하루 2만 회)
+- 토론 근거로 쓸 종류만 넣는다(`CATEGORY_RULES`): 실적 잠정(`earnings`), 공급계약(`contract`), 배당·자사주·소각·밸류업(`shareholder_return`), 증자·사채(`capital`), 출자·시설투자·합병(`investment`), 해명·조회공시·소송·중대재해·채무보증(`risk`), 그 밖의 주요사항보고서·주요경영사항(`other`). 시험(T1, 90일)에서 3,427건 중 737건
+- 빼는 것(`EXCLUDE_KEYWORDS`): 정기보고서(숫자는 `financials`), 지분공시(`insider_holdings`), 증권 발행 서류(증권사 파생상품 발행분이 대부분), IR 개최 안내, 계열사 거래 공시
+- 원문 표는 행마다 "항목 - 세부항목: 값" 한 줄로 바꾼다(병합 칸은 아래 행에 다시 채움). 숫자는 원문 그대로. 섹션 제목은 본문 줄로 넣고 공시 하나를 1,200자 단위로 묶는다. 공시 하나당 40조각까지
+- `doc_id`는 `DART_{접수번호}`, `broker`(→ `Evidence.author_org`)는 제출인, 정정 공시는 `is_correction=true`로 따로 쌓는다(원래 공시도 남김)
+- 과거 공시는 언제든 다시 받을 수 있어서 뉴스처럼 비활성으로 돌리지 않는다
+
 청크 임베딩과 BM25 색인:
 
 ```bash

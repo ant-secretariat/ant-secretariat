@@ -45,11 +45,13 @@ DOCUMENT_TYPE_ALIASES = {"macro_summary": "macro"}
 RESULT_COLUMNS = """
     d.chunk_id, d.doc_id, d.ticker, d.company, d.published_at, d.broker, d.document_type, d.title,
     d.page_start, d.page_end, d.body, d.url, d.section_title, d.section_type, d.chunk_type,
-    d.table_structure, coalesce(m.source, n.source) as source
+    d.table_structure, coalesce(m.source, n.source, p.source) as source
 """
+# 공시 청크의 doc_id는 'DART_' + 접수번호
 FROM_CLAUSE = (
     "from document_chunks d left join report_metadata m on m.report_id = d.doc_id"
     " left join news_metadata n on n.news_id = d.doc_id"
+    " left join disclosure_metadata p on d.document_type = 'disclosure' and p.rcept_no = substr(d.doc_id, 6)"
 )
 
 
@@ -118,7 +120,7 @@ def build_filters(
         clauses.append("d.published_at <= %s")
         params.append(as_of)
     if source:
-        clauses.append("coalesce(m.source, n.source) = %s")
+        clauses.append("coalesce(m.source, n.source, p.source) = %s")
         params.append(source)
     if broker:
         clauses.append("d.broker = %s")

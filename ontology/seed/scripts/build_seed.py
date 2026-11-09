@@ -8,6 +8,12 @@ v0.3 변경 (수경 파이프라인 실제 코드·답변 2026-11-10 대조, 근
   - T1 = 파이프라인 core 100 (KOSPI 90 + KOSDAQ 10), 섹터 = companies.sector_l1(WICS)
   - 매크로 ID = 파이프라인 이름 (OIL_BRENT→BRENT, KOSPI_INDEX→KOSPI), 수집 상태 필드 추가
   - SEC_REAL_ESTATE 삭제 (WICS 대분류에 없음, 소속 종목 0개)
+
+v0.4 변경 (유민 결정: 수집 계획 없는 매크로는 삭제하지 않고 비활성 보관)
+  - 수집 계획 없는 매크로 7개와 거기 걸린 SENSITIVE_TO·IMPACTS 엣지 → status "inactive", inactive_reason "no_data_source"
+  - BASE_RATE_KR 대상 SENSITIVE_TO 3개 → KTB_3Y_KR로 합침 (계단식이라 일별 상관 무의미)
+  - 수집 중이나 회귀 요인이 아닌 KTB_10Y_KR·CPI_KR·BRENT 엣지 → weight_status "factor_requested"
+  - SENSITIVE_TO의 weight_coverage 필드를 weight_status·weight_frequency로 대체
 """
 import csv, json, os, sys
 
@@ -79,8 +85,12 @@ for _m in MACROS:
     _m["in_pipeline"] = bool(_p)
     _m["pipeline_status"] = "collecting" if _p else "not_planned"
     _m["pipeline_table"], _m["pipeline_key"], _m["pipeline_item_code"] = _p or (None, None, None)
+    # v0.4: 수집 계획 없는 지표는 삭제하지 않고 비활성으로 보관 (데이터가 생기면 status만 active로 바꾼다)
+    _m["status"] = "active" if _p else "inactive"
+    _m["inactive_reason"] = None if _p else "no_data_source"
     if not _p:
         _m["notes"] += " 수집 계획 없음(수경 2026-11-10) — 필요하면 추가 요청."
+INACTIVE_MACROS = {m["indicator_id"] for m in MACROS if m["status"] == "inactive"}
 
 # ───────────────────────── 5. COMPANY (T1 = 수경 파이프라인 core 100) ─────────────────────────
 # 종목·시장·섹터는 파이프라인 값 그대로. 지주사 여부·세부 산업은 Claude 초안(섹터 상속 보정용).
@@ -232,11 +242,40 @@ SENS = [
 #   planned      = 수경이 섹터별 corr_daily 중앙값 + 종목 수를 집계해 줄 예정 (최신 as_of 2026-11-06)
 #   none_planned = 회귀 요인에 없어 weight를 채울 수단이 없다 (요인 추가 또는 엣지 정리 필요)
 SENS_FACTORS = {"KOSPI", "USD_KRW", "KTB_3Y_KR"}
-SENSITIVE = [dict(edge_type="SENSITIVE_TO", from_node=s, from_type="SECTOR", to_node=m, to_type="MACRO",
-                  weight=None, expected_sign=sign, weight_source=None, weight_window=None,
-                  weight_as_of=None, weight_n_tickers=None,
-                  weight_coverage="planned" if m in SENS_FACTORS else "none_planned",
-                  rationale=why) for s, m, sign, why in SENS]
+
+# v0.4-① 기준금리는 계단식(정책 결정일에만 변함)이라 일별 수익률과의 상관이 의미 없다 → KTB_3Y_KR 엣지로 합친다.
+#   같은 섹터에 KTB_3Y_KR 엣지가 이미 있으면 중복 제거, 없으면 대상 매크로만 교체.
+_seen = {(s, m) for s, m, _, _ in SENS}
+MERGED, _sens2, MERGED_FROM = [], [], {}
+for s, m, sign, why in SENS:
+    if m != "BASE_RATE_KR":
+        _sens2.append((s, m, sign, why)); continue
+    if (s, "KTB_3Y_KR") in _seen:
+        MERGED.append(dict(sector=s, from_macro=m, into="KTB_3Y_KR", action="dedup", expected_sign_was=sign))
+    else:
+        _sens2.append((s, "KTB_3Y_KR", sign, f"{why} (기준금리→KTB_3Y_KR 합침)"))
+        MERGED.append(dict(sector=s, from_macro=m, into="KTB_3Y_KR", action="renamed", expected_sign_was=sign))
+    MERGED_FROM.setdefault((s, "KTB_3Y_KR"), []).append(m)
+SENS = _sens2
+
+# weight_status (활성 엣지만):
+#   aggregation_pending = 회귀 요인에 있음. 수경이 섹터별 corr_daily 중앙값 + 종목 수를 집계해 줄 예정 (최신 as_of 2026-11-06)
+#   factor_requested    = 매크로는 수집 중이나 회귀 요인이 아님. 수경에게 요인 추가·별도 산출을 요청
+# 비활성(수집 계획 없는 매크로에 걸린 엣지)은 weight_status = None
+WEIGHT_FREQ = {"USD_KRW": "daily", "KOSPI": "daily", "KTB_3Y_KR": "daily", "KTB_10Y_KR": "daily",
+               "CPI_KR": "monthly", "BRENT": "monthly"}
+def _sens_edge(s, m, sign, why):
+    inactive = m in INACTIVE_MACROS
+    return dict(edge_type="SENSITIVE_TO", from_node=s, from_type="SECTOR", to_node=m, to_type="MACRO",
+                status="inactive" if inactive else "active",
+                inactive_reason="no_data_source" if inactive else None,
+                weight=None, expected_sign=sign, weight_source=None, weight_window=None,
+                weight_as_of=None, weight_n_tickers=None,
+                weight_status=None if inactive else ("aggregation_pending" if m in SENS_FACTORS else "factor_requested"),
+                weight_frequency=WEIGHT_FREQ.get(m),
+                merged_from=MERGED_FROM.get((s, m), []),
+                rationale=why)
+SENSITIVE = [_sens_edge(*t) for t in SENS]
 
 # IMPACTS: MACRO → MACRO (지표 간 전이). relation: same = 같은 방향, opposite = 반대 방향
 IMP = [
@@ -250,6 +289,9 @@ IMP = [
  ("DRAM_PRICE","KOSPI","same","반도체 지수 비중"),
 ]
 IMPACTS = [dict(edge_type="IMPACTS", from_node=a, from_type="MACRO", to_node=b, to_type="MACRO",
+                status="inactive" if {a, b} & INACTIVE_MACROS else "active",
+                inactive_reason="no_data_source" if {a, b} & INACTIVE_MACROS else None,
+                inactive_macros=sorted({a, b} & INACTIVE_MACROS),
                 relation=rel, rationale=why) for a, b, rel, why in IMP]
 
 BELONGS = [dict(edge_type="BELONGS_TO", from_node=c["ticker"], from_type="COMPANY",
@@ -267,11 +309,19 @@ assert len(mac_ids) == len(MACROS), "macro indicator_id 중복"
 _used = {c["sector_id"] for c in COMPANIES}
 assert sec_ids == _used, f"소속 종목이 없는 섹터: {sorted(sec_ids - _used)}"
 for e in SENSITIVE: assert e["weight"] is None or e["weight_source"], e  # weight는 출처 없이 못 채운다
+assert len(INACTIVE_MACROS) == 7, INACTIVE_MACROS
+for e in SENSITIVE + IMPACTS:  # 비활성 매크로에 걸린 엣지는 반드시 비활성, 활성 엣지는 활성 매크로만 잇는다
+    touch = {e["from_node"], e["to_node"]} & INACTIVE_MACROS
+    assert (e["status"] == "inactive") == bool(touch), e
+for e in SENSITIVE:
+    assert (e["weight_status"] is None) == (e["status"] == "inactive"), e
+assert len({(e["from_node"], e["to_node"]) for e in SENSITIVE}) == len(SENSITIVE), "SENSITIVE_TO 쌍 중복"
 
 nodes = dict(sectors=SECTORS, macros=MACROS, issues=ISSUES, companies_t1=COMPANIES)
 edges = dict(belongs_to=BELONGS, sensitive_to=SENSITIVE, impacts=IMPACTS,
              benefits_hurts=IMPACT_EDGES, exposed_to=EXPOSED)
-meta = dict(version="seed-v0.3", generated="2026-11-10", spec="온톨로지 기획서 v1.2",
+meta = dict(version="seed-v0.4", generated="2026-11-10", spec="온톨로지 기획서 v1.2",
+            merged_sensitive_edges=MERGED, inactive_macros=sorted(INACTIVE_MACROS),
             t1_definition="KOSPI+KOSDAQ 통합 시가총액 상위 100 보통주(우선주 제외). 수경 파이프라인 companies.is_core, 2026-10-22 지정 후 고정",
             core_export=CORE_EXPORT, tier_assigned_on=TIER_ASSIGNED, sensitivities_latest_as_of=SENS_AS_OF,
             dropped_issue_edges=DROPPED,
@@ -291,7 +341,9 @@ py = f'''"""개미비서단 온톨로지 관계사전 — Phase A 시드 ({meta[
 T1 정의: {meta["t1_definition"]}
 
 - SENSITIVE_TO.weight 는 전부 None. 수경 sensitivities(섹터별 corr_daily 중앙값 + 종목 수)로만 채운다.
-  weight_coverage == "none_planned" 인 엣지는 회귀 요인이 없어 채울 수단이 없다.
+  weight_status: aggregation_pending(회귀 요인에 있음, 수경 집계 대기) / factor_requested(수집 중이나 요인 아님, 수경에 요청).
+- status == "inactive" (inactive_reason "no_data_source") 인 매크로·엣지는 수집 계획이 없어 보관만 한다.
+  주입·Judge 경로 검증에는 active_edges() / active_macros() / company_context() 만 쓴다.
   expected_sign 은 회귀 부호 검증용 사전 가설이며 weight 로 쓰지 않는다.
 - *_source == "claude_draft" 인 값은 유민 검토 전 초안.
 - ISSUE 의 evidence_chunk_ids / valid_from / valid_until 은 필수 속성이지만 아직 비어 있음.
@@ -311,8 +363,25 @@ COMPANIES_T1: dict[str, dict] = {pf({c["ticker"]: c for c in COMPANIES})}
 EDGES: dict[str, list[dict]] = {pf(edges)}
 
 
-def company_context(ticker: str) -> dict:
-    """2홉: COMPANY → SECTOR → MACRO(SENSITIVE_TO) + COMPANY ↔ ISSUE. Phase A 확인용 헬퍼."""
+def is_active(record: dict) -> bool:
+    """status 필드가 없으면(섹터·종목·이슈 등) 활성으로 본다. status == "inactive" 는 주입·경로 검증 대상이 아니다."""
+    return record.get("status", "active") != "inactive"
+
+
+def active_macros() -> dict[str, dict]:
+    return {{k: v for k, v in MACROS.items() if is_active(v)}}
+
+
+def active_edges(kind: str) -> list[dict]:
+    """EDGES[kind] 중 활성 엣지만. get_ontology_context 주입과 Judge 경로 검증은 이 함수만 쓴다."""
+    return [e for e in EDGES[kind] if is_active(e)]
+
+
+def company_context(ticker: str, include_inactive: bool = False) -> dict:
+    """2홉: COMPANY → SECTOR → MACRO(SENSITIVE_TO) + COMPANY ↔ ISSUE. Phase A 확인용 헬퍼.
+
+    기본은 활성 엣지만 돌려준다. 비활성(수집 계획 없는 매크로) 엣지가 필요하면 include_inactive=True.
+    """
     c = COMPANIES_T1.get(ticker)
     if c is None:
         return {{}}
@@ -329,7 +398,8 @@ def company_context(ticker: str) -> dict:
     return {{
         "company": c,
         "sector": SECTORS[sec],
-        "sector_sensitivities": [e for e in EDGES["sensitive_to"] if e["from_node"] == sec],
+        "sector_sensitivities": [e for e in EDGES["sensitive_to"]
+                                 if e["from_node"] == sec and (include_inactive or is_active(e))],
         "issues": list(issues.values()),
     }}
 '''
@@ -339,6 +409,10 @@ print("nodes:", {k: len(v) for k, v in nodes.items()})
 print("edges:", {k: len(v) for k, v in edges.items()})
 print("markets:", {m: sum(c["market"] == m for c in COMPANIES) for m in ("KOSPI", "KOSDAQ")})
 print("macros collecting:", sum(m["in_pipeline"] for m in MACROS), "/", len(MACROS))
-print("sensitive_to weight_coverage:", {k: sum(e["weight_coverage"] == k for e in SENSITIVE) for k in ("planned", "none_planned")})
+print("sensitive_to status:", {k: sum(e["status"] == k for e in SENSITIVE) for k in ("active", "inactive")},
+      "| weight_status:", {k: sum(e["weight_status"] == k for e in SENSITIVE) for k in ("aggregation_pending", "factor_requested")})
+print("impacts status:", {k: sum(e["status"] == k for e in IMPACTS) for k in ("active", "inactive")})
+print("macros inactive:", sorted(INACTIVE_MACROS))
+print("BASE_RATE_KR 합침:", [(m["sector"], m["action"]) for m in MERGED])
 print("dropped issue edges (core에 없는 종목):", DROPPED)
 print("무결성 검사 통과")

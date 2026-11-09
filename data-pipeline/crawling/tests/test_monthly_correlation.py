@@ -11,19 +11,22 @@ def _series(values, start="2014-01-01"):
     return pd.Series(values, index=pd.date_range(start, periods=len(values), freq="MS"), dtype=float)
 
 
-def test_correlation_of_related_monthly_changes():
+def test_stock_return_pairs_with_next_month_factor_change():
     rng = np.random.default_rng(0)
     factor_changes = rng.normal(0, 0.05, 150)
-    stock_changes = 0.8 * factor_changes + rng.normal(0, 0.03, 150)
+    # 주가가 다음 달 지표 변화를 미리 반영하는 상황
+    stock_changes = 0.8 * np.roll(factor_changes, -1) + rng.normal(0, 0.03, 150)
     factor = _series(100 * np.exp(np.cumsum(factor_changes)))
-    stock = _series(50000 * np.exp(np.cumsum(stock_changes)))
+    stock = _series(50000 * np.exp(np.cumsum(stock_changes[:-1])))  # 주가는 한 달 짧게 (마지막 지표 달 전까지)
 
     result = correlation(stock, factor)
+    same_month = correlation(stock, factor, lead=0)
 
-    assert result["n_months"] == WINDOW_MONTHS  # 최근 120개월만
-    assert result["corr_monthly"] > 0.6
+    assert result["lead_months"] == 1 and result["n_months"] == WINDOW_MONTHS
+    assert result["corr_monthly"] > 0.6 > same_month["corr_monthly"]
     assert result["ci_low"] < result["corr_monthly"] < result["ci_high"]
-    assert result["as_of"] == date(2026, 6, 1) and result["window_start"] == date(2016, 7, 1)
+    # as_of는 마지막 지표 달, window_start는 첫 주가 달
+    assert result["as_of"] == date(2026, 6, 1) and result["window_start"] == date(2016, 6, 1)
 
 
 def test_short_history_is_skipped_and_gaps_break_changes():

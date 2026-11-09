@@ -68,7 +68,7 @@
 | 2 | 거절셋 수집 (`ReasonCode` 라벨) | 예정 — precheck 튜닝용, 키워드 사전 보강과 함께 |
 | 3 | Pydantic 스키마: Evidence·Claim·DebateResult(단일→비교), Bull·Bear·Judge 출력 | 완료 (`schemas.py`, 10 tests) |
 | 3b | Bull·Bear·Judge 프롬프트 v3 (D6 `agreed_points`, Bear의 Bull Claim 인용) | 예정 |
-| 4 | 검증 레이어 L1 + 근거 부족 루프(1회 수정) | 예정 |
+| 4 | 검증 레이어 L1 + 근거 부족 루프(1회 수정) | L1 완료 (`validation/l1.py`, 10 tests). 근거 부족 루프·1회 수정은 검색·LLM 연동 후 |
 | 5 | 기준선 비교 실험 루브릭 5~6항목 + 문항 30~50개 | 예정 |
 | 6 | 온톨로지 ISSUE 시드 20~30개 | 예정 (온톨로지 기획서) |
 
@@ -77,6 +77,7 @@
 - `ReasonCode.insufficient_data` — `envelope.py` 확정 이름으로 교체 (`contracts.py`). 3종목·한쪽 미커버 등 관문1 코드도 같음
 - 관문1 거절 코드(미커버 종목·3종목 이상·비교 한쪽 미커버)의 `envelope.py` 이름. 11/9 기준 회의에서 확정되지 않았다. precheck 밖이라 이 패키지는 정의하지 않고, 확정되면 `ReasonCode`에 추가한다
 - `schemas.py` 임시 타입: `confidence`는 기획서에 타입이 없어 `str`, `bull_score`·`bear_score`·`score`는 `float`. 근거 제외 후 `partial` 고지를 담을 필드 위치도 기획서에 없어 아직 없음(검증 레이어 구현 때 결정)
+- `validation/l1.py`의 매매 권유 금지어(`FORBIDDEN_PHRASES`)는 기획서에 목록이 없어 임시. 공백 제거 후 부분 일치라 정상 문장을 막을 수 있으므로 거절셋처럼 문항으로 측정해 확정 필요
 - 공용 계약 위치(`backend/contracts`, data-pipeline)가 생기면 `contracts.py`를 import로 교체하고 파일 삭제
 - `data/intent_data_sources.json` — 수경과 아젠다별 필요 데이터·신선도·T0 가능 여부 확정
 - 아젠다 대체 우선순위(`data/keyword_dictionary.json`의 `selection_rules`) — 기획서에 "최대 3개 유지"만 있음

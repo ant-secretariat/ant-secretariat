@@ -19,8 +19,8 @@ Agent B Storage
 
 ## 2. 사용 기술
 
-- **Vector DB**: Pinecone (클라우드 기반, API 키 필요)
-- **임베딩 모델**: Upstage `solar-embedding-1-large-passage` (4096차원)
+- **저장소·검색**: Supabase Postgres + pgvector (`document_chunks`). 예전 Pinecone은 조회 함수에서 쓰지 않음
+- **임베딩 모델**: Upstage `solar-embedding-2-passage`(문서) / `solar-embedding-2-query`(질문), 1,024차원
 
 ---
 
@@ -215,7 +215,7 @@ result = resolve_company(company_input="삼성전자")
 
 ### search_documents()
 
-문서 조각 검색. `vector_db`를 넘기지 않으면 Supabase `document_chunks`를 검색한다(새 방식).
+문서 조각 검색. Supabase `document_chunks`(리포트·뉴스·공시)만 검색한다. `embedding_model`, `vector_db` 인자는 기존 호출 호환용으로 받기만 한다.
 
 ```python
 from processing.functions.search_documents import search_documents
@@ -258,46 +258,7 @@ python -m processing.search.golden_set import <golden.json> --snapshot <태그> 
 - 정답 후보는 세 방식 상위 10개를 모아 만들어서 세 방식이 모두 놓친 정답은 없다. 절대 점수보다 방식끼리 비교에 쓴다
 - 골든셋 JSON과 검토 화면은 리포트 내용이 들어 있어 git에 올리지 않고 `storage/golden/`(무시 폴더)에 둔다
 
-예전 방식(Pinecone): `embedding_model`과 `vector_db`를 넘기면 아래처럼 예전 검색을 그대로 쓴다. 트렌드 리포트가 호출을 바꿀 때까지 결과가 말없이 바뀌지 않게 남겨 둔 것이다.
-
-```python
-from processing.functions.search_documents import search_documents
-
-result = search_documents(
-    query="HBM 수요 증가",
-    ticker="005930",
-    date_from="2026-01-01",
-    date_to="2026-06-21",
-    document_type="report",
-    report_type="company_report",
-    source="KIRS",
-    top_k=5,
-    embedding_model=embedding_model,
-    vector_db=vector_db,
-)
-```
-
-```json
-{
-  "query": "HBM 수요 증가",
-  "ticker": "005930",
-  "results": [
-    {
-      "chunk_id": "KIRS_005930_001_chunk_001",
-      "ticker": "005930",
-      "company": "삼성전자",
-      "date": "2026-06-15",
-      "source": "KIRS",
-      "document_type": "report",
-      "report_type": "company_report",
-      "title": "리포트 제목",
-      "content": "검색된 본문",
-      "score": 0.84,
-      "url": "원문 URL"
-    }
-  ]
-}
-```
+예전 Pinecone 검색 경로는 없앴다(2026-11-10). 트렌드 리포트·토론처럼 `embedding_model`, `vector_db`를 넘기는 기존 호출도 에러 없이 Supabase를 검색하고, 결과의 키 이름은 예전과 같다. Supabase에는 매크로 요약 청크가 없어 `document_type="macro_summary"`(`macro`) 검색은 빈 결과다.
 
 ---
 

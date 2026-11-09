@@ -13,9 +13,10 @@ def get_agent_context(
     embedding_model: BaseEmbeddingModel = None,
     vector_db: BaseVectorDB = None,
 ) -> dict:
-    """에이전트별 데이터 묶음. 시세·매크로·목표주가는 모두 Supabase에서 읽는다.
+    """에이전트별 데이터 묶음. 시세·매크로·목표주가·문서 검색 모두 Supabase에서 읽는다.
 
-    relational_db 인자는 기존 호출을 깨지 않으려고 받기만 한다(없어도 된다).
+    query를 주면 문서 검색(search_documents, 하이브리드)을 함께 한다.
+    relational_db·embedding_model·vector_db 인자는 기존 호출을 깨지 않으려고 받기만 한다(없어도 된다).
     """
     from processing.functions.get_target_price_data import get_target_price_data
     from processing.functions.get_price_data import get_price_data
@@ -30,7 +31,7 @@ def get_agent_context(
             "price_data":    get_price_data(ticker=ticker, relational_db=relational_db),
             "macro_data":    get_macro_data(relational_db=relational_db),
         }
-        if query and embedding_model and vector_db:
+        if query:
             result["report_documents"] = search_documents(
                 query=query,
                 ticker=ticker,
@@ -63,7 +64,7 @@ def get_agent_context(
             "target_prices": get_target_price_data(ticker=ticker, relational_db=relational_db),
             "macro_data":    get_macro_data(relational_db=relational_db),
         }
-        if query and embedding_model and vector_db:
+        if query:
             result["documents"] = search_documents(
                 query=query,
                 ticker=ticker,

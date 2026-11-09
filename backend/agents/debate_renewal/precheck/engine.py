@@ -73,6 +73,10 @@ def precheck(
     is_advice = _hit(q, cfg.advice_keywords)
     is_generic = _hit(q, cfg.generic_keywords)
 
+    # 명백한 범위 밖 단어는 다른 키워드가 걸려도 거절한다.
+    if q and _hit(q, cfg.out_of_scope_keywords):
+        return result("reject", reject_reason=ReasonCode.out_of_scope_topic, matched_intents=[])
+
     # 질의가 있는데 풀 키워드도, 일반 분석 표현도, 투자 권유 표현도 없으면 범위 밖.
     if q and not (matched or is_generic or is_advice):
         return result("reject", reject_reason=ReasonCode.out_of_scope_topic, matched_intents=[])

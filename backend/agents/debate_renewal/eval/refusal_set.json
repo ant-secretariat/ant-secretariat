@@ -1,6 +1,6 @@
 {
-  "version": "rs-0.2.0",
-  "note": "거절셋 v0 (기획서 D10). 질의만으로 판정되는 거절(관문2)과 과잉 거절 확인용 정상 경계 질의. expect=reject면 reason이 ReasonCode 값, expect=answer면 expect_flags가 기대 flag. 데이터 상태로 갈리는 사유(data_collecting·insufficient_data)와 관문1 사유는 질의가 아니라 종목·데이터로 정해지므로 여기 넣지 않는다. 유민이 직접 작성한 질의이며 수집 원본이 아니다. 문항은 계속 보강한다. split=dev는 사전 튜닝에 쓰고, split=holdout은 튜닝 전에 따로 작성해 실패 문항을 보지 않고 일반화 정도만 잰다.",
+  "version": "rs-0.3.0",
+  "note": "거절셋 v0 (기획서 D10). 질의만으로 판정되는 거절(관문2)과 과잉 거절 확인용 정상 경계 질의. expect=reject면 reason이 ReasonCode 값, expect=answer면 expect_flags가 기대 flag. 데이터 상태로 갈리는 사유(data_collecting·insufficient_data)와 관문1 사유는 질의가 아니라 종목·데이터로 정해지므로 여기 넣지 않는다. 유민이 직접 작성한 질의이며 수집 원본이 아니다. 문항은 계속 보강한다. split=dev는 사전 튜닝에 쓰고, split=holdout은 튜닝 전에 따로 작성해 실패 문항을 보지 않고 일반화 정도만 잰다. split=holdout2는 holdout 실패 문항을 본 뒤 새로 쓴 두 번째 확인용이다.",
   "cases": [
     {"id": "oos-01", "category": "off_topic", "query": "오늘 점심 뭐 먹을까", "expect": "reject", "reason": "out_of_scope_topic", "split": "dev"},
     {"id": "oos-02", "category": "off_topic", "query": "삼성전자 신입 채용 일정 알려줘", "expect": "reject", "reason": "out_of_scope_topic", "split": "dev"},
@@ -70,6 +70,28 @@
     {"id": "ha-09", "category": "holdout_answer", "split": "holdout", "query": "삼성전자 호재 악재 정리해줘", "expect": "answer", "expect_flags": []},
     {"id": "ha-10", "category": "holdout_answer", "split": "holdout", "query": "삼성전자 사업 구조 개편하면 성장할까", "expect": "answer", "expect_flags": []},
     {"id": "ha-11", "category": "holdout_answer", "split": "holdout", "query": "코스피 금리 부담 있어?", "expect": "answer", "expect_flags": []},
-    {"id": "ha-12", "category": "holdout_answer", "split": "holdout", "query": "삼성전자 많이 올랐는데 추격매수해도 돼?", "expect": "answer", "expect_flags": ["investment_advice_request"]}
+    {"id": "ha-12", "category": "holdout_answer", "split": "holdout", "query": "삼성전자 많이 올랐는데 추격매수해도 돼?", "expect": "answer", "expect_flags": ["investment_advice_request"]},
+    {"id": "h2r-01", "category": "holdout2_weak_signal", "split": "holdout2", "query": "맛있는 라면 추천해줘", "expect": "reject", "reason": "out_of_scope_topic"},
+    {"id": "h2r-02", "category": "holdout2_weak_signal", "split": "holdout2", "query": "여행지 추천 부탁해", "expect": "reject", "reason": "out_of_scope_topic"},
+    {"id": "h2r-03", "category": "holdout2_weak_signal", "split": "holdout2", "query": "노트북 추천해줘", "expect": "reject", "reason": "out_of_scope_topic"},
+    {"id": "h2r-04", "category": "holdout2_weak_signal", "split": "holdout2", "query": "올해 대박날 로또 번호 어때", "expect": "reject", "reason": "out_of_scope_topic"},
+    {"id": "h2r-05", "category": "holdout2_weak_signal", "split": "holdout2", "query": "이 책 어때? 읽을만해?", "expect": "reject", "reason": "out_of_scope_topic"},
+    {"id": "h2r-06", "category": "holdout2_weak_signal", "split": "holdout2", "query": "투자 공부 어떻게 시작해?", "expect": "reject", "reason": "out_of_scope_topic"},
+    {"id": "h2r-07", "category": "holdout2_weak_signal", "split": "holdout2", "query": "삼성 갤럭시 케이스 추천", "expect": "reject", "reason": "out_of_scope_topic"},
+    {"id": "h2r-08", "category": "holdout2_weak_signal", "split": "holdout2", "query": "내 연봉 전망 어때?", "expect": "reject", "reason": "out_of_scope_topic"},
+    {"id": "h2r-09", "category": "holdout2_agenda_leak", "split": "holdout2", "query": "산업 재해 신고 방법", "expect": "reject", "reason": "out_of_scope_topic"},
+    {"id": "h2r-10", "category": "holdout2_agenda_leak", "split": "holdout2", "query": "금리 높은 대출 상품 비교", "expect": "reject", "reason": "out_of_scope_topic"},
+    {"id": "h2a-01", "category": "holdout2_answer", "split": "holdout2", "query": "삼성전자 추천할 만해?", "expect": "answer", "expect_flags": ["investment_advice_request"]},
+    {"id": "h2a-02", "category": "holdout2_answer", "split": "holdout2", "query": "SK하이닉스 어때 보여?", "expect": "answer", "expect_flags": []},
+    {"id": "h2a-03", "category": "holdout2_answer", "split": "holdout2", "query": "삼성전자 전망 알려줘", "expect": "answer", "expect_flags": []},
+    {"id": "h2a-04", "category": "holdout2_answer", "split": "holdout2", "query": "삼성전자 지금 매수해도 될까", "expect": "answer", "expect_flags": ["investment_advice_request"]},
+    {"id": "h2a-05", "category": "holdout2_answer", "split": "holdout2", "query": "삼성전자 팔까 말까", "expect": "answer", "expect_flags": ["investment_advice_request"]},
+    {"id": "h2a-06", "category": "holdout2_answer", "split": "holdout2", "query": "삼성전자 매출 성장세 이어질까", "expect": "answer", "expect_flags": []},
+    {"id": "h2a-07", "category": "holdout2_answer", "split": "holdout2", "query": "삼성전자 환율 영향 얼마나 받아?", "expect": "answer", "expect_flags": []},
+    {"id": "h2a-08", "category": "holdout2_answer", "split": "holdout2", "query": "삼성전자 투자 매력 있어?", "expect": "answer", "expect_flags": []},
+    {"id": "h2a-09", "category": "holdout2_answer", "split": "holdout2", "query": "SK하이닉스 약세 이유가 뭐야", "expect": "answer", "expect_flags": []},
+    {"id": "h2a-10", "category": "holdout2_answer", "split": "holdout2", "query": "삼성전자 배당 늘릴까?", "expect": "answer", "expect_flags": []},
+    {"id": "h2a-11", "category": "holdout2_answer", "split": "holdout2", "query": "삼성전자 하락 이유", "expect": "answer", "expect_flags": []},
+    {"id": "h2a-12", "category": "holdout2_answer", "split": "holdout2", "query": "삼성전자 어떻게 평가해?", "expect": "answer", "expect_flags": []}
   ]
 }

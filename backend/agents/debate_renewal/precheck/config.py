@@ -41,6 +41,8 @@ class PrecheckConfig:
     sources: dict[AgendaId, AgendaSource]
     # 명백한 범위 밖 단어. 아젠다·일반 키워드가 함께 걸려도 거절한다 (일반 단어 "어때" 등의 오탐 방지)
     out_of_scope_keywords: tuple[str, ...] = ()
+    # 단독으로는 범위 판정 근거가 약한 단어(추천 등). 질의에 종목명이 있어야 통과한다
+    weak_signal_keywords: tuple[str, ...] = ()
 
     @property
     def dictionary_version(self) -> str:
@@ -87,6 +89,7 @@ def build_config(keyword_doc: dict, source_doc: dict) -> PrecheckConfig:
         advice_keywords=_norm_all(keyword_doc["investment_advice_keywords"]),
         sources=src,
         out_of_scope_keywords=_norm_all(keyword_doc.get("out_of_scope_keywords", [])),
+        weak_signal_keywords=_norm_all(keyword_doc.get("weak_signal_keywords", [])),
     )
 
 

@@ -70,15 +70,18 @@ def precheck(
     # ── 관문2: 주제 범위 ──────────────────────────────────────────
     q = normalize(query or "")
     matched = [a for a in AgendaId if cfg.keywords[a].active and _hit(q, cfg.keywords[a].keywords)]
-    is_advice = _hit(q, cfg.advice_keywords)
+    strong_advice = _hit(q, cfg.advice_keywords)
+    is_advice = strong_advice or _hit(q, cfg.weak_signal_keywords)
     is_generic = _hit(q, cfg.generic_keywords)
+    named = any(normalize(c.company) in q or c.ticker in q for c in companies)
 
     # 명백한 범위 밖 단어는 다른 키워드가 걸려도 거절한다.
     if q and _hit(q, cfg.out_of_scope_keywords):
         return result("reject", reject_reason=ReasonCode.out_of_scope_topic, matched_intents=[])
 
-    # 질의가 있는데 풀 키워드도, 일반 분석 표현도, 투자 권유 표현도 없으면 범위 밖.
-    if q and not (matched or is_generic or is_advice):
+    # 질의가 있는데 근거가 없으면 범위 밖이다. 아젠다 키워드와 확실한 매매 표현은 그것만으로 통과하고,
+    # 일반 분석 표현·"추천" 같은 약한 신호는 질의에 종목명이 있어야 통과한다.
+    if q and not (matched or strong_advice or (named and (is_generic or is_advice))):
         return result("reject", reject_reason=ReasonCode.out_of_scope_topic, matched_intents=[])
 
     selected, cap_dropped = _select_agendas(matched, cfg)

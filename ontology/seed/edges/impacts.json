@@ -5,6 +5,12 @@
     "from_type": "MACRO",
     "to_node": "US_10Y_YIELD",
     "to_type": "MACRO",
+    "status": "inactive",
+    "inactive_reason": "no_data_source",
+    "inactive_macros": [
+      "US_10Y_YIELD",
+      "US_FFR"
+    ],
     "relation": "same",
     "rationale": "정책금리→장기금리"
   },
@@ -14,6 +20,11 @@
     "from_type": "MACRO",
     "to_node": "USD_KRW",
     "to_type": "MACRO",
+    "status": "inactive",
+    "inactive_reason": "no_data_source",
+    "inactive_macros": [
+      "US_FFR"
+    ],
     "relation": "same",
     "rationale": "미 금리↑ 달러 강세"
   },
@@ -23,6 +34,11 @@
     "from_type": "MACRO",
     "to_node": "KTB_10Y_KR",
     "to_type": "MACRO",
+    "status": "inactive",
+    "inactive_reason": "no_data_source",
+    "inactive_macros": [
+      "US_10Y_YIELD"
+    ],
     "relation": "same",
     "rationale": "장기금리 동조화"
   },
@@ -32,6 +48,9 @@
     "from_type": "MACRO",
     "to_node": "KTB_3Y_KR",
     "to_type": "MACRO",
+    "status": "active",
+    "inactive_reason": null,
+    "inactive_macros": [],
     "relation": "same",
     "rationale": "정책금리→단기 시장금리"
   },
@@ -41,6 +60,9 @@
     "from_type": "MACRO",
     "to_node": "KTB_10Y_KR",
     "to_type": "MACRO",
+    "status": "active",
+    "inactive_reason": null,
+    "inactive_macros": [],
     "relation": "same",
     "rationale": "기간 구조"
   },
@@ -50,6 +72,9 @@
     "from_type": "MACRO",
     "to_node": "USD_KRW",
     "to_type": "MACRO",
+    "status": "active",
+    "inactive_reason": null,
+    "inactive_macros": [],
     "relation": "opposite",
     "rationale": "금리차 축소 시 원화 약세"
   },
@@ -59,6 +84,11 @@
     "from_type": "MACRO",
     "to_node": "PPI_KR",
     "to_type": "MACRO",
+    "status": "inactive",
+    "inactive_reason": "no_data_source",
+    "inactive_macros": [
+      "PPI_KR"
+    ],
     "relation": "same",
     "rationale": "원자재 원가"
   },
@@ -68,6 +98,11 @@
     "from_type": "MACRO",
     "to_node": "CPI_KR",
     "to_type": "MACRO",
+    "status": "inactive",
+    "inactive_reason": "no_data_source",
+    "inactive_macros": [
+      "PPI_KR"
+    ],
     "relation": "same",
     "rationale": "생산자→소비자 물가 전가"
   },
@@ -77,6 +112,9 @@
     "from_type": "MACRO",
     "to_node": "CPI_KR",
     "to_type": "MACRO",
+    "status": "active",
+    "inactive_reason": null,
+    "inactive_macros": [],
     "relation": "same",
     "rationale": "수입물가"
   },
@@ -86,6 +124,9 @@
     "from_type": "MACRO",
     "to_node": "BASE_RATE_KR",
     "to_type": "MACRO",
+    "status": "active",
+    "inactive_reason": null,
+    "inactive_macros": [],
     "relation": "same",
     "rationale": "물가 대응 통화정책"
   },
@@ -95,6 +136,11 @@
     "from_type": "MACRO",
     "to_node": "USD_KRW",
     "to_type": "MACRO",
+    "status": "inactive",
+    "inactive_reason": "no_data_source",
+    "inactive_macros": [
+      "VIX"
+    ],
     "relation": "same",
     "rationale": "위험회피 시 원화 약세"
   },
@@ -104,6 +150,11 @@
     "from_type": "MACRO",
     "to_node": "KOSPI",
     "to_type": "MACRO",
+    "status": "inactive",
+    "inactive_reason": "no_data_source",
+    "inactive_macros": [
+      "VIX"
+    ],
     "relation": "opposite",
     "rationale": "위험회피 매도"
   },
@@ -113,6 +164,11 @@
     "from_type": "MACRO",
     "to_node": "USD_KRW",
     "to_type": "MACRO",
+    "status": "inactive",
+    "inactive_reason": "no_data_source",
+    "inactive_macros": [
+      "USD_CNY"
+    ],
     "relation": "same",
     "rationale": "위안-원 동조화"
   },
@@ -122,6 +178,11 @@
     "from_type": "MACRO",
     "to_node": "KOSPI",
     "to_type": "MACRO",
+    "status": "inactive",
+    "inactive_reason": "no_data_source",
+    "inactive_macros": [
+      "CHINA_PMI_MFG"
+    ],
     "relation": "same",
     "rationale": "수출 경기"
   },
@@ -131,6 +192,11 @@
     "from_type": "MACRO",
     "to_node": "KOSPI",
     "to_type": "MACRO",
+    "status": "inactive",
+    "inactive_reason": "no_data_source",
+    "inactive_macros": [
+      "DRAM_PRICE"
+    ],
     "relation": "same",
     "rationale": "반도체 지수 비중"
   }

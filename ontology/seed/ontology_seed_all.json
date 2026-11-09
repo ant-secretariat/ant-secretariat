@@ -1,8 +1,40 @@
 {
   "meta": {
-    "version": "seed-v0.3",
+    "version": "seed-v0.4",
     "generated": "2026-11-10",
     "spec": "온톨로지 기획서 v1.2",
+    "merged_sensitive_edges": [
+      {
+        "sector": "SEC_IT",
+        "from_macro": "BASE_RATE_KR",
+        "into": "KTB_3Y_KR",
+        "action": "renamed",
+        "expected_sign_was": "-"
+      },
+      {
+        "sector": "SEC_CONS_DISC",
+        "from_macro": "BASE_RATE_KR",
+        "into": "KTB_3Y_KR",
+        "action": "renamed",
+        "expected_sign_was": "-"
+      },
+      {
+        "sector": "SEC_FIN",
+        "from_macro": "BASE_RATE_KR",
+        "into": "KTB_3Y_KR",
+        "action": "dedup",
+        "expected_sign_was": "+"
+      }
+    ],
+    "inactive_macros": [
+      "CHINA_PMI_MFG",
+      "DRAM_PRICE",
+      "PPI_KR",
+      "USD_CNY",
+      "US_10Y_YIELD",
+      "US_FFR",
+      "VIX"
+    ],
     "t1_definition": "KOSPI+KOSDAQ 통합 시가총액 상위 100 보통주(우선주 제외). 수경 파이프라인 companies.is_core, 2026-10-22 지정 후 고정",
     "core_export": "2026-11-09",
     "tier_assigned_on": "2026-10-22",
@@ -169,7 +201,9 @@
         "pipeline_status": "collecting",
         "pipeline_table": "macro_data",
         "pipeline_key": "BASE_RATE_KR",
-        "pipeline_item_code": "0101000"
+        "pipeline_item_code": "0101000",
+        "status": "active",
+        "inactive_reason": null
       },
       {
         "indicator_id": "KTB_3Y_KR",
@@ -185,7 +219,9 @@
         "pipeline_status": "collecting",
         "pipeline_table": "macro_data",
         "pipeline_key": "KTB_3Y_KR",
-        "pipeline_item_code": "010200000"
+        "pipeline_item_code": "010200000",
+        "status": "active",
+        "inactive_reason": null
       },
       {
         "indicator_id": "KTB_10Y_KR",
@@ -201,7 +237,9 @@
         "pipeline_status": "collecting",
         "pipeline_table": "macro_data",
         "pipeline_key": "KTB_10Y_KR",
-        "pipeline_item_code": "010210000"
+        "pipeline_item_code": "010210000",
+        "status": "active",
+        "inactive_reason": null
       },
       {
         "indicator_id": "US_FFR",
@@ -217,7 +255,9 @@
         "pipeline_status": "not_planned",
         "pipeline_table": null,
         "pipeline_key": null,
-        "pipeline_item_code": null
+        "pipeline_item_code": null,
+        "status": "inactive",
+        "inactive_reason": "no_data_source"
       },
       {
         "indicator_id": "US_10Y_YIELD",
@@ -233,7 +273,9 @@
         "pipeline_status": "not_planned",
         "pipeline_table": null,
         "pipeline_key": null,
-        "pipeline_item_code": null
+        "pipeline_item_code": null,
+        "status": "inactive",
+        "inactive_reason": "no_data_source"
       },
       {
         "indicator_id": "USD_KRW",
@@ -249,7 +291,9 @@
         "pipeline_status": "collecting",
         "pipeline_table": "macro_data",
         "pipeline_key": "USD_KRW",
-        "pipeline_item_code": "0000001"
+        "pipeline_item_code": "0000001",
+        "status": "active",
+        "inactive_reason": null
       },
       {
         "indicator_id": "USD_CNY",
@@ -265,7 +309,9 @@
         "pipeline_status": "not_planned",
         "pipeline_table": null,
         "pipeline_key": null,
-        "pipeline_item_code": null
+        "pipeline_item_code": null,
+        "status": "inactive",
+        "inactive_reason": "no_data_source"
       },
       {
         "indicator_id": "CPI_KR",
@@ -281,7 +327,9 @@
         "pipeline_status": "collecting",
         "pipeline_table": "macro_data",
         "pipeline_key": "CPI_KR",
-        "pipeline_item_code": "0"
+        "pipeline_item_code": "0",
+        "status": "active",
+        "inactive_reason": null
       },
       {
         "indicator_id": "PPI_KR",
@@ -297,7 +345,9 @@
         "pipeline_status": "not_planned",
         "pipeline_table": null,
         "pipeline_key": null,
-        "pipeline_item_code": null
+        "pipeline_item_code": null,
+        "status": "inactive",
+        "inactive_reason": "no_data_source"
       },
       {
         "indicator_id": "BRENT",
@@ -313,7 +363,9 @@
         "pipeline_status": "collecting",
         "pipeline_table": "macro_data",
         "pipeline_key": "BRENT",
-        "pipeline_item_code": "010103"
+        "pipeline_item_code": "010103",
+        "status": "active",
+        "inactive_reason": null
       },
       {
         "indicator_id": "DRAM_PRICE",
@@ -329,7 +381,9 @@
         "pipeline_status": "not_planned",
         "pipeline_table": null,
         "pipeline_key": null,
-        "pipeline_item_code": null
+        "pipeline_item_code": null,
+        "status": "inactive",
+        "inactive_reason": "no_data_source"
       },
       {
         "indicator_id": "CHINA_PMI_MFG",
@@ -345,7 +399,9 @@
         "pipeline_status": "not_planned",
         "pipeline_table": null,
         "pipeline_key": null,
-        "pipeline_item_code": null
+        "pipeline_item_code": null,
+        "status": "inactive",
+        "inactive_reason": "no_data_source"
       },
       {
         "indicator_id": "VIX",
@@ -361,7 +417,9 @@
         "pipeline_status": "not_planned",
         "pipeline_table": null,
         "pipeline_key": null,
-        "pipeline_item_code": null
+        "pipeline_item_code": null,
+        "status": "inactive",
+        "inactive_reason": "no_data_source"
       },
       {
         "indicator_id": "KOSPI",
@@ -377,7 +435,9 @@
         "pipeline_status": "collecting",
         "pipeline_table": "index_daily",
         "pipeline_key": "1001",
-        "pipeline_item_code": null
+        "pipeline_item_code": null,
+        "status": "active",
+        "inactive_reason": null
       }
     ],
     "issues": [
@@ -3054,16 +3114,22 @@
         "edge_type": "SENSITIVE_TO",
         "from_node": "SEC_IT",
         "from_type": "SECTOR",
-        "to_node": "BASE_RATE_KR",
+        "to_node": "KTB_3Y_KR",
         "to_type": "MACRO",
+        "status": "active",
+        "inactive_reason": null,
         "weight": null,
         "expected_sign": "-",
         "weight_source": null,
         "weight_window": null,
         "weight_as_of": null,
         "weight_n_tickers": null,
-        "weight_coverage": "none_planned",
-        "rationale": "성장주 할인율"
+        "weight_status": "aggregation_pending",
+        "weight_frequency": "daily",
+        "merged_from": [
+          "BASE_RATE_KR"
+        ],
+        "rationale": "성장주 할인율 (기준금리→KTB_3Y_KR 합침)"
       },
       {
         "edge_type": "SENSITIVE_TO",
@@ -3071,13 +3137,17 @@
         "from_type": "SECTOR",
         "to_node": "US_10Y_YIELD",
         "to_type": "MACRO",
+        "status": "inactive",
+        "inactive_reason": "no_data_source",
         "weight": null,
         "expected_sign": "-",
         "weight_source": null,
         "weight_window": null,
         "weight_as_of": null,
         "weight_n_tickers": null,
-        "weight_coverage": "none_planned",
+        "weight_status": null,
+        "weight_frequency": null,
+        "merged_from": [],
         "rationale": "글로벌 성장주 할인율"
       },
       {
@@ -3086,13 +3156,17 @@
         "from_type": "SECTOR",
         "to_node": "USD_KRW",
         "to_type": "MACRO",
+        "status": "active",
+        "inactive_reason": null,
         "weight": null,
         "expected_sign": "+",
         "weight_source": null,
         "weight_window": null,
         "weight_as_of": null,
         "weight_n_tickers": null,
-        "weight_coverage": "planned",
+        "weight_status": "aggregation_pending",
+        "weight_frequency": "daily",
+        "merged_from": [],
         "rationale": "수출 환산 이익"
       },
       {
@@ -3101,13 +3175,17 @@
         "from_type": "SECTOR",
         "to_node": "DRAM_PRICE",
         "to_type": "MACRO",
+        "status": "inactive",
+        "inactive_reason": "no_data_source",
         "weight": null,
         "expected_sign": "+",
         "weight_source": null,
         "weight_window": null,
         "weight_as_of": null,
         "weight_n_tickers": null,
-        "weight_coverage": "none_planned",
+        "weight_status": null,
+        "weight_frequency": null,
+        "merged_from": [],
         "rationale": "메모리 실적 직결"
       },
       {
@@ -3116,13 +3194,17 @@
         "from_type": "SECTOR",
         "to_node": "VIX",
         "to_type": "MACRO",
+        "status": "inactive",
+        "inactive_reason": "no_data_source",
         "weight": null,
         "expected_sign": "-",
         "weight_source": null,
         "weight_window": null,
         "weight_as_of": null,
         "weight_n_tickers": null,
-        "weight_coverage": "none_planned",
+        "weight_status": null,
+        "weight_frequency": null,
+        "merged_from": [],
         "rationale": "고베타"
       },
       {
@@ -3131,13 +3213,17 @@
         "from_type": "SECTOR",
         "to_node": "KTB_10Y_KR",
         "to_type": "MACRO",
+        "status": "active",
+        "inactive_reason": null,
         "weight": null,
         "expected_sign": "-",
         "weight_source": null,
         "weight_window": null,
         "weight_as_of": null,
         "weight_n_tickers": null,
-        "weight_coverage": "none_planned",
+        "weight_status": "factor_requested",
+        "weight_frequency": "daily",
+        "merged_from": [],
         "rationale": "플랫폼 성장주 할인율"
       },
       {
@@ -3146,29 +3232,39 @@
         "from_type": "SECTOR",
         "to_node": "USD_KRW",
         "to_type": "MACRO",
+        "status": "active",
+        "inactive_reason": null,
         "weight": null,
         "expected_sign": "+",
         "weight_source": null,
         "weight_window": null,
         "weight_as_of": null,
         "weight_n_tickers": null,
-        "weight_coverage": "planned",
+        "weight_status": "aggregation_pending",
+        "weight_frequency": "daily",
+        "merged_from": [],
         "rationale": "완성차 수출"
       },
       {
         "edge_type": "SENSITIVE_TO",
         "from_node": "SEC_CONS_DISC",
         "from_type": "SECTOR",
-        "to_node": "BASE_RATE_KR",
+        "to_node": "KTB_3Y_KR",
         "to_type": "MACRO",
+        "status": "active",
+        "inactive_reason": null,
         "weight": null,
         "expected_sign": "-",
         "weight_source": null,
         "weight_window": null,
         "weight_as_of": null,
         "weight_n_tickers": null,
-        "weight_coverage": "none_planned",
-        "rationale": "할부·소비심리"
+        "weight_status": "aggregation_pending",
+        "weight_frequency": "daily",
+        "merged_from": [
+          "BASE_RATE_KR"
+        ],
+        "rationale": "할부·소비심리 (기준금리→KTB_3Y_KR 합침)"
       },
       {
         "edge_type": "SENSITIVE_TO",
@@ -3176,13 +3272,17 @@
         "from_type": "SECTOR",
         "to_node": "CHINA_PMI_MFG",
         "to_type": "MACRO",
+        "status": "inactive",
+        "inactive_reason": "no_data_source",
         "weight": null,
         "expected_sign": "+",
         "weight_source": null,
         "weight_window": null,
         "weight_as_of": null,
         "weight_n_tickers": null,
-        "weight_coverage": "none_planned",
+        "weight_status": null,
+        "weight_frequency": null,
+        "merged_from": [],
         "rationale": "중국 수요"
       },
       {
@@ -3191,13 +3291,17 @@
         "from_type": "SECTOR",
         "to_node": "CPI_KR",
         "to_type": "MACRO",
+        "status": "active",
+        "inactive_reason": null,
         "weight": null,
         "expected_sign": "-",
         "weight_source": null,
         "weight_window": null,
         "weight_as_of": null,
         "weight_n_tickers": null,
-        "weight_coverage": "none_planned",
+        "weight_status": "factor_requested",
+        "weight_frequency": "monthly",
+        "merged_from": [],
         "rationale": "소비 여력"
       },
       {
@@ -3206,13 +3310,17 @@
         "from_type": "SECTOR",
         "to_node": "USD_KRW",
         "to_type": "MACRO",
+        "status": "active",
+        "inactive_reason": null,
         "weight": null,
         "expected_sign": "-",
         "weight_source": null,
         "weight_window": null,
         "weight_as_of": null,
         "weight_n_tickers": null,
-        "weight_coverage": "planned",
+        "weight_status": "aggregation_pending",
+        "weight_frequency": "daily",
+        "merged_from": [],
         "rationale": "원재료 수입"
       },
       {
@@ -3221,13 +3329,17 @@
         "from_type": "SECTOR",
         "to_node": "PPI_KR",
         "to_type": "MACRO",
+        "status": "inactive",
+        "inactive_reason": "no_data_source",
         "weight": null,
         "expected_sign": "-",
         "weight_source": null,
         "weight_window": null,
         "weight_as_of": null,
         "weight_n_tickers": null,
-        "weight_coverage": "none_planned",
+        "weight_status": null,
+        "weight_frequency": null,
+        "merged_from": [],
         "rationale": "원가 상승"
       },
       {
@@ -3236,13 +3348,17 @@
         "from_type": "SECTOR",
         "to_node": "KTB_10Y_KR",
         "to_type": "MACRO",
+        "status": "active",
+        "inactive_reason": null,
         "weight": null,
         "expected_sign": "-",
         "weight_source": null,
         "weight_window": null,
         "weight_as_of": null,
         "weight_n_tickers": null,
-        "weight_coverage": "none_planned",
+        "weight_status": "factor_requested",
+        "weight_frequency": "daily",
+        "merged_from": [],
         "rationale": "바이오 할인율"
       },
       {
@@ -3251,13 +3367,17 @@
         "from_type": "SECTOR",
         "to_node": "USD_KRW",
         "to_type": "MACRO",
+        "status": "active",
+        "inactive_reason": null,
         "weight": null,
         "expected_sign": "+",
         "weight_source": null,
         "weight_window": null,
         "weight_as_of": null,
         "weight_n_tickers": null,
-        "weight_coverage": "planned",
+        "weight_status": "aggregation_pending",
+        "weight_frequency": "daily",
+        "merged_from": [],
         "rationale": "수출 환산"
       },
       {
@@ -3266,29 +3386,20 @@
         "from_type": "SECTOR",
         "to_node": "KTB_3Y_KR",
         "to_type": "MACRO",
+        "status": "active",
+        "inactive_reason": null,
         "weight": null,
         "expected_sign": "+",
         "weight_source": null,
         "weight_window": null,
         "weight_as_of": null,
         "weight_n_tickers": null,
-        "weight_coverage": "planned",
+        "weight_status": "aggregation_pending",
+        "weight_frequency": "daily",
+        "merged_from": [
+          "BASE_RATE_KR"
+        ],
         "rationale": "NIM"
-      },
-      {
-        "edge_type": "SENSITIVE_TO",
-        "from_node": "SEC_FIN",
-        "from_type": "SECTOR",
-        "to_node": "BASE_RATE_KR",
-        "to_type": "MACRO",
-        "weight": null,
-        "expected_sign": "+",
-        "weight_source": null,
-        "weight_window": null,
-        "weight_as_of": null,
-        "weight_n_tickers": null,
-        "weight_coverage": "none_planned",
-        "rationale": "NIM(건전성 악화로 상쇄 가능)"
       },
       {
         "edge_type": "SENSITIVE_TO",
@@ -3296,13 +3407,17 @@
         "from_type": "SECTOR",
         "to_node": "KOSPI",
         "to_type": "MACRO",
+        "status": "active",
+        "inactive_reason": null,
         "weight": null,
         "expected_sign": "+",
         "weight_source": null,
         "weight_window": null,
         "weight_as_of": null,
         "weight_n_tickers": null,
-        "weight_coverage": "planned",
+        "weight_status": "aggregation_pending",
+        "weight_frequency": "daily",
+        "merged_from": [],
         "rationale": "증권 브로커리지"
       },
       {
@@ -3311,13 +3426,17 @@
         "from_type": "SECTOR",
         "to_node": "VIX",
         "to_type": "MACRO",
+        "status": "inactive",
+        "inactive_reason": "no_data_source",
         "weight": null,
         "expected_sign": "-",
         "weight_source": null,
         "weight_window": null,
         "weight_as_of": null,
         "weight_n_tickers": null,
-        "weight_coverage": "none_planned",
+        "weight_status": null,
+        "weight_frequency": null,
+        "merged_from": [],
         "rationale": "위험회피"
       },
       {
@@ -3326,13 +3445,17 @@
         "from_type": "SECTOR",
         "to_node": "USD_KRW",
         "to_type": "MACRO",
+        "status": "active",
+        "inactive_reason": null,
         "weight": null,
         "expected_sign": "+",
         "weight_source": null,
         "weight_window": null,
         "weight_as_of": null,
         "weight_n_tickers": null,
-        "weight_coverage": "planned",
+        "weight_status": "aggregation_pending",
+        "weight_frequency": "daily",
+        "merged_from": [],
         "rationale": "조선·방산 달러 수주"
       },
       {
@@ -3341,13 +3464,17 @@
         "from_type": "SECTOR",
         "to_node": "CHINA_PMI_MFG",
         "to_type": "MACRO",
+        "status": "inactive",
+        "inactive_reason": "no_data_source",
         "weight": null,
         "expected_sign": "+",
         "weight_source": null,
         "weight_window": null,
         "weight_as_of": null,
         "weight_n_tickers": null,
-        "weight_coverage": "none_planned",
+        "weight_status": null,
+        "weight_frequency": null,
+        "merged_from": [],
         "rationale": "산업재 수요"
       },
       {
@@ -3356,13 +3483,17 @@
         "from_type": "SECTOR",
         "to_node": "BRENT",
         "to_type": "MACRO",
+        "status": "active",
+        "inactive_reason": null,
         "weight": null,
         "expected_sign": "-",
         "weight_source": null,
         "weight_window": null,
         "weight_as_of": null,
         "weight_n_tickers": null,
-        "weight_coverage": "none_planned",
+        "weight_status": "factor_requested",
+        "weight_frequency": "monthly",
+        "merged_from": [],
         "rationale": "운송 원가(해운·항공)"
       },
       {
@@ -3371,13 +3502,17 @@
         "from_type": "SECTOR",
         "to_node": "CHINA_PMI_MFG",
         "to_type": "MACRO",
+        "status": "inactive",
+        "inactive_reason": "no_data_source",
         "weight": null,
         "expected_sign": "+",
         "weight_source": null,
         "weight_window": null,
         "weight_as_of": null,
         "weight_n_tickers": null,
-        "weight_coverage": "none_planned",
+        "weight_status": null,
+        "weight_frequency": null,
+        "merged_from": [],
         "rationale": "소재 수요"
       },
       {
@@ -3386,13 +3521,17 @@
         "from_type": "SECTOR",
         "to_node": "USD_CNY",
         "to_type": "MACRO",
+        "status": "inactive",
+        "inactive_reason": "no_data_source",
         "weight": null,
         "expected_sign": "-",
         "weight_source": null,
         "weight_window": null,
         "weight_as_of": null,
         "weight_n_tickers": null,
-        "weight_coverage": "none_planned",
+        "weight_status": null,
+        "weight_frequency": null,
+        "merged_from": [],
         "rationale": "중국산 가격경쟁"
       },
       {
@@ -3401,13 +3540,17 @@
         "from_type": "SECTOR",
         "to_node": "BRENT",
         "to_type": "MACRO",
+        "status": "active",
+        "inactive_reason": null,
         "weight": null,
         "expected_sign": "±",
         "weight_source": null,
         "weight_window": null,
         "weight_as_of": null,
         "weight_n_tickers": null,
-        "weight_coverage": "none_planned",
+        "weight_status": "factor_requested",
+        "weight_frequency": "monthly",
+        "merged_from": [],
         "rationale": "화학 원료·제품가 동반"
       },
       {
@@ -3416,13 +3559,17 @@
         "from_type": "SECTOR",
         "to_node": "BRENT",
         "to_type": "MACRO",
+        "status": "active",
+        "inactive_reason": null,
         "weight": null,
         "expected_sign": "±",
         "weight_source": null,
         "weight_window": null,
         "weight_as_of": null,
         "weight_n_tickers": null,
-        "weight_coverage": "none_planned",
+        "weight_status": "factor_requested",
+        "weight_frequency": "monthly",
+        "merged_from": [],
         "rationale": "재고평가이익 vs 원가"
       },
       {
@@ -3431,13 +3578,17 @@
         "from_type": "SECTOR",
         "to_node": "USD_KRW",
         "to_type": "MACRO",
+        "status": "active",
+        "inactive_reason": null,
         "weight": null,
         "expected_sign": "-",
         "weight_source": null,
         "weight_window": null,
         "weight_as_of": null,
         "weight_n_tickers": null,
-        "weight_coverage": "planned",
+        "weight_status": "aggregation_pending",
+        "weight_frequency": "daily",
+        "merged_from": [],
         "rationale": "원유 수입"
       },
       {
@@ -3446,13 +3597,17 @@
         "from_type": "SECTOR",
         "to_node": "BRENT",
         "to_type": "MACRO",
+        "status": "active",
+        "inactive_reason": null,
         "weight": null,
         "expected_sign": "-",
         "weight_source": null,
         "weight_window": null,
         "weight_as_of": null,
         "weight_n_tickers": null,
-        "weight_coverage": "none_planned",
+        "weight_status": "factor_requested",
+        "weight_frequency": "monthly",
+        "merged_from": [],
         "rationale": "연료비"
       },
       {
@@ -3461,13 +3616,17 @@
         "from_type": "SECTOR",
         "to_node": "USD_KRW",
         "to_type": "MACRO",
+        "status": "active",
+        "inactive_reason": null,
         "weight": null,
         "expected_sign": "-",
         "weight_source": null,
         "weight_window": null,
         "weight_as_of": null,
         "weight_n_tickers": null,
-        "weight_coverage": "planned",
+        "weight_status": "aggregation_pending",
+        "weight_frequency": "daily",
+        "merged_from": [],
         "rationale": "연료 수입"
       },
       {
@@ -3476,13 +3635,17 @@
         "from_type": "SECTOR",
         "to_node": "KTB_10Y_KR",
         "to_type": "MACRO",
+        "status": "active",
+        "inactive_reason": null,
         "weight": null,
         "expected_sign": "-",
         "weight_source": null,
         "weight_window": null,
         "weight_as_of": null,
         "weight_n_tickers": null,
-        "weight_coverage": "none_planned",
+        "weight_status": "factor_requested",
+        "weight_frequency": "daily",
+        "merged_from": [],
         "rationale": "채권 대체재"
       }
     ],
@@ -3493,6 +3656,12 @@
         "from_type": "MACRO",
         "to_node": "US_10Y_YIELD",
         "to_type": "MACRO",
+        "status": "inactive",
+        "inactive_reason": "no_data_source",
+        "inactive_macros": [
+          "US_10Y_YIELD",
+          "US_FFR"
+        ],
         "relation": "same",
         "rationale": "정책금리→장기금리"
       },
@@ -3502,6 +3671,11 @@
         "from_type": "MACRO",
         "to_node": "USD_KRW",
         "to_type": "MACRO",
+        "status": "inactive",
+        "inactive_reason": "no_data_source",
+        "inactive_macros": [
+          "US_FFR"
+        ],
         "relation": "same",
         "rationale": "미 금리↑ 달러 강세"
       },
@@ -3511,6 +3685,11 @@
         "from_type": "MACRO",
         "to_node": "KTB_10Y_KR",
         "to_type": "MACRO",
+        "status": "inactive",
+        "inactive_reason": "no_data_source",
+        "inactive_macros": [
+          "US_10Y_YIELD"
+        ],
         "relation": "same",
         "rationale": "장기금리 동조화"
       },
@@ -3520,6 +3699,9 @@
         "from_type": "MACRO",
         "to_node": "KTB_3Y_KR",
         "to_type": "MACRO",
+        "status": "active",
+        "inactive_reason": null,
+        "inactive_macros": [],
         "relation": "same",
         "rationale": "정책금리→단기 시장금리"
       },
@@ -3529,6 +3711,9 @@
         "from_type": "MACRO",
         "to_node": "KTB_10Y_KR",
         "to_type": "MACRO",
+        "status": "active",
+        "inactive_reason": null,
+        "inactive_macros": [],
         "relation": "same",
         "rationale": "기간 구조"
       },
@@ -3538,6 +3723,9 @@
         "from_type": "MACRO",
         "to_node": "USD_KRW",
         "to_type": "MACRO",
+        "status": "active",
+        "inactive_reason": null,
+        "inactive_macros": [],
         "relation": "opposite",
         "rationale": "금리차 축소 시 원화 약세"
       },
@@ -3547,6 +3735,11 @@
         "from_type": "MACRO",
         "to_node": "PPI_KR",
         "to_type": "MACRO",
+        "status": "inactive",
+        "inactive_reason": "no_data_source",
+        "inactive_macros": [
+          "PPI_KR"
+        ],
         "relation": "same",
         "rationale": "원자재 원가"
       },
@@ -3556,6 +3749,11 @@
         "from_type": "MACRO",
         "to_node": "CPI_KR",
         "to_type": "MACRO",
+        "status": "inactive",
+        "inactive_reason": "no_data_source",
+        "inactive_macros": [
+          "PPI_KR"
+        ],
         "relation": "same",
         "rationale": "생산자→소비자 물가 전가"
       },
@@ -3565,6 +3763,9 @@
         "from_type": "MACRO",
         "to_node": "CPI_KR",
         "to_type": "MACRO",
+        "status": "active",
+        "inactive_reason": null,
+        "inactive_macros": [],
         "relation": "same",
         "rationale": "수입물가"
       },
@@ -3574,6 +3775,9 @@
         "from_type": "MACRO",
         "to_node": "BASE_RATE_KR",
         "to_type": "MACRO",
+        "status": "active",
+        "inactive_reason": null,
+        "inactive_macros": [],
         "relation": "same",
         "rationale": "물가 대응 통화정책"
       },
@@ -3583,6 +3787,11 @@
         "from_type": "MACRO",
         "to_node": "USD_KRW",
         "to_type": "MACRO",
+        "status": "inactive",
+        "inactive_reason": "no_data_source",
+        "inactive_macros": [
+          "VIX"
+        ],
         "relation": "same",
         "rationale": "위험회피 시 원화 약세"
       },
@@ -3592,6 +3801,11 @@
         "from_type": "MACRO",
         "to_node": "KOSPI",
         "to_type": "MACRO",
+        "status": "inactive",
+        "inactive_reason": "no_data_source",
+        "inactive_macros": [
+          "VIX"
+        ],
         "relation": "opposite",
         "rationale": "위험회피 매도"
       },
@@ -3601,6 +3815,11 @@
         "from_type": "MACRO",
         "to_node": "USD_KRW",
         "to_type": "MACRO",
+        "status": "inactive",
+        "inactive_reason": "no_data_source",
+        "inactive_macros": [
+          "USD_CNY"
+        ],
         "relation": "same",
         "rationale": "위안-원 동조화"
       },
@@ -3610,6 +3829,11 @@
         "from_type": "MACRO",
         "to_node": "KOSPI",
         "to_type": "MACRO",
+        "status": "inactive",
+        "inactive_reason": "no_data_source",
+        "inactive_macros": [
+          "CHINA_PMI_MFG"
+        ],
         "relation": "same",
         "rationale": "수출 경기"
       },
@@ -3619,6 +3843,11 @@
         "from_type": "MACRO",
         "to_node": "KOSPI",
         "to_type": "MACRO",
+        "status": "inactive",
+        "inactive_reason": "no_data_source",
+        "inactive_macros": [
+          "DRAM_PRICE"
+        ],
         "relation": "same",
         "rationale": "반도체 지수 비중"
       }

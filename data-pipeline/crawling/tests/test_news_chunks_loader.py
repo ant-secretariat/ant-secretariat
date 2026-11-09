@@ -11,6 +11,19 @@ def test_names_and_press_rules():
     assert news_id("https://a.com/1") == news_id("https://a.com/1") != news_id("https://a.com/2")
 
 
+def test_short_names_match_but_not_other_companies():
+    query, names = names_for("015760", "한국전력", ["한국전력"])
+    assert query == "한전" and "한국전력" in names
+    titles = ["한전, 전력망 갈등 중립기관 통해 푼다", "한전KPS 수주 확대", "한전기술 실적 개선", "한국전력 요금 인상"]
+    kept = select_articles([{"title": t, "press": "yna.co.kr"} for t in titles], names)
+    assert [row["title"] for row in kept] == [titles[0], titles[3]]
+
+    _, names = names_for("373220", "LG에너지솔루션", ["LG에너지솔루션"])
+    assert select_articles([{"title": "LG엔솔 폴란드 공장", "press": "yna.co.kr"}], names)
+    _, names = names_for("047810", "한국항공우주", ["한국항공우주"])
+    assert not select_articles([{"title": "KAIST 연구팀 성과", "press": "yna.co.kr"}], names)
+
+
 def test_select_articles_needs_company_in_title_and_allowed_press():
     rows = [
         {"title": "LG이노텍, 기판 증설", "press": "hankyung.com"},

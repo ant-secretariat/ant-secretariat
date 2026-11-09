@@ -74,3 +74,16 @@ def test_chunk_worker_survives_crashing_process():
         assert worker.run(abs, -5) == 5  # 새 프로세스로 다시 이어 간다
     finally:
         worker.close()
+
+
+def test_stale_embedding_ids_only_for_retitled_chunks():
+    from crawling.report_chunks_loader import stale_embedding_ids
+
+    existing = {"R:a": "실적 리뷰", "R:b": "밸류에이션"}
+    rows = [
+        {"chunk_id": "R:a", "section_title": "실적 리뷰"},  # 그대로 → 임베딩 유지
+        {"chunk_id": "R:b", "section_title": "목표주가 하향"},  # 소제목만 바뀜 → 다시 임베딩
+        {"chunk_id": "R:c", "section_title": "신규"},  # 새 청크 → 원래 비어 있음
+    ]
+
+    assert stale_embedding_ids(existing, rows) == ["R:b"]

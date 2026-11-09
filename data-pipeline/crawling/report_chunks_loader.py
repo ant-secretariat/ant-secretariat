@@ -7,7 +7,7 @@
 
 1. 네이버 리서치에서 기간 내 리포트 목록을 받아 report_metadata에 넣는다 (청킹 상태는 유지)
 2. 아직 안 잘랐거나 실패했거나 청커 버전이 바뀐 리포트만 PDF를 임시 폴더에 받는다
-3. 청커로 자른 뒤 그 리포트의 기존 청크를 지우고 새로 넣는다. PDF는 바로 지운다
+3. 청커로 자른 뒤 그 리포트의 청크를 바꾼다. 본문이 그대로인 청크는 임베딩을 지킨다. PDF는 바로 지운다
 """
 
 from __future__ import annotations
@@ -172,8 +172,7 @@ def chunk_one(
         for leftover in folder.glob(f"{report['report_id']}*"):
             leftover.unlink(missing_ok=True)
     with connection.transaction():
-        connection.execute("delete from document_chunks where doc_id = %s", (report["report_id"],))
-        upsert(connection, "document_chunks", rows, key_columns=["chunk_id"])
+        replace_chunks(connection, report["report_id"], rows)
         connection.execute(
             """
             update report_metadata
@@ -188,6 +187,39 @@ def chunk_one(
             ),
         )
     return len(rows)
+
+
+def replace_chunks(connection: psycopg.Connection, doc_id: str, rows: list[dict]) -> None:
+    """리포트의 청크를 새로 자른 결과로 바꾸되, 내용이 그대로인 청크의 임베딩은 지킨다.
+
+    청크 ID는 본문 해시라서 본문이 같으면 ID도 같다. 새 결과에 없는 청크만 지우고,
+    나머지는 upsert로 메타데이터만 고친다(행에 embedding 칸이 없어 기존 값이 남는다).
+    """
+    existing = dict(
+        connection.execute(
+            "select chunk_id, section_title from document_chunks where doc_id = %s", (doc_id,)
+        ).fetchall()
+    )
+    connection.execute(
+        "delete from document_chunks where doc_id = %s and not (chunk_id = any(%s))",
+        (doc_id, [row["chunk_id"] for row in rows]),
+    )
+    upsert(connection, "document_chunks", rows, key_columns=["chunk_id"])
+    stale = stale_embedding_ids(existing, rows)
+    if stale:
+        connection.execute(
+            "update document_chunks set embedding = null, embedding_model = null where chunk_id = any(%s)",
+            (stale,),
+        )
+
+
+def stale_embedding_ids(existing: dict[str, str], rows: list[dict]) -> list[str]:
+    """본문은 같지만 소제목이 바뀐 청크. 임베딩 입력 머리말에 소제목이 들어가서 다시 임베딩해야 한다."""
+    return [
+        row["chunk_id"]
+        for row in rows
+        if row["chunk_id"] in existing and existing[row["chunk_id"]] != row["section_title"]
+    ]
 
 
 def text_chars_per_page(pdf_path: str) -> float:

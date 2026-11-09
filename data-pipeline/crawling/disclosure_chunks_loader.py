@@ -239,6 +239,9 @@ def fetch_document(client: httpx.Client, rcept_no: str) -> bytes:
     response = client.get(DOCUMENT_URL, params={"crtfc_key": SETTINGS.dart_api_key, "rcept_no": rcept_no})
     response.raise_for_status()
     if not zipfile.is_zipfile(io.BytesIO(response.content)):
+        # 014: 본문 파일 없음 ([첨부정정]처럼 첨부서류만 고친 공시). 실패가 아니라 no_text로 남긴다
+        if b"<status>014</status>" in response.content[:500]:
+            return b""
         raise RuntimeError("DART 원문이 zip이 아님 (한도 초과 또는 오류 응답)")
     with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
         names = archive.namelist()

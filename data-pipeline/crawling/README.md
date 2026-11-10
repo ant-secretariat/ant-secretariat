@@ -230,6 +230,69 @@ python -m crawling.insider_holdings_loader --tickers 005930
 - DART는 날짜를 고르는 조회가 없고 최근 약 2년 치를 한 번에 주므로, 매번 전체를 받아 덮어쓴다
 - 접수일(`rcept_dt`) 기준으로 시점 조회한다. 임원 보고에는 주식 보상 같은 소액 변동도 들어 있다
 
+증권사 리포트 청크(`report_metadata`, `document_chunks`) 적재. 청커는 `processing/processors/report_chunker.py`:
+
+```bash
+python -m crawling.report_chunks_loader --backfill               # T1, 최근 3개월
+python -m crawling.report_chunks_loader --recent                 # T1, 최근 14일 (매일)
+python -m crawling.report_chunks_loader --backfill --rechunk     # 이미 자른 리포트도 다시 자름
+```
+
+- 네이버 리서치 목록을 `report_metadata`에 넣고, 아직 안 잘랐거나 실패했거나 청커 버전(`CHUNKER_VERSION`)이 바뀐 리포트만 PDF를 받아 자른다
+- PDF는 임시 폴더에 받아 자른 뒤 바로 지운다
+- `chunk_status`: `chunked` / `failed`(다음 실행 때 다시 시도) / `no_pdf`(PDF 주소 없음) / `no_text`(글자를 그림으로 그린 PDF라 OCR 없이는 못 읽음. 미래에셋증권 등)
+- 임베딩(`embedding`)은 적재 때 비워 두고 `python -m crawling.chunk_embedder`로 채운다(아래). 임베딩 입력(머리말 + 본문)은 저장하지 않고 그때 만든다
+- BM25 색인(`search_tokens`, `search_token_count`)은 적재할 때 Kiwi로 바로 만든다
+- `mentioned_tickers`는 지금은 리포트 대상 종목 하나만 넣는다. 다른 종목 언급은 온톨로지 연결 단계에서 채운다
+- 다시 자를 때 본문이 같은 청크는 그대로 두어 임베딩을 지키고, 사라진 청크는 지우지 않고 `is_active=false`로 남긴다(토론 근거·온톨로지 ISSUE의 청크 ID 링크 유지). 검색은 활성 청크만, 청크 ID로 여는 근거 조회는 비활성도 포함
+- PDF 자르기는 별도 프로세스에서 돈다. PyMuPDF가 죽거나 5분을 넘기면 그 리포트만 `failed`로 남기고 이어 간다
+- 청커가 PyMuPDF 레이아웃 모델로 표를 찾아서 리포트 1건에 약 10초 걸린다(모델을 끄면 7배 빠르지만 본문이 표로 잘못 잡힘)
+
+뉴스 청크 적재 (`news_metadata`, `document_chunks` document_type='news'):
+
+```bash
+python -m crawling.news_chunks_loader                  # 최근 3일, 매일 실행
+python -m crawling.news_chunks_loader --days 90 --embed # 첫 적재 + 임베딩
+python -m crawling.news_chunks_loader --tickers 005930 --limit 30
+```
+
+- 네이버 **API HUB** 뉴스 검색만 쓴다(`naverapihub.apigw.ntruss.com/search/v1/news`, 헤더 `X-NCP-APIGW-API-KEY-ID/KEY`). 키는 NCP 콘솔 > NAVER API HUB > Application > 인증 정보의 Client ID/Secret(`NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET`). NCP 계정 Access Key(`ncp_iam_…`)는 안 된다
+- API가 검색어당 최신 1,100건까지만 줘서 과거 뉴스는 나중에 받을 수 없다. 대형주는 하루치도 다 안 받힌다 → 매일(가능하면 하루 여러 번) 돌려 쌓는다
+- 제목에 종목명이 있고(다른 회사 이름의 일부가 아닌 형태, 조사는 허용) 허용 언론사(`PRESS_ALLOWLIST`: 주요 일간지·경제지·통신사·방송 + 업종 전문지)인 기사만 남긴다. 기사에서 쓰는 이름이 다른 종목은 `NEWS_NAMES`(네이버, 에쓰오일, 기아차 등)
+- 같은 기사가 여러 종목에 걸리면 한 행으로 두고 `mentioned_tickers`에 모은다
+- 본문은 원문 페이지에서 받고(시험 48건 중 85% 성공, 평균 약 1,700자), 못 받으면 검색 API 요약문을 쓴다(`extraction_method='summary'`)
+- 90일(`--expire-days`)보다 오래된 뉴스 청크는 `is_active=false`(행과 임베딩은 남김)
+
+공시 청크 적재 (`disclosure_metadata`, `document_chunks` document_type='disclosure'):
+
+```bash
+python -m crawling.disclosure_chunks_loader                  # 최근 7일, 매일 실행
+python -m crawling.disclosure_chunks_loader --days 90 --embed # 첫 적재 + 임베딩
+python -m crawling.disclosure_chunks_loader --tickers 000660 --limit 20
+```
+
+- OpenDART `list.json`으로 목록, `document.xml`로 원문을 받는다(`DART_API_KEY`, 하루 2만 회)
+- 토론 근거로 쓸 종류만 넣는다(`CATEGORY_RULES`): 실적 잠정(`earnings`), 공급계약(`contract`), 배당·자사주·소각·밸류업(`shareholder_return`), 증자·사채(`capital`), 출자·시설투자·합병(`investment`), 해명·조회공시·소송·중대재해·채무보증(`risk`), 그 밖의 주요사항보고서·주요경영사항(`other`). 시험(T1, 90일)에서 3,427건 중 737건
+- 빼는 것(`EXCLUDE_KEYWORDS`): 정기보고서(숫자는 `financials`), 지분공시(`insider_holdings`), 증권 발행 서류(증권사 파생상품 발행분이 대부분), IR 개최 안내, 계열사 거래 공시
+- 원문 표는 행마다 "항목 - 세부항목: 값" 한 줄로 바꾼다(병합 칸은 아래 행에 다시 채움). 숫자는 원문 그대로. 섹션 제목은 본문 줄로 넣고 공시 하나를 1,200자 단위로 묶는다. 공시 하나당 40조각까지
+- `doc_id`는 `DART_{접수번호}`, `broker`(→ `Evidence.author_org`)는 제출인, 정정 공시는 `is_correction=true`로 따로 쌓는다(원래 공시도 남김)
+- 과거 공시는 언제든 다시 받을 수 있어서 뉴스처럼 비활성으로 돌리지 않는다
+
+청크 임베딩과 BM25 색인:
+
+```bash
+python -m crawling.chunk_embedder --dry-run   # 대상 수·글자 수만 (API 호출 없음)
+python -m crawling.chunk_embedder --limit 100 # 시험
+python -m crawling.chunk_embedder             # 빈 임베딩 전부 (Upstage solar-embedding-2-passage, 1,024차원)
+python -m crawling.chunk_indexer              # 비어 있는 BM25 색인 채우기 (API 없음)
+python -m crawling.chunk_indexer --all        # 형태소 규칙을 바꾼 뒤 전부 다시
+python -m crawling.chunk_reclassify --dry-run # 청커의 고지 판별 규칙을 기존 청크에 다시 적용 (PDF 다시 안 받음)
+```
+
+- 임베딩 대상은 활성 청크 중 면책 문구가 아닌 것. 100개씩 보내고 묶음마다 저장해서 끊겨도 다시 실행하면 빈 칸만 채운다
+- 분당 25만 토큰 이하로 보낸다(한도 30만). 입력은 6,000자까지 잘라 모델 한도 8,192토큰을 넘지 않게 한다
+- 2026-11-09 기준 리포트 청크 15,285개, 약 1,000만 토큰
+
 KIS 목표주가·투자의견(`broker_opinions`) 적재(`KIS_APP_KEY`, `KIS_APP_SECRET` 필요). 조회 API만 호출합니다:
 
 ```bash

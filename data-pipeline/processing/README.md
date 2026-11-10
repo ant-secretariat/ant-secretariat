@@ -19,8 +19,8 @@ Agent B Storage
 
 ## 2. 사용 기술
 
-- **Vector DB**: Pinecone (클라우드 기반, API 키 필요)
-- **임베딩 모델**: Upstage `solar-embedding-1-large-passage` (4096차원)
+- **저장소·검색**: Supabase Postgres + pgvector (`document_chunks`). 예전 Pinecone은 조회 함수에서 쓰지 않음
+- **임베딩 모델**: Upstage `solar-embedding-2-passage`(문서) / `solar-embedding-2-query`(질문), 1,024차원
 
 ---
 
@@ -70,6 +70,22 @@ financial_research_data_agent/
 - **fallback**: 문단이 너무 길면 문장 단위로 재분할
 - **예외처리**: 문장이 1500자를 초과하는 경우 글자 수 기준으로 강제 분할 (표 등 비정형 텍스트 대응)
 - **결과**: 14개 리포트 → 478개 청크 (4개 기업: 삼성전자, SK하이닉스, 현대차, NAVER)
+
+### 리포트 (PDF) — 새 청커 `processors/report_chunker.py`
+
+기존 `pdf_processor.py`는 지금 파이프라인이 쓰고 있어 그대로 두고, Supabase 적재(`document_chunks`)부터 새 청커로 바꿉니다.
+
+- **소제목 기준 분할**: 본문보다 글자가 크거나 굵은 짧은 줄을 소제목으로 보고 그 단위로 섹션을 나눔. 본문 글자 크기는 문장처럼 긴 줄(30자 이상)에서만 셈(표·사이드바의 작은 글자가 더 많기 때문)
+- **크기**: 섹션 안에서 문단을 1,200자 이하로 묶고, 긴 문단은 문장 경계에서 자름. 400자보다 짧은 조각은 이웃 조각과 합침
+- **줄바꿈 복원**: 한국어 리포트는 글자 단위로 줄을 바꿔서, 문장이 끝나지 않은 줄은 이어 붙임. 원문 줄 끝에 공백이 있으면 진짜 띄어쓰기 자리라 띄우고, 없으면 단어 중간이라 붙임(확대 / 하고 → 확대하고, 순증은 / 이보다 → 순증은 이보다)
+- **차트 글**: 30자 이하 숫자 덩어리(차트 축 값, 작은 수익률 표)와 그 바로 옆(15pt 안)의 짧은 글(차트 제목·범례·출처)은 본문에서 빼고 쪽마다 `차트·소형 표 수치` 청크(`text_only`)로 모음. 본문보다 큰 글자(리포트 제목)는 옮기지 않음. 한 쪽의 숫자 조각이 60자도 안 되면 버림(회사명·날짜·전화번호 조각). 단 `매출액 31조 5,970억원`처럼 이름 붙은 값이 있으면 남김
+- **표**: PyMuPDF `find_tables`로 찾되, 칸에 긴 문장이 있는 상자(본문을 두른 테두리)는 본문으로 되돌림. 표 청크는 `table_structure`가 `intact`(행·열 유지) 또는 `text_only`(칸이 뭉치거나 반복됨, 숫자는 DB 값 사용). 표로 잡히지 않은 숫자 덩어리(재무제표 등)도 `text_only` 표로 분류. 단 `~다.` 문장이 3개 이상이면 본문으로 둠(표지 요약 문단이 주가·재무 박스와 한 조각으로 묶이는 경우). 머리글만 있는 빈 표는 버림
+- **표 제목**: 표 바로 위 짧은 글 중 굵거나 큰 글자, 또는 `표1`·`그림`·`(단위` 형식만 제목으로 씀. 문장, 축 값, `자료:` 출처 줄, 고지 문구는 제외. 짧은 섹션을 합칠 때 이은 제목은 120자까지
+- **머리말·꼬리말**: 여러 쪽의 위·아래 여백에 반복되는 글은 버림
+- **면책 문구**: Compliance Notice, 투자의견 분류·변동 내역 등은 `section_type='disclaimer'`로 표시(기본 검색에서 제외용). 표·목록 형태 고지(투자의견 비율표, 투자등급 기준, 의견·목표가 이력표, 문장 없는 ESG 등급표)도 `is_boilerplate`로 면책 처리. 이 판별만 바꿀 때는 리포트를 다시 자르지 않고 `crawling.chunk_reclassify`로 기존 청크에 적용
+- **청크 ID**: `{doc_id}:{정규화한 본문의 SHA-1 앞 12자}`. 다시 처리해도 같은 내용이면 같은 ID(온톨로지 ISSUE 근거가 참조)
+- **머리말**: 임베딩 입력(`content`)은 `[회사(종목코드) | 증권사 | 날짜 | 소제목]` + 본문, 키워드 검색과 청크 ID는 머리말 없는 `body` 기준
+- **시험**(2026-11-08, 리포트 8개): 본문 청크 길이 중앙값이 약 250자 → 약 500~1,000자, 400자 미만 조각이 거의 없어짐
 
 ### 뉴스
 - **방식**: 문단 단위 청킹 (`\n\n` 기준), 문단이 1500자 초과 시 문장 단위로 재분할
@@ -199,46 +215,53 @@ result = resolve_company(company_input="삼성전자")
 
 ### search_documents()
 
-Vector DB에서 의미 기반 문서 chunk 검색
+문서 조각 검색. Supabase `document_chunks`(리포트·뉴스·공시)만 검색한다. `embedding_model`, `vector_db` 인자는 기존 호출 호환용으로 받기만 한다.
 
 ```python
 from processing.functions.search_documents import search_documents
 
 result = search_documents(
-    query="HBM 수요 증가",
-    ticker="005930",
-    date_from="2026-01-01",
-    date_to="2026-06-21",
-    document_type="report",
-    report_type="company_report",
-    source="KIRS",
+    query="SK하이닉스 HBM4 출하 전망",
+    ticker="000660",            # 빈 문자열이면 전 종목. mentioned_tickers에 든 문서도 포함
+    date_from=None, date_to=None,
+    document_type="report",      # report / news / disclosure / macro (macro_summary도 받음)
+    as_of="2026-09-30",          # 그날까지 게시된 문서만 (미래 정보 누출 방지)
+    broker=None,                 # 증권사로 거르기
+    include_disclaimer=False,    # 면책 문구는 기본 제외
     top_k=5,
-    embedding_model=embedding_model,
-    vector_db=vector_db,
+    mode="hybrid",               # hybrid(기본) / bm25 / vector
 )
+# → {"query", "ticker", "mode", "results": [{chunk_id, report_id, ticker, company, date, source,
+#    author_org, document_type, title, page_start, page_end, content, score, url,
+#    section_title, section_type, chunk_type, table_structure}]}
 ```
 
-```json
-{
-  "query": "HBM 수요 증가",
-  "ticker": "005930",
-  "results": [
-    {
-      "chunk_id": "KIRS_005930_001_chunk_001",
-      "ticker": "005930",
-      "company": "삼성전자",
-      "date": "2026-06-15",
-      "source": "KIRS",
-      "document_type": "report",
-      "report_type": "company_report",
-      "title": "리포트 제목",
-      "content": "검색된 본문",
-      "score": 0.84,
-      "url": "원문 URL"
-    }
-  ]
-}
+- **필터 먼저**: 활성 청크(`is_active`)만, 종목·기간·`as_of`·면책 제외를 먼저 걸고 그 안에서 점수를 낸다
+- **bm25**: 질문과 청크를 같은 Kiwi 규칙(`processing/search/korean_tokens.py`)으로 잘라 BM25(k1=1.2, b=0.75)로 점수. 외부 API 없음. 청크 색인은 `search_tokens`(적재기가 채움, 처음 한 번은 `python -m crawling.chunk_indexer`)
+- **vector**: 질문을 `solar-embedding-2-query`로 임베딩해 코사인 유사도 순. 같은 질문은 한 번만 임베딩
+- **hybrid**: 두 방식 상위 50개를 RRF(k=60)로 합침. 질문 임베딩이 실패하면 BM25로 대신하고 `mode`에 실제 쓴 방식을 남김
+- 기본값은 하이브리드: 골든셋 30문항 비교(2026-11-09)에서 nDCG@10 BM25 0.51 / 의미 0.52 / 하이브리드 0.59, Hit@10 0.90 / 0.90 / 0.97. 의미 검색까지 쓰려면 호출하는 환경에 `UPSTAGE_API_KEY`가 필요하고, 없으면 BM25로 대신한다
+- 차트 축 값만 모은 `차트·소형 표 수치` 청크는 기본 제외(`include_chart_numbers=True`로 포함)
+- `report_type`은 계약서 인자라 받지만 지금 청크에 리포트 유형이 없어 거르지 않는다
+- 조회 실패 시 예외 대신 빈 `results`와 `reason: "search_unavailable"`
+
+**검색 평가(골든셋)**: 질문과 정답 청크 ID를 `search_golden_set` 표에 두고 방식별 점수를 잰다. 청커나 검색을 바꾼 뒤 다시 돌려 비교한다.
+
+```bash
+python -m processing.search.golden_set evaluate --snapshot 2026-11-09-v1                 # 30문항
+python -m processing.search.golden_set evaluate --snapshot 2026-11-09-v1 --reviewed-only # 사람이 검토한 14문항만
+python -m processing.search.golden_set import <golden.json> --snapshot <태그> --reviewed G01-G14
+python -m processing.search.golden_set set-agenda --snapshot 2026-11-09-v1 G01=growth G02=valuation  # 아젠다만 고치기
 ```
+
+- 문항마다 `agenda_id`(토론 아젠다: valuation, macro, risk, growth, shareholder_return, flow)를 두고, 평가 결과를 아젠다별 nDCG@10으로도 나눠 봅니다(오케스트레이터 설계 5.2 Q13). 문항이 없는 아젠다는 결과 끝에 표시합니다
+
+- 2026-11-09 개선 결과(하이브리드): 차트 수치 청크 제외 + 표 형태 고지 정리 후 nDCG@10 0.59 → 0.61, Hit@5 0.87 → 0.90, 최신 의견 유형 0.56 → 0.63. 표 청크 점수 낮추기는 효과가 ±0.02로 불분명해 적용하지 않음
+- `2026-11-09-v1`: 리포트 기준 30문항(유형 6가지 × 5). G01~G14는 수경 검토, G15~G30은 Claude 라벨(검토 전)
+- 정답 후보는 세 방식 상위 10개를 모아 만들어서 세 방식이 모두 놓친 정답은 없다. 절대 점수보다 방식끼리 비교에 쓴다
+- 골든셋 JSON과 검토 화면은 리포트 내용이 들어 있어 git에 올리지 않고 `storage/golden/`(무시 폴더)에 둔다
+
+예전 Pinecone 검색 경로는 없앴다(2026-11-10). 트렌드 리포트·토론처럼 `embedding_model`, `vector_db`를 넘기는 기존 호출도 에러 없이 Supabase를 검색하고, 결과의 키 이름은 예전과 같다. Supabase에는 매크로 요약 청크가 없어 `document_type="macro_summary"`(`macro`) 검색은 빈 결과다.
 
 ---
 
@@ -285,7 +308,12 @@ result = get_report_chunks(
 
 ### get_report_metadata()
 
-리포트 목록과 메타데이터 조회
+리포트 목록과 메타데이터 조회. Supabase `report_metadata`(네이버·KIRS)를 읽습니다(`SUPABASE_DB_URL` 필요).
+
+- `author_org`는 증권사, `published_at`은 발행일. `as_of`를 주면 그날까지 나온 리포트만
+- Supabase 표에 리포트 유형 칸이 없어 `report_type`은 빈 값이고 `report_type` 인자로 거르지 않음
+- 추가 필드 `chunk_status`, `chunk_count`: 본문이 검색(`search_documents`)에 들어갔는지
+- `relational_db` 인자는 기존 호출 호환용으로 받기만 함. 조회 실패 시 빈 결과와 `"error": "report_metadata_unavailable"`
 
 ```python
 from processing.functions.get_report_metadata import get_report_metadata
@@ -294,8 +322,7 @@ result = get_report_metadata(
     ticker="005930",
     date_from="2026-01-01",
     date_to="2026-06-21",
-    report_type="company_report",
-    relational_db=db,
+    as_of="2026-06-21",
 )
 ```
 
@@ -312,8 +339,11 @@ result = get_report_metadata(
       "source": "KIRS",
       "author_org": "작성 기관",
       "published_at": "2026-06-15",
-      "report_type": "company_report",
-      "original_url": "원문 URL"
+      "report_type": "",
+      "original_url": "원문 URL",
+      "pdf_url": "PDF URL",
+      "chunk_status": "chunked",
+      "chunk_count": 12
     }
   ]
 }
@@ -399,7 +429,13 @@ result = get_target_price_data(
 
 ### get_price_data()
 
-주가, 거래량, 변동성 등 숫자 데이터 조회
+주가, 거래량, 변동성 등 숫자 데이터 조회. Supabase `price_data`(pykrx 수정주가)를 읽습니다(`SUPABASE_DB_URL` 필요).
+
+- `prices`는 최신 날짜부터. `as_of`를 주면 그날까지의 시세만(`date_to`와 `as_of` 중 이른 날)
+- `volatility_30d`: 최근 30거래일 일별 로그수익률의 표준편차(연율화하지 않음, 수익률 20개 미만이면 `null`). 인사이트보드 변동성 배지(0.03 기준)와 시뮬레이션 전처리가 같은 정의를 씀
+- 추가 필드 `trading_value`(거래대금). `source`는 `KRX`
+- 현재 T1만 적재되어 있어 그 외 종목은 빈 결과(`latest: null`)
+- `relational_db` 인자는 기존 호출 호환용으로 받기만 함. 조회 실패 시 빈 결과와 `"error": "price_unavailable"`
 
 ```python
 from processing.functions.get_price_data import get_price_data
@@ -408,7 +444,6 @@ result = get_price_data(
     ticker="005930",
     date_from="2026-01-01",
     date_to="2026-06-21",
-    relational_db=db,
 )
 ```
 
@@ -423,17 +458,23 @@ result = get_price_data(
   "latest": {
     "price_date": "2026-06-21",
     "current_price": 80000,
-    "market_cap": null,
-    "volatility_30d": 0.21
+    "market_cap": 477000000000000,
+    "volatility_30d": 0.021
   },
   "prices": [
     {
+      "ticker": "005930",
+      "company": "삼성전자",
       "price_date": "2026-06-21",
       "open": 79000,
       "high": 81000,
       "low": 78500,
       "close": 80000,
-      "volume": 12345678
+      "volume": 12345678,
+      "trading_value": 987654321000,
+      "market_cap": 477000000000000,
+      "volatility_30d": 0.021,
+      "source": "KRX"
     }
   ]
 }
@@ -443,9 +484,12 @@ result = get_price_data(
 
 ### get_macro_data()
 
-금리, 환율, CPI 등 매크로 숫자 데이터 조회
+금리, 환율, CPI 등 매크로 숫자 데이터 조회. Supabase `macro_data`(ECOS)를 읽습니다(`SUPABASE_DB_URL` 필요).
 
-- Supabase `macro_data`에는 D램 수출물가지수 `DRAM_EXPORT_PRICE`(한국은행 수출물가지수 D램, 달러기준, 월별)도 있음
+- 지표: `BASE_RATE_KR`, `KTB_3Y_KR`, `KTB_10Y_KR`, `USD_KRW`(일별), `CPI_KR`, `IPI_KR`, `EXPORTS_KR`, `IMPORTS_KR`, `TRADE_BALANCE_KR`, `DRAM_EXPORT_PRICE`(D램 수출물가지수, 달러기준)(월별, KR), `BRENT`, `WTI`, `DUBAI`(월별, `country='GLOBAL'`)
+- `indicators` 없이 부르면 `country`(기본 `KR`) 지표만, `indicators`를 주면 국가와 상관없이 그 지표를 줌
+- 월간 지표의 `date`는 해당 월 1일이고 발표일은 따로 두지 않음. `as_of`를 주면 그날까지의 값만
+- `relational_db` 인자는 기존 호출 호환용으로 받기만 함. 조회 실패 시 빈 결과와 `"error": "macro_unavailable"`
 
 ```python
 from processing.functions.get_macro_data import get_macro_data
@@ -454,7 +498,6 @@ result = get_macro_data(
     indicators=["BASE_RATE_KR", "USD_KRW"],
     date_from="2026-01-01",
     date_to="2026-06-21",
-    relational_db=db,
 )
 ```
 
@@ -483,7 +526,13 @@ result = get_macro_data(
 
 ### get_disclosure_data()
 
-공시 데이터 조회
+공시 데이터 조회. Supabase `disclosure_metadata`(DART 수시공시·주요사항보고서)를 읽습니다(`SUPABASE_DB_URL` 필요).
+
+- `disclosure_type`은 공시 분류: `earnings`(실적 잠정), `contract`(공급계약), `shareholder_return`(배당·자사주·소각·밸류업), `capital`(증자·사채), `investment`(출자·시설투자·합병), `risk`(해명·조회공시·소송·중대재해·채무보증), `other`. 같은 이름으로 거를 수 있음
+- 정기보고서·지분공시·증권 발행 서류는 적재 대상이 아니라 나오지 않음(`crawling/README.md` 공시 청크 적재 참고)
+- `summary`는 원문 첫 조각(최대 1,000자). 본문 검색은 `search_documents(document_type="disclosure")`
+- 추가 필드 `rcept_no`(접수번호), `is_correction`(정정 공시), `filer`(제출인), `chunk_ids`(본문 청크 ID)
+- `as_of`를 주면 그날까지 접수된 공시만. `relational_db` 인자는 기존 호출 호환용으로 받기만 함. 조회 실패 시 빈 결과와 `"error": "disclosure_unavailable"`
 
 ```python
 from processing.functions.get_disclosure_data import get_disclosure_data
@@ -492,8 +541,7 @@ result = get_disclosure_data(
     ticker="005930",
     date_from="2026-01-01",
     date_to="2026-06-21",
-    disclosure_type="사업보고서",
-    relational_db=db,
+    disclosure_type="investment",
 )
 ```
 
@@ -503,13 +551,17 @@ result = get_disclosure_data(
   "company": "삼성전자",
   "disclosures": [
     {
-      "disclosure_id": "DART_005930_20260615_001",
+      "disclosure_id": "20260615800123",
       "date": "2026-06-15",
-      "source": "OpenDART",
-      "title": "신규 시설투자 공시",
+      "source": "DART",
+      "title": "신규시설투자등",
       "disclosure_type": "investment",
-      "summary": "고대역폭 메모리 생산설비 증설을 위한 투자 결정",
-      "url": "공시 원문 URL"
+      "summary": "신규시설투자등\n1. 투자구분: 신규시설투자 ...",
+      "url": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260615800123",
+      "rcept_no": "20260615800123",
+      "is_correction": false,
+      "filer": "삼성전자",
+      "chunk_ids": ["DART_20260615800123:3f2a9c1b7d0e"]
     }
   ]
 }
@@ -521,7 +573,8 @@ result = get_disclosure_data(
 
 해당 기업에 어떤 데이터가 있는지 확인 (실행 Agent 선택 전 데이터 준비 여부 확인). 반환 형식은 API 계약서 `DataStatus`이고, 이전 형식(`available`, `latest`)도 함께 줍니다.
 
-- 정형 데이터(시세·매크로·재무·목표주가·시뮬레이션 파라미터)는 Supabase에서, 리포트·뉴스·공시 건수는 문서 테이블을 옮기기 전까지 `relational_db`(SQLite)에서 셉니다. `relational_db`가 없으면 문서 건수는 0
+- 모두 Supabase에서 셉니다. 정형 데이터(시세·매크로·재무·목표주가·시뮬레이션 파라미터)는 최신 기준일, 리포트·뉴스·공시는 `document_chunks`에서 검색에 쓸 수 있는 문서(활성·면책 아닌 청크가 있는 문서) 수와 최신 게시일
+- `relational_db`, `vector_db` 인자는 기존 호출 호환용으로 받기만 함
 - `simulation_ready`: 가장 최근 `sim_params`가 `ok`인지. FE가 시뮬레이션 버튼을 미리 끄는 데 씀
 - `derived_snapshot_available`: `get_derived_snapshot` 구현 전이라 `false`
 - `collection_job_status`: T2 수집이 Post-MVP라 `null`

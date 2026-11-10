@@ -38,36 +38,32 @@ class FakeVectorDB:
         ]
 
 
-def test_search_documents_returns_evidence_fields():
-    result = search_documents(
-        query="HBM",
-        ticker="005930",
-        embedding_model=FakeEmbeddingModel(),
-        vector_db=FakeVectorDB(),
-    )
+def test_search_documents_ignores_pinecone_and_uses_supabase(monkeypatch):
+    calls = {}
 
-    item = result["results"][0]
-    assert item["report_id"] == "KIRS_005930_001"
-    assert item["author_org"] == "테스트증권"
-    assert item["page_start"] == 3
-    assert item["page_end"] == 4
+    def fake_search_chunks(connection, query, ticker, top_k, mode, **filters):
+        calls.update(query=query, ticker=ticker, top_k=top_k, **filters)
+        return [{"chunk_id": "R1:a", "report_id": "R1", "author_org": "테스트증권"}], "hybrid"
 
+    class NoConnection:
+        def __enter__(self):
+            return self
 
-def test_search_documents_forwards_date_range_as_raw_iso_strings():
+        def __exit__(self, *args):
+            return False
+
+    monkeypatch.setattr("crawling.db.postgres.connect", lambda: NoConnection())
+    monkeypatch.setattr("processing.search.chunk_search.search_chunks", fake_search_chunks)
     vector_db = FakeVectorDB()
 
-    search_documents(
-        query="HBM",
-        ticker="005930",
-        date_from="2026-01-01",
-        date_to="2026-06-30",
-        embedding_model=FakeEmbeddingModel(),
-        vector_db=vector_db,
+    result = search_documents(
+        query="HBM", ticker="005930", date_from="2026-01-01", date_to="2026-06-30",
+        embedding_model=FakeEmbeddingModel(), vector_db=vector_db,
     )
 
-    assert vector_db.last_filter["date_from"] == "2026-01-01"
-    assert vector_db.last_filter["date_to"] == "2026-06-30"
-    assert "date" not in vector_db.last_filter
+    assert vector_db.last_filter is None  # Pinecone은 부르지 않는다
+    assert result["mode"] == "hybrid" and result["results"][0]["author_org"] == "테스트증권"
+    assert (calls["date_from"], calls["date_to"]) == ("2026-01-01", "2026-06-30")
 
 
 class FakeSupabase:

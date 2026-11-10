@@ -24,6 +24,10 @@ def get_price_data(
     latest의 current_price·market_cap·volatility_30d). trading_value는 추가 필드다.
     volatility_30d는 최근 30거래일 일별 로그수익률의 표준편차(연율화하지 않음)로, 인사이트보드 변동성 배지와
     시뮬레이션 전처리가 같은 정의를 쓴다. as_of를 주면 그날까지의 시세만 쓴다.
+
+    [임시 호환] 오케스트레이터 설계 5.1·기획서 v2는 과거 변동성을 get_derived_snapshot 한 곳에서만 계산하기로 했다
+    (volatility_1m·volatility_3m, ×√252, 배지는 volatility_1m_market_threshold와 비교). volatility_30d는 인사이트보드
+    배지(고정 기준 0.03)와 시뮬레이션 전처리가 get_derived_snapshot으로 옮겨 가기 전까지만 두고, 옮겨 가면 뺀다.
     relational_db 인자는 기존 호출을 깨지 않으려고 받기만 한다.
     """
     try:

@@ -74,3 +74,26 @@ def test_golden_metrics_and_rows():
     )
     assert rows[0]["expected_doc_ids"] == ["R1", "R2"]
     assert rows[0]["reviewed"] is True and rows[0]["is_active"] is False and rows[0]["labeled_by"] == "수경"
+    assert rows[0]["agenda_id"] is None
+
+
+def test_golden_agendas_are_validated_and_summarized():
+    import pytest
+
+    from processing.search.golden_set import golden_rows, parse_agendas, summary
+
+    item = {"id": "G01", "question_type": "reason", "query": "q", "expected_chunk_ids": ["R1:aa"]}
+    assert golden_rows([{**item, "agenda_id": "risk"}], "snap", set(), "수경")[0]["agenda_id"] == "risk"
+    with pytest.raises(ValueError):
+        golden_rows([{**item, "agenda_id": "valuations"}], "snap", set(), "수경")
+    assert parse_agendas(["G01=growth", "G02=valuation"]) == {"G01": "growth", "G02": "valuation"}
+    with pytest.raises(ValueError):
+        parse_agendas(["G01=price"])
+
+    base = {"question_type": "reason", "used_mode": "hybrid", "hit5": 1.0, "hit10": 1.0, "recall10": 1.0, "mrr": 1.0}
+    text = summary([
+        {**base, "golden_id": "G01", "agenda_id": "risk", "mode": "hybrid", "ndcg10": 0.8},
+        {**base, "golden_id": "G02", "agenda_id": "growth", "mode": "hybrid", "ndcg10": 0.4},
+    ])
+    assert "아젠다별 nDCG@10" in text and "risk (1)" in text and "growth (1)" in text
+    assert "문항이 없는 아젠다: ['valuation', 'macro', 'shareholder_return', 'flow']" in text

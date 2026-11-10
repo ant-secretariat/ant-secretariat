@@ -3,9 +3,12 @@
     python -m processing.search.golden_set import golden.json --snapshot 2026-11-09-v1 --reviewer 수경 --reviewed G01-G14
     python -m processing.search.golden_set evaluate --snapshot 2026-11-09-v1
     python -m processing.search.golden_set evaluate --snapshot 2026-11-09-v1 --reviewed-only
+    python -m processing.search.golden_set set-agenda --snapshot 2026-11-09-v1 G01=growth G02=valuation
 
-- 골든셋 JSON: [{"id", "question_type", "query", "ticker", "as_of", "expected_chunk_ids", "excluded",
+- 골든셋 JSON: [{"id", "question_type", "agenda_id", "query", "ticker", "as_of", "expected_chunk_ids", "excluded",
   "labeled_by", "note"}]. 리포트 본문은 넣지 않는다
+- agenda_id는 토론 아젠다(AgendaId: valuation, macro, risk, growth, shareholder_return, flow). 평가 결과를
+  아젠다별로도 나눠 본다(오케스트레이터 설계 5.2 Q13)
 - 평가 지표: Hit@5, Hit@10(정답이 하나라도 있나), Recall@10(정답 중 찾은 비율), nDCG@10(정답의 순위), MRR
 - 의미·하이브리드 평가는 질문마다 Upstage 임베딩을 1번 부른다 (질문 30개에 1원 미만)
 """
@@ -23,6 +26,7 @@ if __package__ in (None, ""):
 
 MODES = ("bm25", "vector", "hybrid")
 TOP_K = 10
+AGENDA_IDS = ("valuation", "macro", "risk", "growth", "shareholder_return", "flow")
 
 
 def golden_rows(items: list[dict], snapshot: str, reviewed_ids: set[str], default_reviewer: str) -> list[dict]:
@@ -30,6 +34,9 @@ def golden_rows(items: list[dict], snapshot: str, reviewed_ids: set[str], defaul
     rows = []
     for item in items:
         chunk_ids = list(dict.fromkeys(item["expected_chunk_ids"]))
+        agenda_id = item.get("agenda_id") or None
+        if agenda_id is not None and agenda_id not in AGENDA_IDS:
+            raise ValueError(f"{item['id']}: 알 수 없는 agenda_id {agenda_id!r}")
         rows.append(
             {
                 "golden_id": item["id"],
@@ -38,6 +45,7 @@ def golden_rows(items: list[dict], snapshot: str, reviewed_ids: set[str], defaul
                 "ticker": item.get("ticker") or None,
                 "as_of": item.get("as_of") or None,
                 "question_type": item["question_type"],
+                "agenda_id": agenda_id,
                 "expected_chunk_ids": chunk_ids,
                 "expected_doc_ids": list(dict.fromkeys(chunk_id.split(":")[0] for chunk_id in chunk_ids)),
                 "labeled_by": item.get("labeled_by") or default_reviewer,
@@ -96,6 +104,33 @@ def import_golden(path: str, snapshot: str, reviewed: str | None, reviewer: str)
     return len(rows)
 
 
+def parse_agendas(pairs: list[str]) -> dict[str, str]:
+    """['G01=growth', 'G02=valuation'] → {'G01': 'growth', ...}. 알 수 없는 아젠다면 오류."""
+    mapping = {}
+    for pair in pairs:
+        golden_id, _, agenda_id = pair.partition("=")
+        if agenda_id not in AGENDA_IDS:
+            raise ValueError(f"{pair}: 알 수 없는 agenda_id (가능: {', '.join(AGENDA_IDS)})")
+        mapping[golden_id.strip()] = agenda_id
+    return mapping
+
+
+def set_agendas(snapshot: str, mapping: dict[str, str]) -> int:
+    """이미 넣은 문항의 agenda_id만 바꾼다(정답 청크·검토 여부는 그대로)."""
+    from crawling.db.postgres import connect
+
+    with connect() as connection:
+        changed = sum(
+            connection.execute(
+                "update search_golden_set set agenda_id = %s where snapshot_tag = %s and golden_id = %s",
+                (agenda_id, snapshot, golden_id),
+            ).rowcount
+            for golden_id, agenda_id in mapping.items()
+        )
+    print(f"agenda_id {changed}/{len(mapping)}문항 갱신 (snapshot={snapshot})")
+    return changed
+
+
 def evaluate(snapshot: str, modes: tuple[str, ...] = MODES, reviewed_only: bool = False) -> list[dict]:
     from psycopg.rows import dict_row
 
@@ -107,7 +142,7 @@ def evaluate(snapshot: str, modes: tuple[str, ...] = MODES, reviewed_only: bool 
         with connection.cursor(row_factory=dict_row) as cursor:
             golden = cursor.execute(
                 """
-                select golden_id, query, ticker, as_of, question_type, expected_chunk_ids
+                select golden_id, query, ticker, as_of, question_type, agenda_id, expected_chunk_ids
                 from search_golden_set
                 where snapshot_tag = %s and is_active and cardinality(expected_chunk_ids) > 0
                   and (not %s or reviewed)
@@ -120,7 +155,8 @@ def evaluate(snapshot: str, modes: tuple[str, ...] = MODES, reviewed_only: bool 
             as_of = item["as_of"].isoformat() if item["as_of"] else None
             for mode in modes:
                 found, used = search_chunks(connection, item["query"], ticker=item["ticker"], as_of=as_of, top_k=TOP_K, mode=mode)
-                results.append({"golden_id": item["golden_id"], "question_type": item["question_type"], "mode": mode,
+                results.append({"golden_id": item["golden_id"], "question_type": item["question_type"],
+                                "agenda_id": item["agenda_id"], "mode": mode,
                                 "used_mode": used, **metrics([r["chunk_id"] for r in found], relevant)})
     return results
 
@@ -140,6 +176,16 @@ def summary(results: list[dict]) -> str:
     for kind in dict.fromkeys(row["question_type"] for row in results):
         lines.append(f"{kind:16}" + "".join(
             f"{mean([r for r in results if r['question_type'] == kind and r['mode'] == mode], 'ndcg10'):8.2f}" for mode in modes))
+    agendas = [a for a in dict.fromkeys(row.get("agenda_id") or "(없음)" for row in results)]
+    lines += ["", "아젠다별 nDCG@10 (문항 수)", f"{'아젠다':20}" + "".join(f"{mode:>8}" for mode in modes)]
+    for agenda in agendas:
+        rows_a = [r for r in results if (r.get("agenda_id") or "(없음)") == agenda]
+        count = len({r["golden_id"] for r in rows_a})
+        lines.append(f"{agenda + f' ({count})':20}" + "".join(
+            f"{mean([r for r in rows_a if r['mode'] == mode], 'ndcg10'):8.2f}" for mode in modes))
+    missing = [a for a in AGENDA_IDS if a not in agendas]
+    if missing:
+        lines.append(f"문항이 없는 아젠다: {missing}")
     fallback = [row["golden_id"] for row in results if row["used_mode"] != row["mode"]]
     lines += ["", "상위 10개에 정답이 없는 문항"]
     lines += [f"  {mode}: {[r['golden_id'] for r in results if r['mode'] == mode and not r['hit10']]}" for mode in modes]
@@ -157,6 +203,9 @@ def main() -> None:
     load.add_argument("--snapshot", required=True)
     load.add_argument("--reviewed", default=None, help="사람이 검토한 문항 (예: G01-G14)")
     load.add_argument("--reviewer", default="claude", help="labeled_by가 없을 때 쓸 이름")
+    tag = commands.add_parser("set-agenda", help="문항의 agenda_id만 바꾼다 (예: G01=growth G02=valuation)")
+    tag.add_argument("--snapshot", required=True)
+    tag.add_argument("pairs", nargs="+")
     run = commands.add_parser("evaluate", help="검색 방식별 점수")
     run.add_argument("--snapshot", required=True)
     run.add_argument("--modes", nargs="+", default=list(MODES), choices=MODES)
@@ -165,6 +214,9 @@ def main() -> None:
     args = parser.parse_args()
     if args.command == "import":
         import_golden(args.path, args.snapshot, args.reviewed, args.reviewer)
+        return
+    if args.command == "set-agenda":
+        set_agendas(args.snapshot, parse_agendas(args.pairs))
         return
     results = evaluate(args.snapshot, tuple(args.modes), args.reviewed_only)
     print(summary(results))

@@ -251,7 +251,10 @@ result = search_documents(
 python -m processing.search.golden_set evaluate --snapshot 2026-11-09-v1                 # 30문항
 python -m processing.search.golden_set evaluate --snapshot 2026-11-09-v1 --reviewed-only # 사람이 검토한 14문항만
 python -m processing.search.golden_set import <golden.json> --snapshot <태그> --reviewed G01-G14
+python -m processing.search.golden_set set-agenda --snapshot 2026-11-09-v1 G01=growth G02=valuation  # 아젠다만 고치기
 ```
+
+- 문항마다 `agenda_id`(토론 아젠다: valuation, macro, risk, growth, shareholder_return, flow)를 두고, 평가 결과를 아젠다별 nDCG@10으로도 나눠 봅니다(오케스트레이터 설계 5.2 Q13). 문항이 없는 아젠다는 결과 끝에 표시합니다
 
 - 2026-11-09 개선 결과(하이브리드): 차트 수치 청크 제외 + 표 형태 고지 정리 후 nDCG@10 0.59 → 0.61, Hit@5 0.87 → 0.90, 최신 의견 유형 0.56 → 0.63. 표 청크 점수 낮추기는 효과가 ±0.02로 불분명해 적용하지 않음
 - `2026-11-09-v1`: 리포트 기준 30문항(유형 6가지 × 5). G01~G14는 수경 검토, G15~G30은 Claude 라벨(검토 전)

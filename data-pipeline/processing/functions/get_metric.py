@@ -100,9 +100,16 @@ FINANCIAL_COLUMNS = ("debt_ratio", "operating_margin", "revenue_growth_yoy", "ro
 def get_metric(ticker: str, metric_id: str, as_of: str) -> dict:
     """시맨틱 레이어의 단일 정의로 지표 하나를 계산한다. 반환 형식은 API 계약서 MetricValue.
 
-    as_of까지 공개된 데이터만 쓴다. 값을 낼 수 없으면 value는 null이고 reason에 사유를 담는다.
+    as_of까지 공개된 데이터만 쓴다. 값을 낼 수 없으면 value는 null이고 reason에 사유(REASONS)를 담는다.
+    반환의 as_of는 실제로 쓴 데이터의 날짜(거래일·공시 접수일)이고, 요청한 날은 requested_as_of다.
+    display는 토론·트렌드 리포트가 문장에 그대로 넣을 표시용 문자열이다(format_display).
+    형식 문서: processing/docs/get_metric.md
     """
-    as_of = date.fromisoformat(as_of).isoformat()
+    requested = date.fromisoformat(as_of).isoformat()
+    return _finish(_compute(ticker, metric_id, requested), requested)
+
+
+def _compute(ticker: str, metric_id: str, as_of: str) -> dict:
     if metric_id not in METRIC_IDS:
         return _result(ticker, metric_id, None, "", "", as_of, [], "unknown_metric")
 
@@ -123,6 +130,61 @@ def get_metric(ticker: str, metric_id: str, as_of: str) -> dict:
     except Exception as exc:
         logger.error("지표 조회 실패: %s %s(%s)", ticker, metric_id, type(exc).__name__)
         return _result(ticker, metric_id, None, _unit(metric_id), "", as_of, [], "metric_unavailable")
+
+
+def _finish(result: dict, requested: str) -> dict:
+    """계약서 필드 뒤에 추가 필드(requested_as_of, display)를 붙인다."""
+    result["requested_as_of"] = requested
+    result["display"] = format_display(result["metric_id"], result["value"], result["unit"])
+    return result
+
+
+# ---------------------------------------------------------------------------
+# 반환 형식 (processing/docs/get_metric.md)
+
+UNITS = ("배", "원", "%", "%p", "주", "건")
+REASONS = {
+    "unknown_metric": "metric_id가 METRIC_IDS에 없음",
+    "metric_unavailable": "DB 조회 실패(일시적)",
+    "no_data": "그날까지 이 종목의 데이터가 없음(적재 범위 밖 포함)",
+    "no_value": "데이터 행은 있지만 이 지표 값이 비어 있음(예: 적자라 PER 없음)",
+    "not_applicable_financials": "금융업이라 의미 없는 지표(부채비율)",
+}
+# 주당 값·가격은 그대로(1,176,000원), 합계 금액은 조·억 단위로(−1.17조 원)
+PER_SHARE_WON = {"close", "eps", "bps", "dps"}
+# 증감을 나타내는 지표는 양수에도 +를 붙인다
+SIGNED_METRICS = {"foreign_net_buy_20d", "inst_net_buy_20d", "individual_net_buy_20d", "revenue_growth_yoy",
+                  "insider_net_shares_90d", "major_holder_ratio_change_90d"}
+TRILLION = 10**12
+HUNDRED_MILLION = 10**8
+
+
+def format_display(metric_id: str, value, unit: str) -> str | None:
+    """value와 unit으로 만든 표시용 문자열. value가 null이면 null.
+
+    배·%·%p는 소수 둘째 자리까지(끝의 0은 지움), 원은 주당 값이면 쉼표 정수, 합계면 조·억 원,
+    주·건은 쉼표 정수. 증감 지표는 양수에 +를 붙인다.
+    """
+    if value is None:
+        return None
+    value = float(value)
+    sign = "+" if metric_id in SIGNED_METRICS and value > 0 else ""
+    if unit in ("배", "%", "%p"):
+        return f"{sign}{_decimal(value)}{unit}"
+    if unit == "원":
+        if metric_id in PER_SHARE_WON or abs(value) < HUNDRED_MILLION:
+            return f"{sign}{value:,.0f}원"
+        if abs(value) >= TRILLION:
+            return f"{sign}{_decimal(value / TRILLION)}조 원"
+        return f"{sign}{_decimal(value / HUNDRED_MILLION)}억 원"
+    if unit in ("주", "건"):
+        return f"{sign}{value:,.0f}{unit}"
+    return f"{sign}{_decimal(value)}{unit}"
+
+
+def _decimal(value: float) -> str:
+    text = f"{value:,.2f}".rstrip("0").rstrip(".")
+    return "0" if text in ("-0", "") else text
 
 
 def _daily_metric(connection, ticker: str, metric_id: str, as_of: str) -> dict:

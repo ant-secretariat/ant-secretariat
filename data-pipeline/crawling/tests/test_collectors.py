@@ -147,6 +147,14 @@ class MacroDataCollectorTest(unittest.TestCase):
 
         self.assertTrue(requested[0].endswith("/901Y033/M/202609/202609/A00/2"))
 
+    def test_dram_export_price_uses_dollar_basis_item(self) -> None:
+        indicator = DEFAULT_ECOS_INDICATORS["DRAM_EXPORT_PRICE"]
+
+        self.assertEqual((indicator.stat_code, indicator.cycle), ("402Y016", "M"))
+        # D램 품목 / 달러기준 (원화기준 W는 환율이 섞임)
+        self.assertEqual(indicator.item_code, "30911201AA/D")
+        self.assertEqual((indicator.frequency, indicator.country), ("monthly", "KR"))
+
     def test_trade_balance_is_exports_minus_imports_for_matching_months(self) -> None:
         values = {
             ("T002", "202608"): "60000",

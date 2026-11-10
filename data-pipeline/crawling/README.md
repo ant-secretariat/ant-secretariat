@@ -166,7 +166,7 @@ unknown
 기본값은 실제 수집 provider입니다.
 
 - `PRICE_DATA_PROVIDER=naver`: Naver Finance 일별 시세를 수집해 `price_data`에 저장
-- `MACRO_DATA_PROVIDER=ecos`: 한국은행 ECOS에서 기준금리, 국고채 3·10년 금리, CPI, USD/KRW 환율, 유가(WTI·Dubai·Brent 월평균), 통관 수출·수입과 무역수지(수출 − 수입), 전산업생산지수(계절조정)를 수집
+- `MACRO_DATA_PROVIDER=ecos`: 한국은행 ECOS에서 기준금리, 국고채 3·10년 금리, CPI, USD/KRW 환율, 유가(WTI·Dubai·Brent 월평균), 통관 수출·수입과 무역수지(수출 − 수입), 전산업생산지수(계절조정), D램 수출물가지수(`DRAM_EXPORT_PRICE`, 달러기준 월별. TrendForce D램 가격이 유료라 대체 지표)를 수집
 - `MACRO_DATA_PROVIDER=naver`: Naver 시장지표에서 USD/KRW만 수집
 
 실제 수치 데이터까지 포함해 실행:
@@ -251,6 +251,25 @@ python -m crawling.sim_loader --tickers 005930    # 특정 종목만
 - `sim_params.params_json`: 계수(omega·alpha·gamma·beta), 다음날 조건부 분산, 표준화 잔차(`std_resid`), 30일 예상 변동성. 경로 생성은 `crawling.analytics.garch.simulate_paths` 참고
 - `status=not_converged`이면 `params_json.status_reason`이 `optimizer_failed`(최적화 실패) 또는 `nonstationary`(지속성 ≥ 1)
 - `sensitivities`: 요인(KOSPI·USD_KRW·KTB_3Y_KR)이 30거래일 동안 1σ 움직일 때 종목 30일 수익률(%) 변화. `multi`는 세 요인 동시 회귀, `simple`은 단일 요인 회귀, `corr_daily`는 일별 상관계수(온톨로지 엣지 가중치)
+- 국고채 10년(`KTB_10Y_KR`)은 `simple`과 `corr_daily`만 낸다. 3년물과 일별 변화 상관이 0.9라 `multi`에 같이 넣으면 계수가 불안정해진다(2026-11-10 추가)
+- 섹터별 묶음은 뷰 `sector_sensitivities`(WICS l1/l2, corr_daily 중앙값·사분위·종목 수, 최신은 `is_latest`)
+
+월별 지표 상관 (`price_monthly`, `monthly_correlations`, 뷰 `sector_monthly_correlations`):
+
+```bash
+python -m crawling.monthly_corr_loader --backfill   # 처음 한 번: T1 10년 치 월말 종가 + 상관 계산
+python -m crawling.monthly_corr_loader              # 매달: 최근 3개월 종가 갱신 + 상관 다시 계산
+python -m crawling.monthly_corr_loader --skip-fetch # 상관만 다시 계산
+```
+
+- 월별로만 나오는 지표(CPI_KR, BRENT, DRAM_EXPORT_PRICE)는 corr_daily를 낼 수 없어서, 종목 월 로그수익률과 요인 월 로그변화의 상관(최근 최대 120개월, 최소 24개월)을 따로 낸다
+- 일별 시세는 3년 치만 두므로 월말 수정종가(pykrx 월봉)만 10년 치 저장한다(T1 100종목 약 1.1만 행, 1MB). 끝나지 않은 이번 달은 넣지 않는다
+- 개월 수(`n_months`)와 95% 신뢰구간(`ci_low`, `ci_high`)을 함께 남긴다. 36개월이면 ±0.3, 120개월이면 ±0.18 정도 흔들린다
+- 요인마다 as_of가 다르다(발표가 늦은 지표는 1~2달 늦음). 섹터 뷰는 요인별 최신을 `is_latest`로 표시
+- **1달 시차**(`lead_months=1`): t월 주가 수익률과 t+1월 지표 변화를 짝짓는다. 지표는 월평균인데 종가는 월말이라 같은 달끼리는 시점이 어긋나고, 주가가 지표를 앞서 반영한다. 같은 달로 맞추면 S-Oil–브렌트 0.20, 삼성전자–D램 0.14였는데 1달 시차로 0.41, 0.27
+- `as_of`는 계산에 쓴 마지막 지표 달, `window_start`는 첫 주가 달
+- 섹터 중앙값은 업종과 상관없는 종목이 섞여 희석된다(예: D램은 반도체 중분류 0.15인데 삼성전자 0.27·SK하이닉스 0.26). 지표가 경기 전반과도 같이 움직여 은행 등에서도 0.1~0.2가 나온다. 핵심 종목은 종목 값을 보는 게 낫다
+- 전년 대비(12개월) 상관은 0.5~0.8로 높게 나오지만, 12개월 변화가 서로 겹쳐 실제보다 부풀려지고 신뢰구간을 낼 수 없어 넣지 않았다
 
 ## 뉴스 / 공시 Provider
 

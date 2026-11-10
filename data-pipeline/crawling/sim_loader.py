@@ -118,7 +118,7 @@ def _load_factors(connection: psycopg.Connection, start: date, end: date) -> pd.
     frame = pd.DataFrame(kospi, columns=["trade_date", "KOSPI"]).set_index("trade_date")
     frame.index = pd.to_datetime(frame.index)
 
-    macro_ids = [name for name in sensitivity.FACTORS if name != "KOSPI"]
+    macro_ids = [name for name in sensitivity.ALL_FACTORS if name != "KOSPI"]
     macro = pd.DataFrame(
         connection.execute(
             "select indicator_id, date, value from macro_data "

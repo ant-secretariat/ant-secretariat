@@ -1,11 +1,11 @@
-# 온톨로지 관계사전 시드 v0.4 — 값의 출처와 결정 근거
+# 온톨로지 관계사전 시드 v0.5 — 값의 출처와 결정 근거
 
 작성: 유민 · 2026-11-10 (v0.2 2026-11-09) · 기준 스펙: 온톨로지 프로덕트 기획서 v1.2
 
 이 문서는 시드에 채워진 값이 **어디서 왔고, 어떤 규칙으로 정했고, 얼마나 검증됐는지**를 항목별로 정리한다.
 JSON 레코드에도 `*_source` / `status` / `inactive_reason` / `pipeline_status` / `weight_status` 필드로 같은 정보가 들어 있다.
 
-v0.4는 v0.3에 "수집 계획 없는 매크로는 삭제하지 않고 비활성 보관" 결정(유민)을 반영한 버전이다(6번 SENSITIVE_TO). v0.3은 수경(nasuzz) 데이터 파이프라인의 실제 코드·답변(2026-11-10)과 대조해 맞춘 버전이다. 파이프라인 값으로 바꾼 항목은 검증 상태를 ✅로 올리고 출처에 파일 경로를 적었다. 파이프라인 코드 경로는 PR #10~#19(open) 기준이다.
+v0.5는 수경이 PR #29에 남긴 섹터별 weight·DRAM 대체 지표·`KTB_10Y_KR` 답변(2026-11-10, 값은 PR #34 기준)을 반영해 weight를 채운 버전이다. v0.4는 v0.3에 "수집 계획 없는 매크로는 삭제하지 않고 비활성 보관" 결정(유민)을 반영한 버전이다(6번 SENSITIVE_TO). v0.3은 수경(nasuzz) 데이터 파이프라인의 실제 코드·답변(2026-11-10)과 대조해 맞춘 버전이다. 파이프라인 값으로 바꾼 항목은 검증 상태를 ✅로 올리고 출처에 파일 경로를 적었다. 파이프라인 코드 경로는 PR #10~#19(open) 기준이다.
 
 ## 0. 한눈에 보기
 
@@ -15,17 +15,17 @@ v0.4는 v0.3에 "수집 계획 없는 매크로는 삭제하지 않고 비활성
 | 2 | 종목 → 섹터 배정 | `companies.sector_l1` WICS 대분류 (`data-pipeline/crawling/collectors/wics_collector.py`, `market_loader.py::refresh_sectors`) | 파이프라인 값 그대로 (v0.2 초안 7종목 교체) | ✅ 실데이터 |
 | 3 | 지주사 여부·세부 산업 | 도메인 지식 | 수작업 (섹터 상속 보정용) | ⚠️ 초안 |
 | 4 | 섹터 속성 (cycle/rate/fx) | GICS 섹터 일반론 + 한국 시장 구조 | 정성 판단 | ⚠️ 초안 · 회귀 결과로 검증 예정 |
-| 5 | 매크로 지표 7개 (수집 중) | `data-pipeline/crawling/collectors/macro_data_collector.py::DEFAULT_ECOS_INDICATORS`, `index_daily` | 파이프라인 ID·항목코드 그대로 | ✅ 실코드 |
-| 6 | 매크로 지표 7개 (수집 계획 없음) | FRED·ECOS·NBS·TrendForce 후보 | 아젠다 경로상 필요한 지표 → `status: inactive`로 보관 | ⚠️ 수경 "수집 계획 없음" (2026-11-10) · 비활성 |
+| 5 | 매크로 지표 8개 (수집 중) | `data-pipeline/crawling/collectors/macro_data_collector.py::DEFAULT_ECOS_INDICATORS`, `index_daily` | 파이프라인 ID·항목코드 그대로 | ✅ 실코드 |
+| 6 | 매크로 지표 6개 (수집 계획 없음) | FRED·ECOS·NBS 후보 | 아젠다 경로상 필요한 지표 → `status: inactive`로 보관 | ⚠️ 수경 "수집 계획 없음" (2026-11-10) · 비활성 |
 | 7 | ISSUE 26개 | 업종 구조·정책 이슈 (도메인 지식) | 선정 기준 3개로 필터링 | ⚠️ 초안 · 근거 청크 미연결 |
 | 8 | BENEFITS/HURTS strength | 매출 노출도에 대한 정성 판단 | low / mid / high 3단계 | ⚠️ 초안 |
 | 9 | EXPOSED_TO exposure | strength 기계적 변환 | high .9 / mid .6 / low .3 | ⚠️ 초안 |
-| 10 | SENSITIVE_TO 엣지 쌍 28개 (활성 19 · 비활성 9) | 섹터 속성 + 원가·수요 경로 | 경제적 전달 경로 가설. BASE_RATE_KR 3개는 KTB_3Y_KR로 합침 | ⚠️ 초안 |
-| 11 | SENSITIVE_TO weight | 비어 있음 (null) | 수경 `sensitivities.corr_daily` 섹터 집계로만 채움 | — 대기 (활성 19개: `aggregation_pending` 11 · `factor_requested` 8) |
+| 10 | SENSITIVE_TO 엣지 쌍 28개 (활성 20 · 비활성 8) | 섹터 속성 + 원가·수요 경로 | 경제적 전달 경로 가설. BASE_RATE_KR 3개는 KTB_3Y_KR로 합침 | ⚠️ 초안 |
+| 11 | SENSITIVE_TO weight | 수경 섹터 중앙값 (일별 `corr_daily_median` · 월별 `corr_monthly_median`) | 수경 값 그대로 (활성 20개 모두 채움, 비활성 8개는 null) | ✅ 수경 DB 값 (PR #34 미병합 기준) |
 | 12 | SENSITIVE_TO expected_sign | 경제적 전달 경로 | 부호 가설 (+ / − / ±) | ⚠️ 회귀 부호와 대조용 |
 | 13 | IMPACTS (매크로→매크로) | 표준 거시 전달 경로 | 방향(same/opposite)만 정의 | ⚠️ 교과서적 관계 · 미검증 |
 
-**검증 상태 요약: ✅ 3 · ⚠️ 9 · 대기 1** (13개 항목, v0.3과 같음). ✅는 파이프라인 값으로 교체된 항목이다. v0.4는 항목 수를 바꾸지 않고 6·10·11번의 처리 방식만 정했다.
+**검증 상태 요약: ✅ 4 · ⚠️ 9 · 대기 0** (13개 항목). ✅는 파이프라인 값으로 교체된 항목이다(v0.5에서 11번 weight 추가). 부호 검증(`expected_sign`)과 ISSUE 근거 청크는 ⚠️로 남아 있다.
 
 ---
 
@@ -87,7 +87,7 @@ v0.4는 v0.3에 "수집 계획 없는 매크로는 삭제하지 않고 비활성
 
 수경 파이프라인은 **ECOS만** 수집하고 FRED·NBS·TrendForce 수집기는 없다. 시드 각 지표에 `pipeline_status`(collecting / not_planned), `pipeline_table`, `pipeline_key`, `pipeline_item_code`를 추가했다.
 
-**수집 중 7개 — ✅ (ID·항목코드는 파이프라인 값)**
+**수집 중 8개 — ✅ (ID·항목코드는 파이프라인 값)**
 
 | indicator_id | 테이블 | 키 / ECOS 항목코드 | 주기 | 비고 |
 |---|---|---|---|---|
@@ -97,14 +97,15 @@ v0.4는 v0.3에 "수집 계획 없는 매크로는 삭제하지 않고 비활성
 | USD_KRW | `macro_data` | 731Y001 / 0000001 | daily | 민감도 요인 |
 | CPI_KR | `macro_data` | 901Y009 / 0 | monthly | |
 | BRENT | `macro_data` | 902Y003 / 010103 | monthly | v0.2 `OIL_BRENT`(FRED 일별)에서 변경. **ECOS 월평균** |
+| DRAM_EXPORT_PRICE | `macro_data` | 402Y016 / 30911201AA/D | monthly | v0.4 `DRAM_PRICE`(TrendForce, 유료)를 **대체**. 한국은행 수출물가지수 품목별 D램 **달러기준**(원화기준은 환율이 섞여 제외), 2020=100. 수경 PR #34 (`macro_data_collector.py`) |
 | KOSPI | `index_daily` | index_code `1001` | daily | v0.2 `KOSPI_INDEX`에서 변경. `macro_data`가 아니라 `index_daily`. 민감도 요인명도 `KOSPI` |
 
-**수집 계획 없음 7개 — ⚠️ 비활성 보관 (수경 2026-11-10: "FRED 지표는 아직 수집 계획에 없음")**
-`US_FFR`, `US_10Y_YIELD`, `USD_CNY`, `VIX`(FRED), `PPI_KR`(ECOS 코드 미확인), `CHINA_PMI_MFG`(NBS), `DRAM_PRICE`(TrendForce, 유료).
+**수집 계획 없음 6개 — ⚠️ 비활성 보관 (수경 2026-11-10: "FRED 지표는 아직 수집 계획에 없음")**
+`US_FFR`, `US_10Y_YIELD`, `USD_CNY`, `VIX`(FRED), `PPI_KR`(ECOS 코드 미확인), `CHINA_PMI_MFG`(NBS).
 - 결정(유민, 중간안): **삭제하지 않고** 매크로와 거기 걸린 엣지에 `status: "inactive"`, `inactive_reason: "no_data_source"`를 단다. 삭제하면 아젠다 경로 설계가 사라지고, 그대로 두면 데이터 없는 근거 없는 주장이 주입되기 때문이다.
 - 비활성은 `get_ontology_context` 주입과 Judge 경로 검증에서 뺀다. 데이터 수집이 생기면 `status`만 `active`로 바꾸면 된다 (기획서의 off → shadow → on 구조와 같은 방식).
 - 헬퍼(`ontology_seed.py`)의 `active_edges()` · `active_macros()` · `company_context()`는 활성만 돌려준다. 비활성이 필요하면 `company_context(include_inactive=True)`.
-- 후속: **`DRAM_PRICE`는 SEC_IT(삼성전자·SK하이닉스 시총 1·2위) 핵심 경로**라 무료 대체 지표를 우선 찾아야 한다 (수경에게 질문).
+- **v0.5: `DRAM_PRICE`는 비활성 목록에서 빠졌다.** 수경이 무료 대체 지표(`DRAM_EXPORT_PRICE`)를 수집하기로 해서 ID를 바꾸고 활성화했다. 이 엣지(SEC_IT → `DRAM_EXPORT_PRICE`, IMPACTS `DRAM_EXPORT_PRICE → KOSPI`)가 다시 활성이다. TrendForce 현물·고정가가 아니라 **수출물가지수라 시차·성격이 다르다**는 점은 프롬프트 표현에서 "D램 수출물가"로 구분해야 한다.
 
 **참고.** 파이프라인에는 시드에 없는 `WTI`, `DUBAI`, `EXPORTS_KR`, `IMPORTS_KR`, `IPI_KR`, 계산 지표 `TRADE_BALANCE_KR`도 이미 있다. 수출 비중이 큰 섹터 엣지의 후보지만, 근거 없이 넣지 않았다.
 
@@ -138,30 +139,47 @@ ISSUE 정의에 포함된 대상 목록에서 생성. v0.2의 100개에서 **제
 ### EXPOSED_TO (COMPANY → ISSUE, 93개) — ⚠️
 BENEFITS/HURTS 중 종목 대상 엣지를 뒤집고 `strength`를 숫자로 바꿨다 (high 0.9 / mid 0.6 / low 0.3). 독립적으로 판단한 값이 아니므로 `exposure_source`에 변환 규칙을 적어뒀다. 매출 비중 데이터가 생기면 교체한다.
 
-### SENSITIVE_TO (SECTOR → MACRO, 28개: 활성 19 · 비활성 9) — weight 대기
-- **weight는 전부 null.** 수경의 회귀 결과를 받기 전에는 채우지 않는다. 전문가 정의 값으로 채우지 않는다.
-- **수경 파이프라인의 회귀** (`data-pipeline/crawling/analytics/sensitivity.py`, 테이블 `sensitivities`):
-  - 종목 단위, 요인 3개(`KOSPI`, `USD_KRW`, `KTB_3Y_KR`), 최근 3년, 30일 수익률
-  - 기획서 v1.2의 "일별 수익률 표준화 계수(상관 기반 민감도)"에 해당하는 컬럼은 **`corr_daily`**다. `beta`(30일 겹침 구간·요인 1σ당 %)는 다른 값이다.
-- **섹터 값은 수경이 집계해 준다** (2026-11-10): 섹터별 `corr_daily` **중앙값 + 종목 수**, 최신 `as_of` 기준(2026-11-06). 시장 지수 3개만 받고 있고 KRX 업종지수는 WICS와 분류가 달라 소속 종목 값을 묶는 방식으로 한다.
-- **원인별 분류 (v0.3의 29개 중 `none_planned` 20개 + `planned` 9개)** — 결정은 유민(중간안: ① 복구 + ② 비활성 보관)
+### SENSITIVE_TO (SECTOR → MACRO, 28개: 활성 20 · 비활성 8) — ✅ weight 채움
+- **weight는 수경 값 그대로다.** 추정·보정·반올림 변경 없음. 출처: 수경 PR #29 코멘트(2026-11-10)의 섹터 중앙값 표. 값은 PR #34(`sector_sensitivities`, `sector_monthly_correlations` 뷰)에 있고 **#34가 병합되기 전이라 코드 경로는 PR 기준**이다.
+- **일별(KOSPI·USD_KRW·KTB_3Y_KR·KTB_10Y_KR):** `sector_sensitivities.corr_daily_median`, 일별 변화 최근 3년, `weight_as_of` 2026-11-06. 종목별 `corr_daily`(`sensitivities`)의 WICS 대분류 중앙값이다. 기획서 v1.2의 "일별 수익률 표준화 계수(상관 기반 민감도)"에 해당한다 (`beta`는 다른 값).
+- **월별(CPI_KR·BRENT·DRAM_EXPORT_PRICE):** `sector_monthly_correlations.corr_monthly_median`, 월별 변화 최근 최대 120개월, **t월 주가 수익률 ↔ t+1월 지표 변화(1달 시차)**. 지표는 월평균이고 주가는 월말 종가라서 이렇게 짝을 지었다. `weight_as_of`는 CPI_KR 2026-10-01, BRENT·DRAM 2026-09-01. IT만 종목 수 18(LG씨엔에스 상장 24개월 미만 제외).
+- 필드: `weight`, `weight_source`, `weight_window`, `weight_as_of`, `weight_n_tickers`, `weight_status: filled`, `weight_frequency`. 비활성 엣지는 모두 null. `build_seed.py`는 채워진 엣지에 이 필드가 하나라도 없거나 weight가 ±1을 넘으면 실패한다.
+- **금리 엣지는 섹터당 하나만 둔다.** `KTB_3Y_KR`과 `KTB_10Y_KR`은 일별 변화 상관이 0.9라 둘 다 두면 같은 효과가 두 번 들어간다(수경 지적). 기획서 v1.2도 SENSITIVE_TO 예시에서 섹터당 금리 엣지 하나(`ktb_rate`)만 쓰고, 07의 "많이 쓸수록 점수 오르는 지표 삭제" 원칙과도 맞는다. 현재 섹터별 금리 엣지는 3년물(IT·경기소비재·금융)이거나 10년물(커뮤니케이션서비스·건강관리·유틸리티)이고 **한 섹터에 둘이 같이 있는 경우는 없다**. 무결성 검사가 이를 확인한다. 어느 쪽을 쓸지는 값 차이가 0.03 이하라 가설 근거로 정했다(NIM 민감 업종은 단기 3년물, 할인율 민감 업종은 장기 10년물). 10년물은 수경이 multi 회귀에 넣지 않았고 simple 회귀와 `corr_daily`만 있다.
+- **expected_sign 부호 검증 (`sign_check`).** 가설을 회귀 값으로 덮어쓰지 않고 결과만 기록한다. `near_zero`는 |weight| < 0.02라 부호를 판단하지 않는다.
 
-| 분류 | 처리 | 엣지 | 수 |
-|---|---|---|---|
-| A. 회귀 요인에 있음 | `weight_status: aggregation_pending` (수경 집계 대기) | `USD_KRW` 7 · `KOSPI` 1 · `KTB_3Y_KR` 1 (FIN) | 9 |
-| B. 기준금리 → KTB_3Y_KR 합침 | 아래 별도 설명. 합친 뒤 A와 같이 `aggregation_pending` | SEC_IT·SEC_CONS_DISC는 `BASE_RATE_KR`을 `KTB_3Y_KR`로 교체, SEC_FIN은 이미 `KTB_3Y_KR`이 있어 중복 제거 | 3 → 2 |
-| C. 수집 중이나 회귀 요인 아님 | `weight_status: factor_requested` | `KTB_10Y_KR` 3 (COMM·HEALTH·UTIL, 일별) · `CPI_KR` 1 (CONS_DISC, 월별) · `BRENT` 4 (INDUS·MATERIAL·ENERGY·UTIL, 월별) | 8 |
-| D. 수집 계획 없는 매크로 | `status: inactive`, `inactive_reason: no_data_source`, `weight_status: null` | SEC_IT: `US_10Y_YIELD`·`DRAM_PRICE`·`VIX` / CONS_DISC: `CHINA_PMI_MFG` / CONS_STAP: `PPI_KR` / FIN: `VIX` / INDUS: `CHINA_PMI_MFG` / MATERIAL: `CHINA_PMI_MFG`·`USD_CNY` | 9 |
+| 섹터 | 매크로 | 가설 | weight | 종목 수 | as_of | 부호 검증 |
+|---|---|---|---|---|---|---|
+| IT | `KTB_3Y_KR` | - | -0.111 | 19 | 2026-11-06 | match |
+| IT | `USD_KRW` | + | -0.001 | 19 | 2026-11-06 | near_zero |
+| IT | `DRAM_EXPORT_PRICE` | + | +0.121 | 18 | 2026-09-01 | match |
+| 커뮤니케이션서비스 | `KTB_10Y_KR` | - | -0.075 | 7 | 2026-11-06 | match |
+| 경기관련소비재 | `USD_KRW` | + | +0.001 | 7 | 2026-11-06 | near_zero |
+| 경기관련소비재 | `KTB_3Y_KR` | - | -0.086 | 7 | 2026-11-06 | match |
+| 경기관련소비재 | `CPI_KR` | - | +0.118 | 7 | 2026-10-01 | mismatch |
+| 필수소비재 | `USD_KRW` | - | -0.004 | 2 | 2026-11-06 | near_zero · 종목 수 적음 |
+| 건강관리 | `KTB_10Y_KR` | - | -0.081 | 7 | 2026-11-06 | match |
+| 건강관리 | `USD_KRW` | + | -0.012 | 7 | 2026-11-06 | near_zero |
+| 금융 | `KTB_3Y_KR` | + | -0.087 | 15 | 2026-11-06 | mismatch |
+| 금융 | `KOSPI` | + | +0.398 | 15 | 2026-11-06 | match |
+| 산업재 | `USD_KRW` | + | -0.002 | 31 | 2026-11-06 | near_zero |
+| 산업재 | `BRENT` | - | +0.224 | 31 | 2026-09-01 | mismatch |
+| 소재 | `BRENT` | ± | +0.110 | 5 | 2026-09-01 | — |
+| 에너지 | `BRENT` | ± | +0.274 | 5 | 2026-09-01 | — |
+| 에너지 | `USD_KRW` | - | -0.055 | 5 | 2026-11-06 | match |
+| 유틸리티 | `BRENT` | - | +0.144 | 1 | 2026-09-01 | mismatch · 종목 수 적음 |
+| 유틸리티 | `USD_KRW` | - | -0.032 | 1 | 2026-11-06 | match · 종목 수 적음 |
+| 유틸리티 | `KTB_10Y_KR` | - | -0.155 | 1 | 2026-11-06 | match · 종목 수 적음 |
 
-  v0.3의 `none_planned` 20 = B 3 + C 8 + D 9. 합치고 나면 총 28개 = A 9 + B 2 + C 8 + D 9 (활성 19 = A + B + C).
-- **BASE_RATE_KR 합침.** 기준금리는 일별로 저장되지만 정책 결정일에만 바뀌는 계단식 값이라 일별 수익률과의 상관이 의미 없다. 같은 방향의 금리 가설을 `KTB_3Y_KR`(시장이 기준금리 기대를 반영하는 단기 금리)로 옮긴다. 합친 엣지에는 `merged_from: ["BASE_RATE_KR"]`을 남겼고 `meta.merged_sensitive_edges`에 3건의 처리(renamed 2, dedup 1)와 원래 `expected_sign`이 있다. SEC_FIN은 둘 다 `+`라 충돌이 없었다. `BASE_RATE_KR` 노드와 IMPACTS 엣지는 그대로 둔다.
-- **`weight_frequency`.** C 중 `CPI_KR`·`BRENT`는 월별이라 일별 `corr_daily`로는 못 구한다. 월별 상관을 따로 산출할 수 있는지는 수경에게 질문한다. `KTB_10Y_KR`는 일별이라 회귀 요인에 추가만 하면 된다.
-- 채울 때 함께 넣을 필드: `weight_source`(예: `sensitivities.corr_daily sector median`), `weight_window`(`window_start`~`as_of`), `weight_as_of`, `weight_n_tickers`(집계에 쓴 종목 수). `build_seed.py`는 `weight_source` 없이 weight를 채우면 실패한다.
-- **expected_sign:** 회귀 결과 부호 검증용 사전 가설이다. 회귀 부호가 가설과 다르면 자동으로 덮어쓰지 않고 검토 목록에 올린다. weight 대용으로 쓰지 않는다. 수경 `direction_uncertain`(신뢰구간이 0 포함)도 함께 본다.
+  - **mismatch 4개 (검토 필요):** 경기소비재→`CPI_KR`(가설 − / 실측 +), 금융→`KTB_3Y_KR`(가설 + / 실측 −), 산업재→`BRENT`(가설 − / 실측 +), 유틸리티→`BRENT`(가설 − / 실측 +, **종목 1개라 불안정**). 회귀가 맞고 가설이 틀렸는지 판단하려면 `direction_uncertain`(신뢰구간이 0 포함)과 함께 봐야 한다. 금융→`KTB_3Y_KR`은 v0.4에서 `BASE_RATE_KR`(+)을 합친 엣지라 합친 근거(NIM)도 같이 재검토 대상이다.
+  - **near_zero 5개:** `USD_KRW`가 거의 모든 섹터에서 0 근처라 엣지가 약하다 (수경 지적). IT·경기소비재·필수소비재·건강관리·산업재. 유의한 관계로 주입하면 안 되고, 플래그를 켜기 전에 엣지 유지 여부를 판단한다.
+  - **종목 수 3개 미만 섹터**(필수소비재 2, 유틸리티 1)는 `weight_low_n: true`.
+  - **섹터 중앙값은 관련 없는 종목이 섞여 희석된다.** 예: D램은 IT 섹터 0.121이지만 삼성전자 0.27, SK하이닉스 0.26이라 핵심 경로는 **종목 단위 SENSITIVE_TO**가 더 적합하다 (기획서 v1.2 엣지 정의는 `SECTOR / COMPANY → MACRO`). 이번 PR에는 섹터 값만 넣었다. 종목 단위 엣지는 수경에게 종목별 값(출처·as_of 포함)을 받은 뒤 후속으로 추가한다.
+- **BASE_RATE_KR 합침(v0.4).** 기준금리는 일별로 저장되지만 정책 결정일에만 바뀌는 계단식 값이라 일별 수익률과의 상관이 의미 없다. 같은 방향의 금리 가설을 `KTB_3Y_KR`로 옮겼다. 합친 엣지에는 `merged_from: ["BASE_RATE_KR"]`, `meta.merged_sensitive_edges`에 3건(renamed 2, dedup 1)과 원래 `expected_sign`을 남겼다. `BASE_RATE_KR` 노드와 IMPACTS 엣지는 그대로다.
+- **비활성 8개** (수집 계획 없는 매크로 6개): IT→`US_10Y_YIELD`·`VIX`, 경기소비재→`CHINA_PMI_MFG`, 필수소비재→`PPI_KR`, 금융→`VIX`, 산업재→`CHINA_PMI_MFG`, 소재→`CHINA_PMI_MFG`·`USD_CNY`. `weight_status: null`.
 - 삭제: `SEC_REAL_ESTATE → KTB_10Y_KR` (섹터 삭제, 2번 참고).
 
-### IMPACTS (MACRO → MACRO, 15개: 활성 5 · 비활성 10) — ⚠️
-끝점 중 하나라도 수집 계획 없는 매크로면 `status: inactive`(`inactive_macros`에 해당 지표). 활성 5개는 `BASE_RATE_KR→KTB_3Y_KR`·`BASE_RATE_KR→KTB_10Y_KR`·`BASE_RATE_KR→USD_KRW`·`USD_KRW→CPI_KR`·`CPI_KR→BASE_RATE_KR`.
+### IMPACTS (MACRO → MACRO, 15개: 활성 6 · 비활성 9) — ⚠️
+끝점 중 하나라도 수집 계획 없는 매크로면 `status: inactive`(`inactive_macros`에 해당 지표). 활성 6개는 `BASE_RATE_KR→KTB_3Y_KR`·`BASE_RATE_KR→KTB_10Y_KR`·`BASE_RATE_KR→USD_KRW`·`USD_KRW→CPI_KR`·`CPI_KR→BASE_RATE_KR`·`DRAM_EXPORT_PRICE→KOSPI`.
 
 표준 거시 전달 경로(정책금리 → 시장금리, 금리차 → 환율, 유가 → PPI → CPI, 위험회피 → 원화 약세 등). 스펙상 IMPACTS는 방향만 명시하므로 `relation`(same / opposite)만 두고 weight는 없다. ID만 파이프라인 이름으로 바꿨다(`BRENT`, `KOSPI`).
 
@@ -181,11 +199,10 @@ python scripts/build_seed.py core_companies_2026-11-09.csv .  # 시드 생성 + 
 
 | 누구 | 무엇 | 상태 |
 |---|---|---|
-| 수경 | 섹터별 `corr_daily` 중앙값 + 종목 수 집계 전달 (최신 as_of 2026-11-06) | 대기 (수경 집계 예정) |
-| 수경 | `KTB_10Y_KR`를 회귀 요인에 추가 가능한지 (일별) | 질문 전달 대기 |
-| 수경 | `CPI_KR`·`BRENT`(월별)를 월별 상관으로 따로 산출 가능한지 | 질문 전달 대기 |
-| 수경 | `DRAM_PRICE` 무료 대체 지표 아이디어 (삼성전자·SK하이닉스 핵심 경로) | 질문 전달 대기 |
-| 유민 | 수집 계획 없는 지표 7개 | ✅ 결정: 삭제 않고 `inactive` 보관 (v0.4) |
+| 수경 | 섹터별 weight 집계, `KTB_10Y_KR`·`CPI_KR`·`BRENT` 요인, DRAM 대체 지표 | ✅ 2026-11-10 PR #29 코멘트로 회신 (v0.5 반영) |
+| 수경 | IT→`DRAM_EXPORT_PRICE` 등 핵심 경로의 **종목 단위** 월별 상관값(삼성전자 0.27·SK하이닉스 0.26 등)과 출처·as_of | 요청 필요 |
+| 유민 | 수집 계획 없는 지표 6개 | ✅ 결정: 삭제 않고 `inactive` 보관 (v0.4) |
+| 유민 | 부호 불일치 4개(경기소비재→CPI, 금융→KTB_3Y, 산업재→BRENT, 유틸리티→BRENT)와 `USD_KRW` near_zero 5개 엣지 유지 여부 | 검토 필요 |
 | 유민 | KOSDAQ 신규 10종목의 이슈 엣지 라벨링, `is_holding`·`sub_industry` 검토 | 후속 |
 | 태은 | Supabase 테이블로 옮길 때 이 JSON 구조 그대로 써도 되는지 · `company_context` 2홉 헬퍼가 `get_ontology_context` 구현과 겹치는지 | 미회신 |
 | 전원 | MACRO category 2개 추가 승인 · ISSUE 확정 규칙(근거 청크 1개 이상) 승인 · COMPETITOR 통합 결정 | 미결 |
@@ -203,3 +220,4 @@ python scripts/build_seed.py core_companies_2026-11-09.csv .  # 시드 생성 + 
 | v0.2 | 2026-11-09 | 최초 시드. KOSPI 시총 상위 100(marcap), GICS 관행 섹터 배정, 매크로 14개 |
 | v0.3 | 2026-11-10 | 수경 파이프라인 대조. T1 = core 100(KOSPI 90 + KOSDAQ 10), 섹터 = WICS, 매크로 ID 통일(`BRENT`, `KOSPI`)·수집 상태 필드, `SEC_REAL_ESTATE` 삭제, SENSITIVE_TO `weight_coverage`·`weight_n_tickers` 추가 |
 | v0.4 | 2026-11-10 | 수집 계획 없는 매크로 7개와 엣지(SENSITIVE_TO 9·IMPACTS 10) `inactive` 보관, BASE_RATE_KR 대상 SENSITIVE_TO 3개 → KTB_3Y_KR 합침(29→28), `weight_coverage`를 `weight_status`(aggregation_pending / factor_requested)·`weight_frequency`로 대체, 헬퍼에 active 필터 추가 |
+| v0.5 | 2026-11-10 | 수경 섹터 중앙값으로 SENSITIVE_TO weight 채움(활성 20개, 출처·기간·as_of·종목 수·`weight_frequency`), `DRAM_PRICE`→`DRAM_EXPORT_PRICE`(ECOS 402Y016) 교체·활성화, 금리 엣지 섹터당 1개 검사 추가, `sign_check`·`weight_low_n` 필드, `weight_status`를 filled / not_available로 정리 (SENSITIVE_TO 활성 20·비활성 8, IMPACTS 활성 6·비활성 9) |

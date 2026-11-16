@@ -14,6 +14,13 @@ v0.4 변경 (유민 결정: 수집 계획 없는 매크로는 삭제하지 않�
   - BASE_RATE_KR 대상 SENSITIVE_TO 3개 → KTB_3Y_KR로 합침 (계단식이라 일별 상관 무의미)
   - 수집 중이나 회귀 요인이 아닌 KTB_10Y_KR·CPI_KR·BRENT 엣지 → weight_status "factor_requested"
   - SENSITIVE_TO의 weight_coverage 필드를 weight_status·weight_frequency로 대체
+
+v0.5 변경 (수경 PR #29 코멘트 2026-11-10, 값은 PR #34 기준)
+  - SENSITIVE_TO weight 채움: 활성 엣지 전부 수경 섹터 중앙값(일별 corr_daily / 월별 corr_monthly) + 출처·기간·as_of·종목 수
+  - DRAM_PRICE(비활성) → DRAM_EXPORT_PRICE(ECOS 402Y016 수출물가지수 D램 달러기준, 월별)로 교체·활성화
+  - 금리 엣지는 섹터당 하나만 둔다 (KTB_3Y_KR / KTB_10Y_KR 동시 금지 — 상관 0.9라 같은 효과가 두 번 들어감)
+  - expected_sign 부호 검증 결과를 sign_check(match / mismatch / near_zero)로 기록. 가설을 회귀 값으로 덮어쓰지 않는다
+  - 종목 수 3개 미만 섹터는 weight_low_n
 """
 import csv, json, os, sys
 
@@ -64,7 +71,7 @@ MACROS = [
     M("CPI_KR", "한국 CPI", "inflation", "up_negative", "YoY%", "ECOS", "901Y009", "monthly", True, "금리 경로 기대에 영향."),
     M("PPI_KR", "한국 PPI", "inflation", "up_negative", "YoY%", "ECOS", None, "monthly", False, "source_code 확인 필요."),
     M("BRENT", "브렌트유", "commodity", "mixed", "USD/bbl", "ECOS", "902Y003", "monthly", True, "ECOS 월평균(일별 아님). 정유 마진·운송 원가."),
-    M("DRAM_PRICE", "DRAM 가격", "commodity", "up_positive", "USD", "TrendForce", None, "weekly/monthly", False, "유료 소스. 대체 지표 협의 필요."),
+    M("DRAM_EXPORT_PRICE", "D램 수출물가지수(달러기준)", "commodity", "up_positive", "2020=100", "ECOS", "402Y016", "monthly", True, "v0.4의 DRAM_PRICE(TrendForce, 유료)를 대체. 한국은행 수출물가지수 품목별 D램, 달러기준(원화기준은 환율이 섞여 제외). 월별."),
     M("CHINA_PMI_MFG", "중국 제조업 PMI", "sentiment", "up_positive", "index", "NBS", None, "monthly", False, "50 기준. 소재·산업재 수요."),
     M("VIX", "VIX", "sentiment", "up_negative", "index", "FRED", "VIXCLS", "daily", False, "위험회피 심리."),
     M("KOSPI", "KOSPI", "market", "up_positive", "pt", "KRX(pykrx)", "1001", "daily", True, "시장 베타 기준. macro_data가 아니라 index_daily(index_code 1001). 민감도 요인명도 KOSPI."),
@@ -78,6 +85,7 @@ PIPE = {
     "USD_KRW": ("macro_data", "USD_KRW", "0000001"),
     "CPI_KR": ("macro_data", "CPI_KR", "0"),
     "BRENT": ("macro_data", "BRENT", "010103"),
+    "DRAM_EXPORT_PRICE": ("macro_data", "DRAM_EXPORT_PRICE", "30911201AA/D"),
     "KOSPI": ("index_daily", "1001", None),
 }
 for _m in MACROS:
@@ -223,7 +231,7 @@ EXPOSED = [dict(edge_type="EXPOSED_TO", from_node=e["to_node"], from_type="COMPA
 # expected_sign = 회귀 결과 부호 검증용 사전 가설 (weight 아님)
 SENS = [
  ("SEC_IT","BASE_RATE_KR","-","성장주 할인율"),("SEC_IT","US_10Y_YIELD","-","글로벌 성장주 할인율"),
- ("SEC_IT","USD_KRW","+","수출 환산 이익"),("SEC_IT","DRAM_PRICE","+","메모리 실적 직결"),("SEC_IT","VIX","-","고베타"),
+ ("SEC_IT","USD_KRW","+","수출 환산 이익"),("SEC_IT","DRAM_EXPORT_PRICE","+","메모리 실적 직결"),("SEC_IT","VIX","-","고베타"),
  ("SEC_COMM","KTB_10Y_KR","-","플랫폼 성장주 할인율"),
  ("SEC_CONS_DISC","USD_KRW","+","완성차 수출"),("SEC_CONS_DISC","BASE_RATE_KR","-","할부·소비심리"),
  ("SEC_CONS_DISC","CHINA_PMI_MFG","+","중국 수요"),("SEC_CONS_DISC","CPI_KR","-","소비 여력"),
@@ -258,23 +266,63 @@ for s, m, sign, why in SENS:
     MERGED_FROM.setdefault((s, "KTB_3Y_KR"), []).append(m)
 SENS = _sens2
 
-# weight_status (활성 엣지만):
-#   aggregation_pending = 회귀 요인에 있음. 수경이 섹터별 corr_daily 중앙값 + 종목 수를 집계해 줄 예정 (최신 as_of 2026-11-06)
-#   factor_requested    = 매크로는 수집 중이나 회귀 요인이 아님. 수경에게 요인 추가·별도 산출을 요청
-# 비활성(수집 계획 없는 매크로에 걸린 엣지)은 weight_status = None
+# v0.5: 수경이 섹터 중앙값을 집계해 줬다 (2026-11-10, PR #29 코멘트 · 값은 PR #34 뷰 기준).
+#   일별 = sector_sensitivities.corr_daily_median (KOSPI·USD_KRW·KTB_3Y_KR·KTB_10Y_KR, 최근 3년, as_of 2026-11-06)
+#   월별 = sector_monthly_correlations.corr_monthly_median (CPI_KR·BRENT·DRAM_EXPORT_PRICE, 최근 최대 120개월, 1달 시차)
+# 값은 수경이 준 그대로 옮겼고 추정·보정하지 않았다. 표에 없는 (섹터, 매크로) 쌍은 weight를 채우지 않는다.
+WSRC = {
+    "daily": dict(src="sector_sensitivities.corr_daily_median", window="일별 변화, 최근 3년"),
+    "monthly": dict(src="sector_monthly_correlations.corr_monthly_median", window="월별 변화, 최근 최대 120개월, 1달 시차"),
+}
+W_AS_OF = {"KOSPI": "2026-11-06", "USD_KRW": "2026-11-06", "KTB_3Y_KR": "2026-11-06", "KTB_10Y_KR": "2026-11-06",
+           "CPI_KR": "2026-10-01", "BRENT": "2026-09-01", "DRAM_EXPORT_PRICE": "2026-09-01"}
+W_N = {"SEC_INDUS": 31, "SEC_IT": 19, "SEC_FIN": 15, "SEC_HEALTH": 7, "SEC_CONS_DISC": 7, "SEC_COMM": 7,
+       "SEC_MATERIAL": 5, "SEC_ENERGY": 5, "SEC_CONS_STAP": 2, "SEC_UTIL": 1}   # 일별 종목 수
+W_N_MONTHLY_OVERRIDE = {("SEC_IT", m): 18 for m in ("CPI_KR", "BRENT", "DRAM_EXPORT_PRICE")}  # LG씨엔에스 상장 24개월 미만 제외
+#            KOSPI   USD_KRW KTB_3Y  KTB_10Y CPI_KR  BRENT   DRAM_EXPORT_PRICE
+_W_COLS = ["KOSPI", "USD_KRW", "KTB_3Y_KR", "KTB_10Y_KR", "CPI_KR", "BRENT", "DRAM_EXPORT_PRICE"]
+_W_ROWS = {
+    "SEC_INDUS":     [0.474, -0.002, -0.070, -0.043, 0.104, 0.224, 0.077],
+    "SEC_IT":        [0.559, -0.001, -0.111, -0.086, 0.049, 0.132, 0.121],
+    "SEC_FIN":       [0.398, -0.004, -0.087, -0.075, 0.059, 0.255, 0.155],
+    "SEC_HEALTH":    [0.338, -0.012, -0.079, -0.081, 0.015, 0.099, 0.050],
+    "SEC_CONS_DISC": [0.362,  0.001, -0.086, -0.092, 0.118, 0.263, 0.027],
+    "SEC_COMM":      [0.299, -0.028, -0.082, -0.075, 0.070, 0.109, 0.111],
+    "SEC_MATERIAL":  [0.515, -0.041, -0.118, -0.110, 0.084, 0.110, 0.021],
+    "SEC_ENERGY":    [0.395, -0.055, -0.003,  0.005, 0.117, 0.274, 0.090],
+    "SEC_CONS_STAP": [0.123, -0.004,  0.002, -0.013, 0.032, 0.182, 0.015],
+    "SEC_UTIL":      [0.429, -0.032, -0.178, -0.155, 0.018, 0.144, -0.075],
+}
+WEIGHTS = {(s, m): v for s, row in _W_ROWS.items() for m, v in zip(_W_COLS, row)}
+assert set(W_N) == set(_W_ROWS) == {s["sector_id"] for s in SECTORS}
 WEIGHT_FREQ = {"USD_KRW": "daily", "KOSPI": "daily", "KTB_3Y_KR": "daily", "KTB_10Y_KR": "daily",
-               "CPI_KR": "monthly", "BRENT": "monthly"}
+               "CPI_KR": "monthly", "BRENT": "monthly", "DRAM_EXPORT_PRICE": "monthly"}
+NEAR_ZERO = 0.02  # |weight|가 이보다 작으면 부호 검증 대상에서 "약함"으로 분리
+LOW_N = 3         # 종목 수가 이보다 적은 섹터는 중앙값이 불안정 (수경)
+
+def _sign_check(sign, w):
+    if w is None or sign == "±": return None
+    if abs(w) < NEAR_ZERO: return "near_zero"
+    return "match" if (w > 0) == (sign == "+") else "mismatch"
+
 def _sens_edge(s, m, sign, why):
     inactive = m in INACTIVE_MACROS
+    w = None if inactive else WEIGHTS.get((s, m))
+    freq = WEIGHT_FREQ.get(m)
+    kw = {}
+    if w is not None:
+        n = W_N_MONTHLY_OVERRIDE.get((s, m), W_N[s])
+        kw = dict(weight=w, weight_source=WSRC[freq]["src"], weight_window=WSRC[freq]["window"],
+                  weight_as_of=W_AS_OF[m], weight_n_tickers=n)
+    # weight_status: filled = 수경 값 채움 / not_available = 활성인데 표에 값이 없음 / None = 비활성
     return dict(edge_type="SENSITIVE_TO", from_node=s, from_type="SECTOR", to_node=m, to_type="MACRO",
                 status="inactive" if inactive else "active",
                 inactive_reason="no_data_source" if inactive else None,
-                weight=None, expected_sign=sign, weight_source=None, weight_window=None,
-                weight_as_of=None, weight_n_tickers=None,
-                weight_status=None if inactive else ("aggregation_pending" if m in SENS_FACTORS else "factor_requested"),
-                weight_frequency=WEIGHT_FREQ.get(m),
-                merged_from=MERGED_FROM.get((s, m), []),
-                rationale=why)
+                **{**dict(weight=None, weight_source=None, weight_window=None, weight_as_of=None, weight_n_tickers=None), **kw},
+                expected_sign=sign, sign_check=_sign_check(sign, w),
+                weight_low_n=(w is not None and kw["weight_n_tickers"] < LOW_N) or None,
+                weight_status=None if inactive else ("filled" if w is not None else "not_available"),
+                weight_frequency=freq, merged_from=MERGED_FROM.get((s, m), []), rationale=why)
 SENSITIVE = [_sens_edge(*t) for t in SENS]
 
 # IMPACTS: MACRO → MACRO (지표 간 전이). relation: same = 같은 방향, opposite = 반대 방향
@@ -286,7 +334,7 @@ IMP = [
  ("USD_KRW","CPI_KR","same","수입물가"),("CPI_KR","BASE_RATE_KR","same","물가 대응 통화정책"),
  ("VIX","USD_KRW","same","위험회피 시 원화 약세"),("VIX","KOSPI","opposite","위험회피 매도"),
  ("USD_CNY","USD_KRW","same","위안-원 동조화"),("CHINA_PMI_MFG","KOSPI","same","수출 경기"),
- ("DRAM_PRICE","KOSPI","same","반도체 지수 비중"),
+ ("DRAM_EXPORT_PRICE","KOSPI","same","반도체 지수 비중"),
 ]
 IMPACTS = [dict(edge_type="IMPACTS", from_node=a, from_type="MACRO", to_node=b, to_type="MACRO",
                 status="inactive" if {a, b} & INACTIVE_MACROS else "active",
@@ -309,18 +357,27 @@ assert len(mac_ids) == len(MACROS), "macro indicator_id 중복"
 _used = {c["sector_id"] for c in COMPANIES}
 assert sec_ids == _used, f"소속 종목이 없는 섹터: {sorted(sec_ids - _used)}"
 for e in SENSITIVE: assert e["weight"] is None or e["weight_source"], e  # weight는 출처 없이 못 채운다
-assert len(INACTIVE_MACROS) == 7, INACTIVE_MACROS
+assert len(INACTIVE_MACROS) == 6, INACTIVE_MACROS
 for e in SENSITIVE + IMPACTS:  # 비활성 매크로에 걸린 엣지는 반드시 비활성, 활성 엣지는 활성 매크로만 잇는다
     touch = {e["from_node"], e["to_node"]} & INACTIVE_MACROS
     assert (e["status"] == "inactive") == bool(touch), e
 for e in SENSITIVE:
     assert (e["weight_status"] is None) == (e["status"] == "inactive"), e
+    if e["weight_status"] == "filled":
+        assert all(e[k] is not None for k in ("weight", "weight_source", "weight_window", "weight_as_of", "weight_n_tickers")), e
+        assert -1.0 <= e["weight"] <= 1.0, e
+# 같은 섹터에 금리 엣지(국채 3년·10년)는 하나만 (상관 0.9라 같은 효과 이중 계상 방지)
+_rate_cnt = {}
+for e in SENSITIVE:
+    if e["status"] == "active" and e["to_node"] in ("KTB_3Y_KR", "KTB_10Y_KR"):
+        _rate_cnt[e["from_node"]] = _rate_cnt.get(e["from_node"], 0) + 1
+assert all(c == 1 for c in _rate_cnt.values()), _rate_cnt
 assert len({(e["from_node"], e["to_node"]) for e in SENSITIVE}) == len(SENSITIVE), "SENSITIVE_TO 쌍 중복"
 
 nodes = dict(sectors=SECTORS, macros=MACROS, issues=ISSUES, companies_t1=COMPANIES)
 edges = dict(belongs_to=BELONGS, sensitive_to=SENSITIVE, impacts=IMPACTS,
              benefits_hurts=IMPACT_EDGES, exposed_to=EXPOSED)
-meta = dict(version="seed-v0.4", generated="2026-11-10", spec="온톨로지 기획서 v1.2",
+meta = dict(version="seed-v0.5", generated="2026-11-10", spec="온톨로지 기획서 v1.2",
             merged_sensitive_edges=MERGED, inactive_macros=sorted(INACTIVE_MACROS),
             t1_definition="KOSPI+KOSDAQ 통합 시가총액 상위 100 보통주(우선주 제외). 수경 파이프라인 companies.is_core, 2026-10-22 지정 후 고정",
             core_export=CORE_EXPORT, tier_assigned_on=TIER_ASSIGNED, sensitivities_latest_as_of=SENS_AS_OF,
@@ -340,8 +397,10 @@ py = f'''"""개미비서단 온톨로지 관계사전 — Phase A 시드 ({meta[
 생성: {meta["generated"]} · 기준 스펙: {meta["spec"]} · T1 지정일: {TIER_ASSIGNED} (core 내보내기 {CORE_EXPORT})
 T1 정의: {meta["t1_definition"]}
 
-- SENSITIVE_TO.weight 는 전부 None. 수경 sensitivities(섹터별 corr_daily 중앙값 + 종목 수)로만 채운다.
-  weight_status: aggregation_pending(회귀 요인에 있음, 수경 집계 대기) / factor_requested(수집 중이나 요인 아님, 수경에 요청).
+- SENSITIVE_TO.weight 는 수경 섹터 중앙값(일별 corr_daily / 월별 corr_monthly)만 쓴다. 활성 엣지는 모두 채워졌고
+  weight_source·weight_window·weight_as_of·weight_n_tickers 가 함께 있다. 비활성 엣지는 None.
+  sign_check: expected_sign(가설)과 회귀 부호의 대조 — match / mismatch / near_zero(|w|<0.02). 가설을 덮어쓰지 않는다.
+  weight_low_n: 종목 수 3개 미만 섹터라 중앙값이 불안정.
 - status == "inactive" (inactive_reason "no_data_source") 인 매크로·엣지는 수집 계획이 없어 보관만 한다.
   주입·Judge 경로 검증에는 active_edges() / active_macros() / company_context() 만 쓴다.
   expected_sign 은 회귀 부호 검증용 사전 가설이며 weight 로 쓰지 않는다.
@@ -410,7 +469,8 @@ print("edges:", {k: len(v) for k, v in edges.items()})
 print("markets:", {m: sum(c["market"] == m for c in COMPANIES) for m in ("KOSPI", "KOSDAQ")})
 print("macros collecting:", sum(m["in_pipeline"] for m in MACROS), "/", len(MACROS))
 print("sensitive_to status:", {k: sum(e["status"] == k for e in SENSITIVE) for k in ("active", "inactive")},
-      "| weight_status:", {k: sum(e["weight_status"] == k for e in SENSITIVE) for k in ("aggregation_pending", "factor_requested")})
+      "| weight_status:", {k: sum(e["weight_status"] == k for e in SENSITIVE) for k in ("filled", "not_available")},
+      "| sign_check:", {k: sum(e["sign_check"] == k for e in SENSITIVE) for k in ("match", "mismatch", "near_zero")})
 print("impacts status:", {k: sum(e["status"] == k for e in IMPACTS) for k in ("active", "inactive")})
 print("macros inactive:", sorted(INACTIVE_MACROS))
 print("BASE_RATE_KR 합침:", [(m["sector"], m["action"]) for m in MERGED])

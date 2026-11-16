@@ -1,7 +1,7 @@
 """공용 계약 타입 — 임시 위치.
 
 기획서 v3.0 1.4절 제안안은 다음과 같다.
-- AgendaId · DataTier        → data-pipeline (공용 열거형, backend가 import)
+- AgendaId · Tier · DataTier → data-pipeline (공용 열거형, backend가 import). 수경 PR #30 `processing.enums`
 - ReasonCode · NextAction · PrecheckResult → backend/contracts
 
 두 위치 모두 아직 레포에 없으므로, 이 패키지가 같은 이름·같은 값으로 먼저 정의한다.
@@ -27,10 +27,25 @@ class AgendaId(str, Enum):
     flow = "flow"
 
 
-class DataTier(str, Enum):
+class Tier(str, Enum):
+    """종목 등급. 데이터 에이전트가 `companies.tier`에 저장하고 `resolve_company`가 `tier`로 돌려준다.
+
+    계약서(openapi.yaml)에서 T0/T1/T2의 이름은 `Tier`다 (수경 #21 리뷰, 2026-11-10).
+    """
+
     T0 = "T0"  # 파생 데이터만 있음 → reduced
     T1 = "T1"  # 전체 데이터 → full
-    T2 = "T2"  # 수집 전/수집 중 → 거절 + 수집 예약
+    T2 = "T2"  # 수집 전/수집 중 → 거절 + 수집 예약 (MVP에서는 생기지 않음, ensure_company_data가 Post-MVP)
+
+
+class DataTier(str, Enum):
+    """근거 종류. `get_agent_context` 결과의 `data_tier` 값 (종목 등급 `Tier`와 다르다)."""
+
+    report = "report"
+    news_only = "news_only"
+    disclosure_only = "disclosure_only"
+    derived_only = "derived_only"
+    macro_only = "macro_only"
 
 
 class ReasonCode(str, Enum):

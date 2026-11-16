@@ -2,7 +2,7 @@ import pytest
 from pydantic import ValidationError
 
 from agents.debate_renewal.contracts import AgendaId as A
-from agents.debate_renewal.contracts import DataTier
+from agents.debate_renewal.contracts import Tier
 from agents.debate_renewal.schemas import (
     AgendaResult,
     AgendaVerdict,
@@ -45,7 +45,7 @@ def judge(**kw):
 def meta(mode, tickers):
     return DebateMeta(
         trace_id="t", data_as_of="2026-11-07", generated_at="2026-11-09T00:00:00Z", mode=mode,
-        companies=[CompanyMeta(ticker=t, company=t, data_tier=DataTier.T1) for t in tickers],
+        companies=[CompanyMeta(ticker=t, company=t, tier=Tier.T1) for t in tickers],
     )
 
 

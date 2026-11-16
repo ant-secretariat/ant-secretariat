@@ -10,7 +10,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from agents.debate_renewal.contracts import AgendaId, DataTier, ExcludedAgenda, PrecheckFlag
+from agents.debate_renewal.contracts import AgendaId, DataTier, ExcludedAgenda, PrecheckFlag, Tier
 
 
 class _Strict(BaseModel):
@@ -142,7 +142,8 @@ class CompanyMeta(_Strict):
     ticker: str
     company: str
     sector: str = ""
-    data_tier: DataTier
+    tier: Tier  # 종목 등급 (T0/T1/T2)
+    data_tier: DataTier | None = None  # 근거 종류. get_agent_context 결과에서 채움
 
 
 class DebateMeta(ResponseMeta):

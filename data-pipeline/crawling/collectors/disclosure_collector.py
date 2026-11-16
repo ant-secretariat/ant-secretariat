@@ -10,6 +10,7 @@ from xml.etree import ElementTree
 
 import httpx
 
+from crawling.collectors.dart_api import has_data
 from crawling.config.settings import SETTINGS, Settings
 from crawling.crawler.http import create_ssl_context
 
@@ -99,8 +100,8 @@ class DartDisclosureProvider:
         company: str,
         corp_code: str,
     ) -> list[dict]:
-        if payload.get("status") not in {"000", "013"}:
-            raise RuntimeError(f"OpenDART list API error: {payload.get('status')} {payload.get('message')}")
+        if not has_data(payload, "OpenDART list API error"):
+            return []
         rows: list[dict] = []
         for item in payload.get("list", []):
             disclosed_at = _normalize_dart_date(item.get("rcept_dt", ""))

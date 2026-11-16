@@ -49,7 +49,7 @@ class KirsResearchCrawler:
                 reports.extend(
                     report for report in page_reports if self._published_on_or_after(report, cutoff)
                 )
-                if not page_reports or not self._published_on_or_after(page_reports[-1], cutoff):
+                if self._reached_cutoff(page_reports, cutoff):
                     break
                 if page_number < self.settings.max_pages:
                     await asyncio.sleep(self.settings.request_delay_seconds)
@@ -135,6 +135,20 @@ class KirsResearchCrawler:
         return pdf_link.get("data-no", "").strip() if pdf_link else ""
 
     @staticmethod
+    def _reached_cutoff(page_reports: list[ReportMetadata], cutoff: date) -> bool:
+        """이 페이지에서 멈출지. 날짜를 읽은 행 중 가장 오래된 행이 기간 밖이면 멈춘다.
+
+        행이 없거나 날짜를 하나도 못 읽으면 페이지 구조가 바뀐 것일 수 있어, 계속 넘기지 않고 멈춘다.
+        """
+        if not page_reports:
+            return True
+        dates = [published for report in page_reports if (published := parse_date(report.published_at))]
+        if not dates:
+            logger.warning("KIRS 목록에서 날짜를 하나도 읽지 못해 수집을 멈춥니다 (%s건)", len(page_reports))
+            return True
+        return min(dates) < cutoff
+
+    @staticmethod
     def _published_on_or_after(report: ReportMetadata, cutoff: date) -> bool:
         published = parse_date(report.published_at)
         # 날짜를 못 읽은 행은 버리지 않는다
@@ -142,8 +156,8 @@ class KirsResearchCrawler:
 
     @staticmethod
     def _parse_company(value: str) -> tuple[str, str]:
-        # 최근 상장 종목은 코드에 영문이 섞이기도 한다 (예: 0008Z0)
-        match = re.match(r"^(.*?)\s*\(\s*([0-9A-Z]{6})\s*\)\s*$", value)
+        # 최근 상장 종목은 코드에 영문이 섞이기도 한다 (예: 0008Z0). 숫자가 하나는 있어야 해서 (KOSDAQ) 같은 말은 거른다
+        match = re.match(r"^(.*?)\s*\(\s*((?=[0-9A-Z]{0,5}\d)[0-9A-Z]{6})\s*\)\s*$", value)
         if not match:
             return value.strip(), ""
         return match.group(1).strip(), match.group(2)

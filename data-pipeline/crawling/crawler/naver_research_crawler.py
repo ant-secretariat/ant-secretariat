@@ -6,7 +6,9 @@ stock.naver.com의 robots.txt는 일반 크롤러를 허용하지 않으므로 �
 
 - fetch_reports_by_date: 기간 내 전 종목 리포트 목록. 매일 배치에서 대상 종목만 골라 쓴다
 - fetch_reports_for_company: 종목 하나의 리포트 목록. 종목을 처음 수집할 때 쓴다
-- PDF 주소는 목록에 없어 리포트마다 상세 API를 한 번 더 부른다(with_pdf_url)
+- PDF 주소는 목록에 없어 리포트마다 상세 API를 한 번 더 부른다(with_pdf_url).
+  그래서 종목·개수를 먼저 거른 뒤 남은 리포트에만 상세 API를 부른다
+- 페이지나 한 건이 실패해도 그때까지 모은 리포트는 돌려준다(일일 배치가 멈추지 않게)
 """
 
 from __future__ import annotations
@@ -44,12 +46,17 @@ class NaverResearchCrawler:
         tickers: set[str] | None = None,
     ) -> list[dict]:
         """start~end에 나온 리포트. tickers를 주면 그 종목만 남긴 뒤 PDF 주소를 붙인다."""
-        with self._client() as client:
-            items = self._fetch_items(client, {"startDate": start.isoformat(), "endDate": end.isoformat()})
-            if tickers is not None:
-                items = [item for item in items if item.get("itemCode") in tickers]
-            reports = [self._to_report(client, item, with_pdf_url) for item in items]
-        logger.info("NAVER 기간별 리포트: %s ~ %s, %s건", start, end, len(reports))
+        label = f"{start} ~ {end}"
+        try:
+            with self._client() as client:
+                items = self._fetch_items(client, {"startDate": start.isoformat(), "endDate": end.isoformat()})
+                if tickers is not None:
+                    items = [item for item in items if item.get("itemCode") in tickers]
+                reports = self._to_reports(client, items, with_pdf_url)
+        except Exception as exc:
+            logger.warning("NAVER 기간별 수집 실패: %s - %s", label, exc)
+            return []
+        logger.info("NAVER 기간별 리포트: %s, %s건", label, len(reports))
         return [report.as_record() for report in self._deduplicate(reports)]
 
     def fetch_reports_for_company(
@@ -59,17 +66,21 @@ class NaverResearchCrawler:
         months: int = 6,
         max_pages: int | None = None,
         with_pdf_url: bool = True,
+        limit: int | None = None,
     ) -> list[dict]:
+        """종목 하나의 최근 리포트. 최신순으로 limit건(기본 MAX_REPORTS_PER_COMPANY)만 남긴 뒤 PDF 주소를 붙인다."""
         end = date.today()
         params = {
             "itemCodes": ticker,
             "startDate": subtract_months(end, months).isoformat(),
             "endDate": end.isoformat(),
         }
+        limit = limit or self.settings.max_reports_per_company
         try:
             with self._client() as client:
                 items = self._fetch_items(client, params, max_pages or self.settings.max_pages)
-                reports = [self._to_report(client, item, with_pdf_url) for item in items]
+                items = sorted(items, key=lambda item: item.get("writeDate") or "", reverse=True)[:limit]
+                reports = self._to_reports(client, items, with_pdf_url)
         except Exception as exc:
             logger.warning("NAVER 기업 수집 실패: %s(%s) - %s", company, ticker, exc)
             return []
@@ -82,15 +93,20 @@ class NaverResearchCrawler:
         params: dict[str, str],
         max_pages: int | None = None,
     ) -> list[dict]:
+        """목록 페이지를 넘기며 모은다. 중간 페이지가 실패하면 그때까지 모은 항목을 돌려준다."""
         items: list[dict] = []
         index = 0
         while max_pages is None or index < max_pages:
-            response = client.get(
-                self.settings.naver_research_api_url,
-                params={**params, "size": PAGE_SIZE, "index": index},
-            )
-            response.raise_for_status()
-            payload = response.json()
+            try:
+                response = client.get(
+                    self.settings.naver_research_api_url,
+                    params={**params, "size": PAGE_SIZE, "index": index},
+                )
+                response.raise_for_status()
+                payload = response.json()
+            except Exception as exc:
+                logger.warning("NAVER 목록 %s페이지 실패, 앞 페이지까지 %s건만 씁니다: %s - %s", index + 1, len(items), params, exc)
+                break
             items.extend(payload.get("items") or [])
             if not payload.get("hasNext"):
                 break
@@ -99,6 +115,16 @@ class NaverResearchCrawler:
         else:
             logger.warning("NAVER 목록이 MAX_PAGES(%s)에서 잘렸습니다: %s", max_pages, params)
         return items
+
+    def _to_reports(self, client: httpx.Client, items: list[dict], with_pdf_url: bool) -> list[ReportMetadata]:
+        """항목마다 변환한다. 한 건이 깨져도(nid 없음 등) 그 건만 건너뛴다."""
+        reports = []
+        for item in items:
+            try:
+                reports.append(self._to_report(client, item, with_pdf_url))
+            except Exception as exc:
+                logger.warning("NAVER 리포트 항목 건너뜀: %s - %s", item.get("title") or item.get("nid"), exc)
+        return reports
 
     def _fetch_pdf_url(self, client: httpx.Client, nid: str) -> str | None:
         try:

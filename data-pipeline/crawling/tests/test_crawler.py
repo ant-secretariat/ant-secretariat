@@ -128,11 +128,42 @@ class CrawlerParserTest(unittest.TestCase):
 
         self.assertEqual(requested, ["1", "2"])
         self.assertEqual(len(reports), 3)
+        self.assertEqual(sorted(report.ticker for report in reports), ["010000", "010001", "020000"])
+        self.assertTrue(all(report.report_id.startswith(f"KIRS_{report.ticker}_") for report in reports))
+
+    def test_crawl_stops_when_no_date_can_be_read(self) -> None:
+        requested: list[str] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path == "/robots.txt":
+                return httpx.Response(200, text="User-agent: *\nAllow: /")
+            requested.append(request.url.params["page"])
+            return httpx.Response(200, text=_kirs_page(1, ["날짜없음", "날짜없음"]))
+
+        transport = httpx.MockTransport(handler)
+        real_client = httpx.AsyncClient
+
+        def client_factory(*args, **kwargs):
+            kwargs.pop("verify", None)
+            return real_client(*args, transport=transport, **kwargs)
+
+        crawler = KirsResearchCrawler(Settings(months=1, max_pages=10, request_delay_seconds=0))
+        with patch("crawling.crawler.kirs_research_crawler.httpx.AsyncClient", client_factory):
+            asyncio.run(crawler.crawl())
+
+        self.assertEqual(requested, ["1"])
+
+    def test_parse_company_requires_a_digit_in_code(self) -> None:
+        parse = KirsResearchCrawler._parse_company
+
+        self.assertEqual(parse("삼성전자 (005930)"), ("삼성전자", "005930"))
+        self.assertEqual(parse("신규상장 (0008Z0)"), ("신규상장", "0008Z0"))
+        self.assertEqual(parse("에이비씨 (KOSDAQ)"), ("에이비씨 (KOSDAQ)", ""))
 
 
 def _kirs_page(page: int, dates: list[str]) -> str:
     rows = "".join(
-        f"""<tr><td>회사{page}{index} (00{page}{index:03d}0)</td><td>리포트 {page}-{index}</td>
+        f"""<tr><td>회사{page}{index} ({page:02d}{index:04d})</td><td>리포트 {page}-{index}</td>
         <td>한국IR협의회</td><td>{day}</td>
         <td><a href="https://w4.kirs.or.kr/download/{page}-{index}.pdf">PDF</a></td></tr>"""
         for index, day in enumerate(dates)

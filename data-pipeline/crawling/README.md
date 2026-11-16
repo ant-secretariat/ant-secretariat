@@ -65,6 +65,7 @@ SCHEDULE_TIMEZONE=Asia/Seoul
 
 네이버 리포트는 `stock.naver.com` 내부 JSON API(`NAVER_RESEARCH_API_URL`)로 수집합니다. 목록에는 PDF 주소가 없어 리포트마다 상세 API를 한 번 더 호출합니다.
 `stock.naver.com`의 robots.txt는 일반 크롤러를 허용하지 않으므로 팀 내부 테스트 범위에서만 사용하고, 요청 간격을 줄이거나 PDF 원문을 외부에 배포하지 않습니다.
+팀 내부 미니 프로젝트라 이 robots.txt는 따르지 않기로 팀에서 정했습니다(`RESPECT_ROBOTS_TXT`는 KIRS에만 적용). 대신 요청 간격(`REQUEST_DELAY_SECONDS`)을 지키고, 종목·개수를 먼저 거른 리포트에만 상세 API를 호출해 요청 수를 줄이며, 외부 시연·공개 전에 다시 검토합니다.
 
 ## 실행
 

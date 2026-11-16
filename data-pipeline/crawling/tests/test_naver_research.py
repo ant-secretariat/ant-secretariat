@@ -35,7 +35,8 @@ class NaverResearchCrawlerTest(unittest.TestCase):
         def handler(request: httpx.Request) -> httpx.Response:
             self.requests.append(request)
             if request.url.path.endswith("/company"):
-                return httpx.Response(200, json=self.pages[request.url.params["index"]])
+                page = self.pages[request.url.params["index"]]
+                return httpx.Response(500) if page is None else httpx.Response(200, json=page)
             nid = request.url.path.rsplit("/", 1)[-1]
             return httpx.Response(200, json={"attachUrl": f"https://stock.pstatic.net/{nid}.pdf"})
 
@@ -93,6 +94,36 @@ class NaverResearchCrawlerTest(unittest.TestCase):
 
         self.assertEqual(self.requests[0].url.params["itemCodes"], "005930")
         self.assertEqual(self.requests[0].url.params["size"], "50")
+
+    def test_fetch_for_company_keeps_pages_before_a_failure(self) -> None:
+        self.pages["1"] = None  # 2페이지 요청이 500으로 실패
+
+        rows = self.crawler.fetch_reports_for_company("005930", "삼성전자", with_pdf_url=False)
+
+        self.assertEqual(len(rows), 2)
+
+    def test_fetch_skips_broken_item_only(self) -> None:
+        broken = _item("9", "005930")
+        del broken["nid"]
+        self.pages["1"] = {"hasNext": False, "items": [broken]}
+
+        rows = self.crawler.fetch_reports_by_date(date(2026, 10, 1), date(2026, 10, 26), with_pdf_url=True)
+
+        self.assertEqual(len(rows), 2)
+
+    def test_fetch_by_date_returns_empty_instead_of_raising(self) -> None:
+        self.pages["0"] = None
+
+        self.assertEqual(self.crawler.fetch_reports_by_date(date(2026, 10, 1), date(2026, 10, 26)), [])
+
+    def test_fetch_for_company_limits_before_pdf_lookup(self) -> None:
+        self.pages["0"]["items"][0]["writeDate"] = "2026-10-20"
+
+        rows = self.crawler.fetch_reports_for_company("005930", "삼성전자", limit=1)
+
+        self.assertEqual([row["original_url"] for row in rows], ["https://stock.naver.com/research/company/1"])
+        detail_calls = [r for r in self.requests if not r.url.path.endswith("/company")]
+        self.assertEqual(len(detail_calls), 1)
 
 
 if __name__ == "__main__":

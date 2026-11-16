@@ -17,14 +17,15 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from agents.debate_renewal.contracts import CompanyContext, DataTier, ReasonCode
+from agents.debate_renewal.contracts import CompanyContext, ReasonCode, Tier
 from agents.debate_renewal.precheck import SourceStatus, TickerDataStatus, precheck
 from agents.debate_renewal.precheck.config import PrecheckConfig
 
 DEFAULT_PATH = Path(__file__).with_name("refusal_set.json")
 _TODAY = date(2026, 11, 7)
 _COMPANY = CompanyContext(ticker="005930", company="삼성전자", sector="반도체")
-_SOURCES = ("report", "news", "disclosure", "price", "macro", "target_price")
+_SOURCES = ("report", "news", "disclosure", "price", "macro", "target_price",
+            "financials", "flow", "insider", "sensitivity", "derived")  # 뒤 5개는 수경이 추가 예정 (ds-0.2.0)
 
 
 def load_cases(path: Path = DEFAULT_PATH) -> tuple[str, list[dict[str, Any]]]:
@@ -43,7 +44,7 @@ def load_cases(path: Path = DEFAULT_PATH) -> tuple[str, list[dict[str, Any]]]:
 
 def _fresh_status(_: str) -> TickerDataStatus:
     s = SourceStatus(count=10, latest=_TODAY)
-    return TickerDataStatus(data_tier=DataTier.T1, sources={k: s for k in _SOURCES})
+    return TickerDataStatus(tier=Tier.T1, sources={k: s for k in _SOURCES})
 
 
 def split_of(cases: list[dict[str, Any]], split: str) -> list[dict[str, Any]]:

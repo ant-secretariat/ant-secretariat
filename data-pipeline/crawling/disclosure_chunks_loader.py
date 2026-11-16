@@ -31,6 +31,7 @@ import httpx
 import psycopg
 from psycopg.rows import dict_row
 
+from crawling.collectors.dart_api import has_data
 from crawling.config.settings import SETTINGS
 from crawling.crawler.http import create_ssl_context
 from crawling.db.postgres import connect
@@ -180,11 +181,8 @@ def list_disclosures(client: httpx.Client, corp_code: str, date_from: date, date
         })
         response.raise_for_status()
         payload = response.json()
-        status = payload.get("status")
-        if status == "013":  # 조회된 데이터 없음
+        if not has_data(payload, "OpenDART list 오류"):
             return items
-        if status != "000":
-            raise RuntimeError(f"OpenDART list 오류 {status}: {payload.get('message')}")
         items.extend(payload.get("list", []))
         if page >= int(payload.get("total_page") or 1):
             return items

@@ -8,6 +8,7 @@ from datetime import date, datetime
 
 import httpx
 
+from crawling.collectors.dart_api import has_data, mask_key
 from crawling.config.settings import SETTINGS, Settings
 from crawling.crawler.http import create_ssl_context
 
@@ -16,7 +17,6 @@ logger = logging.getLogger(__name__)
 
 DART_URL = "https://opendart.fss.or.kr/api/fnlttMultiAcnt.json"
 CORPS_PER_REQUEST = 100  # API 최대값
-DART_NO_DATA = "013"
 # 보고서 코드 → 분기
 REPORT_QUARTERS = {"11013": 1, "11012": 2, "11014": 3, "11011": 4}
 # DART 계정명 → 표준 계정 키. 은행·보험 등은 매출액이 없고 영업이익에 (손실)이 붙는다
@@ -67,17 +67,13 @@ class DartFinancialsClient:
             response.raise_for_status()
             payload = response.json()
         except Exception as exc:
-            # httpx 오류 메시지에는 인증키가 든 URL이 들어간다
-            message = str(exc).replace(self.settings.dart_api_key, "***") if self.settings.dart_api_key else str(exc)
+            message = mask_key(str(exc), self.settings.dart_api_key)
             raise RuntimeError(f"DART 재무 조회 실패: {year} {report_code} - {message}") from None
         finally:
             time.sleep(self.settings.request_delay_seconds)
 
-        status = payload.get("status")
-        if status == DART_NO_DATA:
+        if not has_data(payload, f"DART 재무 조회 실패: {year} {report_code}"):
             return []
-        if status != "000":
-            raise RuntimeError(f"DART 재무 조회 실패: {year} {report_code} - {status} {payload.get('message')}")
         return payload.get("list") or []
 
 
@@ -91,8 +87,9 @@ def financial_rows(raw_rows: list[dict], tickers: set[str]) -> list[dict]:
     picked: dict[tuple, dict] = {}
     # 같은 계정이 두 번 나오는 경우(당기순이익 등)가 있어 ord가 앞선 것을 쓴다
     for raw in sorted(raw_rows, key=lambda row: int(row.get("ord") or 0)):
-        account = ACCOUNTS.get(raw.get("account_nm", "").strip())
-        ticker = raw.get("stock_code", "").strip()
+        # 키는 있고 값이 null인 경우도 있어 get의 기본값 대신 or로 비운다
+        account = ACCOUNTS.get((raw.get("account_nm") or "").strip())
+        ticker = (raw.get("stock_code") or "").strip()
         if account is None or ticker not in tickers:
             continue
         key = (ticker, int(raw["bsns_year"]), REPORT_QUARTERS[raw["reprt_code"]], raw["fs_div"], account)
@@ -112,6 +109,12 @@ def financial_rows(raw_rows: list[dict], tickers: set[str]) -> list[dict]:
                 amount = amount_ytd - q3_ytd if amount_ytd is not None and q3_ytd is not None else None
                 if q3 and amount is not None:
                     rcept_no = max(rcept_no, q3["rcept_no"])
+        period_end = _period_end(raw.get("thstrm_dt"))
+        if period_end is None:
+            # 날짜를 못 읽은 행 하나 때문에 그 해 전체가 실패하지 않게 그 행만 건너뛴다
+            logger.warning("기간 날짜를 읽지 못해 건너뜁니다: %s %sQ%s %s %s %r",
+                           ticker, year, quarter, fs_div, account, raw.get("thstrm_dt"))
+            continue
         rows.append(
             {
                 "ticker": ticker,
@@ -119,8 +122,8 @@ def financial_rows(raw_rows: list[dict], tickers: set[str]) -> list[dict]:
                 "quarter": quarter,
                 "fs_div": fs_div,
                 "account": account,
-                "account_nm": raw["account_nm"].strip(),
-                "period_end": _period_end(raw.get("thstrm_dt", "")),
+                "account_nm": (raw.get("account_nm") or "").strip(),
+                "period_end": period_end,
                 "amount": amount,
                 "amount_ytd": amount_ytd,
                 "rcept_no": rcept_no,
@@ -143,7 +146,10 @@ def _rcept_date(rcept_no: str) -> date:
     return datetime.strptime(rcept_no[:8], "%Y%m%d").date()
 
 
-def _period_end(value: str) -> date:
-    # "2026.06.30 현재" 또는 "2026.01.01 ~ 2026.06.30"
-    last = value.replace("현재", "").split("~")[-1].strip()
-    return datetime.strptime(last, "%Y.%m.%d").date()
+def _period_end(value: str | None) -> date | None:
+    # "2026.06.30 현재" 또는 "2026.01.01 ~ 2026.06.30". 읽지 못하면 None
+    last = (value or "").replace("현재", "").split("~")[-1].strip()
+    try:
+        return datetime.strptime(last, "%Y.%m.%d").date()
+    except ValueError:
+        return None

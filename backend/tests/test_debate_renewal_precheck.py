@@ -3,7 +3,7 @@ from datetime import date, timedelta
 import pytest
 
 from agents.debate_renewal.contracts import AgendaId as A
-from agents.debate_renewal.contracts import CompanyContext, DataTier, ReasonCode
+from agents.debate_renewal.contracts import CompanyContext, Tier, ReasonCode
 from agents.debate_renewal.precheck import SourceStatus, TickerDataStatus, precheck
 
 TODAY = date(2026, 11, 7)
@@ -13,10 +13,10 @@ SAMSUNG = CompanyContext(ticker="005930", company="삼성전자", sector="반도
 HYNIX = CompanyContext(ticker="000660", company="SK하이닉스", sector="반도체")
 
 
-def full_status(latest=FRESH, tier=DataTier.T1) -> TickerDataStatus:
+def full_status(latest=FRESH, tier=Tier.T1) -> TickerDataStatus:
     s = SourceStatus(count=10, latest=latest)
     return TickerDataStatus(
-        data_tier=tier,
+        tier=tier,
         sources={k: s for k in ["report", "news", "disclosure", "price", "macro", "target_price"]},
     )
 
@@ -92,7 +92,7 @@ def test_investment_advice_runs_with_flag():
 
 # ── 관문3 ────────────────────────────────────────────────
 def test_t2_is_rejected_data_collecting():
-    r = run("", data_status=provider(**{"005930": full_status(tier=DataTier.T2)}))
+    r = run("", data_status=provider(**{"005930": full_status(tier=Tier.T2)}))
     assert r.verdict == "reject" and r.reject_reason == ReasonCode.data_collecting
 
 
@@ -102,11 +102,11 @@ def test_unknown_ticker_is_treated_as_not_collected():
 
 
 def test_t0_runs_reduced_with_tier_limited_exclusions():
-    r = run("배당 알려줘", data_status=provider(**{"005930": full_status(tier=DataTier.T0)}))
+    r = run("배당 알려줘", data_status=provider(**{"005930": full_status(tier=Tier.T0)}))
     assert r.verdict == "reduced"
-    assert r.allowed_agendas == [A.macro]
+    assert r.allowed_agendas == [A.macro, A.shareholder_return]  # 주주환원은 T0도 가능 (ds-0.2.0)
     reasons = {e.agenda_id: e.reason for e in r.excluded}
-    assert reasons == {A.risk: "tier_limited", A.shareholder_return: "tier_limited"}
+    assert reasons == {A.risk: "tier_limited"}
 
 
 def test_missing_source_excludes_agenda_as_no_data():
@@ -121,7 +121,7 @@ def test_missing_source_excludes_agenda_as_no_data():
 
 
 def test_no_usable_agenda_is_rejected():
-    empty = TickerDataStatus(data_tier=DataTier.T1, sources={})
+    empty = TickerDataStatus(tier=Tier.T1, sources={})
     r = run("", data_status=provider(**{"005930": empty}))
     assert r.verdict == "reject" and r.reject_reason == ReasonCode.insufficient_data
     assert len(r.excluded) == 3
@@ -134,7 +134,7 @@ def test_stale_data_runs_with_flag():
 
 
 def test_stale_boundary_is_inclusive_of_threshold():
-    ok = full_status(latest=TODAY - timedelta(days=30))  # macro 기준 30일 → 노후 아님
+    ok = full_status(latest=TODAY - timedelta(days=7))  # 기본 아젠다 기준 7일 → 노후 아님
     assert "stale_data" not in run("금리", data_status=provider(**{"005930": ok})).flags
 
 
@@ -150,7 +150,7 @@ def test_compare_mode_uses_intersection_of_available_agendas():
 
 
 def test_compare_rejects_when_either_side_is_t2():
-    r = run("", companies=(SAMSUNG, HYNIX), data_status=provider(**{"000660": full_status(tier=DataTier.T2)}))
+    r = run("", companies=(SAMSUNG, HYNIX), data_status=provider(**{"000660": full_status(tier=Tier.T2)}))
     assert r.reject_reason == ReasonCode.data_collecting
 
 
@@ -160,7 +160,7 @@ def test_three_companies_raise():
 
 
 def test_result_carries_dictionary_version():
-    assert run("").dictionary_version == "kw-0.1.0+ds-0.1.0-stub"
+    assert run("").dictionary_version == "kw-0.1.0+ds-0.2.0"
 
 
 def test_flow_net_buy_is_not_investment_advice():

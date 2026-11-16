@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -32,16 +33,15 @@ CORE_COUNT = 100
 PRICE_COLUMNS = ("open", "high", "low", "close", "volume")
 SNAPSHOT_PRICE_COLUMNS = ("trading_value", "market_cap")
 PRICE_BATCH_TICKERS = 20
-# 하루 상장폐지는 보통 몇 건이다. 이보다 많으면 KRX 응답 이상으로 보고 멈춘다
-MAX_DELIST_RATIO = 0.02
-MIN_DELIST_GUARD = 5
 
 
 def refresh_companies(
     connection: psycopg.Connection,
     day: date,
-    allow_mass_delist: bool = False,
+    allow_mass_delist: bool | None = None,
 ) -> None:
+    if allow_mass_delist is None:
+        allow_mass_delist = os.getenv("ALLOW_MASS_DELIST", "").lower() in ("1", "true")
     listed = krx.fetch_listed_companies(day)
     corp_codes = (
         DartDisclosureProvider.fetch_corp_code_map(SETTINGS)
@@ -101,6 +101,11 @@ def refresh_companies(
         _assign_core(connection, day)
 
 
+# 하루 상장폐지는 보통 몇 건이다. 이보다 많으면 KRX 응답 이상으로 보고 멈춘다
+MAX_DELIST_RATIO = 0.02
+MIN_DELIST_GUARD = 5
+
+
 def _check_delist_count(
     connection: psycopg.Connection,
     listed_tickers: list[str],
@@ -115,7 +120,7 @@ def _check_delist_count(
     if delist_looks_abnormal(current, to_delist) and not allow_mass_delist:
         raise SystemExit(
             f"상장폐지 대상 {to_delist}/{current}종목: 비정상으로 보고 중단합니다 "
-            "(KRX 응답 확인, 의도한 경우 --allow-mass-delist)"
+            "(KRX 응답 확인, 의도한 경우 ALLOW_MASS_DELIST=1)"
         )
 
 
@@ -326,11 +331,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--years", type=int, default=3, help="과거 적재 기간(년)")
     parser.add_argument("--all", action="store_true", help="T1/T2가 아니라 상장 전종목 대상")
     parser.add_argument("--force", action="store_true", help="이미 적재된 날짜도 다시 받기")
-    parser.add_argument(
-        "--allow-mass-delist",
-        action="store_true",
-        help="--master에서 상장폐지 대상이 많아도 그대로 진행 (의도한 경우만)",
-    )
     return parser.parse_args()
 
 
@@ -345,7 +345,7 @@ def main() -> None:
     day = args.date or date.today()
     with connect() as connection:
         if args.master:
-            refresh_companies(connection, _latest_trading_day(day), args.allow_mass_delist)
+            refresh_companies(connection, _latest_trading_day(day))
         elif args.backfill:
             backfill(connection, args.years, args.all, args.force, args.date)
         else:

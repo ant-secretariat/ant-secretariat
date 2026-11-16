@@ -188,15 +188,13 @@
   },
   {
     "edge_type": "IMPACTS",
-    "from_node": "DRAM_PRICE",
+    "from_node": "DRAM_EXPORT_PRICE",
     "from_type": "MACRO",
     "to_node": "KOSPI",
     "to_type": "MACRO",
-    "status": "inactive",
-    "inactive_reason": "no_data_source",
-    "inactive_macros": [
-      "DRAM_PRICE"
-    ],
+    "status": "active",
+    "inactive_reason": null,
+    "inactive_macros": [],
     "relation": "same",
     "rationale": "반도체 지수 비중"
   }

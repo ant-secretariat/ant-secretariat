@@ -160,15 +160,7 @@ def test_three_companies_raise():
 
 
 def test_result_carries_dictionary_version():
-<<<<<<< HEAD
-    assert run("").dictionary_version == "kw-0.3.0+ds-0.1.0-stub"
-=======
-<<<<<<< HEAD
-    assert run("").dictionary_version == "kw-0.2.0+ds-0.1.0-stub"
-=======
-    assert run("").dictionary_version == "kw-0.1.0+ds-0.2.0"
->>>>>>> feat/3.x-debate-refusal-set
->>>>>>> feat/3.x-debate-keyword-dict
+    assert run("").dictionary_version == "kw-0.3.0+ds-0.2.0"
 
 
 def test_flow_net_buy_is_not_investment_advice():

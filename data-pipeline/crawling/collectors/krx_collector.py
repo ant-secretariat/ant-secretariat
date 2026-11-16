@@ -25,7 +25,11 @@ CALENDAR_INDEX = "1001"
 def fetch_listed_companies(day: date) -> list[dict]:
     rows: list[dict] = []
     for market in MARKETS:
-        for ticker in stock.get_market_ticker_list(_krx(day), market=market):
+        tickers = stock.get_market_ticker_list(_krx(day), market=market)
+        if not tickers:
+            # 빈 목록을 그대로 돌려주면 종목 마스터 갱신이 전 종목을 상장폐지로 처리한다
+            raise RuntimeError(f"{market} 종목 목록이 비었습니다 (KRX 로그인·응답 확인)")
+        for ticker in tickers:
             rows.append(
                 {
                     "ticker": ticker,

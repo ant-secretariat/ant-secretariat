@@ -17,6 +17,14 @@ def connect(settings: Settings | None = None) -> psycopg.Connection:
     return psycopg.connect(settings.supabase_db_url, autocommit=True)
 
 
+def dedupe(rows: Iterable[dict[str, Any]], key_columns: Sequence[str]) -> list[dict[str, Any]]:
+    """같은 충돌 키가 여러 번 있으면 마지막 행만 남긴다.
+
+    Postgres는 한 INSERT ... ON CONFLICT DO UPDATE에서 같은 행을 두 번 고칠 수 없어 전체가 실패한다.
+    """
+    return list({tuple(row[key] for key in key_columns): row for row in rows}.values())
+
+
 def upsert(
     connection: psycopg.Connection,
     table: str,
@@ -29,7 +37,7 @@ def upsert(
     update_columns를 주면 충돌 시 그 컬럼만 갱신한다. 같은 행을 여러 소스가
     나눠 채우는 경우(예: 시세는 종목별 조회, 거래대금은 날짜별 조회)에 쓴다.
     """
-    rows = list(rows)
+    rows = dedupe(rows, key_columns)
     if not rows:
         return 0
 

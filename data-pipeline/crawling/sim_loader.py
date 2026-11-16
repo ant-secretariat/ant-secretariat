@@ -10,6 +10,7 @@ price_data·index_daily·macro_data가 먼저 적재돼 있어야 한다.
 from __future__ import annotations
 
 import argparse
+import math
 import logging
 import sys
 from collections import Counter
@@ -25,6 +26,8 @@ from psycopg.types.json import Jsonb
 
 from crawling.analytics import garch, sensitivity
 from crawling.db.postgres import connect, upsert
+# 대상 종목 규칙은 시세 적재와 같은 곳 하나만 쓴다
+from crawling.market_loader import _target_tickers
 
 logger = logging.getLogger(__name__)
 
@@ -33,9 +36,16 @@ WINDOW_YEARS = 3
 KOSPI_CODE = "1001"
 # 영업일 차이(공휴일 등)로 빈 매크로 값은 직전 값으로 최대 며칠까지 채운다
 MACRO_FILL_DAYS = 3
+# 실패 종목이 이 비율을 넘으면 실행 전체를 실패로 본다
+MAX_FAILURE_RATIO = 0.1
 
 
 def run(connection: psycopg.Connection, day: date, tickers: list[str]) -> None:
+    """종목마다 GARCH와 민감도를 따로 적합한다. 한 종목이 실패해도 나머지는 저장한다.
+
+    GARCH가 실패한 종목은 status='error' 행으로 남긴다(결과 없음과 실패를 구분).
+    실패 종목이 MAX_FAILURE_RATIO를 넘으면 저장 뒤 0이 아닌 종료 코드로 끝내 스케줄러가 알 수 있게 한다.
+    """
     as_of = connection.execute(
         "select max(trade_date) from price_data where trade_date <= %s", (day,)
     ).fetchone()[0]
@@ -50,12 +60,18 @@ def run(connection: psycopg.Connection, day: date, tickers: list[str]) -> None:
 
     sim_rows: list[dict] = []
     sensitivity_rows: list[dict] = []
+    failed: list[str] = []
     for ticker in tickers:
         series = closes.get(ticker)
         if series is None or series.empty:
             logger.warning("%s: 시세가 없어 건너뜁니다", ticker)
             continue
-        fit = garch.fit_gjr_garch(garch.log_returns(series))
+        try:
+            fit = garch.fit_gjr_garch(garch.log_returns(series))
+        except Exception as exc:
+            logger.exception("%s: GARCH 적합 실패", ticker)
+            fit = error_fit(len(series), exc)
+            failed.append(ticker)
         sim_rows.append(
             {
                 "ticker": ticker,
@@ -63,14 +79,18 @@ def run(connection: psycopg.Connection, day: date, tickers: list[str]) -> None:
                 "model_id": garch.MODEL_ID,
                 "status": fit["status"],
                 "n_obs": fit["n_obs"],
-                "params_json": Jsonb(fit["params_json"]),
+                "params_json": Jsonb(finite(fit["params_json"])),
                 "fitted_at": fitted_at,
             }
         )
-        sensitivity_rows.extend(
-            {"ticker": ticker, "as_of": as_of, **row, "fitted_at": fitted_at}
-            for row in sensitivity.compute_sensitivities(series, factors)
-        )
+        # 민감도는 GARCH와 독립이다. 실패해도 GARCH 결과는 저장한다
+        try:
+            sensitivity_rows.extend(
+                {"ticker": ticker, "as_of": as_of, **row, "fitted_at": fitted_at}
+                for row in sensitivity.compute_sensitivities(series, factors)
+            )
+        except Exception:
+            logger.exception("%s: 민감도 계산 실패", ticker)
 
     upsert(connection, "sim_params", sim_rows, key_columns=["ticker", "as_of", "model_id"])
     upsert(
@@ -86,6 +106,27 @@ def run(connection: psycopg.Connection, day: date, tickers: list[str]) -> None:
         ", ".join(f"{status} {count}" for status, count in sorted(statuses.items())),
         len(sensitivity_rows),
     )
+    if len(failed) > len(tickers) * MAX_FAILURE_RATIO:
+        raise SystemExit(f"GARCH 실패 {len(failed)}/{len(tickers)}종목: {failed[:10]}")
+
+
+def error_fit(n_obs: int, exc: Exception) -> dict:
+    return {
+        "status": "error",
+        "n_obs": n_obs,
+        "params_json": {"status_reason": f"{type(exc).__name__}: {exc}"[:300]},
+    }
+
+
+def finite(value):
+    """NaN·inf를 None으로 바꾼다. Postgres jsonb는 NaN을 받지 못한다."""
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, dict):
+        return {key: finite(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [finite(item) for item in value]
+    return value
 
 
 def _load_closes(
@@ -127,18 +168,16 @@ def _load_factors(connection: psycopg.Connection, start: date, end: date) -> pd.
         ).fetchall(),
         columns=["indicator_id", "date", "value"],
     ).pivot(index="date", columns="indicator_id", values="value")
+    # 아직 적재 안 된 지표도 빈 컬럼으로 둔다. 없으면 민감도 계산이 KeyError로 전체를 멈춘다
+    macro = macro.reindex(columns=macro_ids)
+    for name in macro_ids:
+        if macro[name].isna().all():
+            logger.warning("macro_data에 %s가 없습니다 (macro_loader --backfill 확인)", name)
     macro.index = pd.to_datetime(macro.index)
 
     calendar = frame.index.union(macro.index)
     macro = macro.reindex(calendar).ffill(limit=MACRO_FILL_DAYS)
     return frame.join(macro.reindex(frame.index)).astype(float)
-
-
-def _target_tickers(connection: psycopg.Connection, all_tickers: bool) -> list[str]:
-    query = "select ticker from companies where listed"
-    if not all_tickers:
-        query += " and tier in ('T1', 'T2')"
-    return [ticker for (ticker,) in connection.execute(query + " order by ticker")]
 
 
 def parse_args() -> argparse.Namespace:
@@ -157,7 +196,7 @@ def main() -> None:
     )
     args = parse_args()
     with connect() as connection:
-        tickers = args.tickers or _target_tickers(connection, args.all)
+        tickers = sorted(set(args.tickers)) if args.tickers else _target_tickers(connection, args.all)
         run(connection, args.date or date.today(), tickers)
 
 

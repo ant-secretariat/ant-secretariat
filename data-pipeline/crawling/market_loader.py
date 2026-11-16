@@ -32,9 +32,16 @@ CORE_COUNT = 100
 PRICE_COLUMNS = ("open", "high", "low", "close", "volume")
 SNAPSHOT_PRICE_COLUMNS = ("trading_value", "market_cap")
 PRICE_BATCH_TICKERS = 20
+# 하루 상장폐지는 보통 몇 건이다. 이보다 많으면 KRX 응답 이상으로 보고 멈춘다
+MAX_DELIST_RATIO = 0.02
+MIN_DELIST_GUARD = 5
 
 
-def refresh_companies(connection: psycopg.Connection, day: date) -> None:
+def refresh_companies(
+    connection: psycopg.Connection,
+    day: date,
+    allow_mass_delist: bool = False,
+) -> None:
     listed = krx.fetch_listed_companies(day)
     corp_codes = (
         DartDisclosureProvider.fetch_corp_code_map(SETTINGS)
@@ -57,6 +64,7 @@ def refresh_companies(connection: psycopg.Connection, day: date) -> None:
         }
         for company in listed
     ]
+    _check_delist_count(connection, [row["ticker"] for row in rows], allow_mass_delist)
     # 별칭·티어는 다른 경로로 관리하므로 갱신 대상에서 뺀다
     upsert(
         connection,
@@ -93,6 +101,28 @@ def refresh_companies(connection: psycopg.Connection, day: date) -> None:
         _assign_core(connection, day)
 
 
+def _check_delist_count(
+    connection: psycopg.Connection,
+    listed_tickers: list[str],
+    allow_mass_delist: bool,
+) -> None:
+    """빈 목록·일부 시장 누락 같은 응답 이상으로 대량 상장폐지 처리가 되지 않게 막는다."""
+    current, to_delist = connection.execute(
+        "select count(*) filter (where listed), "
+        "count(*) filter (where listed and not (ticker = any(%s))) from companies",
+        (listed_tickers,),
+    ).fetchone()
+    if delist_looks_abnormal(current, to_delist) and not allow_mass_delist:
+        raise SystemExit(
+            f"상장폐지 대상 {to_delist}/{current}종목: 비정상으로 보고 중단합니다 "
+            "(KRX 응답 확인, 의도한 경우 --allow-mass-delist)"
+        )
+
+
+def delist_looks_abnormal(current: int, to_delist: int) -> bool:
+    return bool(current) and to_delist > max(MIN_DELIST_GUARD, current * MAX_DELIST_RATIO)
+
+
 def _assign_core(connection: psycopg.Connection, day: date) -> None:
     preferred = {
         ticker
@@ -118,8 +148,9 @@ def backfill(
     years: int,
     all_tickers: bool,
     force: bool,
+    end_day: date | None = None,
 ) -> None:
-    end = _latest_trading_day(date.today())
+    end = _latest_trading_day(end_day or date.today())
     start = end - timedelta(days=365 * years)
     tickers = _target_tickers(connection, all_tickers)
     logger.info("과거 적재 시작: %s ~ %s, 대상 %s종목", start, end, len(tickers))
@@ -134,7 +165,7 @@ def backfill(
 
     _load_price_history(connection, tickers, start, end)
 
-    done = set() if force else _loaded_market_days(connection, start, end)
+    done = set() if force else _loaded_market_days(connection, start, end, tickers)
     days = [day for day in krx.fetch_trading_days(start, end) if day not in done]
     logger.info("날짜별 스냅샷 %s일 적재 (이미 적재된 %s일 건너뜀)", len(days), len(done))
     for position, day in enumerate(days, start=1):
@@ -153,10 +184,20 @@ def daily(connection: psycopg.Connection, day: date, all_tickers: bool) -> None:
     tickers = _target_tickers(connection, all_tickers)
     adjusted = _tickers_with_share_change(connection, day, snapshot["market_daily"], tickers)
 
+    # 상장주식수가 바뀐 종목은 액면분할·증자로 과거 수정주가가 달라졌을 수 있다.
+    # 새 주식수(처리 완료 표시)는 이력을 다시 받은 뒤에 저장해야, 실패하면 다음 실행에서 다시 감지된다
+    failed: set[str] = set()
+    if adjusted:
+        logger.info("상장주식수 변동 %s종목의 수정주가 이력을 다시 받습니다", len(adjusted))
+        oldest = connection.execute("select min(trade_date) from price_data").fetchone()[0]
+        failed = _load_price_history(connection, sorted(adjusted), oldest or day, day)
+        if failed:
+            logger.warning("수정주가 재다운로드 실패 %s종목은 오늘 스냅샷을 저장하지 않습니다: %s", len(failed), sorted(failed))
+
     _upsert_snapshot(
         connection,
         snapshot,
-        tickers,
+        [ticker for ticker in tickers if ticker not in failed],
         PRICE_COLUMNS + SNAPSHOT_PRICE_COLUMNS,
     )
     upsert(
@@ -165,13 +206,7 @@ def daily(connection: psycopg.Connection, day: date, all_tickers: bool) -> None:
         krx.fetch_index_history(day, day),
         key_columns=["index_code", "trade_date"],
     )
-    logger.info("%s 하루치 적재 완료: %s종목", day, len(tickers))
-
-    # 상장주식수가 바뀐 종목은 액면분할·증자로 과거 수정주가가 달라졌을 수 있다
-    if adjusted:
-        logger.info("상장주식수 변동 %s종목의 수정주가 이력을 다시 받습니다", len(adjusted))
-        oldest = connection.execute("select min(trade_date) from price_data").fetchone()[0]
-        _load_price_history(connection, sorted(adjusted), oldest or day, day)
+    logger.info("%s 하루치 적재 완료: %s종목", day, len(tickers) - len(failed))
 
 
 def _load_price_history(
@@ -179,10 +214,16 @@ def _load_price_history(
     tickers: list[str],
     start: date,
     end: date,
-) -> None:
+) -> set[str]:
+    """종목별 시세 이력을 받아 저장한다. 받지 못한 종목은 건너뛰고 돌려준다."""
     batch: list[dict] = []
+    failed: set[str] = set()
     for position, ticker in enumerate(tickers, start=1):
-        batch.extend(krx.fetch_price_history(ticker, start, end))
+        try:
+            batch.extend(krx.fetch_price_history(ticker, start, end))
+        except Exception as exc:
+            logger.warning("%s: 시세 이력 조회 실패 - %s", ticker, exc)
+            failed.add(ticker)
         if position % PRICE_BATCH_TICKERS == 0 or position == len(tickers):
             upsert(
                 connection,
@@ -193,6 +234,7 @@ def _load_price_history(
             )
             batch = []
             logger.info("종목별 시세 진행 %s/%s", position, len(tickers))
+    return failed
 
 
 def _upsert_snapshot(
@@ -224,12 +266,25 @@ def _target_tickers(connection: psycopg.Connection, all_tickers: bool) -> list[s
     return [ticker for (ticker,) in connection.execute(query + " order by ticker")]
 
 
-def _loaded_market_days(connection: psycopg.Connection, start: date, end: date) -> set[date]:
+def _loaded_market_days(
+    connection: psycopg.Connection,
+    start: date,
+    end: date,
+    tickers: list[str],
+) -> set[date]:
+    """대상 종목이 모두 채워진 날짜. 그날 시세가 있는 대상 종목 전부에 스냅샷이 있어야 한다.
+
+    T1을 먼저 받고 나중에 --all로 종목을 늘려도 새 종목의 스냅샷을 받도록, 날짜가 아니라 종목 기준으로 본다.
+    그날 상장 전이던 종목은 시세도 없으므로 세지 않는다.
+    """
     return {
         day
         for (day,) in connection.execute(
-            "select distinct trade_date from market_daily where trade_date between %s and %s",
-            (start, end),
+            "select p.trade_date from price_data p "
+            "left join market_daily m on m.ticker = p.ticker and m.trade_date = p.trade_date "
+            "where p.trade_date between %s and %s and p.ticker = any(%s) "
+            "group by p.trade_date having count(*) = count(m.ticker)",
+            (start, end, tickers),
         )
     }
 
@@ -271,6 +326,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--years", type=int, default=3, help="과거 적재 기간(년)")
     parser.add_argument("--all", action="store_true", help="T1/T2가 아니라 상장 전종목 대상")
     parser.add_argument("--force", action="store_true", help="이미 적재된 날짜도 다시 받기")
+    parser.add_argument(
+        "--allow-mass-delist",
+        action="store_true",
+        help="--master에서 상장폐지 대상이 많아도 그대로 진행 (의도한 경우만)",
+    )
     return parser.parse_args()
 
 
@@ -285,9 +345,9 @@ def main() -> None:
     day = args.date or date.today()
     with connect() as connection:
         if args.master:
-            refresh_companies(connection, _latest_trading_day(day))
+            refresh_companies(connection, _latest_trading_day(day), args.allow_mass_delist)
         elif args.backfill:
-            backfill(connection, args.years, args.all, args.force)
+            backfill(connection, args.years, args.all, args.force, args.date)
         else:
             daily(connection, day, args.all)
 

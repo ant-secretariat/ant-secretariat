@@ -24,10 +24,10 @@ pytest tests/test_debate_renewal_precheck.py
 
 ```
 backend/agents/debate_renewal/
-  contracts.py              # AgendaId·DataTier·ReasonCode·NextAction·PrecheckResult (임시 위치)
+  contracts.py              # AgendaId·Tier·DataTier·ReasonCode·NextAction·PrecheckResult (임시 위치)
   precheck/                 # 규칙 기반 순수 함수, LLM 없음
   data/keyword_dictionary.json
-  data/intent_data_sources.json   # 스텁 — 소유자는 데이터 에이전트(수경)
+  data/intent_data_sources.json   # 수경 제안값 반영 (소유자는 데이터 에이전트)
 ```
 
 ## 확정 필요 (코드에 임시값으로 들어가 있음)

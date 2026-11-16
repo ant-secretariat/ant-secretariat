@@ -166,7 +166,7 @@ unknown
 기본값은 실제 수집 provider입니다.
 
 - `PRICE_DATA_PROVIDER=naver`: Naver Finance 일별 시세를 수집해 `price_data`에 저장
-- `MACRO_DATA_PROVIDER=ecos`: 한국은행 ECOS에서 기준금리, 국고채 금리, CPI를 수집하고 Naver 시장지표에서 USD/KRW를 함께 저장
+- `MACRO_DATA_PROVIDER=ecos`: 한국은행 ECOS에서 기준금리, 국고채 3·10년 금리, CPI, USD/KRW 환율, 유가(WTI·Dubai·Brent 월평균), 통관 수출·수입과 무역수지(수출 − 수입), 전산업생산지수(계절조정)를 수집
 - `MACRO_DATA_PROVIDER=naver`: Naver 시장지표에서 USD/KRW만 수집
 
 실제 수치 데이터까지 포함해 실행:
@@ -177,6 +177,24 @@ python main.py --run-once --source naver --include-price-data --include-macro-da
 
 ECOS 수집에는 `ECOS_API_KEY`가 필요합니다. 네트워크가 없는 테스트 환경에서는 `.env`에서 `PRICE_DATA_PROVIDER=mock`,
 `MACRO_DATA_PROVIDER=mock`으로 바꿀 수 있습니다. 추후 한국투자 Open API 같은 provider로 교체할 수 있도록 `collectors/`에 provider 경계를 두었습니다.
+
+Supabase `macro_data` 테이블 적재(`SUPABASE_DB_URL`, `ECOS_API_KEY` 필요):
+
+```bash
+python -m crawling.macro_loader --backfill   # 2000년부터 전체 이력
+python -m crawling.macro_loader --daily      # 최근 구간(일별 45일, 월별 400일) 갱신
+```
+
+시뮬레이션 파라미터(`sim_params`, GJR-GARCH + FHS)와 민감도(`sensitivities`) 적합. 시세·지수·매크로 적재 후 실행:
+
+```bash
+python -m crawling.sim_loader                     # T1/T2 종목, 최신 거래일 기준 최근 3년
+python -m crawling.sim_loader --tickers 005930    # 특정 종목만
+```
+
+- `sim_params.params_json`: 계수(omega·alpha·gamma·beta), 다음날 조건부 분산, 표준화 잔차(`std_resid`), 30일 예상 변동성. 경로 생성은 `crawling.analytics.garch.simulate_paths` 참고
+- `status=not_converged`이면 `params_json.status_reason`이 `optimizer_failed`(최적화 실패) 또는 `nonstationary`(지속성 ≥ 1)
+- `sensitivities`: 요인(KOSPI·USD_KRW·KTB_3Y_KR)이 30거래일 동안 1σ 움직일 때 종목 30일 수익률(%) 변화. `multi`는 세 요인 동시 회귀, `simple`은 단일 요인 회귀, `corr_daily`는 일별 상관계수(온톨로지 엣지 가중치)
 
 ## 뉴스 / 공시 Provider
 

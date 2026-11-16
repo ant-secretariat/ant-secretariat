@@ -106,6 +106,7 @@ class Settings:
     ecos_api_key: str = os.getenv("ECOS_API_KEY", "")
     kis_app_key: str = os.getenv("KIS_APP_KEY", "")
     kis_app_secret: str = os.getenv("KIS_APP_SECRET", "")
+    supabase_db_url: str = os.getenv("SUPABASE_DB_URL", "")
 
     def __post_init__(self) -> None:
         if self.source not in {"naver", "kirs", "all"}:

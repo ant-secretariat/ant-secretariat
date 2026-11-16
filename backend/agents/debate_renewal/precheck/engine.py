@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 from agents.debate_renewal.contracts import (
     AgendaId,
     CompanyContext,
-    DataTier,
+    Tier,
     ExcludedAgenda,
     PrecheckFlag,
     PrecheckResult,
@@ -40,9 +40,14 @@ class TickerDataStatus(BaseModel):
     """get_available_data_status 결과를 precheck가 쓰는 모양으로 줄인 것.
 
     sources 키는 intent_data_sources.json의 requires_any와 같은 이름을 쓴다.
+
+    `tier`는 종목 등급(T0/T1/T2)이고 근거 종류 `data_tier`와 다르다 (수경 #21 리뷰).
+    `get_available_data_status`는 DB 조회라 종목당 약 0.3초라서 precheck(100ms 미만) 안에서 부르지 않는다.
+    오케스트레이터가 `resolve_company` 결과의 `tier`·`data_status`를 넘겨주는 방식을 쓰고(수경 제안, #32),
+    이 provider는 그 값을 담아 돌려주는 얇은 함수다.
     """
 
-    data_tier: DataTier
+    tier: Tier
     sources: dict[str, SourceStatus] = Field(default_factory=dict)
 
 
@@ -82,7 +87,7 @@ def precheck(
 
     # ── 관문3: 데이터 ────────────────────────────────────────────
     statuses = [data_status(c.ticker) for c in companies]
-    if any(s is None or s.data_tier == DataTier.T2 for s in statuses):
+    if any(s is None or s.tier == Tier.T2 for s in statuses):
         return result(
             "reject", reject_reason=ReasonCode.data_collecting, matched_intents=matched, flags=flags
         )
@@ -111,7 +116,7 @@ def precheck(
             flags=flags,
         )
 
-    reduced = any(s.data_tier == DataTier.T0 for s in statuses) or len(allowed) < len(selected)  # type: ignore[union-attr]
+    reduced = any(s.tier == Tier.T0 for s in statuses) or len(allowed) < len(selected)  # type: ignore[union-attr]
     return result(
         "reduced" if reduced else "full",
         allowed_agendas=allowed,
@@ -157,7 +162,7 @@ class _Avail(BaseModel):
 
 def _agenda_availability(agenda: AgendaId, status: TickerDataStatus, cfg: PrecheckConfig, today: date) -> _Avail:
     src = cfg.sources[agenda]
-    if status.data_tier == DataTier.T0 and not src.t0_available:
+    if status.tier == Tier.T0 and not src.t0_available:
         return _Avail(available=False, tier_limited=True)
     have = [status.sources[s] for s in src.requires_any if s in status.sources and status.sources[s].count > 0]
     if not have:

@@ -49,7 +49,7 @@
 
 ## 설계 불변 조건 (기획서 v3.0)
 
-- `AgendaId`·`DataTier`·`ReasonCode`·`NextAction`은 열거형만 쓴다. 문자열 하드코딩 금지
+- `AgendaId`·`Tier`(T0/T1/T2)·`DataTier`(근거 종류)·`ReasonCode`·`NextAction`은 열거형만 쓴다. `tier`와 `data_tier`는 다른 값이다. 문자열 하드코딩 금지
 - `precheck()`는 **순수 함수**: LLM·네트워크·DB 호출 금지, 수 ms. 종목 데이터 현황은 `data_status` provider로 주입
 - 데이터 접근은 도구 레지스트리 `invoke()` 경유. 데이터 함수 직접 import 금지
 - LLM은 Upstage Solar(OpenAI 호환), `json_schema` strict 출력 + Pydantic 검증 (D7)
@@ -78,10 +78,10 @@
 - 관문1 거절 코드(미커버 종목·3종목 이상·비교 한쪽 미커버)의 `envelope.py` 이름. 11/9 기준 회의에서 확정되지 않았다. precheck 밖이라 이 패키지는 정의하지 않고, 확정되면 `ReasonCode`에 추가한다
 - `schemas.py` 임시 타입: `confidence`는 기획서에 타입이 없어 `str`, `bull_score`·`bear_score`·`score`는 `float`. 근거 제외 후 `partial` 고지를 담을 필드 위치도 기획서에 없어 아직 없음(검증 레이어 구현 때 결정)
 - `validation/l1.py`의 매매 권유 금지어(`FORBIDDEN_PHRASES`)는 기획서에 목록이 없어 임시. 공백 제거 후 부분 일치라 정상 문장을 막을 수 있으므로 거절셋처럼 문항으로 측정해 확정 필요
-- 공용 계약 위치(`backend/contracts`, data-pipeline)가 생기면 `contracts.py`를 import로 교체하고 파일 삭제
-- `data/intent_data_sources.json` — 수경과 아젠다별 필요 데이터·신선도·T0 가능 여부 확정
+- 공용 계약 위치(`backend/contracts`, data-pipeline)가 생기면 `contracts.py`를 import로 교체하고 파일 삭제. 수경 #30이 병합되면 `from processing.enums import AgendaId, DataTier, Tier`
+- `data/intent_data_sources.json` — 값은 수경 제안(#21 리뷰 2026-11-10) 반영. `financials`·`flow`·`insider`·`sensitivity`·`derived` 키는 데이터 쪽이 `get_available_data_status`에 추가할 예정(#35 병합 후)이라 그 전에는 해당 키가 provider에 없다 — 남은 키로 판정된다
 - 아젠다 대체 우선순위(`data/keyword_dictionary.json`의 `selection_rules`) — 기획서에 "최대 3개 유지"만 있음
-- `flow` 아젠다 `active: false` — `investor_flow_daily` 확보 후 활성화
+- `flow` 아젠다 `active: false` — 데이터 쪽은 활성화 OK(`investor_flow_daily` T1 100종목 3년 치). 키워드 사전·거절셋 라벨·기준선 문항 8개와 같이 바꿔야 해서 별도 PR로 진행
 - 큐 라이브러리(PgQueuer vs Procrastinate), 배포 방식은 팀 결정 대기
 
 ## 명령

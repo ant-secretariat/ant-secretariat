@@ -1,5 +1,5 @@
 from agents.debate_renewal.contracts import AgendaId as A
-from agents.debate_renewal.contracts import DataTier
+from agents.debate_renewal.contracts import Tier
 from agents.debate_renewal.schemas import (
     AgendaResult, AgendaVerdict, AxisVerdict, BearOutput, BullOutput, Claim, Comparison,
     ComparisonAxis, CompanyDebate, CompanyMeta, DebateMeta, DebateResult, Evidence, Judge,
@@ -36,7 +36,7 @@ def single(bull_claims=None, bear_claims=None, ref="B1", ev=("S1",), j=None):
                       verdict=AgendaVerdict(winner="bull", reason="r", score=Score(bull=3, bear=2)))
     return DebateResult(
         meta=DebateMeta(trace_id="t", data_as_of="d", generated_at="g", mode="single",
-                        companies=[CompanyMeta(ticker="005930", company="삼성전자", data_tier=DataTier.T1)]),
+                        companies=[CompanyMeta(ticker="005930", company="삼성전자", tier=Tier.T1)]),
         scope=Scope(verdict="full"), selected_agendas=[A.valuation], agendas=[ag],
         evidence=evidence(*ev), judge=j or judge(),
     )
@@ -100,8 +100,8 @@ def _compare(ref_b="B-B1"):
     )
     return DebateResult(
         meta=DebateMeta(trace_id="t", data_as_of="d", generated_at="g", mode="compare", companies=[
-            CompanyMeta(ticker="005930", company="a", data_tier=DataTier.T1),
-            CompanyMeta(ticker="000660", company="b", data_tier=DataTier.T1)]),
+            CompanyMeta(ticker="005930", company="a", tier=Tier.T1),
+            CompanyMeta(ticker="000660", company="b", tier=Tier.T1)]),
         scope=Scope(verdict="full"), selected_agendas=[A.valuation], comparison=Comparison(axes=[ax]),
         evidence=evidence("S1"), judge=judge(),
     )

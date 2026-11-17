@@ -2554,6 +2554,7 @@ components:
       type: object
       required:
       - verdict
+      - mode
       - allowed_agendas
       - excluded
       - selection_reason
@@ -2567,6 +2568,12 @@ components:
           - full
           - reduced
           - reject
+        mode:
+          type: string
+          enum:
+          - single
+          - compare
+          description: EntityResolution.mode를 이어받습니다. run_debate는 이 값으로 모드를 정하고 다시 판정하지 않습니다(ADR 0007).
         reject_reason:
           oneOf:
           - $ref: '#/components/schemas/ReasonCode'
@@ -2574,6 +2581,7 @@ components:
         allowed_agendas:
           type: array
           maxItems: 3
+          description: 비교 모드에서는 비교 축이며, 두 종목 모두 데이터가 있는 아젠다만 들어갑니다.
           items:
             $ref: '#/components/schemas/AgendaId'
         excluded:

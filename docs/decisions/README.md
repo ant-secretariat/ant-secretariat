@@ -28,6 +28,9 @@ AI 에이전트도 [AGENTS.md](../../AGENTS.md)를 통해 이 폴더를 읽습�
 | [0004](0004-macro-indicator-mapping.md) | 매크로 지표 이름·출처 매핑과 수집하지 않는 지표의 처리 | 채택 | 2026-11 | 수경, 유민 |
 | [0005](0005-vector-store-pgvector.md) | 벡터 저장소를 Pinecone에서 Supabase pgvector로 옮기고, 청크 ID는 내용 기준 | 채택 | 2026-11 | 수경 |
 | [0006](0006-shared-enums-data-tier.md) | `AgendaId`·`DataTier`·`Tier` 공용 열거형은 data-pipeline에 둔다 | 채택 | 2026-11 | 수경, 유민 |
+| [0007](0007-two-stock-comparison-in-mvp.md) | 2종목 비교(D3)를 MVP에 포함, 비교 모드는 토론 기획서 v3.0 기준 | 채택 | 2026-11-17 | 태은 |
+| [0008](0008-ontology-flag-default-off.md) | 관계 사전 기능 플래그는 기본 꺼짐, 켬/끔 평가로 기본값을 정함 | 채택 | 2026-11-17 | 태은 |
+| [0009](0009-sse-event-delivery.md) | 진행 이벤트는 `job_events` 1초 조회로 SSE 전달, 단위는 단계와 주장 | 제안 | 2026-11-17 | 태은 |
 
 결정일이 `2026-11`로만 적힌 것은 카톡 대화 날짜를 확인해 고쳐 주세요.
 

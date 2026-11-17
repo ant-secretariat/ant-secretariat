@@ -19,3 +19,6 @@ torch>=2.0.0
 
 # orchestrator (Agent C)
 langgraph>=1.0.0
+
+# agents/debate_renewal (Agent F 리빌드)
+pydantic>=2.6

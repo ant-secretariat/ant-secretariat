@@ -1386,7 +1386,9 @@ components:
       - internal_error
       - job_not_found
       - invalid_job_state
-      description: 마지막 두 값은 제안입니다(OQ-2). 사용자 문구는 reason.message를 사용합니다.
+      description: |-
+        마지막 두 값은 제안입니다(OQ-2). 사용자 문구는 reason.message를 사용합니다.
+        `no_data`: 종목은 커버되지만 고를 수 있는 아젠다에 쓸 데이터가 하나도 없을 때입니다. precheck 관문3이 범위를 줄이다가 남는 아젠다가 없으면 이 코드로 거절하고, 다음 행동은 `choose_alternative_company`입니다. 토론 기획서의 임시 이름 `insufficient_data`는 쓰지 않습니다(11/17 결정).
     NextAction:
       description: 사유 코드와 1:1로 대응합니다(REASON_POLICY).
       oneOf:

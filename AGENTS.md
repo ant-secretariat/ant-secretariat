@@ -5,6 +5,7 @@
 - [docs/CODE_CONVENTIONS.md](docs/CODE_CONVENTIONS.md) — 날짜·종목코드·단위·빈 값·이름·설정·로그 형식
 - [docs/CONVENTIONS.md](docs/CONVENTIONS.md) — 브랜치, 커밋, PR, 리뷰 규칙
 - [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) — 환경변수와 비밀값을 두는 위치
+- [docs/decisions/](docs/decisions/README.md) — 팀 의사결정 기록(ADR). 종목 범위, 지표 ID, 저장소 같은 합의된 결정. 코드가 결정과 다르면 결정을 먼저 확인합니다.
 
 ## 반드시 지킬 것
 

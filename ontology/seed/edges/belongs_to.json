@@ -1,0 +1,702 @@
+[
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "000250",
+    "from_type": "COMPANY",
+    "to_node": "SEC_HEALTH",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "028300",
+    "from_type": "COMPANY",
+    "to_node": "SEC_HEALTH",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "036930",
+    "from_type": "COMPANY",
+    "to_node": "SEC_IT",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "039030",
+    "from_type": "COMPANY",
+    "to_node": "SEC_IT",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "058470",
+    "from_type": "COMPANY",
+    "to_node": "SEC_IT",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "086520",
+    "from_type": "COMPANY",
+    "to_node": "SEC_MATERIAL",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "196170",
+    "from_type": "COMPANY",
+    "to_node": "SEC_HEALTH",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "240810",
+    "from_type": "COMPANY",
+    "to_node": "SEC_IT",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "247540",
+    "from_type": "COMPANY",
+    "to_node": "SEC_IT",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "277810",
+    "from_type": "COMPANY",
+    "to_node": "SEC_INDUS",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "000100",
+    "from_type": "COMPANY",
+    "to_node": "SEC_HEALTH",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "000150",
+    "from_type": "COMPANY",
+    "to_node": "SEC_INDUS",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "000270",
+    "from_type": "COMPANY",
+    "to_node": "SEC_CONS_DISC",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "000500",
+    "from_type": "COMPANY",
+    "to_node": "SEC_INDUS",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "000660",
+    "from_type": "COMPANY",
+    "to_node": "SEC_IT",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "000720",
+    "from_type": "COMPANY",
+    "to_node": "SEC_INDUS",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "000810",
+    "from_type": "COMPANY",
+    "to_node": "SEC_FIN",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "000880",
+    "from_type": "COMPANY",
+    "to_node": "SEC_INDUS",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "003230",
+    "from_type": "COMPANY",
+    "to_node": "SEC_CONS_STAP",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "003490",
+    "from_type": "COMPANY",
+    "to_node": "SEC_INDUS",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "003550",
+    "from_type": "COMPANY",
+    "to_node": "SEC_INDUS",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "003670",
+    "from_type": "COMPANY",
+    "to_node": "SEC_MATERIAL",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "005380",
+    "from_type": "COMPANY",
+    "to_node": "SEC_CONS_DISC",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "005490",
+    "from_type": "COMPANY",
+    "to_node": "SEC_MATERIAL",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "005830",
+    "from_type": "COMPANY",
+    "to_node": "SEC_FIN",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "005930",
+    "from_type": "COMPANY",
+    "to_node": "SEC_IT",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "005940",
+    "from_type": "COMPANY",
+    "to_node": "SEC_FIN",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "006260",
+    "from_type": "COMPANY",
+    "to_node": "SEC_INDUS",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "006400",
+    "from_type": "COMPANY",
+    "to_node": "SEC_IT",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "006800",
+    "from_type": "COMPANY",
+    "to_node": "SEC_FIN",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "007660",
+    "from_type": "COMPANY",
+    "to_node": "SEC_IT",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "009150",
+    "from_type": "COMPANY",
+    "to_node": "SEC_IT",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "009540",
+    "from_type": "COMPANY",
+    "to_node": "SEC_INDUS",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "009830",
+    "from_type": "COMPANY",
+    "to_node": "SEC_ENERGY",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "010120",
+    "from_type": "COMPANY",
+    "to_node": "SEC_INDUS",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "010130",
+    "from_type": "COMPANY",
+    "to_node": "SEC_MATERIAL",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "010140",
+    "from_type": "COMPANY",
+    "to_node": "SEC_INDUS",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "010950",
+    "from_type": "COMPANY",
+    "to_node": "SEC_ENERGY",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "011070",
+    "from_type": "COMPANY",
+    "to_node": "SEC_IT",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "011200",
+    "from_type": "COMPANY",
+    "to_node": "SEC_INDUS",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "012330",
+    "from_type": "COMPANY",
+    "to_node": "SEC_CONS_DISC",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "012450",
+    "from_type": "COMPANY",
+    "to_node": "SEC_INDUS",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "0126Z0",
+    "from_type": "COMPANY",
+    "to_node": "SEC_HEALTH",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "015760",
+    "from_type": "COMPANY",
+    "to_node": "SEC_UTIL",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "016360",
+    "from_type": "COMPANY",
+    "to_node": "SEC_FIN",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "017670",
+    "from_type": "COMPANY",
+    "to_node": "SEC_COMM",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "018260",
+    "from_type": "COMPANY",
+    "to_node": "SEC_IT",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "021240",
+    "from_type": "COMPANY",
+    "to_node": "SEC_CONS_DISC",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "024110",
+    "from_type": "COMPANY",
+    "to_node": "SEC_FIN",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "028050",
+    "from_type": "COMPANY",
+    "to_node": "SEC_INDUS",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "028260",
+    "from_type": "COMPANY",
+    "to_node": "SEC_INDUS",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "030200",
+    "from_type": "COMPANY",
+    "to_node": "SEC_COMM",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "032640",
+    "from_type": "COMPANY",
+    "to_node": "SEC_COMM",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "032830",
+    "from_type": "COMPANY",
+    "to_node": "SEC_FIN",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "033780",
+    "from_type": "COMPANY",
+    "to_node": "SEC_CONS_STAP",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "034020",
+    "from_type": "COMPANY",
+    "to_node": "SEC_INDUS",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "034730",
+    "from_type": "COMPANY",
+    "to_node": "SEC_ENERGY",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "035420",
+    "from_type": "COMPANY",
+    "to_node": "SEC_COMM",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "035720",
+    "from_type": "COMPANY",
+    "to_node": "SEC_COMM",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "039490",
+    "from_type": "COMPANY",
+    "to_node": "SEC_FIN",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "042660",
+    "from_type": "COMPANY",
+    "to_node": "SEC_INDUS",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "042700",
+    "from_type": "COMPANY",
+    "to_node": "SEC_IT",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "047040",
+    "from_type": "COMPANY",
+    "to_node": "SEC_INDUS",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "047050",
+    "from_type": "COMPANY",
+    "to_node": "SEC_INDUS",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "047810",
+    "from_type": "COMPANY",
+    "to_node": "SEC_INDUS",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "051910",
+    "from_type": "COMPANY",
+    "to_node": "SEC_MATERIAL",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "055550",
+    "from_type": "COMPANY",
+    "to_node": "SEC_FIN",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "062040",
+    "from_type": "COMPANY",
+    "to_node": "SEC_INDUS",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "064350",
+    "from_type": "COMPANY",
+    "to_node": "SEC_INDUS",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "064400",
+    "from_type": "COMPANY",
+    "to_node": "SEC_IT",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "066570",
+    "from_type": "COMPANY",
+    "to_node": "SEC_IT",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "068270",
+    "from_type": "COMPANY",
+    "to_node": "SEC_HEALTH",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "071050",
+    "from_type": "COMPANY",
+    "to_node": "SEC_FIN",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "078930",
+    "from_type": "COMPANY",
+    "to_node": "SEC_ENERGY",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "079550",
+    "from_type": "COMPANY",
+    "to_node": "SEC_INDUS",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "086280",
+    "from_type": "COMPANY",
+    "to_node": "SEC_INDUS",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "086790",
+    "from_type": "COMPANY",
+    "to_node": "SEC_FIN",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "090430",
+    "from_type": "COMPANY",
+    "to_node": "SEC_CONS_DISC",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "096770",
+    "from_type": "COMPANY",
+    "to_node": "SEC_ENERGY",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "105560",
+    "from_type": "COMPANY",
+    "to_node": "SEC_FIN",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "138040",
+    "from_type": "COMPANY",
+    "to_node": "SEC_FIN",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "161390",
+    "from_type": "COMPANY",
+    "to_node": "SEC_CONS_DISC",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "180640",
+    "from_type": "COMPANY",
+    "to_node": "SEC_INDUS",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "207940",
+    "from_type": "COMPANY",
+    "to_node": "SEC_HEALTH",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "259960",
+    "from_type": "COMPANY",
+    "to_node": "SEC_COMM",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "267250",
+    "from_type": "COMPANY",
+    "to_node": "SEC_INDUS",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "267260",
+    "from_type": "COMPANY",
+    "to_node": "SEC_INDUS",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "272210",
+    "from_type": "COMPANY",
+    "to_node": "SEC_INDUS",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "278470",
+    "from_type": "COMPANY",
+    "to_node": "SEC_CONS_DISC",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "298040",
+    "from_type": "COMPANY",
+    "to_node": "SEC_INDUS",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "307950",
+    "from_type": "COMPANY",
+    "to_node": "SEC_IT",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "316140",
+    "from_type": "COMPANY",
+    "to_node": "SEC_FIN",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "323410",
+    "from_type": "COMPANY",
+    "to_node": "SEC_FIN",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "326030",
+    "from_type": "COMPANY",
+    "to_node": "SEC_HEALTH",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "329180",
+    "from_type": "COMPANY",
+    "to_node": "SEC_INDUS",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "352820",
+    "from_type": "COMPANY",
+    "to_node": "SEC_COMM",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "353200",
+    "from_type": "COMPANY",
+    "to_node": "SEC_IT",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "373220",
+    "from_type": "COMPANY",
+    "to_node": "SEC_IT",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "402340",
+    "from_type": "COMPANY",
+    "to_node": "SEC_IT",
+    "to_type": "SECTOR"
+  },
+  {
+    "edge_type": "BELONGS_TO",
+    "from_node": "443060",
+    "from_type": "COMPANY",
+    "to_node": "SEC_INDUS",
+    "to_type": "SECTOR"
+  }
+]

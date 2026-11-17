@@ -1,0 +1,463 @@
+[
+  {
+    "issue_id": "ISS_AI_MEMORY_DEMAND",
+    "name": "AI 서버용 HBM·고용량 메모리 수요 확대",
+    "type": "industry",
+    "polarity": "positive",
+    "duration": "persistent",
+    "agenda_ids": [
+      "growth",
+      "valuation"
+    ],
+    "notes": "AI 가속기 탑재 HBM 수요. 공급사 점유율 경쟁이 핵심 변수.",
+    "evidence_chunk_ids": [],
+    "valid_from": null,
+    "valid_until": null,
+    "review_cycle_days": 180,
+    "status": "draft",
+    "labeled_by": "claude_draft"
+  },
+  {
+    "issue_id": "ISS_MEMORY_PRICE_CYCLE",
+    "name": "메모리 가격 상승 사이클",
+    "type": "industry",
+    "polarity": "positive",
+    "duration": "cyclical",
+    "agenda_ids": [
+      "valuation",
+      "growth"
+    ],
+    "notes": "DRAM·NAND 가격 반등 국면. 사이클 피크 논쟁이 Bear 논거.",
+    "evidence_chunk_ids": [],
+    "valid_from": null,
+    "valid_until": null,
+    "review_cycle_days": 90,
+    "status": "draft",
+    "labeled_by": "claude_draft"
+  },
+  {
+    "issue_id": "ISS_SEMI_EXPORT_CONTROL",
+    "name": "미국 대중 반도체 수출 통제",
+    "type": "policy",
+    "polarity": "negative",
+    "duration": "persistent",
+    "agenda_ids": [
+      "risk",
+      "macro"
+    ],
+    "notes": "중국 공장 장비 반입·고성능 칩 판매 제한.",
+    "evidence_chunk_ids": [],
+    "valid_from": null,
+    "valid_until": null,
+    "review_cycle_days": 180,
+    "status": "draft",
+    "labeled_by": "claude_draft"
+  },
+  {
+    "issue_id": "ISS_FOUNDRY_COMPETITION",
+    "name": "파운드리 선단공정 경쟁 열위",
+    "type": "company",
+    "polarity": "negative",
+    "duration": "persistent",
+    "agenda_ids": [
+      "risk",
+      "growth"
+    ],
+    "notes": "선단공정 수율·고객 확보에서 경쟁사 대비 열위.",
+    "evidence_chunk_ids": [],
+    "valid_from": null,
+    "valid_until": null,
+    "review_cycle_days": 180,
+    "status": "draft",
+    "labeled_by": "claude_draft"
+  },
+  {
+    "issue_id": "ISS_AI_POWER_INFRA",
+    "name": "AI 데이터센터·전력망 투자 확대",
+    "type": "industry",
+    "polarity": "positive",
+    "duration": "persistent",
+    "agenda_ids": [
+      "growth",
+      "valuation"
+    ],
+    "notes": "변압기·전선·발전설비 수요. 수주잔고가 실적 가시성 근거.",
+    "evidence_chunk_ids": [],
+    "valid_from": null,
+    "valid_until": null,
+    "review_cycle_days": 180,
+    "status": "draft",
+    "labeled_by": "claude_draft"
+  },
+  {
+    "issue_id": "ISS_AI_PCB_DEMAND",
+    "name": "AI 서버용 고다층 기판·부품 수요",
+    "type": "industry",
+    "polarity": "positive",
+    "duration": "persistent",
+    "agenda_ids": [
+      "growth"
+    ],
+    "notes": "AI 가속기·네트워크 장비용 MLB·기판.",
+    "evidence_chunk_ids": [],
+    "valid_from": null,
+    "valid_until": null,
+    "review_cycle_days": 180,
+    "status": "draft",
+    "labeled_by": "claude_draft"
+  },
+  {
+    "issue_id": "ISS_AUTO_US_TARIFF",
+    "name": "미국 수입차 관세",
+    "type": "policy",
+    "polarity": "negative",
+    "duration": "persistent",
+    "agenda_ids": [
+      "risk",
+      "macro"
+    ],
+    "notes": "대미 수출 완성차·부품 마진 압박. 현지 생산 확대로 대응.",
+    "evidence_chunk_ids": [],
+    "valid_from": null,
+    "valid_until": null,
+    "review_cycle_days": 180,
+    "status": "draft",
+    "labeled_by": "claude_draft"
+  },
+  {
+    "issue_id": "ISS_EV_DEMAND_SLOWDOWN",
+    "name": "전기차 수요 둔화(캐즘)",
+    "type": "industry",
+    "polarity": "negative",
+    "duration": "cyclical",
+    "agenda_ids": [
+      "risk",
+      "growth"
+    ],
+    "notes": "보조금 축소·가격 부담으로 EV 판매 성장 둔화.",
+    "evidence_chunk_ids": [],
+    "valid_from": null,
+    "valid_until": null,
+    "review_cycle_days": 90,
+    "status": "draft",
+    "labeled_by": "claude_draft"
+  },
+  {
+    "issue_id": "ISS_BATTERY_CHINA_COMPETITION",
+    "name": "중국 배터리 저가 경쟁",
+    "type": "industry",
+    "polarity": "negative",
+    "duration": "persistent",
+    "agenda_ids": [
+      "risk",
+      "valuation"
+    ],
+    "notes": "LFP 중심 중국 업체의 가격 경쟁.",
+    "evidence_chunk_ids": [],
+    "valid_from": null,
+    "valid_until": null,
+    "review_cycle_days": 180,
+    "status": "draft",
+    "labeled_by": "claude_draft"
+  },
+  {
+    "issue_id": "ISS_ESS_DEMAND",
+    "name": "ESS(에너지저장장치) 수요 확대",
+    "type": "industry",
+    "polarity": "positive",
+    "duration": "persistent",
+    "agenda_ids": [
+      "growth"
+    ],
+    "notes": "데이터센터·재생에너지 연계 ESS. EV 둔화 상쇄 논거.",
+    "evidence_chunk_ids": [],
+    "valid_from": null,
+    "valid_until": null,
+    "review_cycle_days": 180,
+    "status": "draft",
+    "labeled_by": "claude_draft"
+  },
+  {
+    "issue_id": "ISS_SHIPBUILDING_UPCYCLE",
+    "name": "조선 수주 업사이클",
+    "type": "industry",
+    "polarity": "positive",
+    "duration": "cyclical",
+    "agenda_ids": [
+      "growth",
+      "valuation"
+    ],
+    "notes": "선가 상승·수주잔고 확대. 인도 시점부터 이익 반영.",
+    "evidence_chunk_ids": [],
+    "valid_from": null,
+    "valid_until": null,
+    "review_cycle_days": 90,
+    "status": "draft",
+    "labeled_by": "claude_draft"
+  },
+  {
+    "issue_id": "ISS_US_SHIPBUILDING_COOP",
+    "name": "한미 조선 협력(MRO·현지 투자)",
+    "type": "policy",
+    "polarity": "positive",
+    "duration": "persistent",
+    "agenda_ids": [
+      "growth",
+      "macro"
+    ],
+    "notes": "미 해군 MRO·현지 조선소 투자 협력.",
+    "evidence_chunk_ids": [],
+    "valid_from": null,
+    "valid_until": null,
+    "review_cycle_days": 180,
+    "status": "draft",
+    "labeled_by": "claude_draft"
+  },
+  {
+    "issue_id": "ISS_DEFENSE_EXPORT",
+    "name": "K-방산 수출 확대",
+    "type": "industry",
+    "polarity": "positive",
+    "duration": "persistent",
+    "agenda_ids": [
+      "growth",
+      "valuation"
+    ],
+    "notes": "지상무기·항공·유도무기 수출 계약.",
+    "evidence_chunk_ids": [],
+    "valid_from": null,
+    "valid_until": null,
+    "review_cycle_days": 180,
+    "status": "draft",
+    "labeled_by": "claude_draft"
+  },
+  {
+    "issue_id": "ISS_NUCLEAR_EXPORT",
+    "name": "원전 수주·수출",
+    "type": "industry",
+    "polarity": "positive",
+    "duration": "persistent",
+    "agenda_ids": [
+      "growth"
+    ],
+    "notes": "해외 원전·SMR 프로젝트.",
+    "evidence_chunk_ids": [],
+    "valid_from": null,
+    "valid_until": null,
+    "review_cycle_days": 180,
+    "status": "draft",
+    "labeled_by": "claude_draft"
+  },
+  {
+    "issue_id": "ISS_RATE_CUT_NIM",
+    "name": "금리 인하에 따른 은행 NIM 축소",
+    "type": "macro",
+    "polarity": "negative",
+    "duration": "cyclical",
+    "agenda_ids": [
+      "valuation",
+      "macro"
+    ],
+    "notes": "예대마진 축소. 비이자이익·주주환원이 방어 논거.",
+    "evidence_chunk_ids": [],
+    "valid_from": null,
+    "valid_until": null,
+    "review_cycle_days": 90,
+    "status": "draft",
+    "labeled_by": "claude_draft"
+  },
+  {
+    "issue_id": "ISS_PF_CREDIT_RISK",
+    "name": "부동산 PF 부실·건전성 리스크",
+    "type": "macro",
+    "polarity": "negative",
+    "duration": "cyclical",
+    "agenda_ids": [
+      "risk"
+    ],
+    "notes": "PF 연체·충당금 부담.",
+    "evidence_chunk_ids": [],
+    "valid_from": null,
+    "valid_until": null,
+    "review_cycle_days": 90,
+    "status": "draft",
+    "labeled_by": "claude_draft"
+  },
+  {
+    "issue_id": "ISS_TRADING_VOLUME_BOOM",
+    "name": "증시 거래대금 증가",
+    "type": "market",
+    "polarity": "positive",
+    "duration": "cyclical",
+    "agenda_ids": [
+      "growth",
+      "valuation"
+    ],
+    "notes": "브로커리지 수수료·IB 실적 개선.",
+    "evidence_chunk_ids": [],
+    "valid_from": null,
+    "valid_until": null,
+    "review_cycle_days": 90,
+    "status": "draft",
+    "labeled_by": "claude_draft"
+  },
+  {
+    "issue_id": "ISS_VALUEUP_POLICY",
+    "name": "밸류업·주주환원 정책",
+    "type": "policy",
+    "polarity": "positive",
+    "duration": "persistent",
+    "agenda_ids": [
+      "shareholder_return",
+      "valuation"
+    ],
+    "notes": "자사주 소각·배당 확대 압력. 저PBR 업종 재평가.",
+    "evidence_chunk_ids": [],
+    "valid_from": null,
+    "valid_until": null,
+    "review_cycle_days": 180,
+    "status": "draft",
+    "labeled_by": "claude_draft"
+  },
+  {
+    "issue_id": "ISS_GOVERNANCE_REFORM",
+    "name": "상법 개정·지배구조 개선",
+    "type": "policy",
+    "polarity": "positive",
+    "duration": "persistent",
+    "agenda_ids": [
+      "shareholder_return",
+      "valuation"
+    ],
+    "notes": "이사 충실의무 확대 등. 지주사 할인 축소 논거.",
+    "evidence_chunk_ids": [],
+    "valid_from": null,
+    "valid_until": null,
+    "review_cycle_days": 180,
+    "status": "draft",
+    "labeled_by": "claude_draft"
+  },
+  {
+    "issue_id": "ISS_CHINA_CHEM_OVERCAPACITY",
+    "name": "중국 석유화학 공급 과잉",
+    "type": "industry",
+    "polarity": "negative",
+    "duration": "persistent",
+    "agenda_ids": [
+      "risk",
+      "valuation"
+    ],
+    "notes": "범용 석화 스프레드 약세. 구조조정 여부가 변수.",
+    "evidence_chunk_ids": [],
+    "valid_from": null,
+    "valid_until": null,
+    "review_cycle_days": 180,
+    "status": "draft",
+    "labeled_by": "claude_draft"
+  },
+  {
+    "issue_id": "ISS_PLATFORM_REGULATION",
+    "name": "플랫폼 규제",
+    "type": "policy",
+    "polarity": "negative",
+    "duration": "persistent",
+    "agenda_ids": [
+      "risk"
+    ],
+    "notes": "수수료·광고·결제 규제.",
+    "evidence_chunk_ids": [],
+    "valid_from": null,
+    "valid_until": null,
+    "review_cycle_days": 180,
+    "status": "draft",
+    "labeled_by": "claude_draft"
+  },
+  {
+    "issue_id": "ISS_KBEAUTY_EXPORT",
+    "name": "K-뷰티 수출 확대",
+    "type": "industry",
+    "polarity": "positive",
+    "duration": "persistent",
+    "agenda_ids": [
+      "growth"
+    ],
+    "notes": "미국·일본 등 채널 다변화.",
+    "evidence_chunk_ids": [],
+    "valid_from": null,
+    "valid_until": null,
+    "review_cycle_days": 180,
+    "status": "draft",
+    "labeled_by": "claude_draft"
+  },
+  {
+    "issue_id": "ISS_KFOOD_EXPORT",
+    "name": "K-푸드 수출 확대",
+    "type": "industry",
+    "polarity": "positive",
+    "duration": "persistent",
+    "agenda_ids": [
+      "growth"
+    ],
+    "notes": "라면·스낵 해외 매출 비중 확대.",
+    "evidence_chunk_ids": [],
+    "valid_from": null,
+    "valid_until": null,
+    "review_cycle_days": 180,
+    "status": "draft",
+    "labeled_by": "claude_draft"
+  },
+  {
+    "issue_id": "ISS_BIO_CDMO_DEMAND",
+    "name": "바이오시밀러·CDMO 수요 확대",
+    "type": "industry",
+    "polarity": "positive",
+    "duration": "persistent",
+    "agenda_ids": [
+      "growth",
+      "valuation"
+    ],
+    "notes": "특허 만료 사이클·위탁생산 수요.",
+    "evidence_chunk_ids": [],
+    "valid_from": null,
+    "valid_until": null,
+    "review_cycle_days": 180,
+    "status": "draft",
+    "labeled_by": "claude_draft"
+  },
+  {
+    "issue_id": "ISS_PHARMA_US_TARIFF",
+    "name": "미국 의약품 관세",
+    "type": "policy",
+    "polarity": "negative",
+    "duration": "event_driven",
+    "agenda_ids": [
+      "risk",
+      "macro"
+    ],
+    "notes": "현지 생산 여부가 노출도 결정.",
+    "evidence_chunk_ids": [],
+    "valid_from": null,
+    "valid_until": null,
+    "review_cycle_days": 30,
+    "status": "draft",
+    "labeled_by": "claude_draft"
+  },
+  {
+    "issue_id": "ISS_FREIGHT_NORMALIZATION",
+    "name": "컨테이너 운임 하락",
+    "type": "industry",
+    "polarity": "negative",
+    "duration": "cyclical",
+    "agenda_ids": [
+      "risk",
+      "valuation"
+    ],
+    "notes": "선복 공급 증가로 운임 정상화.",
+    "evidence_chunk_ids": [],
+    "valid_from": null,
+    "valid_until": null,
+    "review_cycle_days": 90,
+    "status": "draft",
+    "labeled_by": "claude_draft"
+  }
+]

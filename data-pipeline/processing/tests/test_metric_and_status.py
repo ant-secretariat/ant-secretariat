@@ -83,7 +83,7 @@ def test_roe_basis_explains_ttm(monkeypatch):
 
 
 def test_flow_metric_sums_recent_trading_days(monkeypatch):
-    connection = _use(monkeypatch, FakeConnection((-1500000000000, date(2026, 11, 6), 20)))
+    connection = _use(monkeypatch, FakeConnection((-1500000000000, date(2026, 11, 6), 20, 20)))
 
     result = get_metric("005930", "foreign_net_buy_20d", "2026-11-08")
 
@@ -91,20 +91,39 @@ def test_flow_metric_sums_recent_trading_days(monkeypatch):
     assert result["basis"] == "최근 20거래일 합계"
     assert result["as_of"] == "2026-11-06"
     assert result["source"] == ["investor_flow_daily"]
-    assert connection.queries[0][1] == ("005930", "2026-11-08", 20)
+    assert connection.queries[0][1] == ("005930", "2026-11-08", "1001", 20, "005930")
 
 
-def test_flow_metric_notes_short_history(monkeypatch):
-    _use(monkeypatch, FakeConnection((2.123456, date(2026, 11, 6), 5)))
+def test_flow_metric_averages_full_window(monkeypatch):
+    _use(monkeypatch, FakeConnection((2.123456, date(2026, 11, 6), 20, 20)))
 
     result = get_metric("005930", "short_volume_ratio_20d", "2026-11-08")
 
     assert result["value"] == 2.1235
-    assert result["basis"] == "최근 20거래일 평균 (값이 있는 날 5일)"
+    assert result["basis"] == "최근 20거래일 평균"
+
+
+def test_flow_metric_with_missing_days_is_partial_window(monkeypatch):
+    # 20거래일 중 값이 있는 날이 15일뿐이면 15일 합계를 20일 합계로 내보내지 않는다
+    _use(monkeypatch, FakeConnection((-900, date(2026, 11, 6), 15, 20)))
+
+    result = get_metric("005930", "foreign_net_buy_20d", "2026-11-08")
+
+    assert result["value"] is None
+    assert result["reason"] == "partial_window"
+    assert "15일" in result["basis"]
+    assert result["as_of"] == "2026-11-06"
+
+
+def test_flow_metric_with_short_calendar_is_partial_window(monkeypatch):
+    # 상장 5일차처럼 거래일 자체가 20일이 안 되는 경우
+    _use(monkeypatch, FakeConnection((300, date(2026, 11, 6), 5, 5)))
+
+    assert get_metric("005930", "inst_net_buy_20d", "2026-11-08")["reason"] == "partial_window"
 
 
 def test_flow_metric_without_rows_is_no_data(monkeypatch):
-    _use(monkeypatch, FakeConnection((None, None, 0)))
+    _use(monkeypatch, FakeConnection((None, None, 0, 0)))
 
     assert get_metric("999999", "inst_net_buy_20d", "2026-11-08")["reason"] == "no_data"
 

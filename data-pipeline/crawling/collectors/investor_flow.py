@@ -38,11 +38,20 @@ SHORT_FETCHERS = {
 
 
 def fetch_investor_flow(ticker: str, start: date, end: date) -> list[dict]:
-    """한 종목의 start~end 일별 순매수·공매도 행."""
+    """한 종목의 start~end 일별 순매수·공매도 행.
+
+    pykrx는 KRX 응답 오류(KeyError·ValueError·JSON 오류 등)를 예외 대신 빈 DataFrame으로 돌려준다
+    (pykrx dataframe_empty_handler). 그래서 투자자별 거래 응답이 비면 실패로 올린다.
+    공매도 응답은 상장 전 구간이나 공개 지연(잔고 약 2거래일)으로 정상적으로 빌 수 있어 실패로 보지 않고,
+    적재기가 빈 값으로 기존 값을 덮어쓰지 않게 저장한다(keep_existing_on_null).
+    """
     frames = {
         "value": stock.get_market_trading_value_by_date(_krx(start), _krx(end), ticker),
         "volume": stock.get_market_trading_volume_by_date(_krx(start), _krx(end), ticker),
     }
+    for kind in ("value", "volume"):
+        if frames[kind] is None or frames[kind].empty:
+            raise RuntimeError(f"{ticker} 투자자별 거래{'대금' if kind == 'value' else '량'} 응답이 비었습니다 ({start}~{end})")
     for kind, fetcher in SHORT_FETCHERS.items():
         frames[kind] = _fetch_in_windows(fetcher, ticker, start, end)
     return flow_rows(ticker, frames)
@@ -56,7 +65,8 @@ def _fetch_in_windows(fetcher, ticker: str, start: date, end: date) -> pd.DataFr
         try:
             frame = fetcher(_krx(cursor), _krx(window_end), ticker)
         except Exception as exc:
-            # 상장 전 기간처럼 KRX가 빈 응답을 주면 pykrx가 예외를 낸다. 그 구간만 비워 둔다
+            # pykrx는 대부분의 응답 오류를 빈 DataFrame으로 돌려주고, 네트워크 오류 등만 예외로 올린다.
+            # 어느 쪽이든 그 구간만 비워 두고, 저장할 때 빈 값이 기존 값을 지우지 않게 한다
             logger.warning("%s 공매도 %s ~ %s 조회 실패: %s", ticker, cursor, window_end, type(exc).__name__)
             frame = None
         if frame is not None and not frame.empty:

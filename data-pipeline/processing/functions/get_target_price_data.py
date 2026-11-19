@@ -102,19 +102,22 @@ def _build_result(ticker: str, rows: list[tuple]) -> dict:
             "pdf_url": "",
         })
 
-    prices = [r["target_price"] for r in target_prices if r["target_price"] is not None]
+    consensus = _consensus(records)
+    # 트렌드 리포트 카드가 쓰는 이전 형식. 기간 안 모든 의견의 평균은 같은 증권사가 의견을 여러 번 낼수록
+    # 오래된 목표가에 가중치가 실려 컨센서스와 크게 달라지므로(운영 DB 최대 38%), avg/min/max는 consensus와 같게 둔다.
+    # count는 이전처럼 기간 안 의견 수다
     summary = {
         "count":            len(target_prices),
-        "avg_target_price": round(sum(prices) / len(prices), 0) if prices else None,
-        "min_target_price": min(prices) if prices else None,
-        "max_target_price": max(prices) if prices else None,
+        "avg_target_price": consensus["avg_target_price"],
+        "min_target_price": consensus["min_target_price"],
+        "max_target_price": consensus["max_target_price"],
     }
 
     return {
         "ticker":        ticker,
         "company":       target_prices[0]["company"] if target_prices else "",
         "records":       records,
-        "consensus":     _consensus(records),
+        "consensus":     consensus,
         "target_prices": target_prices,
         "summary":       summary,
     }

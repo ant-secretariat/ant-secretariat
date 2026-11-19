@@ -152,10 +152,11 @@ def test_get_target_price_data_keeps_previous_shape_during_migration(monkeypatch
     assert first["investment_opinion"] == "매수"
     assert first["opinion_raw"] == "Strong BUY"
     assert (first["report_id"], first["title"], first["original_url"], first["pdf_url"]) == ("", "", "", "")
+    # avg/min/max는 기간 안 모든 의견 평균이 아니라 consensus(증권사별 최신 1건)와 같다. 대체된 5/1 의견(8만)은 빠진다
     assert result["summary"] == {
         "count": 5,
-        "avg_target_price": 90000,
-        "min_target_price": 80000,
+        "avg_target_price": 95000,
+        "min_target_price": 90000,
         "max_target_price": 100000,
     }
 

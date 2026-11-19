@@ -153,7 +153,9 @@ class NaverNewsProvider:
 
 
 # 종목명 바로 뒤에 붙어도 같은 회사로 보는 조사·기호 ("카카오가", "LG는"). 그 밖의 글자가 붙으면 다른 회사 ("LG전자", "카카오뱅크")
-_PARTICLES = ("은", "는", "이", "가", "을", "를", "의", "에", "와", "과", "도", "로", "으로", "만", "측", "보다", "까지")
+# 조사 다음에 다시 글자가 이어지면("LG에너지솔루션", "SK이노베이션", "한화에어로스페이스") 조사가 아니라 다른 회사 이름이다
+_PARTICLES = ("은", "는", "이", "가", "을", "를", "의", "에", "와", "과", "도", "로", "으로", "만", "측", "보다", "까지",
+              "에서", "에게", "에도", "에는", "와의", "과의", "으로는", "로는", "부터", "처럼", "이나", "나", "마저", "조차")
 
 
 def mentions_company(text: str, names: list[str]) -> bool:
@@ -166,9 +168,17 @@ def mentions_company(text: str, names: list[str]) -> bool:
         for match in re.finditer(r"\s*".join(map(re.escape, chars)), lowered):
             before = lowered[match.start() - 1] if match.start() else ""
             after = lowered[match.end():]
-            if not _is_word_char(before) and (not after or not _is_word_char(after[0]) or after.startswith(_PARTICLES)):
+            if not _is_word_char(before) and (not after or not _is_word_char(after[0]) or _particle_then_boundary(after)):
                 return True
     return False
+
+
+def _particle_then_boundary(after: str) -> bool:
+    """이름 뒤가 조사이고, 조사 다음이 문장 끝이거나 글자가 아닌지."""
+    return any(
+        after.startswith(particle) and not _is_word_char(after[len(particle):len(particle) + 1])
+        for particle in _PARTICLES
+    )
 
 
 def _is_word_char(char: str) -> bool:

@@ -97,6 +97,8 @@ def financial_rows(raw_rows: list[dict], tickers: set[str]) -> list[dict]:
 
     rows: list[dict] = []
     for (ticker, year, quarter, fs_div, account), raw in picked.items():
+        # 분기·반기 보고서의 thstrm_amount는 그 분기 3개월 값이다(누적은 thstrm_add_amount).
+        # 확인: 삼성전자 2025년 반기보고서 2분기 연결 매출 74.6조 원 = 실제 2분기 매출(상반기 누적이면 약 153.7조 원)
         amount = _amount(raw.get("thstrm_amount"))
         is_income = raw.get("sj_div") != "BS"
         amount_ytd = None

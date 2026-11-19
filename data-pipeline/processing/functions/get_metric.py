@@ -27,6 +27,8 @@ FINANCIAL_METRICS = {
 }
 # 수급: 그날까지 최근 20거래일 합계(순매수) 또는 평균(공매도 비중)
 FLOW_WINDOW = 20
+# 거래일 달력으로 쓰는 지수(KOSPI). 매일 적재되고 휴장일이 없다
+CALENDAR_INDEX = "1001"
 FLOW_METRICS = {
     "foreign_net_buy_20d": ("원", "foreign_net_value", "sum"),
     "inst_net_buy_20d": ("원", "inst_net_value", "sum"),
@@ -153,6 +155,7 @@ REASONS = {
     "metric_unavailable": "DB 조회 실패(일시적)",
     "no_data": "그날까지 이 종목의 데이터가 없음(적재 범위 밖 포함)",
     "no_value": "데이터 행은 있지만 이 지표 값이 비어 있음(예: 적자라 PER 없음)",
+    "partial_window": "계산 창(예: 최근 20거래일) 중 값이 빈 날이 있어 일부 날짜만으로는 계산하지 않음",
     "not_applicable_financials": "금융업이라 의미 없는 지표(부채비율)",
 }
 # 주당 값·가격은 그대로(1,176,000원), 합계 금액은 조·억 단위로(−1.17조 원)
@@ -222,21 +225,28 @@ def _flow_metric(connection, ticker: str, metric_id: str, as_of: str) -> dict:
 
     unit, column, aggregate = FLOW_METRICS[metric_id]
     source = ["investor_flow_daily"]
+    # 창은 행 20개가 아니라 거래일 달력(KOSPI 지수 거래일) 20일이다. 그 종목 수급이 있는 마지막 거래일부터 센다.
+    # 하루라도 비면(적재 공백·거래정지 등) 일부 날짜만으로 계산하지 않고 null로 둔다
     row = connection.execute(
         sql.SQL(
-            "with recent as ("
-            " select {column}, trade_date from investor_flow_daily"
-            " where ticker = %s and trade_date <= %s::date"
-            " order by trade_date desc limit %s"
-            ") select {aggregate}({column}), max(trade_date), count({column}) from recent"
+            "with last as ("
+            " select max(trade_date) as day from investor_flow_daily where ticker = %s and trade_date <= %s::date"
+            "), calendar as ("
+            " select i.trade_date from index_daily i, last"
+            " where i.index_code = %s and i.trade_date <= last.day order by i.trade_date desc limit %s"
+            ") select {aggregate}(f.{column}), (select day from last), count(f.{column}), count(*)"
+            " from calendar c left join investor_flow_daily f on f.ticker = %s and f.trade_date = c.trade_date"
         ).format(column=sql.Identifier(column), aggregate=sql.SQL(aggregate)),
-        (ticker, as_of, FLOW_WINDOW),
+        (ticker, as_of, CALENDAR_INDEX, FLOW_WINDOW, ticker),
     ).fetchone()
-    value, last_date, days = row
+    value, last_date, days, calendar_days = row
     if last_date is None:
         return _result(ticker, metric_id, None, unit, "", as_of, source, "no_data")
     label = "합계" if aggregate == "sum" else "평균"
-    basis = f"최근 {FLOW_WINDOW}거래일 {label}" + (f" (값이 있는 날 {days}일)" if days < FLOW_WINDOW else "")
+    if days < FLOW_WINDOW or calendar_days < FLOW_WINDOW:
+        basis = f"최근 {FLOW_WINDOW}거래일 {label}: 값이 있는 날 {days}일뿐이라 계산하지 않음"
+        return _result(ticker, metric_id, None, unit, basis, last_date.isoformat(), source, "partial_window")
+    basis = f"최근 {FLOW_WINDOW}거래일 {label}"
     if aggregate == "avg" and value is not None:
         value = round(float(value), 4)
     return _result(

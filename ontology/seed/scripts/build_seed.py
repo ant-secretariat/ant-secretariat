@@ -1,8 +1,18 @@
-"""온톨로지 관계사전 시드 v0.3 생성 — 기획서 v1.2 엣지 7종 정의 기준
+"""온톨로지 관계사전 시드 v0.6 생성 — 기획서 v1.2 엣지 7종 정의 기준
 
 사용법: python build_seed.py <core_companies.csv> <출력 폴더>
   - core_companies.csv 는 수경 파이프라인 companies.is_core 내보내기 (extract_t1.py 로 형식 검증)
-  - 출력 폴더 아래 nodes/, edges/, ontology_seed_all.json, ontology_seed.py 를 덮어씀
+  - 출력 폴더의 ontology_seed.json 하나만 덮어쓴다 (원본은 이 파일 하나. 읽기는 ontology_seed.py 로더)
+
+v0.6 변경 (태은 PR #29 리뷰, ADR 0008 · 헌법 원칙 III·IV)
+  - 모든 노드·엣지에 status·reviewed. 노출 = status "active" 이고 reviewed True 인 것만 (로더 is_exposed)
+  - 엣지 공통 필드: relation·src·src_type·dst·dst_type·source·method·as_of·valid_from·valid_to·evidence_ids
+    (계약 draft.5 Relation 이름. IMPACTS 의 방향 값은 relation → direction 으로 옮김)
+  - Claude 초안(ISSUE·BENEFITS/HURTS·EXPOSED_TO·IMPACTS)은 status "draft", reviewed False → 노출 안 됨
+  - SENSITIVE_TO 중 가설과 부호가 반대(mismatch)이거나 0 근처(near_zero)인 엣지 → status "needs_review"
+  - 노드의 Claude 초안 속성은 draft_fields 에 이름을 적고, 로더가 기본값에서 뺀다
+  - 섹터 name = WICS 대분류 명칭. ISSUE valid_until → valid_to. weight_low_n 은 True/False (weight 없으면 null)
+  - W_N(섹터 종목 수)을 core 소속 종목 수(상장 이력이 짧은 0126Z0 제외)와 대조
 
 v0.3 변경 (수경 파이프라인 실제 코드·답변 2026-11-10 대조, 근거는 SOURCES.md)
   - T1 = 파이프라인 core 100 (KOSPI 90 + KOSDAQ 10), 섹터 = companies.sector_l1(WICS)
@@ -28,12 +38,24 @@ RAW, OUT = sys.argv[1], sys.argv[2]
 CORE_EXPORT = "2026-11-09"      # core_companies.csv 내보낸 날 (수경)
 TIER_ASSIGNED = "2026-10-22"    # 파이프라인이 시총 순위로 T1을 지정한 날. 이후 고정
 SENS_AS_OF = "2026-11-06"       # sensitivities 최신 as_of (수경)
+GENERATED = "2026-11-22"        # 이 시드를 만든 날 (Claude 초안 엣지의 as_of)
 os.makedirs(OUT, exist_ok=True)
 
+
+def edge(relation, src, src_type, dst, dst_type, *, status, reviewed, source, method, as_of,
+         valid_from=None, valid_to=None, evidence_ids=None, **extra):
+    """엣지 공통 필드 (Design Doc 4.8 · 계약 draft.5 Relation). 노출 = status "active" and reviewed."""
+    return dict(relation=relation, src=src, src_type=src_type, dst=dst, dst_type=dst_type,
+                status=status, reviewed=reviewed, source=source, method=method, as_of=as_of,
+                valid_from=valid_from, valid_to=valid_to, evidence_ids=evidence_ids or [], **extra)
+
+
 # ───────────────────────── 1. SECTOR ─────────────────────────
+# 섹터 식별(id·WICS 명칭·코드)은 파이프라인 값이라 검수된 것으로 본다. 경기·금리·환율 성격은 Claude 초안.
 S = lambda i, n, en, g, cyc, rate, fx, note: dict(
     sector_id=i, name=n, name_en=en, gics_code=g, cycle_type=cyc,
-    rate_sensitivity=rate, fx_sensitivity=fx, notes=note, source="claude_draft")
+    rate_sensitivity=rate, fx_sensitivity=fx, notes=note, source="pipeline:companies.sector_l1(WICS)",
+    status="active", reviewed=True, draft_fields=["cycle_type", "rate_sensitivity", "fx_sensitivity", "notes"])
 SECTORS = [
     S("SEC_IT", "정보기술", "Information Technology", "45", "growth", "high", "positive", "반도체·전자부품·IT서비스. 수출 비중 최대."),
     S("SEC_COMM", "커뮤니케이션서비스", "Communication Services", "50", "growth", "medium", "neutral", "통신·인터넷 플랫폼·게임·엔터."),
@@ -54,6 +76,7 @@ _NAME_OF = {v: k for k, v in WICS_L1.items()}
 for _s in SECTORS:
     _s["wics_code"] = "G" + _s["gics_code"]
     _s["wics_name"] = _NAME_OF[_s["sector_id"]]
+    _s["name"] = _s["wics_name"]  # 파이프라인과 같은 이름을 쓴다 (헬스케어 → 건강관리 등)
 
 # ───────────────────────── 2. MACRO ─────────────────────────
 # in_pipeline: 수경 DB(1차 기준)에 이미 수집 중인 지표인지
@@ -95,6 +118,8 @@ for _m in MACROS:
     _m["pipeline_table"], _m["pipeline_key"], _m["pipeline_item_code"] = _p or (None, None, None)
     # v0.4: 수집 계획 없는 지표는 삭제하지 않고 비활성으로 보관 (데이터가 생기면 status만 active로 바꾼다)
     _m["status"] = "active" if _p else "inactive"
+    _m["reviewed"] = bool(_p)  # 수집 중인 지표는 수경이 ID·출처를 확인했다
+    _m["draft_fields"] = ["direction", "notes"]  # 방향 가설·메모는 Claude 초안
     _m["inactive_reason"] = None if _p else "no_data_source"
     if not _p:
         _m["notes"] += " 수집 계획 없음(수경 2026-11-10) — 필요하면 추가 요청."
@@ -118,27 +143,28 @@ with open(RAW, encoding="utf-8-sig") as f:
             ticker=code, name=row["name"], market=row["market"], sector_id=WICS_L1[row["sector_l1"]],
             sector_l1=row["sector_l1"], sector_l2=row["sector_l2"], sub_industry=SUB.get(code),
             is_holding=code in HOLDINGS, tier="T1", is_core=True, tier_assigned_on=TIER_ASSIGNED,
-            sector_source="pipeline:companies.sector_l1(WICS)", sub_industry_source="claude_draft"))
+            sector_source="pipeline:companies.sector_l1(WICS)", sub_industry_source="claude_draft",
+            status="active", reviewed=True, draft_fields=["sub_industry", "is_holding"]))
 TICKERS = {c["ticker"]: c["name"] for c in COMPANIES}
 assert len(COMPANIES) == 100 and len(TICKERS) == 100, "core는 100종목·중복 없음이어야 한다"
 assert HOLDINGS <= set(TICKERS) and set(SUB) <= set(TICKERS), "HOLDINGS/SUB에 core에 없는 종목이 있다"
 
 # ───────────────────────── 3. ISSUE + BENEFITS/HURTS ─────────────────────────
-# 필수 속성(v1.2): evidence_chunk_ids(근거 청크), valid_from/valid_until(유효기간)
+# 필수 속성(v1.2): evidence_chunk_ids(근거 청크), valid_from/valid_to(유효기간). 채워지고 검수되기 전에는 노출 안 됨
 REVIEW = {"persistent": 180, "cyclical": 90, "event_driven": 30}
 ISSUES, IMPACT_EDGES, DROPPED = [], [], []  # DROPPED: core에 없어 버린 (이슈, 종목) 엣지
+DRAFT = dict(status="draft", reviewed=False, source="claude_draft", method="claude_draft", as_of=GENERATED)
 def I(iid, name, typ, pol, dur, agendas, note, targets):
     ISSUES.append(dict(
         issue_id=iid, name=name, type=typ, polarity=pol, duration=dur, agenda_ids=agendas,
-        notes=note, evidence_chunk_ids=[], valid_from=None, valid_until=None,
-        review_cycle_days=REVIEW[dur], status="draft", labeled_by="claude_draft"))
+        notes=note, evidence_chunk_ids=[], valid_from=None, valid_to=None,
+        review_cycle_days=REVIEW[dur], status="draft", reviewed=False, labeled_by="claude_draft"))
     rel = "BENEFITS" if pol == "positive" else "HURTS"
     for tgt, strength in targets:
         ttype = "SECTOR" if tgt.startswith("SEC_") else "COMPANY"
         if ttype == "COMPANY" and tgt not in TICKERS:
             DROPPED.append([iid, tgt]); continue
-        IMPACT_EDGES.append(dict(edge_type=rel, from_node=iid, from_type="ISSUE",
-                                 to_node=tgt, to_type=ttype, strength=strength))
+        IMPACT_EDGES.append(edge(rel, iid, "ISSUE", tgt, ttype, **DRAFT, strength=strength))
 
 I("ISS_AI_MEMORY_DEMAND","AI 서버용 HBM·고용량 메모리 수요 확대","industry","positive","persistent",["growth","valuation"],
   "AI 가속기 탑재 HBM 수요. 공급사 점유율 경쟁이 핵심 변수.",
@@ -221,10 +247,9 @@ I("ISS_FREIGHT_NORMALIZATION","컨테이너 운임 하락","industry","negative"
 
 # EXPOSED_TO: COMPANY → ISSUE (exposure 0~1). strength 기반 초안값
 EXP = {"high": 0.9, "mid": 0.6, "low": 0.3}
-EXPOSED = [dict(edge_type="EXPOSED_TO", from_node=e["to_node"], from_type="COMPANY",
-                to_node=e["from_node"], to_type="ISSUE", exposure=EXP[e["strength"]],
-                exposure_source="claude_draft (strength 매핑: high .9 / mid .6 / low .3)")
-           for e in IMPACT_EDGES if e["to_type"] == "COMPANY"]
+EXPOSED = [edge("EXPOSED_TO", e["dst"], "COMPANY", e["src"], "ISSUE", **DRAFT, exposure=EXP[e["strength"]],
+                exposure_rule="strength 매핑: high .9 / mid .6 / low .3")
+           for e in IMPACT_EDGES if e["dst_type"] == "COMPANY"]
 
 # ───────────────────────── 4. SENSITIVE_TO / IMPACTS ─────────────────────────
 # SENSITIVE_TO: SECTOR → MACRO. weight는 수경 회귀(상관 기반 민감도)로만 채움.
@@ -278,6 +303,13 @@ W_AS_OF = {"KOSPI": "2026-11-06", "USD_KRW": "2026-11-06", "KTB_3Y_KR": "2026-11
            "CPI_KR": "2026-10-01", "BRENT": "2026-09-01", "DRAM_EXPORT_PRICE": "2026-09-01"}
 W_N = {"SEC_INDUS": 31, "SEC_IT": 19, "SEC_FIN": 15, "SEC_HEALTH": 7, "SEC_CONS_DISC": 7, "SEC_COMM": 7,
        "SEC_MATERIAL": 5, "SEC_ENERGY": 5, "SEC_CONS_STAP": 2, "SEC_UTIL": 1}   # 일별 종목 수
+# 수경 값의 종목 수 = core 소속 종목 수 − 민감도 이력이 없는 종목. 0126Z0(삼성에피스홀딩스)은 신규 상장이라 빠졌다.
+W_N_EXCLUDED = {"0126Z0"}
+_members = {}
+for _c in COMPANIES:
+    if _c["ticker"] not in W_N_EXCLUDED:
+        _members[_c["sector_id"]] = _members.get(_c["sector_id"], 0) + 1
+assert W_N == _members, f"W_N이 core 소속 종목 수와 다르다: {W_N} vs {_members}"
 W_N_MONTHLY_OVERRIDE = {("SEC_IT", m): 18 for m in ("CPI_KR", "BRENT", "DRAM_EXPORT_PRICE")}  # LG씨엔에스 상장 24개월 미만 제외
 #            KOSPI   USD_KRW KTB_3Y  KTB_10Y CPI_KR  BRENT   DRAM_EXPORT_PRICE
 _W_COLS = ["KOSPI", "USD_KRW", "KTB_3Y_KR", "KTB_10Y_KR", "CPI_KR", "BRENT", "DRAM_EXPORT_PRICE"]
@@ -309,18 +341,25 @@ def _sens_edge(s, m, sign, why):
     inactive = m in INACTIVE_MACROS
     w = None if inactive else WEIGHTS.get((s, m))
     freq = WEIGHT_FREQ.get(m)
-    kw = {}
-    if w is not None:
-        n = W_N_MONTHLY_OVERRIDE.get((s, m), W_N[s])
-        kw = dict(weight=w, weight_source=WSRC[freq]["src"], weight_window=WSRC[freq]["window"],
-                  weight_as_of=W_AS_OF[m], weight_n_tickers=n)
-    # weight_status: filled = 수경 값 채움 / not_available = 활성인데 표에 값이 없음 / None = 비활성
-    return dict(edge_type="SENSITIVE_TO", from_node=s, from_type="SECTOR", to_node=m, to_type="MACRO",
-                status="inactive" if inactive else "active",
+    n = None if w is None else W_N_MONTHLY_OVERRIDE.get((s, m), W_N[s])
+    check = _sign_check(sign, w)
+    # status: inactive = 수집 계획 없는 매크로 / needs_review = 가설과 부호가 반대이거나 0 근처 / active
+    # reviewed: 수경 회귀 값이 있고 가설과 어긋나지 않을 때만 True (회귀 값으로 가설을 덮어쓰지 않는다)
+    if inactive:
+        status = "inactive"
+    elif w is None or check in ("mismatch", "near_zero"):
+        status = "needs_review"
+    else:
+        status = "active"
+    return edge("SENSITIVE_TO", s, "SECTOR", m, "MACRO", status=status, reviewed=status == "active",
+                source=WSRC[freq]["src"] if w is not None else None,
+                method=f"corr_{freq}_sector_median" if w is not None else None,
+                as_of=W_AS_OF[m] if w is not None else None,
                 inactive_reason="no_data_source" if inactive else None,
-                **{**dict(weight=None, weight_source=None, weight_window=None, weight_as_of=None, weight_n_tickers=None), **kw},
-                expected_sign=sign, sign_check=_sign_check(sign, w),
-                weight_low_n=(w is not None and kw["weight_n_tickers"] < LOW_N) or None,
+                review_reason=check if status == "needs_review" else None,
+                weight=w, weight_window=WSRC[freq]["window"] if w is not None else None, weight_n_tickers=n,
+                expected_sign=sign, sign_check=check,
+                weight_low_n=None if w is None else n < LOW_N,
                 weight_status=None if inactive else ("filled" if w is not None else "not_available"),
                 weight_frequency=freq, merged_from=MERGED_FROM.get((s, m), []), rationale=why)
 SENSITIVE = [_sens_edge(*t) for t in SENS]
@@ -336,142 +375,77 @@ IMP = [
  ("USD_CNY","USD_KRW","same","위안-원 동조화"),("CHINA_PMI_MFG","KOSPI","same","수출 경기"),
  ("DRAM_EXPORT_PRICE","KOSPI","same","반도체 지수 비중"),
 ]
-IMPACTS = [dict(edge_type="IMPACTS", from_node=a, from_type="MACRO", to_node=b, to_type="MACRO",
-                status="inactive" if {a, b} & INACTIVE_MACROS else "active",
+IMPACTS = [edge("IMPACTS", a, "MACRO", b, "MACRO", **{**DRAFT, "status": "inactive" if {a, b} & INACTIVE_MACROS else "draft"},
                 inactive_reason="no_data_source" if {a, b} & INACTIVE_MACROS else None,
                 inactive_macros=sorted({a, b} & INACTIVE_MACROS),
-                relation=rel, rationale=why) for a, b, rel, why in IMP]
+                direction=rel, rationale=why) for a, b, rel, why in IMP]
 
-BELONGS = [dict(edge_type="BELONGS_TO", from_node=c["ticker"], from_type="COMPANY",
-                to_node=c["sector_id"], to_type="SECTOR") for c in COMPANIES]
+BELONGS = [edge("BELONGS_TO", c["ticker"], "COMPANY", c["sector_id"], "SECTOR", status="active", reviewed=True,
+                source="pipeline:companies.sector_l1(WICS)", method="pipeline", as_of=CORE_EXPORT)
+           for c in COMPANIES]
 
 # ───────────────────────── 검증 ─────────────────────────
 sec_ids = {s["sector_id"] for s in SECTORS}; mac_ids = {m["indicator_id"] for m in MACROS}
 iss_ids = {i["issue_id"] for i in ISSUES}
-for e in SENSITIVE: assert e["from_node"] in sec_ids and e["to_node"] in mac_ids, e
-for e in IMPACTS: assert e["from_node"] in mac_ids and e["to_node"] in mac_ids, e
-for e in IMPACT_EDGES: assert e["to_node"] in sec_ids or e["to_node"] in TICKERS, e
+for e in SENSITIVE: assert e["src"] in sec_ids and e["dst"] in mac_ids, e
+for e in IMPACTS: assert e["src"] in mac_ids and e["dst"] in mac_ids, e
+for e in IMPACT_EDGES: assert e["dst"] in sec_ids or e["dst"] in TICKERS, e
 for c in COMPANIES: assert c["sector_id"] in sec_ids, c
 assert len(iss_ids) == len(ISSUES)
 assert len(mac_ids) == len(MACROS), "macro indicator_id 중복"
 _used = {c["sector_id"] for c in COMPANIES}
 assert sec_ids == _used, f"소속 종목이 없는 섹터: {sorted(sec_ids - _used)}"
-for e in SENSITIVE: assert e["weight"] is None or e["weight_source"], e  # weight는 출처 없이 못 채운다
+for e in SENSITIVE: assert e["weight"] is None or e["source"], e  # weight는 출처 없이 못 채운다
 assert len(INACTIVE_MACROS) == 6, INACTIVE_MACROS
 for e in SENSITIVE + IMPACTS:  # 비활성 매크로에 걸린 엣지는 반드시 비활성, 활성 엣지는 활성 매크로만 잇는다
-    touch = {e["from_node"], e["to_node"]} & INACTIVE_MACROS
+    touch = {e["src"], e["dst"]} & INACTIVE_MACROS
     assert (e["status"] == "inactive") == bool(touch), e
 for e in SENSITIVE:
     assert (e["weight_status"] is None) == (e["status"] == "inactive"), e
     if e["weight_status"] == "filled":
-        assert all(e[k] is not None for k in ("weight", "weight_source", "weight_window", "weight_as_of", "weight_n_tickers")), e
+        assert all(e[k] is not None for k in ("weight", "source", "weight_window", "as_of", "weight_n_tickers")), e
         assert -1.0 <= e["weight"] <= 1.0, e
 # 같은 섹터에 금리 엣지(국채 3년·10년)는 하나만 (상관 0.9라 같은 효과 이중 계상 방지)
 _rate_cnt = {}
 for e in SENSITIVE:
-    if e["status"] == "active" and e["to_node"] in ("KTB_3Y_KR", "KTB_10Y_KR"):
-        _rate_cnt[e["from_node"]] = _rate_cnt.get(e["from_node"], 0) + 1
+    if e["status"] != "inactive" and e["dst"] in ("KTB_3Y_KR", "KTB_10Y_KR"):
+        _rate_cnt[e["src"]] = _rate_cnt.get(e["src"], 0) + 1
 assert all(c == 1 for c in _rate_cnt.values()), _rate_cnt
-assert len({(e["from_node"], e["to_node"]) for e in SENSITIVE}) == len(SENSITIVE), "SENSITIVE_TO 쌍 중복"
+assert len({(e["src"], e["dst"]) for e in SENSITIVE}) == len(SENSITIVE), "SENSITIVE_TO 쌍 중복"
 
 nodes = dict(sectors=SECTORS, macros=MACROS, issues=ISSUES, companies_t1=COMPANIES)
 edges = dict(belongs_to=BELONGS, sensitive_to=SENSITIVE, impacts=IMPACTS,
              benefits_hurts=IMPACT_EDGES, exposed_to=EXPOSED)
-meta = dict(version="seed-v0.5", generated="2026-11-10", spec="온톨로지 기획서 v1.2",
+# 노출 가능한 노드·엣지는 출처·방법·기준일이 반드시 있다 (헌법 원칙 IV)
+for k, v in edges.items():
+    for e in v:
+        assert isinstance(e["reviewed"], bool) and e["status"] in ("active", "draft", "needs_review", "inactive"), e
+        if e["status"] == "active" and e["reviewed"]:
+            assert e["source"] and e["method"] and e["as_of"], e
+for k, v in nodes.items():
+    for n in v:
+        assert isinstance(n["reviewed"], bool) and n["status"] in ("active", "draft", "inactive"), n
+meta = dict(version="seed-v0.6", generated=GENERATED, spec="온톨로지 기획서 v1.2",
+            exposure_rule='status == "active" and reviewed == True (ADR 0008). draft_fields 는 include_draft 일 때만',
             merged_sensitive_edges=MERGED, inactive_macros=sorted(INACTIVE_MACROS),
             t1_definition="KOSPI+KOSDAQ 통합 시가총액 상위 100 보통주(우선주 제외). 수경 파이프라인 companies.is_core, 2026-10-22 지정 후 고정",
             core_export=CORE_EXPORT, tier_assigned_on=TIER_ASSIGNED, sensitivities_latest_as_of=SENS_AS_OF,
             dropped_issue_edges=DROPPED,
             not_included=["COMPETES_WITH (COMPETITOR→COMPANY 통합 여부 미결)"])
-os.makedirs(f"{OUT}/nodes", exist_ok=True); os.makedirs(f"{OUT}/edges", exist_ok=True)
-for k, v in nodes.items(): json.dump(v, open(f"{OUT}/nodes/{k}.json","w",encoding="utf-8"), ensure_ascii=False, indent=2)
-for k, v in edges.items(): json.dump(v, open(f"{OUT}/edges/{k}.json","w",encoding="utf-8"), ensure_ascii=False, indent=2)
-json.dump(dict(meta=meta, nodes=nodes, edges=edges),
-          open(f"{OUT}/ontology_seed_all.json","w",encoding="utf-8"), ensure_ascii=False, indent=2)
-
-# ───────────────────────── Python dict 모듈 ─────────────────────────
-from pprint import pformat
-pf = lambda o: pformat(o, width=110, sort_dicts=False)
-py = f'''"""개미비서단 온톨로지 관계사전 — Phase A 시드 ({meta["version"]})
-
-생성: {meta["generated"]} · 기준 스펙: {meta["spec"]} · T1 지정일: {TIER_ASSIGNED} (core 내보내기 {CORE_EXPORT})
-T1 정의: {meta["t1_definition"]}
-
-- SENSITIVE_TO.weight 는 수경 섹터 중앙값(일별 corr_daily / 월별 corr_monthly)만 쓴다. 활성 엣지는 모두 채워졌고
-  weight_source·weight_window·weight_as_of·weight_n_tickers 가 함께 있다. 비활성 엣지는 None.
-  sign_check: expected_sign(가설)과 회귀 부호의 대조 — match / mismatch / near_zero(|w|<0.02). 가설을 덮어쓰지 않는다.
-  weight_low_n: 종목 수 3개 미만 섹터라 중앙값이 불안정.
-- status == "inactive" (inactive_reason "no_data_source") 인 매크로·엣지는 수집 계획이 없어 보관만 한다.
-  주입·Judge 경로 검증에는 active_edges() / active_macros() / company_context() 만 쓴다.
-  expected_sign 은 회귀 부호 검증용 사전 가설이며 weight 로 쓰지 않는다.
-- *_source == "claude_draft" 인 값은 유민 검토 전 초안.
-- ISSUE 의 evidence_chunk_ids / valid_from / valid_until 은 필수 속성이지만 아직 비어 있음.
-"""
-from __future__ import annotations
-
-META = {pf(meta)}
-
-SECTORS: dict[str, dict] = {pf({s["sector_id"]: s for s in SECTORS})}
-
-MACROS: dict[str, dict] = {pf({m["indicator_id"]: m for m in MACROS})}
-
-ISSUES: dict[str, dict] = {pf({i["issue_id"]: i for i in ISSUES})}
-
-COMPANIES_T1: dict[str, dict] = {pf({c["ticker"]: c for c in COMPANIES})}
-
-EDGES: dict[str, list[dict]] = {pf(edges)}
-
-
-def is_active(record: dict) -> bool:
-    """status 필드가 없으면(섹터·종목·이슈 등) 활성으로 본다. status == "inactive" 는 주입·경로 검증 대상이 아니다."""
-    return record.get("status", "active") != "inactive"
-
-
-def active_macros() -> dict[str, dict]:
-    return {{k: v for k, v in MACROS.items() if is_active(v)}}
-
-
-def active_edges(kind: str) -> list[dict]:
-    """EDGES[kind] 중 활성 엣지만. get_ontology_context 주입과 Judge 경로 검증은 이 함수만 쓴다."""
-    return [e for e in EDGES[kind] if is_active(e)]
-
-
-def company_context(ticker: str, include_inactive: bool = False) -> dict:
-    """2홉: COMPANY → SECTOR → MACRO(SENSITIVE_TO) + COMPANY ↔ ISSUE. Phase A 확인용 헬퍼.
-
-    기본은 활성 엣지만 돌려준다. 비활성(수집 계획 없는 매크로) 엣지가 필요하면 include_inactive=True.
-    """
-    c = COMPANIES_T1.get(ticker)
-    if c is None:
-        return {{}}
-    sec = c["sector_id"]
-    issues: dict[str, dict] = {{}}
-    for e in EDGES["benefits_hurts"]:  # 섹터 엣지 먼저, 종목 엣지가 덮어씀 (종목 단위 우선)
-        if e["to_node"] == sec:
-            issues[e["from_node"]] = {{**ISSUES[e["from_node"]], "relation": e["edge_type"],
-                                      "strength": e["strength"], "via": "SECTOR"}}
-    for e in EDGES["benefits_hurts"]:
-        if e["to_node"] == ticker:
-            issues[e["from_node"]] = {{**ISSUES[e["from_node"]], "relation": e["edge_type"],
-                                      "strength": e["strength"], "via": "COMPANY"}}
-    return {{
-        "company": c,
-        "sector": SECTORS[sec],
-        "sector_sensitivities": [e for e in EDGES["sensitive_to"]
-                                 if e["from_node"] == sec and (include_inactive or is_active(e))],
-        "issues": list(issues.values()),
-    }}
-'''
-open(f"{OUT}/ontology_seed.py", "w", encoding="utf-8").write(py)
+# 원본은 이 JSON 하나. 읽기·노출 판정은 손으로 쓴 ontology_seed.py 로더가 한다 (v0.6: nodes/·edges/·생성 .py 삭제)
+with open(f"{OUT}/ontology_seed.json", "w", encoding="utf-8", newline="\n") as f:
+    json.dump(dict(meta=meta, nodes=nodes, edges=edges), f, ensure_ascii=False, indent=2)
+    f.write("\n")
 
 print("nodes:", {k: len(v) for k, v in nodes.items()})
 print("edges:", {k: len(v) for k, v in edges.items()})
 print("markets:", {m: sum(c["market"] == m for c in COMPANIES) for m in ("KOSPI", "KOSDAQ")})
 print("macros collecting:", sum(m["in_pipeline"] for m in MACROS), "/", len(MACROS))
-print("sensitive_to status:", {k: sum(e["status"] == k for e in SENSITIVE) for k in ("active", "inactive")},
+print("sensitive_to status:", {k: sum(e["status"] == k for e in SENSITIVE) for k in ("active", "needs_review", "inactive")},
       "| weight_status:", {k: sum(e["weight_status"] == k for e in SENSITIVE) for k in ("filled", "not_available")},
       "| sign_check:", {k: sum(e["sign_check"] == k for e in SENSITIVE) for k in ("match", "mismatch", "near_zero")})
-print("impacts status:", {k: sum(e["status"] == k for e in IMPACTS) for k in ("active", "inactive")})
+print("impacts status:", {k: sum(e["status"] == k for e in IMPACTS) for k in ("draft", "inactive")})
+print("exposed edges:", {k: sum(e["status"] == "active" and e["reviewed"] for e in v) for k, v in edges.items()})
 print("macros inactive:", sorted(INACTIVE_MACROS))
 print("BASE_RATE_KR 합침:", [(m["sector"], m["action"]) for m in MERGED])
 print("dropped issue edges (core에 없는 종목):", DROPPED)

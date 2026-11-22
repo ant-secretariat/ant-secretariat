@@ -1,11 +1,11 @@
-# 온톨로지 관계사전 시드 v0.5 — 값의 출처와 결정 근거
+# 온톨로지 관계사전 시드 v0.6 — 값의 출처와 결정 근거
 
 작성: 유민 · 2026-11-10 (v0.2 2026-11-09) · 기준 스펙: 온톨로지 프로덕트 기획서 v1.2
 
 이 문서는 시드에 채워진 값이 **어디서 왔고, 어떤 규칙으로 정했고, 얼마나 검증됐는지**를 항목별로 정리한다.
 JSON 레코드에도 `*_source` / `status` / `inactive_reason` / `pipeline_status` / `weight_status` 필드로 같은 정보가 들어 있다.
 
-v0.5는 수경이 PR #29에 남긴 섹터별 weight·DRAM 대체 지표·`KTB_10Y_KR` 답변(2026-11-10, 값은 PR #34 기준)을 반영해 weight를 채운 버전이다. v0.4는 v0.3에 "수집 계획 없는 매크로는 삭제하지 않고 비활성 보관" 결정(유민)을 반영한 버전이다(6번 SENSITIVE_TO). v0.3은 수경(nasuzz) 데이터 파이프라인의 실제 코드·답변(2026-11-10)과 대조해 맞춘 버전이다. 파이프라인 값으로 바꾼 항목은 검증 상태를 ✅로 올리고 출처에 파일 경로를 적었다. 파이프라인 코드 경로는 PR #10~#19(open) 기준이다.
+v0.6은 태은 리뷰(PR #29)를 반영해 노출 규칙을 바꾼 버전이다. 노출 = `status == "active"` 이고 `reviewed == true` 인 노드·엣지만이며(ADR 0008), Claude 초안과 가설과 어긋난 민감도는 기본값에서 빠진다. 원본은 `ontology_seed.json` 하나이고 `ontology_seed.py`는 손으로 쓴 로더다. v0.5는 수경이 PR #29에 남긴 섹터별 weight·DRAM 대체 지표·`KTB_10Y_KR` 답변(2026-11-10, 값은 PR #34 기준)을 반영해 weight를 채운 버전이다. v0.4는 v0.3에 "수집 계획 없는 매크로는 삭제하지 않고 비활성 보관" 결정(유민)을 반영한 버전이다(6번 SENSITIVE_TO). v0.3은 수경(nasuzz) 데이터 파이프라인의 실제 코드·답변(2026-11-10)과 대조해 맞춘 버전이다. 파이프라인 값으로 바꾼 항목은 검증 상태를 ✅로 올리고 출처에 파일 경로를 적었다. 파이프라인 코드 경로는 PR #10~#19(open) 기준이다.
 
 ## 0. 한눈에 보기
 
@@ -29,7 +29,7 @@ v0.5는 수경이 PR #29에 남긴 섹터별 weight·DRAM 대체 지표·`KTB_10
 
 ---
 
-## 1. T1 종목 (`nodes/companies_t1.json`) — ✅
+## 1. T1 종목 (`nodes.companies_t1`) — ✅
 
 **출처.** 수경 Supabase `companies` 테이블에서 `is_core = true`인 종목을 내보낸 `core_companies_2026-11-09.csv`(100행, 컬럼 `ticker,name,market,sector_l1,sector_l2`). 입력 CSV는 시드 재현용 마스터 목록이며 시세·리포트 같은 수집 원본이 아니다.
 
@@ -71,7 +71,7 @@ v0.5는 수경이 PR #29에 남긴 섹터별 weight·DRAM 대체 지표·`KTB_10
 
 **남은 한계.** 산업재가 31개로 여전히 크다 (조선·방산·전력기기·건설·운송·지주). 섹터 단위 민감도는 이 안의 차이를 못 잡아서 `sub_industry`를 따로 달았다. `is_holding`·`sub_industry`는 Claude 초안(`sub_industry_source`) — ⚠️.
 
-## 3. 섹터 속성 (`nodes/sectors.json`) — ⚠️
+## 3. 섹터 속성 (`nodes.sectors`, `draft_fields`) — ⚠️
 
 정성 판단이다. 이번 대조에서 바뀐 것은 없고 `wics_code`·`wics_name`만 추가했다.
 
@@ -83,7 +83,7 @@ v0.5는 수경이 PR #29에 남긴 섹터별 weight·DRAM 대체 지표·`KTB_10
 
 **검증 계획.** 수경의 섹터별 corr_daily 집계가 오면 부호·크기로 이 라벨을 확인한다. 어긋나면 라벨을 고친다 (라벨이 회귀 값을 덮어쓰지 않는다). WICS 재분류로 섹터 구성이 바뀐 만큼(위 7종목) 라벨 재점검이 필요하다.
 
-## 4. 매크로 지표 (`nodes/macros.json`)
+## 4. 매크로 지표 (`nodes.macros`)
 
 수경 파이프라인은 **ECOS만** 수집하고 FRED·NBS·TrendForce 수집기는 없다. 시드 각 지표에 `pipeline_status`(collecting / not_planned), `pipeline_table`, `pipeline_key`, `pipeline_item_code`를 추가했다.
 
@@ -104,14 +104,14 @@ v0.5는 수경이 PR #29에 남긴 섹터별 weight·DRAM 대체 지표·`KTB_10
 `US_FFR`, `US_10Y_YIELD`, `USD_CNY`, `VIX`(FRED), `PPI_KR`(ECOS 코드 미확인), `CHINA_PMI_MFG`(NBS).
 - 결정(유민, 중간안): **삭제하지 않고** 매크로와 거기 걸린 엣지에 `status: "inactive"`, `inactive_reason: "no_data_source"`를 단다. 삭제하면 아젠다 경로 설계가 사라지고, 그대로 두면 데이터 없는 근거 없는 주장이 주입되기 때문이다.
 - 비활성은 `get_ontology_context` 주입과 Judge 경로 검증에서 뺀다. 데이터 수집이 생기면 `status`만 `active`로 바꾸면 된다 (기획서의 off → shadow → on 구조와 같은 방식).
-- 헬퍼(`ontology_seed.py`)의 `active_edges()` · `active_macros()` · `company_context()`는 활성만 돌려준다. 비활성이 필요하면 `company_context(include_inactive=True)`.
+- 로더(`ontology_seed.py`)의 `nodes()` · `edges()` · `company_context()`는 노출 가능한 것만 돌려준다. 검수용으로 초안까지 보려면 `include_draft=True`(비활성은 이때도 빠진다).
 - **v0.5: `DRAM_PRICE`는 비활성 목록에서 빠졌다.** 수경이 무료 대체 지표(`DRAM_EXPORT_PRICE`)를 수집하기로 해서 ID를 바꾸고 활성화했다. 이 엣지(SEC_IT → `DRAM_EXPORT_PRICE`, IMPACTS `DRAM_EXPORT_PRICE → KOSPI`)가 다시 활성이다. TrendForce 현물·고정가가 아니라 **수출물가지수라 시차·성격이 다르다**는 점은 프롬프트 표현에서 "D램 수출물가"로 구분해야 한다.
 
 **참고.** 파이프라인에는 시드에 없는 `WTI`, `DUBAI`, `EXPORTS_KR`, `IMPORTS_KR`, `IPI_KR`, 계산 지표 `TRADE_BALANCE_KR`도 이미 있다. 수출 비중이 큰 섹터 엣지의 후보지만, 근거 없이 넣지 않았다.
 
 **스펙과 다른 점.** `category` 예시값(rate / fx / commodity / market)에 `inflation`, `sentiment` 두 개를 추가했다. 승인 필요. 파이프라인 `macro_data`에는 category 컬럼이 없으므로 category는 온톨로지 쪽 속성이다.
 
-## 5. ISSUE 26개 (`nodes/issues.json`, `status: draft`) — ⚠️
+## 5. ISSUE 26개 (`nodes.issues`, `status: draft`, `reviewed: false`) — ⚠️
 
 **선정 기준 (셋 다 충족).**
 1. T1 종목 1개 이상에 영향을 주는 경로를 한 문장으로 설명할 수 있다
@@ -120,11 +120,11 @@ v0.5는 수경이 PR #29에 남긴 섹터별 weight·DRAM 대체 지표·`KTB_10
 
 **값의 의미.** `polarity`는 연결된 종목·섹터 입장에서의 방향(positive → BENEFITS, negative → HURTS). `strength`는 매출·이익 영향 비중에 대한 정성 판단(high = 핵심 사업 직결, mid = 주요 사업 일부, low = 간접). `duration`은 persistent / cyclical / event_driven이고 `review_cycle_days`(180 / 90 / 30)는 재검토 주기 제안값이다.
 
-**근거 청크 — 아직 연결 안 됨 (v1.2 필수 속성).** `evidence_chunk_ids`, `valid_from` / `valid_until`이 비어 있다. 수경 답변(2026-11-10)으로 연결 방법은 확정됐다.
+**근거 청크 — 아직 연결 안 됨 (v1.2 필수 속성).** `evidence_chunk_ids`, `valid_from` / `valid_to`가 비어 있다. 수경 답변(2026-11-10)으로 연결 방법은 확정됐다.
 - 벡터 저장소는 Supabase **pgvector**로 이전됐다 (v0.2 조사 시점 코드에는 Pinecone).
 - 리포트 94종목 (2026-08-07 ~ 11-06, 활성 청크 17,272개) · 뉴스 98종목 (기사 6,822건, 청크 11,576개, 최근 2주 위주) · 공시는 적재 진행 중.
 - `chunk_id`는 내용 기준이라 재적재해도 같다. 청킹 규칙이 바뀌어 사라진 청크는 삭제하지 않고 `is_active=false`로 남기므로 예전 id로 찾아도 깨지지 않는다. 뉴스 id는 원문 URL 기준이다.
-- 따라서 `evidence_chunk_ids`에는 `chunk_id`를 저장하고, `valid_from`은 근거 청크 날짜, `valid_until`은 `review_cycle_days`로 정한다. DB 조회 권한이 필요해 이번 PR에서는 비워 두었다.
+- 따라서 `evidence_chunk_ids`에는 `chunk_id`를 저장하고, `valid_from`은 근거 청크 날짜, `valid_to`는 `review_cycle_days`로 정한다. DB 조회 권한이 필요해 이번 PR에서는 비워 두었다.
 
 **확정 규칙 제안.** 근거 청크를 1개 이상 못 찾은 이슈는 시드에서 뺀다. 이 규칙을 통과해야 `status: draft` → `confirmed`. 뉴스가 최근 2주 위주라 오래된 `persistent` 이슈는 리포트 청크로 근거를 찾아야 할 수 있다.
 
@@ -193,7 +193,11 @@ python scripts/extract_t1.py core_companies_2026-11-09.csv   # CSV 형식 검증
 python scripts/build_seed.py core_companies_2026-11-09.csv .  # 시드 생성 + 무결성 검사
 ```
 
-`build_seed.py`는 정의 데이터(이슈, 엣지 쌍)를 코드 안에 담고 있고 표준 라이브러리만 쓴다. 실행하면 `nodes/`·`edges/`·`ontology_seed_all.json`·`ontology_seed.py`를 다시 쓰며, 같은 입력이면 결과가 같다. 무결성 검사: 종목 100개·중복 없음, 엣지 양 끝 노드 존재, 이슈·지표 ID 중복 없음, 소속 종목 없는 섹터 없음, 출처 없는 weight 금지, 비활성 매크로에 걸린 엣지는 반드시 비활성(그 반대도), 활성 엣지의 `weight_status`는 값이 있고 비활성은 없음, SENSITIVE_TO 쌍 중복 없음.
+`build_seed.py`는 정의 데이터(이슈, 엣지 쌍)를 코드 안에 담고 있고 표준 라이브러리만 쓴다. 실행하면 `ontology_seed.json` 하나를 다시 쓰며, 같은 입력이면 바이트 단위로 같다(`tests/test_ontology_seed.py`가 확인). 무결성 검사: 종목 100개·중복 없음, 엣지 양 끝 노드 존재, 이슈·지표 ID 중복 없음, 소속 종목 없는 섹터 없음, 출처 없는 weight 금지, 비활성 매크로에 걸린 엣지는 반드시 비활성(그 반대도), 활성 엣지의 `weight_status`는 값이 있고 비활성은 없음, SENSITIVE_TO 쌍 중복 없음, `W_N`(섹터 종목 수) = core 소속 종목 수 − `0126Z0`, 노출 가능한 엣지는 `source`·`method`·`as_of` 필수.
+
+```bash
+python -m pytest ontology/seed/tests -q   # 재생성 일치 · 노출 규칙 · 계약 필드
+```
 
 ## 8. 팀원 확인 요청
 
@@ -204,7 +208,8 @@ python scripts/build_seed.py core_companies_2026-11-09.csv .  # 시드 생성 + 
 | 유민 | 수집 계획 없는 지표 6개 | ✅ 결정: 삭제 않고 `inactive` 보관 (v0.4) |
 | 유민 | 부호 불일치 4개(경기소비재→CPI, 금융→KTB_3Y, 산업재→BRENT, 유틸리티→BRENT)와 `USD_KRW` near_zero 5개 엣지 유지 여부 | 검토 필요 |
 | 유민 | KOSDAQ 신규 10종목의 이슈 엣지 라벨링, `is_holding`·`sub_industry` 검토 | 후속 |
-| 태은 | Supabase 테이블로 옮길 때 이 JSON 구조 그대로 써도 되는지 · `company_context` 2홉 헬퍼가 `get_ontology_context` 구현과 겹치는지 | 미회신 |
+| 태은 | 노출 규칙·엣지 공통 필드·JSON 단일화 (PR #29 리뷰 1·2·3·6) | ✅ v0.6 반영 |
+| 태은 | ADR 0003 월별 예외 문서화 (리뷰 4, 태은 작성 제안) · DB 적재기 (`ontology_nodes`·`ontology_edges`) | 후속 |
 | 전원 | MACRO category 2개 추가 승인 · ISSUE 확정 규칙(근거 청크 1개 이상) 승인 · COMPETITOR 통합 결정 | 미결 |
 
 ## 9. 계약 메모 (수경 답변 2026-11-10)
@@ -221,3 +226,4 @@ python scripts/build_seed.py core_companies_2026-11-09.csv .  # 시드 생성 + 
 | v0.3 | 2026-11-10 | 수경 파이프라인 대조. T1 = core 100(KOSPI 90 + KOSDAQ 10), 섹터 = WICS, 매크로 ID 통일(`BRENT`, `KOSPI`)·수집 상태 필드, `SEC_REAL_ESTATE` 삭제, SENSITIVE_TO `weight_coverage`·`weight_n_tickers` 추가 |
 | v0.4 | 2026-11-10 | 수집 계획 없는 매크로 7개와 엣지(SENSITIVE_TO 9·IMPACTS 10) `inactive` 보관, BASE_RATE_KR 대상 SENSITIVE_TO 3개 → KTB_3Y_KR 합침(29→28), `weight_coverage`를 `weight_status`(aggregation_pending / factor_requested)·`weight_frequency`로 대체, 헬퍼에 active 필터 추가 |
 | v0.5 | 2026-11-10 | 수경 섹터 중앙값으로 SENSITIVE_TO weight 채움(활성 20개, 출처·기간·as_of·종목 수·`weight_frequency`), `DRAM_PRICE`→`DRAM_EXPORT_PRICE`(ECOS 402Y016) 교체·활성화, 금리 엣지 섹터당 1개 검사 추가, `sign_check`·`weight_low_n` 필드, `weight_status`를 filled / not_available로 정리 (SENSITIVE_TO 활성 20·비활성 8, IMPACTS 활성 6·비활성 9) |
+| v0.6 | 2026-11-22 | 태은 리뷰 반영. 모든 노드·엣지에 `status`·`reviewed`, 노출 = active + reviewed. 엣지 공통 필드(`relation`·`src`·`dst`·`source`·`method`·`as_of`·`valid_from`·`valid_to`·`evidence_ids`), IMPACTS 방향은 `direction`. Claude 초안 엣지·이슈는 `draft`, SENSITIVE_TO mismatch 4·near_zero 5는 `needs_review`(노출 11개). 노드 초안 속성은 `draft_fields`. 섹터 이름 WICS, `valid_until`→`valid_to`, `weight_low_n` bool, `W_N` 검증. 원본 JSON 하나(`ontology_seed.json`)·손으로 쓴 로더·pytest |

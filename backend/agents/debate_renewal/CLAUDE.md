@@ -75,14 +75,14 @@
 
 ## 확정 필요한 임시값 (코드 곳곳에 TODO)
 
-- `ReasonCode.insufficient_data` — `envelope.py` 확정 이름으로 교체 (`contracts.py`). 3종목·한쪽 미커버 등 관문1 코드도 같음
+- ~~`ReasonCode.insufficient_data`~~ → 계약의 `no_data`로 확정(11/17, 계약 draft.5 PR #46). 다음 행동은 `choose_alternative_company`
 - 관문1 거절 코드(미커버 종목·3종목 이상·비교 한쪽 미커버)의 `envelope.py` 이름. 11/9 기준 회의에서 확정되지 않았다. precheck 밖이라 이 패키지는 정의하지 않고, 확정되면 `ReasonCode`에 추가한다
 - 거절셋 수치(rs-0.2.0, 사전 kw-0.2.0): dev 오답변율 5%·과잉거절 0%, **holdout 오답변율 40%**(목표 ≤5%)·과잉거절 8%. dev는 튜닝에 썼으니 holdout이 실제 수준이다. 실패 원인은 "추천" 같은 투자 권유 단어 하나만 걸려도 통과하는 구조와 일반 단어 오탐. 기획서 D1대로 룰이 놓치는 비율이 높아 경량 모델 승격 대상인지 확정 필요. "주가가 왜 떨어졌어?"·"들고 있어도 돼?"는 범위 안으로 보고 사전에 반영했다(임시 판단)
 - 거절셋 기준선(rs-0.1.0, 사전 kw-0.1.0): 오답변율 35%(목표 ≤5%), 과잉거절률 22%. 주가 변동 이유("주가가 왜 떨어졌어?")·보유 여부("들고 있어도 돼?")처럼 `valuation`·`risk`로 볼 만한 질의를 범위 안으로 볼지, 키워드 사전을 어디까지 넓힐지 확정 필요
-- 공용 계약 위치(`backend/contracts`, data-pipeline)가 생기면 `contracts.py`를 import로 교체하고 파일 삭제. 수경 #30이 병합되면 `from processing.enums import AgendaId, DataTier, Tier`
+- `AgendaId`·`DataTier`·`Tier`는 `processing.enums`(#30, main)에서 import한다. 멤버 이름은 `UPPER_SNAKE`(예: `AgendaId.VALUATION`). `ReasonCode`·`NextAction`·`PrecheckResult`는 `backend/contracts/`가 생기면 옮긴다
 - `data/intent_data_sources.json` — 값은 수경 제안(#21 리뷰 2026-11-10) 반영. `financials`·`flow`·`insider`·`sensitivity`·`derived` 키는 데이터 쪽이 `get_available_data_status`에 추가할 예정(#35 병합 후)이라 그 전에는 해당 키가 provider에 없다 — 남은 키로 판정된다
 - 아젠다 대체 우선순위(`data/keyword_dictionary.json`의 `selection_rules`) — 기획서에 "최대 3개 유지"만 있음
-- `flow` 아젠다 `active: false` — 데이터 쪽은 활성화 OK(`investor_flow_daily` T1 100종목 3년 치). 키워드 사전·거절셋 라벨·기준선 문항 8개와 같이 바꿔야 해서 별도 PR로 진행
+- `flow` 아젠다는 kw-0.1.1부터 활성(수경 확인, `investor_flow_daily` T1 3년 치). 수급 질문이 어느 기본 아젠다를 대체할지(`flow_replaces`: macro → valuation → risk)는 임시값
 - 큐 라이브러리(PgQueuer vs Procrastinate), 배포 방식은 팀 결정 대기
 
 ## 명령
@@ -90,7 +90,7 @@
 ```bash
 cd backend
 python -m venv .venv && .venv\Scripts\activate     # macOS/Linux: source .venv/bin/activate
-pip install pydantic pytest pytest-asyncio          # precheck만 돌릴 때는 이것으로 충분
+pip install pydantic pytest pytest-asyncio -e ../data-pipeline   # processing.enums(공용 열거형)를 쓰므로 data-pipeline도 설치
 pytest tests/test_debate_renewal_precheck.py
 # 전체 백엔드 테스트는 requirements.txt 전체 설치 필요 (torch 등 무거움)
 ```

@@ -138,8 +138,14 @@ class OverallVerdict(_Strict):
 
 
 class Judge(_Strict):
+    """단일 모드는 overall_verdict 하나, 비교 모드는 종목마다 판정 하나(per_company_verdict, ticker → 판정).
+
+    비교 모드에서 두 종목에 stance 하나를 주면 어느 종목에 대한 판정인지 뜻이 없다(유민 결정 2026-11-22).
+    """
+
     user_profile: UserProfile
-    overall_verdict: OverallVerdict
+    overall_verdict: Optional[OverallVerdict] = None  # 단일 모드 필수, 비교 모드 금지
+    per_company_verdict: dict[str, OverallVerdict] = Field(default_factory=dict)  # 비교 모드 필수: 두 종목 모두
 
 
 # ── DebateResult (1.7) ───────────────────────────────────────────
@@ -200,6 +206,8 @@ class DebateResult(_Strict):
                 got = getattr(m, field)
                 if got is not None and got != want:
                     raise ValueError(f"meta.{field}(호환용)는 companies[0].{field}와 같아야 한다")
+            if self.judge.overall_verdict is None or self.judge.per_company_verdict:
+                raise ValueError("single 모드는 judge.overall_verdict 하나만 쓴다 (per_company_verdict 없음)")
             return self
         if len(tickers) != 2 or self.comparison is None or self.agendas:
             raise ValueError("compare 모드는 종목 2개, comparison 필수, agendas 없음")
@@ -207,6 +215,8 @@ class DebateResult(_Strict):
             raise ValueError("compare 모드의 두 종목은 서로 달라야 한다")
         if any(getattr(m, f) is not None for f in ("ticker", "company", "sector")):
             raise ValueError("compare 모드에서는 meta.ticker·company·sector(호환용)를 보내지 않는다")
+        if self.judge.overall_verdict is not None or set(self.judge.per_company_verdict) != set(tickers):
+            raise ValueError("compare 모드는 judge.per_company_verdict에 두 종목 판정을 하나씩 넣고 overall_verdict는 보내지 않는다")
         allowed, seen = set(tickers), set()
         for ax in self.comparison.axes:
             if ax.agenda_id in seen:

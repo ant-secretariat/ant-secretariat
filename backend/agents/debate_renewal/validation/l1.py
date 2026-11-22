@@ -117,11 +117,14 @@ def _texts(r: DebateResult) -> Iterator[tuple[str, str, Optional[str]]]:
             for ticker, d in ax.per_company.items():
                 for k, p in enumerate(d.bear.agreed_points):
                     yield f"comparison.axes[{i}].per_company[{ticker}].bear.agreed_points[{k}]", p, None
-    ov = r.judge.overall_verdict
-    yield "judge.overall_verdict.final_brief", ov.final_brief, None
-    yield "judge.overall_verdict.caution", ov.caution, None
-    for k, p in enumerate(ov.points_to_check):
-        yield f"judge.overall_verdict.points_to_check[{k}]", p, None
+    # 단일 모드는 overall_verdict 하나, 비교 모드는 종목별 판정(per_company_verdict)
+    verdicts = [("judge.overall_verdict", r.judge.overall_verdict)] if r.judge.overall_verdict else []
+    verdicts += [(f"judge.per_company_verdict[{t}]", v) for t, v in r.judge.per_company_verdict.items()]
+    for base, ov in verdicts:
+        yield f"{base}.final_brief", ov.final_brief, None
+        yield f"{base}.caution", ov.caution, None
+        for k, p in enumerate(ov.points_to_check):
+            yield f"{base}.points_to_check[{k}]", p, None
 
 
 def check_l1(result: DebateResult) -> L1Report:

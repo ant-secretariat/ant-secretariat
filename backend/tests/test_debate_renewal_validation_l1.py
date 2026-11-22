@@ -91,7 +91,14 @@ def test_neutral_wording_is_not_flagged():
     assert check_l1(single(j=judge(final_brief="근거가 엇갈립니다", caution="변동성을 확인하세요"))).ok
 
 
-def _compare(ref_b="B-B1"):
+def cjudge(**kw):
+    ov = dict(stance="neutral", confidence="mid", bull_score=3, bear_score=3, final_brief="요약")
+    ov.update(kw)
+    return Judge(user_profile=UserProfile(risk_profile="conservative"),
+                 per_company_verdict={"005930": OverallVerdict(**ov), "000660": OverallVerdict(**{**ov, "final_brief": "요약"})})
+
+
+def _compare(ref_b="B-B1", j=None):
     bull_a, bear_a = debate(b="A-B1", r="A-R1", ref="A-B1")
     bull_b, bear_b = debate(b="B-B1", r="B-R1", ref=ref_b)
     ax = ComparisonAxis(
@@ -104,8 +111,13 @@ def _compare(ref_b="B-B1"):
             CompanyMeta(ticker="005930", company="a", sector="IT", data_tier=DataTier.REPORT),
             CompanyMeta(ticker="000660", company="b", sector="IT", data_tier=DataTier.REPORT)]),
         scope=Scope(verdict="full"), selected_agendas=[A.VALUATION], comparison=Comparison(axes=[ax]),
-        evidence=evidence("S1"), judge=judge(),
+        evidence=evidence("S1"), judge=j or cjudge(),
     )
+
+
+def test_compare_mode_checks_each_company_verdict_text():
+    r = check_l1(_compare(j=cjudge(final_brief="삼성전자를 매수하세요")))
+    assert codes(r) == ["forbidden_phrase"] and "per_company_verdict[005930]" in r.issues[0].path
 
 
 def test_compare_mode_checks_each_company_debate():

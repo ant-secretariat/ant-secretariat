@@ -77,7 +77,7 @@
 - 비교 모드 Judge 판정은 종목별로 하나씩(`judge.per_company_verdict`, ticker → 판정)이고 `overall_verdict`는 단일 모드만 쓴다(유민 결정 2026-11-22). 계약 반영은 #46에 요청
 - ~~`ReasonCode.insufficient_data`~~ → 계약의 `no_data`로 확정(11/17, 계약 draft.5 PR #46). 다음 행동은 `choose_alternative_company`
 - 관문1 거절 코드(미커버 종목·3종목 이상·비교 한쪽 미커버)의 `envelope.py` 이름. 11/9 기준 회의에서 확정되지 않았다. precheck 밖이라 이 패키지는 정의하지 않고, 확정되면 `ReasonCode`에 추가한다
-- `schemas.py`는 계약 draft.5(PR #46) DebateResult와 같은 필드다(점수 integer, `data_richness`·`ontology`, `companies[].data_tier`). `confidence`는 계약에도 타입이 `str`뿐이라 값 목록이 없다. 비교 모드 `judge.overall_verdict`가 판정 1개인 점은 기획서에서 정할 것. 근거 제외 후 `partial` 고지를 담을 필드 위치도 기획서에 없어 아직 없음(검증 레이어 구현 때 결정)
+- `schemas.py`는 계약 draft.5(PR #46) DebateResult와 같은 필드다(점수 integer, `data_richness`·`ontology`, `companies[].data_tier`). `confidence`는 계약에도 타입이 `str`뿐이라 값 목록이 없다. 근거 제외 후 `partial` 고지를 담을 필드 위치도 기획서에 없어 아직 없음(검증 레이어 구현 때 결정)
 - `AgendaId`·`DataTier`·`Tier`는 `processing.enums`(#30, main)에서 import한다. 멤버 이름은 `UPPER_SNAKE`(예: `AgendaId.VALUATION`). `ReasonCode`·`NextAction`·`PrecheckResult`는 `backend/contracts/`가 생기면 옮긴다
 - `data/intent_data_sources.json` — 값은 수경 제안(#21 리뷰 2026-11-10) 반영. `financials`·`flow`·`insider`·`sensitivity`·`derived` 키는 데이터 쪽이 `get_available_data_status`에 추가할 예정(#35 병합 후)이라 그 전에는 해당 키가 provider에 없다 — 남은 키로 판정된다
 - 아젠다 대체 우선순위(`data/keyword_dictionary.json`의 `selection_rules`) — 기획서에 "최대 3개 유지"만 있음

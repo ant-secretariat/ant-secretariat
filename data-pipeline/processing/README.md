@@ -174,6 +174,26 @@ python processing/run_pipeline.py --pdf-base-path crawling --report-id REPORT_ID
 
 ---
 
+### 공용 열거형 (`processing/enums.py`)
+
+API 계약서(`docs/api/openapi.yaml`)의 `AgendaId`, `DataTier`, `Tier`와 같은 값입니다. 문자열을 직접 쓰지 말고 여기서 import해서 씁니다. 값을 바꾸려면 계약서를 먼저 고치고, `processing/tests/test_enums.py`가 둘이 같은지 확인합니다.
+
+```python
+from processing.enums import AgendaId, DataTier, Tier, data_tier_for
+
+AgendaId("valuation")      # 문자열 → 열거형 (없는 값이면 ValueError)
+AgendaId.FLOW == "flow"    # str을 상속해 문자열 비교·JSON 직렬화가 그대로 됨
+data_tier_for(report_count=0, news_count=12, disclosure_count=3, derived_available=True)  # DataTier.NEWS_ONLY
+```
+
+| 열거형 | 값 | 쓰는 곳 |
+|---|---|---|
+| `AgendaId` | valuation, macro, risk, growth, shareholder_return, flow | `get_agent_context`의 `intent`, 토론 아젠다, 온톨로지 `agenda_id` |
+| `DataTier` | report, news_only, disclosure_only, derived_only, macro_only | `get_agent_context` 결과의 `data_tier` (근거 종류, 위에서부터 우선) |
+| `Tier` | T0, T1, T2 | `resolve_company`의 `tier` (종목 등급. `DataTier`와 다름) |
+
+---
+
 ### resolve_company()
 
 회사명/선택값을 ticker로 변환

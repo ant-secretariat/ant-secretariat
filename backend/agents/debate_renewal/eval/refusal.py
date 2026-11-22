@@ -3,7 +3,7 @@
     cd backend && python -m agents.debate_renewal.eval.refusal
 
 지표
-- 오답변율  = 거절해야 하는데 통과시킨 비율 (≤ 5% 목표)
+- 오답변율  = 거절해야 하는데 통과시킨 비율 (≤ 5% 목표). 거절은 했지만 사유가 틀린 것은 따로 센다
 - 과잉거절률 = 답해야 하는데 거절한 비율
 - flag 일치율 = 답해야 하는 질의 중 기대 flag(투자 권유 등)와 정확히 같은 비율
 
@@ -49,37 +49,49 @@ def _fresh_status(_: str) -> TickerDataStatus:
 
 def evaluate(cases: list[dict[str, Any]], config: PrecheckConfig | None = None) -> dict[str, Any]:
     rows, by_cat = [], defaultdict(lambda: [0, 0])  # category → [맞음, 전체]
+    by_reason: dict[str, list[int]] = defaultdict(lambda: [0, 0])  # 거절 사유 → [맞음, 전체]
+    dictionary_version = ""
     for c in cases:
         r = precheck(c["query"], [_COMPANY], data_status=_fresh_status, config=config, today=_TODAY)
+        dictionary_version = r.dictionary_version
         if c["expect"] == "reject":
             ok = r.verdict == "reject" and r.reject_reason == ReasonCode(c["reason"])
         else:
             ok = r.verdict != "reject" and sorted(r.flags) == sorted(c.get("expect_flags", []))
         by_cat[c["category"]][0] += ok
         by_cat[c["category"]][1] += 1
+        if c["expect"] == "reject":
+            by_reason[c["reason"]][0] += ok
+            by_reason[c["reason"]][1] += 1
         rows.append({**c, "ok": ok, "got_verdict": r.verdict, "got_reason": r.reject_reason, "got_flags": list(r.flags)})
 
     rej = [x for x in rows if x["expect"] == "reject"]
     ans = [x for x in rows if x["expect"] == "answer"]
     return {
-        "wrong_answer_rate": sum(not x["ok"] for x in rej) / len(rej) if rej else 0.0,
+        "dictionary_version": dictionary_version,
+        "wrong_answer_rate": sum(x["got_verdict"] != "reject" for x in rej) / len(rej) if rej else 0.0,
+        "wrong_reason_rate": sum(x["got_verdict"] == "reject" and not x["ok"] for x in rej) / len(rej) if rej else 0.0,
         "over_refusal_rate": sum(x["got_verdict"] == "reject" for x in ans) / len(ans) if ans else 0.0,
         "flag_match_rate": sum(x["ok"] for x in ans) / len(ans) if ans else 0.0,
         "counts": {"reject": len(rej), "answer": len(ans)},
         "by_category": {k: tuple(v) for k, v in by_cat.items()},
+        "by_reason": {k: tuple(v) for k, v in by_reason.items()},
         "failures": [x for x in rows if not x["ok"]],
     }
 
 
 def format_report(version: str, m: dict[str, Any]) -> str:
     out = [
-        f"거절셋 {version}  (거절 {m['counts']['reject']}건 · 답변 {m['counts']['answer']}건)",
+        f"거절셋 {version} · 사전 {m['dictionary_version']}  (거절 {m['counts']['reject']}건 · 답변 {m['counts']['answer']}건)",
         f"  오답변율    {m['wrong_answer_rate']:.1%}  (목표 ≤ 5%)",
+        f"  사유 오류율 {m['wrong_reason_rate']:.1%}  (거절은 했지만 사유가 다름)",
         f"  과잉거절률  {m['over_refusal_rate']:.1%}",
         f"  flag 일치율 {m['flag_match_rate']:.1%}",
         "  카테고리별 정답:",
     ]
     out += [f"    {k}: {a}/{b}" for k, (a, b) in sorted(m["by_category"].items())]
+    out.append("  사유별 정답:")
+    out += [f"    {k}: {a}/{b}" for k, (a, b) in sorted(m["by_reason"].items())]
     out.append("  실패 문항:")
     for x in m["failures"]:
         exp = x["reason"] if x["expect"] == "reject" else f"answer {x.get('expect_flags', [])}"

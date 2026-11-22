@@ -1,11 +1,10 @@
-"""공용 계약 타입 — 임시 위치.
+"""공용 계약 타입.
 
-기획서 v3.0 1.4절 제안안은 다음과 같다.
-- AgendaId · Tier · DataTier → data-pipeline (공용 열거형, backend가 import). 수경 PR #30 `processing.enums`
-- ReasonCode · NextAction · PrecheckResult → backend/contracts
+- AgendaId · Tier · DataTier → data-pipeline `processing.enums` (#30, ADR 0006). 여기서 다시 내보낸다.
+  값과 멤버 이름(UPPER_SNAKE)은 계약서와 같고, 이 패키지는 정의를 복사하지 않는다.
+- ReasonCode · NextAction · PrecheckResult · RiskProfile → `backend/contracts`가 생기면 옮긴다(임시 위치).
+  값은 계약서(docs/api/openapi.yaml) 이름을 그대로 쓴다.
 
-두 위치 모두 아직 레포에 없으므로, 이 패키지가 같은 이름·같은 값으로 먼저 정의한다.
-계약 패키지가 생기면 이 파일의 정의를 import로 교체하고 이 파일은 지운다.
 다른 곳에서는 이 파일 밖에서 문자열 하드코딩을 하지 않는다.
 """
 from __future__ import annotations
@@ -13,64 +12,48 @@ from __future__ import annotations
 from enum import Enum
 from typing import Literal
 
+from processing.enums import AgendaId, DataTier, Tier
 from pydantic import BaseModel, ConfigDict, Field
 
-
-class AgendaId(str, Enum):
-    """아젠다 ID = intent 값 (최종본 5.2 Q12). 선언 순서가 화면 표시 순서."""
-
-    valuation = "valuation"
-    macro = "macro"
-    risk = "risk"
-    growth = "growth"
-    shareholder_return = "shareholder_return"
-    flow = "flow"
-
-
-class Tier(str, Enum):
-    """종목 등급. 데이터 에이전트가 `companies.tier`에 저장하고 `resolve_company`가 `tier`로 돌려준다.
-
-    계약서(openapi.yaml)에서 T0/T1/T2의 이름은 `Tier`다 (수경 #21 리뷰, 2026-11-10).
-    """
-
-    T0 = "T0"  # 파생 데이터만 있음 → reduced
-    T1 = "T1"  # 전체 데이터 → full
-    T2 = "T2"  # 수집 전/수집 중 → 거절 + 수집 예약 (MVP에서는 생기지 않음, ensure_company_data가 Post-MVP)
-
-
-class DataTier(str, Enum):
-    """근거 종류. `get_agent_context` 결과의 `data_tier` 값 (종목 등급 `Tier`와 다르다)."""
-
-    report = "report"
-    news_only = "news_only"
-    disclosure_only = "disclosure_only"
-    derived_only = "derived_only"
-    macro_only = "macro_only"
+__all__ = [
+    "AgendaId", "DataTier", "Tier", "ReasonCode", "NextAction", "RiskProfile",
+    "CompanyContext", "ExcludedAgenda", "PrecheckFlag", "PrecheckResult",
+]
 
 
 class ReasonCode(str, Enum):
-    """envelope.py 이름을 그대로 쓴다. 이 패키지가 쓰는 것만 정의한다.
+    """계약서 ReasonCode 중 이 패키지(precheck)가 쓰는 것만 정의한다."""
 
-    TODO(envelope.py): INSUFFICIENT_DATA는 임시 이름이다. 선택된 아젠다에 쓸 데이터가
-    하나도 없을 때의 코드를 envelope.py 확정 이름으로 교체해야 한다 (기획서 D4, Q1).
-    """
-
-    out_of_scope_topic = "out_of_scope_topic"
-    data_collecting = "data_collecting"
-    insufficient_data = "insufficient_data"  # TODO(envelope.py): 확정 이름으로 교체
+    OUT_OF_SCOPE_TOPIC = "out_of_scope_topic"
+    DATA_COLLECTING = "data_collecting"
+    NO_DATA = "no_data"  # 남는 아젠다에 쓸 데이터가 없음 (11/17 결정, 계약 draft.5)
 
 
 class NextAction(str, Enum):
-    choose_supported_topic = "choose_supported_topic"
-    check_back_later = "check_back_later"
+    """사유 코드와 1:1 (계약서 REASON_POLICY)."""
+
+    CHOOSE_SUPPORTED_TOPIC = "choose_supported_topic"   # out_of_scope_topic
+    CHECK_BACK_LATER = "check_back_later"               # data_collecting
+    CHOOSE_ALTERNATIVE_COMPANY = "choose_alternative_company"  # no_data
+
+
+class RiskProfile(str, Enum):
+    """계약서 RiskProfile."""
+
+    CONSERVATIVE = "conservative"
+    MODERATE_CONSERVATIVE = "moderate_conservative"
+    MODERATE = "moderate"
+    AGGRESSIVE = "aggressive"
+    VERY_AGGRESSIVE = "very_aggressive"
 
 
 class CompanyContext(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    ticker: str
+    ticker: str = Field(pattern=r"^[0-9A-Z]{6}$")
     company: str
     sector: str = ""
+    tier: Tier = Tier.T1  # 계약서 CompanyContext
 
 
 class ExcludedAgenda(BaseModel):

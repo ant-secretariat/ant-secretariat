@@ -42,6 +42,12 @@ def judge(**kw):
     return Judge(user_profile=UserProfile(risk_profile="conservative", investment_goal="장기"), overall_verdict=OverallVerdict(**ov))
 
 
+def cjudge(tickers=("005930", "000660")):
+    ov = dict(stance="neutral", confidence="mid", bull_score=4, bear_score=3, final_brief="요약")
+    return Judge(user_profile=UserProfile(risk_profile="conservative"),
+                 per_company_verdict={tk: OverallVerdict(**ov) for tk in tickers})
+
+
 def meta(mode, tickers):
     return DebateMeta(
         trace_id="t", data_as_of="2026-11-07", generated_at="2026-11-09T00:00:00Z", mode=mode,
@@ -107,13 +113,13 @@ def test_single_rejects_comparison():
 def test_compare_result_valid():
     r = DebateResult(
         meta=meta("compare", ["005930", "000660"]), scope=Scope(verdict="reduced"),
-        selected_agendas=[A.VALUATION], comparison=Comparison(axes=[axis()]), judge=judge(),
+        selected_agendas=[A.VALUATION], comparison=Comparison(axes=[axis()]), judge=cjudge(),
     )
     assert r.comparison.axes[0].axis_verdict.stronger == "005930"
 
 
 def test_compare_requires_comparison_and_no_agendas():
-    kw = dict(meta=meta("compare", ["005930", "000660"]), scope=Scope(verdict="full"), selected_agendas=[A.VALUATION], judge=judge())
+    kw = dict(meta=meta("compare", ["005930", "000660"]), scope=Scope(verdict="full"), selected_agendas=[A.VALUATION], judge=cjudge())
     with pytest.raises(ValidationError):
         DebateResult(**kw)
     with pytest.raises(ValidationError):
@@ -186,7 +192,7 @@ def test_not_comparable_axis_must_not_have_verdict():
 def _compare(axes, tickers=("005930", "000660"), selected=None):
     return DebateResult(
         meta=meta("compare", list(tickers)), scope=Scope(verdict="full"),
-        selected_agendas=selected or [A.VALUATION, A.MACRO, A.RISK], comparison=Comparison(axes=axes), judge=judge(),
+        selected_agendas=selected or [A.VALUATION, A.MACRO, A.RISK], comparison=Comparison(axes=axes), judge=cjudge(tickers),
     )
 
 
@@ -214,4 +220,29 @@ def test_compare_mode_rejects_single_compat_fields():
     m = meta("compare", ["005930", "000660"]).model_copy(update={"ticker": "005930"})
     with pytest.raises(ValidationError):
         DebateResult(meta=m, scope=Scope(verdict="full"), selected_agendas=[A.VALUATION],
-                     comparison=Comparison(axes=[axis()]), judge=judge())
+                     comparison=Comparison(axes=[axis()]), judge=cjudge())
+
+
+# ── 비교 모드 판정은 종목별 (유민 결정 2026-11-22) ─────────────────
+def _cmp(j):
+    return DebateResult(meta=meta("compare", ["005930", "000660"]), scope=Scope(verdict="full"),
+                        selected_agendas=[A.VALUATION], comparison=Comparison(axes=[axis()]), judge=j)
+
+
+def test_compare_needs_one_verdict_per_company():
+    r = _cmp(cjudge())
+    assert set(r.judge.per_company_verdict) == {"005930", "000660"} and r.judge.overall_verdict is None
+    assert DebateResult.model_validate_json(r.model_dump_json()) == r
+    with pytest.raises(ValidationError):  # 한 종목만
+        _cmp(cjudge(("005930",)))
+    with pytest.raises(ValidationError):  # 비교 대상이 아닌 종목
+        _cmp(cjudge(("005930", "035420")))
+    with pytest.raises(ValidationError):  # 판정 하나로 두 종목을 묶음
+        _cmp(judge())
+
+
+def test_single_rejects_per_company_verdict():
+    with pytest.raises(ValidationError):
+        single(judge=cjudge(("005930",)))
+    with pytest.raises(ValidationError):
+        single(judge=Judge(user_profile=UserProfile()))

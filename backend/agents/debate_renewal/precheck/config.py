@@ -36,6 +36,7 @@ class PrecheckConfig:
     keywords: dict[AgendaId, AgendaKeywords]
     shareholder_return_replaces: tuple[AgendaId, ...]
     growth_replaces: tuple[AgendaId, ...]
+    flow_replaces: tuple[AgendaId, ...]
     generic_keywords: tuple[str, ...]
     advice_keywords: tuple[str, ...]
     sources: dict[AgendaId, AgendaSource]
@@ -81,6 +82,7 @@ def build_config(keyword_doc: dict, source_doc: dict) -> PrecheckConfig:
         keywords=kw,
         shareholder_return_replaces=_ids(rules["shareholder_return_replaces"]),
         growth_replaces=_ids(rules["growth_replaces"]),
+        flow_replaces=_ids(rules.get("flow_replaces", rules["growth_replaces"])),
         generic_keywords=_norm_all(keyword_doc["generic_keywords"]),
         advice_keywords=_norm_all(keyword_doc["investment_advice_keywords"]),
         sources=src,

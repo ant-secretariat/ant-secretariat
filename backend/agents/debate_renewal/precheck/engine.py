@@ -5,7 +5,7 @@
 """
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from typing import Callable, Literal, Optional, Sequence
 
 from pydantic import BaseModel, Field
@@ -21,13 +21,25 @@ from agents.debate_renewal.contracts import (
 )
 from agents.debate_renewal.precheck.config import PrecheckConfig, load_default_config, normalize
 
+KST = timezone(timedelta(hours=9))  # 한국은 서머타임이 없어 고정 오프셋으로 충분 (tzdata 없이 동작)
+
+
+def today_kst() -> date:
+    """오늘 날짜(KST). 서버가 UTC로 돌아도 KST 00~09시에 하루 전 날짜가 되지 않게 한다 (AGENTS.md 규칙 1)."""
+    return datetime.now(KST).date()
+
+
+class DataStatusUnavailable(LookupError):
+    """데이터 현황을 받지 못함. 조회 실패를 '수집 중'이나 '데이터 없음'으로 바꾸지 않는다 (헌법 원칙 III)."""
+
+
 AGENDA_TITLES: dict[AgendaId, str] = {
-    AgendaId.valuation: "실적 및 밸류에이션",
-    AgendaId.macro: "산업 및 매크로 환경",
-    AgendaId.risk: "리스크 요인",
-    AgendaId.growth: "성장 동력",
-    AgendaId.shareholder_return: "주주환원",
-    AgendaId.flow: "수급·투자자 동향",
+    AgendaId.VALUATION: "실적 및 밸류에이션",
+    AgendaId.MACRO: "산업 및 매크로 환경",
+    AgendaId.RISK: "리스크 요인",
+    AgendaId.GROWTH: "성장 동력",
+    AgendaId.SHAREHOLDER_RETURN: "주주환원",
+    AgendaId.FLOW: "수급·투자자 동향",
 }
 
 
@@ -51,7 +63,8 @@ class TickerDataStatus(BaseModel):
     sources: dict[str, SourceStatus] = Field(default_factory=dict)
 
 
-# ticker → 현황. 현황을 모르는 종목(None)은 아직 수집 전(T2)으로 취급한다.
+# ticker → 현황. None은 조회 실패·누락으로 보고 DataStatusUnavailable을 던진다.
+# "수집 중"(data_collecting)은 tier가 실제로 T2일 때만 쓴다 (MVP에는 T2가 없다).
 DataStatusProvider = Callable[[str], Optional[TickerDataStatus]]
 
 
@@ -64,7 +77,7 @@ def precheck(
     today: date | None = None,
 ) -> PrecheckResult:
     cfg = config or load_default_config()
-    today = today or date.today()
+    today = today or today_kst()
     mode: Literal["single", "compare"] = "compare" if len(companies) == 2 else "single"
     if len(companies) not in (1, 2):
         raise ValueError("precheck는 종목 1~2개만 받는다 (3개 이상은 관문1에서 거절).")
@@ -80,16 +93,19 @@ def precheck(
 
     # 질의가 있는데 풀 키워드도, 일반 분석 표현도, 투자 권유 표현도 없으면 범위 밖.
     if q and not (matched or is_generic or is_advice):
-        return result("reject", reject_reason=ReasonCode.out_of_scope_topic, matched_intents=[])
+        return result("reject", reject_reason=ReasonCode.OUT_OF_SCOPE_TOPIC, matched_intents=[])
 
     selected, cap_dropped = _select_agendas(matched, cfg)
     flags: list[PrecheckFlag] = ["investment_advice_request"] if is_advice else []
 
     # ── 관문3: 데이터 ────────────────────────────────────────────
     statuses = [data_status(c.ticker) for c in companies]
-    if any(s is None or s.tier == Tier.T2 for s in statuses):
+    missing = [c.ticker for c, s in zip(companies, statuses) if s is None]
+    if missing:
+        raise DataStatusUnavailable(f"데이터 현황을 받지 못한 종목: {missing}")
+    if any(s.tier == Tier.T2 for s in statuses):  # type: ignore[union-attr]
         return result(
-            "reject", reject_reason=ReasonCode.data_collecting, matched_intents=matched, flags=flags
+            "reject", reject_reason=ReasonCode.DATA_COLLECTING, matched_intents=matched, flags=flags
         )
 
     allowed: list[AgendaId] = []
@@ -110,7 +126,7 @@ def precheck(
     if not allowed:
         return result(
             "reject",
-            reject_reason=ReasonCode.insufficient_data,
+            reject_reason=ReasonCode.NO_DATA,
             excluded=excluded,
             matched_intents=matched,
             flags=flags,
@@ -145,10 +161,12 @@ def _select_agendas(matched: list[AgendaId], cfg: PrecheckConfig) -> tuple[list[
                 return
         dropped.append(new)  # 전부 직접 언급돼 자리가 없음
 
-    if AgendaId.shareholder_return in matched:
-        swap_in(AgendaId.shareholder_return, cfg.shareholder_return_replaces)
-    if AgendaId.growth in matched:
-        swap_in(AgendaId.growth, cfg.growth_replaces)
+    if AgendaId.SHAREHOLDER_RETURN in matched:
+        swap_in(AgendaId.SHAREHOLDER_RETURN, cfg.shareholder_return_replaces)
+    if AgendaId.GROWTH in matched:
+        swap_in(AgendaId.GROWTH, cfg.growth_replaces)
+    if AgendaId.FLOW in matched:
+        swap_in(AgendaId.FLOW, cfg.flow_replaces)
 
     selected = sorted(set(selected), key=list(AgendaId).index)[: cfg.max_agendas]
     return selected, dropped
@@ -168,7 +186,8 @@ def _agenda_availability(agenda: AgendaId, status: TickerDataStatus, cfg: Preche
     if not have:
         return _Avail(available=False)
     dates = [h.latest for h in have if h.latest]
-    stale = bool(dates) and (today - max(dates)).days > src.stale_after_days
+    # 날짜를 하나도 모르면 최신이라고 단정하지 않고 노후로 본다 (헌법 원칙 III)
+    stale = (not dates) or (today - max(dates)).days > src.stale_after_days
     return _Avail(available=True, stale=stale)
 
 
@@ -178,6 +197,15 @@ def _selection_reason(matched: list[AgendaId], allowed: list[AgendaId], excluded
         "질의에서 확인한 주제를 반영해 " if any(m in allowed for m in matched) else "기본 아젠다로 "
     )
     tail = f" {len(allowed)}개 아젠다로 토론합니다."
-    if excluded:
-        tail += " 일부 아젠다는 자료가 부족해 제외했습니다."
+    for reason in ("not_selected_cap", "no_data", "tier_limited"):  # 사유별로 따로 고지
+        dropped = [AGENDA_TITLES[e.agenda_id] for e in excluded if e.reason == reason]
+        if dropped:
+            tail += " " + _EXCLUDED_NOTICE[reason].format(names="·".join(dropped))
     return f"{head}{names}{tail}"
+
+
+_EXCLUDED_NOTICE = {
+    "not_selected_cap": "{names}은(는) 한 번에 3개까지 다뤄서 이번에는 제외했습니다.",
+    "no_data": "{names}은(는) 자료가 부족해 제외했습니다.",
+    "tier_limited": "{names}은(는) 이 종목에서 아직 다루지 않는 주제라 제외했습니다.",
+}

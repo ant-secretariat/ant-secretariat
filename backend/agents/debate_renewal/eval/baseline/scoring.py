@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import random
+import re
 from collections import defaultdict
 from itertools import combinations
 from pathlib import Path
@@ -20,6 +21,8 @@ from typing import Any, Optional
 
 HERE = Path(__file__).parent
 SYSTEMS = ("debate", "single")
+AGENDAS = ("valuation", "macro", "risk", "growth", "shareholder_return", "flow")  # processing.enums.AgendaId 값
+_TICKER = re.compile(r"^[0-9A-Z]{6}$")
 
 
 def _load(path: Path) -> dict:
@@ -43,6 +46,10 @@ def load_questions(path: Path = HERE / "questions.json") -> dict:
         raise ValueError("문항 id가 중복됐다")
     per_agenda: dict[str, int] = defaultdict(int)
     for c in cases:
+        if c["agenda_id"] not in AGENDAS:
+            raise ValueError(f"{c['id']}: 알 수 없는 agenda_id {c['agenda_id']!r}")
+        if "ticker" in c and not (isinstance(c["ticker"], str) and _TICKER.match(c["ticker"])):
+            raise ValueError(f"{c['id']}: ticker는 6자리 문자열이어야 한다 ({c['ticker']!r})")
         per_agenda[c["agenda_id"]] += 1
     if max(per_agenda.values()) - min(per_agenda.values()) > 1:
         raise ValueError(f"아젠다별 문항 수가 고르지 않다: {dict(per_agenda)}")
@@ -95,12 +102,28 @@ def _ratio(num: float, den: float) -> Optional[float]:
     return num / den if den else None
 
 
-def score_results(outputs: list[dict], grades: list[dict], key: dict, questions: dict, rubric: dict) -> dict[str, Any]:
+def _agreement(by_grader: dict[str, dict[tuple[str, str], int]], rid: Optional[str] = None) -> list[dict]:
+    """채점자 쌍마다 일치율·kappa. rid를 주면 그 루브릭 항목만 센다."""
+    pairs = []
+    for g1, g2 in combinations(sorted(by_grader), 2):
+        keys = sorted(k for k in by_grader[g1] if rid is None or k[1] == rid)
+        a, b = [by_grader[g1][k] for k in keys], [by_grader[g2][k] for k in keys]
+        pairs.append({"graders": (g1, g2), "agreement": sum(x == y for x, y in zip(a, b)) / len(a), "kappa": cohens_kappa(a, b)})
+    return pairs
+
+
+def score_results(outputs: list[dict], grades: list[dict], key: dict, questions: dict, rubric: dict,
+                  seed: Optional[int] = None) -> dict[str, Any]:
+    """seed: make_blind_pack에 쓴 값. 결과에 그대로 남겨 같은 pack을 다시 만들 수 있게 한다(헌법 원칙 V)."""
     ids = [i["id"] for i in rubric["items"]]
     _validate_grades(grades, key, ids)
     agenda_of = {c["id"]: c["agenda_id"] for c in questions["cases"]}
+    unknown = sorted({k["question_id"] for k in key.values()} - set(agenda_of))
+    if unknown:
+        raise ValueError(f"문항 파일에 없는 question_id: {unknown}")
 
     cells: dict[str, list[float]] = defaultdict(list)  # system → 채점(항목 통과 비율)
+    per_q: dict[str, dict[str, list[float]]] = defaultdict(lambda: {s: [] for s in SYSTEMS})  # 문항별 승패용
     per_item: dict[str, dict[str, list[int]]] = {s: defaultdict(list) for s in SYSTEMS}
     per_agenda: dict[str, dict[str, list[float]]] = defaultdict(lambda: {s: [] for s in SYSTEMS})
     by_grader: dict[str, dict[tuple[str, str], int]] = defaultdict(dict)
@@ -108,6 +131,7 @@ def score_results(outputs: list[dict], grades: list[dict], key: dict, questions:
         k = key[g["blind_id"]]
         frac = sum(g["scores"].values()) / len(ids)
         cells[k["system"]].append(frac)
+        per_q[k["question_id"]][k["system"]].append(frac)
         per_agenda[agenda_of[k["question_id"]]][k["system"]].append(frac)
         for rid, v in g["scores"].items():
             per_item[k["system"]][rid].append(v)
@@ -121,13 +145,21 @@ def score_results(outputs: list[dict], grades: list[dict], key: dict, questions:
     token_x = _ratio(mean([o["tokens"] for o in use["debate"]]), mean([o["tokens"] for o in use["single"]]))
     latency_x = _ratio(mean([o["latency_s"] for o in use["debate"]]), mean([o["latency_s"] for o in use["single"]]))
 
-    pairs = []
-    for g1, g2 in combinations(sorted(by_grader), 2):
-        keys = sorted(by_grader[g1])
-        a, b = [by_grader[g1][k] for k in keys], [by_grader[g2][k] for k in keys]
-        pairs.append({"graders": (g1, g2), "agreement": sum(x == y for x, y in zip(a, b)) / len(a), "kappa": cohens_kappa(a, b)})
+    # 문항별 승패: (토론 평균 − 단일 평균)의 부호. 채점자 평균끼리 비교한다.
+    # 동점은 승으로 세지 않는다(보수적). win_rate = 승 / 전체 문항 → PRD "우위율 60% 이상" 판정에 쓴다.
+    diffs = {q: mean(v["debate"]) - mean(v["single"]) for q, v in per_q.items()}
+    wins = sum(x > 0 for x in diffs.values())
+    ties = sum(x == 0 for x in diffs.values())
 
     return {
+        "seed": seed,
+        "rubric_version": rubric.get("version"),
+        "questions_version": questions.get("version"),
+        "n_questions": len(diffs),
+        "wins": wins,
+        "ties": ties,
+        "losses": len(diffs) - wins - ties,
+        "win_rate": wins / len(diffs),  # 동점은 패와 같이 분모에만 들어간다
         "score": score,
         "gain": gain,  # 루브릭 통과 비율 차이 (debate − single)
         "token_x": token_x,
@@ -136,5 +168,6 @@ def score_results(outputs: list[dict], grades: list[dict], key: dict, questions:
         "gain_per_latency_x": _ratio(gain, latency_x) if latency_x else None,
         "per_item_pass_rate": {s: {r: mean(per_item[s][r]) for r in ids} for s in SYSTEMS},
         "per_agenda_gain": {a: mean(v["debate"]) - mean(v["single"]) for a, v in sorted(per_agenda.items())},
-        "grader_agreement": pairs,
+        "grader_agreement": _agreement(by_grader),
+        "grader_agreement_per_item": {r: _agreement(by_grader, r) for r in ids},  # 일치율 낮은 항목부터 다듬는다
     }

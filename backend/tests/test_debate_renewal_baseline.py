@@ -3,7 +3,7 @@ import json
 import pytest
 
 from agents.debate_renewal.eval.baseline.scoring import (
-    cohens_kappa, load_questions, load_rubric, make_blind_pack, score_results,
+    AGENDAS, cohens_kappa, load_questions, load_rubric, make_blind_pack, score_results,
 )
 
 RUBRIC = load_rubric()
@@ -36,7 +36,8 @@ def test_shipped_files_satisfy_the_spec():
     q = load_questions()
     assert 30 <= len(q["cases"]) <= 50
     assert 5 <= len(RUBRIC["items"]) <= 6
-    assert "flow" not in {c["agenda_id"] for c in q["cases"]}  # 비활성 아젠다는 제외
+    assert {c["agenda_id"] for c in q["cases"]} <= set(AGENDAS)
+    assert all(c["as_of"] and c["ticker"].isdigit() and len(c["ticker"]) == 6 for c in q["cases"])
 
 
 def test_blind_pack_hides_system_and_is_reproducible():
@@ -89,3 +90,57 @@ def test_unbalanced_agendas_are_rejected(tmp_path):
     p.write_text(json.dumps({"cases": cases}), encoding="utf-8")
     with pytest.raises(ValueError):
         load_questions(p)
+
+
+# ── 태은 #28 리뷰 반영 ─────────────────────────────────────
+def test_every_question_passes_precheck_with_its_agenda():
+    # 실험 때 토론 결과가 비지 않도록, 문항마다 라벨 아젠다가 precheck 허용 목록에 들어가야 한다
+    from agents.debate_renewal.contracts import CompanyContext
+    from agents.debate_renewal.eval.refusal import _TODAY, _fresh_status
+    from agents.debate_renewal.precheck import precheck
+
+    bad = []
+    for c in load_questions()["cases"]:
+        r = precheck(c["query"], [CompanyContext(ticker=c["ticker"], company=c["company"])],
+                     data_status=_fresh_status, today=_TODAY)
+        if c["agenda_id"] not in {a.value for a in r.allowed_agendas}:
+            bad.append((c["id"], r.verdict, [a.value for a in r.allowed_agendas]))
+    assert not bad, bad
+
+
+def test_win_rate_counts_ties_as_non_wins():
+    pack, key = make_blind_pack(outputs(), seed=3)
+    gs = grade(pack, key, {"debate": 4, "single": 4})
+    for g in gs:  # q1만 토론이 이기게
+        k = key[g["blind_id"]]
+        if k["question_id"] == "q1" and k["system"] == "debate":
+            g["scores"] = {r: 1 for r in IDS}
+    r = score_results(outputs(), gs, key, mini_questions(), RUBRIC, seed=3)
+    assert (r["wins"], r["ties"], r["losses"]) == (1, 1, 0) and r["win_rate"] == 0.5
+
+
+def test_result_carries_reproduction_info_and_per_item_agreement():
+    pack, key = make_blind_pack(outputs(), seed=5)
+    qs = {**mini_questions(), "version": "qs-test"}
+    r = score_results(outputs(), grade(pack, key, {"debate": 5, "single": 2}), key, qs, RUBRIC, seed=5)
+    assert (r["seed"], r["rubric_version"], r["questions_version"]) == (5, RUBRIC["version"], "qs-test")
+    assert set(r["grader_agreement_per_item"]) == set(IDS)
+    assert r["grader_agreement_per_item"]["R1"][0]["agreement"] == 1.0
+
+
+def test_unknown_question_id_is_reported():
+    pack, key = make_blind_pack(outputs(), seed=1)
+    with pytest.raises(ValueError, match="question_id"):
+        score_results(outputs(), grade(pack, key, {"debate": 5, "single": 2}), key,
+                      {"cases": [{"id": "q1", "agenda_id": "valuation"}]}, RUBRIC)
+
+
+def test_invalid_agenda_or_ticker_is_rejected(tmp_path):
+    base = [{"id": f"q{i}", "agenda_id": a, "ticker": "005930"} for i, a in enumerate(AGENDAS * 6)]
+    for bad in ({"agenda_id": "dividend"}, {"ticker": 5930}):
+        cases = [dict(c) for c in base]
+        cases[0].update(bad)
+        p = tmp_path / "q.json"
+        p.write_text(json.dumps({"cases": cases}), encoding="utf-8")
+        with pytest.raises(ValueError):
+            load_questions(p)

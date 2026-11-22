@@ -15,7 +15,7 @@
 
 ```bash
 cd backend
-pip install pydantic pytest pytest-asyncio
+pip install pydantic pytest pytest-asyncio -e ../data-pipeline
 pytest tests/test_debate_renewal_precheck.py
 ```
 
@@ -31,7 +31,7 @@ backend/agents/debate_renewal/
 
 ## 확정 필요 (코드에 임시값으로 들어가 있음)
 
-- `ReasonCode.insufficient_data`: envelope.py 확정 이름으로 교체 (`contracts.py` TODO)
+- 거절 코드는 계약 이름을 쓴다: 데이터가 없어 남는 아젠다가 없으면 `no_data` (11/17 결정)
 - 공용 계약 위치(`backend/contracts`, data-pipeline)가 생기면 `contracts.py`를 import로 교체
 - `intent_data_sources.json`: 아젠다별 필요 데이터·신선도 기준·T0 가능 여부 (수경과 확정)
 - 아젠다 대체 우선순위(`selection_rules`): 기획서에 "최대 3개 유지"만 있고 무엇을 빼는지는 없음

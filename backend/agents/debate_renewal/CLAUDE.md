@@ -74,9 +74,9 @@
 
 ## 확정 필요한 임시값 (코드 곳곳에 TODO)
 
-- `ReasonCode.insufficient_data` — `envelope.py` 확정 이름으로 교체 (`contracts.py`). 3종목·한쪽 미커버 등 관문1 코드도 같음
+- ~~`ReasonCode.insufficient_data`~~ → 계약의 `no_data`로 확정(11/17, 계약 draft.5 PR #46). 다음 행동은 `choose_alternative_company`
 - 관문1 거절 코드(미커버 종목·3종목 이상·비교 한쪽 미커버)의 `envelope.py` 이름. 11/9 기준 회의에서 확정되지 않았다. precheck 밖이라 이 패키지는 정의하지 않고, 확정되면 `ReasonCode`에 추가한다
-- 공용 계약 위치(`backend/contracts`, data-pipeline)가 생기면 `contracts.py`를 import로 교체하고 파일 삭제. 수경 #30이 병합되면 `from processing.enums import AgendaId, DataTier, Tier`
+- `AgendaId`·`DataTier`·`Tier`는 `processing.enums`(#30, main)에서 import한다. 멤버 이름은 `UPPER_SNAKE`(예: `AgendaId.VALUATION`). `ReasonCode`·`NextAction`·`PrecheckResult`는 `backend/contracts/`가 생기면 옮긴다
 - `data/intent_data_sources.json` — 값은 수경 제안(#21 리뷰 2026-11-10) 반영. `financials`·`flow`·`insider`·`sensitivity`·`derived` 키는 데이터 쪽이 `get_available_data_status`에 추가할 예정(#35 병합 후)이라 그 전에는 해당 키가 provider에 없다 — 남은 키로 판정된다
 - 아젠다 대체 우선순위(`data/keyword_dictionary.json`의 `selection_rules`) — 기획서에 "최대 3개 유지"만 있음
 - `flow` 아젠다 `active: false` — 데이터 쪽은 활성화 OK(`investor_flow_daily` T1 100종목 3년 치). 키워드 사전·거절셋 라벨·기준선 문항 8개와 같이 바꿔야 해서 별도 PR로 진행
@@ -87,7 +87,7 @@
 ```bash
 cd backend
 python -m venv .venv && .venv\Scripts\activate     # macOS/Linux: source .venv/bin/activate
-pip install pydantic pytest pytest-asyncio          # precheck만 돌릴 때는 이것으로 충분
+pip install pydantic pytest pytest-asyncio -e ../data-pipeline   # processing.enums(공용 열거형)를 쓰므로 data-pipeline도 설치
 pytest tests/test_debate_renewal_precheck.py
 # 전체 백엔드 테스트는 requirements.txt 전체 설치 필요 (torch 등 무거움)
 ```

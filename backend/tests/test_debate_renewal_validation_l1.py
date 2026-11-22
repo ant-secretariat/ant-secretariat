@@ -1,11 +1,12 @@
 from agents.debate_renewal.contracts import AgendaId as A
-from agents.debate_renewal.contracts import Tier
+from agents.debate_renewal.contracts import DataTier
 from agents.debate_renewal.schemas import (
     AgendaResult, AgendaVerdict, AxisVerdict, BearOutput, BullOutput, Claim, Comparison,
     ComparisonAxis, CompanyDebate, CompanyMeta, DebateMeta, DebateResult, Evidence, Judge,
     OverallVerdict, Score, Scope, UserProfile,
 )
 from agents.debate_renewal.validation import check_l1
+from agents.debate_renewal.validation.l1 import find_forbidden
 
 
 def claim(cid, text="영업이익이 늘었다", ev=("S1",)):
@@ -18,9 +19,9 @@ def evidence(*ids):
 
 
 def judge(**kw):
-    ov = dict(stance="neutral", confidence="mid", bull_score=3.0, bear_score=3.0, final_brief="요약")
+    ov = dict(stance="neutral", confidence="mid", bull_score=3, bear_score=3, final_brief="요약")
     ov.update(kw)
-    return Judge(user_profile=UserProfile(risk_profile="안정형", investment_goal="장기"), overall_verdict=OverallVerdict(**ov))
+    return Judge(user_profile=UserProfile(risk_profile="conservative", investment_goal="장기"), overall_verdict=OverallVerdict(**ov))
 
 
 def debate(b="B1", r="R1", ref="B1", bull_claims=None, bear_claims=None):
@@ -32,12 +33,12 @@ def debate(b="B1", r="R1", ref="B1", bull_claims=None, bear_claims=None):
 
 def single(bull_claims=None, bear_claims=None, ref="B1", ev=("S1",), j=None):
     bull, bear = debate(ref=ref, bull_claims=bull_claims, bear_claims=bear_claims)
-    ag = AgendaResult(id=A.valuation, title="t", bull=bull, bear=bear,
+    ag = AgendaResult(id=A.VALUATION, title="t", bull=bull, bear=bear,
                       verdict=AgendaVerdict(winner="bull", reason="r", score=Score(bull=3, bear=2)))
     return DebateResult(
-        meta=DebateMeta(trace_id="t", data_as_of="d", generated_at="g", mode="single",
-                        companies=[CompanyMeta(ticker="005930", company="삼성전자", tier=Tier.T1)]),
-        scope=Scope(verdict="full"), selected_agendas=[A.valuation], agendas=[ag],
+        meta=DebateMeta(trace_id="t", data_as_of="d", generated_at="g", mode="single", data_richness="rich",
+                        companies=[CompanyMeta(ticker="005930", company="삼성전자", sector="IT", data_tier=DataTier.REPORT)]),
+        scope=Scope(verdict="full"), selected_agendas=[A.VALUATION], agendas=[ag],
         evidence=evidence(*ev), judge=j or judge(),
     )
 
@@ -82,7 +83,7 @@ def test_forbidden_trade_phrase_in_judge_text_is_flagged_ignoring_spaces():
 
 
 def test_forbidden_phrase_in_points_to_check_and_claim_text():
-    r = check_l1(single(bull_claims=[claim("B1", text="비중을 늘리는 것이 맞다")], j=judge(points_to_check=["사세요"])))
+    r = check_l1(single(bull_claims=[claim("B1", text="비중을 늘리는 것이 좋습니다")], j=judge(points_to_check=["사세요"])))
     assert sorted(codes(r)) == ["forbidden_phrase", "forbidden_phrase"]
 
 
@@ -94,15 +95,15 @@ def _compare(ref_b="B-B1"):
     bull_a, bear_a = debate(b="A-B1", r="A-R1", ref="A-B1")
     bull_b, bear_b = debate(b="B-B1", r="B-R1", ref=ref_b)
     ax = ComparisonAxis(
-        agenda_id=A.valuation, comparable=True,
+        agenda_id=A.VALUATION, comparable=True,
         per_company={"005930": CompanyDebate(bull=bull_a, bear=bear_a), "000660": CompanyDebate(bull=bull_b, bear=bear_b)},
         axis_verdict=AxisVerdict(stronger="tie", reason="r"),
     )
     return DebateResult(
-        meta=DebateMeta(trace_id="t", data_as_of="d", generated_at="g", mode="compare", companies=[
-            CompanyMeta(ticker="005930", company="a", tier=Tier.T1),
-            CompanyMeta(ticker="000660", company="b", tier=Tier.T1)]),
-        scope=Scope(verdict="full"), selected_agendas=[A.valuation], comparison=Comparison(axes=[ax]),
+        meta=DebateMeta(trace_id="t", data_as_of="d", generated_at="g", mode="compare", data_richness="rich", companies=[
+            CompanyMeta(ticker="005930", company="a", sector="IT", data_tier=DataTier.REPORT),
+            CompanyMeta(ticker="000660", company="b", sector="IT", data_tier=DataTier.REPORT)]),
+        scope=Scope(verdict="full"), selected_agendas=[A.VALUATION], comparison=Comparison(axes=[ax]),
         evidence=evidence("S1"), judge=judge(),
     )
 
@@ -112,3 +113,55 @@ def test_compare_mode_checks_each_company_debate():
     r = check_l1(_compare(ref_b="A-B1"))  # 000660의 Bear가 다른 종목의 Bull을 인용
     assert codes(r) == ["bad_bull_claim_ref"]
     assert "per_company[000660]" in r.issues[0].path
+
+
+# ── 태은 #27 리뷰 반영 ─────────────────────────────────────
+import pytest  # noqa: E402
+
+BLOCKED = [
+    "SK하이닉스가 더 좋은 종목입니다",
+    "삼성전자를 사는 게 좋습니다",
+    "매수할 것을 권합니다",
+    "매수를 추천드립니다",
+    "지금이 매수 적기입니다",
+    "삼성전자를 사라",
+    "담아두세요",
+    "적극 매수",
+    "투자에 적합한 종목입니다",
+    "지금 매수 하세요",
+]
+ALLOWED = [
+    "외국인이 비중을 늘리며 순매수 중이다",
+    "기관이 비중을 줄이고 있다",
+    "증권사 3곳이 매수 추천을 유지했다",
+    "검사세요",
+    "매수세가 유입되었다",
+    "공시 확인을 추천드립니다",
+    "변동성을 확인하세요",
+]
+
+
+@pytest.mark.parametrize("text", BLOCKED)
+def test_advice_and_comparison_phrases_are_blocked(text):
+    assert find_forbidden(text), text
+
+
+@pytest.mark.parametrize("text", ALLOWED)
+def test_factual_sentences_are_not_blocked(text):
+    assert find_forbidden(text) is None, (text, find_forbidden(text))
+
+
+def test_placeholder_in_judge_and_verdict_text_is_flagged():
+    r = check_l1(single(j=judge(final_brief="PER은 {{per}}배", points_to_check=["{{ PER(TTM) }} 확인", "{{opm%}}와 {{}}"])))
+    details = [i.detail for i in r.issues if i.code == "unresolved_placeholder"]
+    assert details == ["{{per}}", "{{ PER(TTM) }}", "{{opm%}}", "{{}}"]
+
+
+def test_every_placeholder_in_a_sentence_is_reported():
+    r = check_l1(single(bull_claims=[claim("B1", text="{{per}}배, {{pbr}}배")]))
+    assert [i.detail for i in r.issues] == ["{{per}}", "{{pbr}}"] and all(i.claim_id == "B1" for i in r.issues)
+
+
+def test_bad_bull_claim_ref_points_to_bear_claim():
+    r = check_l1(single(ref="B99"))
+    assert r.issues[0].code == "bad_bull_claim_ref" and r.issues[0].claim_id == "R1"

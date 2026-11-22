@@ -10,7 +10,8 @@
 | `precheck()` 관문2·3 엔진 + 테스트 24개 | 다음 PR (이 PR 위에 쌓임) |
 | Pydantic 스키마 (Bull·Bear·Judge·DebateResult, 단일·비교) | 완료 (테스트 10개) |
 | 검증 레이어 L1 (결정적 검사) | 완료 (테스트 10개) |
-| 프롬프트 v3, 근거 부족 루프, 비교 모드 실행 | 예정 |
+| Bull·Bear·Judge 프롬프트 v3 (`prompts/`, 메시지 조립·strict 출력 스키마) | 완료 (테스트 13개) — LLM 호출은 run_debate 연동 때 |
+| 근거 부족 루프, 비교 모드 실행, 2라운드 프롬프트 | 예정 |
 
 ## 실행
 
@@ -26,6 +27,7 @@ pytest tests/test_debate_renewal_precheck.py
 backend/agents/debate_renewal/
   contracts.py              # AgendaId·Tier·DataTier·ReasonCode·NextAction·PrecheckResult (임시 위치)
   precheck/                 # 규칙 기반 순수 함수, LLM 없음
+  prompts/                  # Bull·Bear·Judge 프롬프트 v3 문구·메시지 조립·Judge 출력 모양 (LLM 호출 없음)
   data/keyword_dictionary.json
   data/intent_data_sources.json   # 수경 제안값 반영 (소유자는 데이터 에이전트)
 ```

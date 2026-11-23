@@ -12,19 +12,21 @@
 2. **숫자는 코드, 문장은 LLM + 검증:** 트렌드 리포트의 목표주가·인사이트보드의 배지는 코드가 계산하고, LLM 문장은 L1 검증을 통과해야만 노출한다.
 3. **레거시 경로 정리:** Pinecone·SQLite 직접 접근을 없애고 데이터 함수(Supabase)만 쓴다.
 
-자유 질의·플래너·도구 레지스트리·Langfuse는 Post-MVP다(계약 11/5 결정).
+4. **공통 인프라:** 도구 레지스트리(모든 데이터 조회 경유), Langfuse 추적, Postgres 큐 워커(Design Doc v1.5 4.1).
+
+자유 질의·플래너·레지스트리의 LLM 도구 정의는 Post-MVP다(계약 11/5 결정). v2.2에서 레지스트리·Langfuse·워커를 MVP로 정정했다(처음 계획에서 Post-MVP로 잘못 뺐음).
 
 ## Technical Context
 
 **Language/Version**: Python 3.12 (backend), TypeScript (frontend, 타입 갱신만)
 
-**Primary Dependencies**: FastAPI, Pydantic v2, LangGraph(기존 라우팅 유지), openai SDK(Upstage 호환), psycopg(데이터 함수 경유), `psycopg_pool`(SSE 조회, R14). 테스트 전용: `pyyaml`, `jsonschema` (research R9)
+**Primary Dependencies**: FastAPI, Pydantic v2, LangGraph(기존 라우팅 유지), openai SDK(Upstage 호환), psycopg(데이터 함수 경유), `psycopg_pool`(SSE 조회, R14), `langfuse` SDK(선택 설정, R17). 테스트 전용: `pyyaml`, `jsonschema` (research R9)
 
 **Storage**: Supabase Postgres — 신규 `agent_jobs`·`job_events`·`uncovered_query_log` (R2). `users`는 SQLite 유지(범위 밖)
 
 **Testing**: pytest + FastAPI TestClient. 데이터 함수·LLM은 monkeypatch로 대체. 계약 테스트는 `openapi.yaml` 스키마 검증(R9)
 
-**Target Platform**: 단일 인스턴스 FastAPI 서버 (uvicorn)
+**Target Platform**: 같은 이미지의 두 프로세스 — API(uvicorn)와 워커(`python -m orchestrator.worker`)
 
 **Project Type**: web-service (backend) + 기존 SPA(frontend)
 
@@ -78,11 +80,14 @@ backend/
 │   └── jobs.py                #   JobStatus, JobEvent 타입
 ├── core/                      # #60: errors(→ REASON_POLICY 사용), config, logging_setup
 ├── verification/              # 신규: text_rules.py (금지 표현·자리표시, 토론과 공용)
+├── tools/                     # 신규: registry.py (ToolSpec·register·invoke), specs.py (MVP 도구 등록)
+├── observability/             # 신규: langfuse.py (trace·span, 설정 없으면 no-op)
 ├── orchestrator/
 │   ├── companies.py           # resolve_companies (관문1) — resolve_company_context 대체
 │   ├── requirements.py        # ROUTE_REQUIREMENTS · check_coverage (경로별 실행 조건, R3)
 │   ├── uncovered.py           # log_uncovered_query
-│   ├── jobs.py                # 토론 job 생성·재사용·한도, append_event, 시작 시 정리
+│   ├── jobs.py                # job 생성·재사용·한도(토론·시뮬레이션), append_event
+│   ├── worker.py              # 워커 루프: SKIP LOCKED·하트비트·복구·타임아웃, run_debate·run_simulation 연결
 │   ├── graph.py · router.py   # trend_report 경로 추가, 노드가 Envelope 반환
 │   ├── schemas.py · service.py
 ├── functions/agent_jobs.py    # Supabase 저장소로 교체 (SQL은 여기에만)
@@ -111,9 +116,11 @@ frontend/src/                   # types.ts · api/client.ts (봉투·Badge·Clai
 | --- | --- | --- | --- | --- |
 | PR-0 | 계약 draft.6 | `REASON_POLICY` 표(OQ-1), `EntityResolution.companies` maxItems 3, `BrokerView`·`VerificationSummary`, 매크로 항목 `ticker="macro"`, 계약 테스트(R9) | — | 유민·수경 리뷰 |
 | PR-1 ★ | 공통 봉투 | `backend/contracts/envelope.py`·`entities.py`, `core/errors`가 `REASON_POLICY` 사용 | PR-0 | 전원 (응답 형식) |
-| PR-2 ★ | job 저장소 | 마이그레이션 `agent_jobs`·`job_events`, `functions/agent_jobs.py` Supabase 교체, `JobStatus`, `append_event`(advisory lock, R15), 시작 시 정리, 끝난 job 이벤트 7일 보관 | PR-1 | 유민 (`run_debate`가 이벤트 기록) |
+| PR-R ★ | 도구 레지스트리 | `backend/tools/registry.py`(`ToolSpec`·`register`·`get`·`list_for`·`invoke`), MVP 도구 14개 등록, `error` 필드 → `ToolResult.error` | PR-1 | 전원 (데이터 조회 경로) |
+| PR-L | Langfuse | `observability/langfuse.py`, 요청·job trace, `invoke`·LLM span, 설정 없으면 no-op | PR-R | — (비용 상한 실측) |
+| PR-2 ★ | job 저장소·워커 | 마이그레이션 `agent_jobs`(job_type·parent_job_id·하트비트 열)·`job_events`, `functions/agent_jobs.py` Supabase 교체, `append_event`(R15), **워커 루프**(SKIP LOCKED·하트비트·복구·타임아웃, R4), 이벤트 7일 보관 | PR-1 | 유민 (`emit` 연결) |
 | PR-3 ★ | 관문1 | `resolve_companies`, `mentioned_in_query`, `ROUTE_REQUIREMENTS`·`check_coverage`, 대안 3개(`suggest_alternatives`), `uncovered_query_log` 마이그레이션·`log_uncovered_query` | PR-1, 수경 `suggest_alternatives` | 유민 (precheck 입력) |
-| PR-4 ★ | 토론 경로 | precheck 호출(`data_status` provider, `DataStatusUnavailable`→503), 거절 payload 채우기, 재사용·동시 한도, `job_started`/`rejected` 봉투, `run_debate` 어댑터, `simulate` 버튼 처리(409·`no_data`) | PR-2, PR-3, 유민 provider 어댑터 | 유민·수경 (시뮬레이션 상태) |
+| PR-4 ★ | 토론 경로 | precheck 호출(`data_status` provider, `DataStatusUnavailable`→503), 거절 payload 채우기, 재사용·동시 한도, `job_started`/`rejected` 봉투, `run_debate` 연결(`emit`·`fetch_evidence`=레지스트리·`profile`·`data_tier`, 순수 함수), `simulate` → 시뮬레이션 job 생성(409·`no_data`·재사용) | PR-2, PR-3, PR-R, 유민 provider·#76 | 유민·수경 (시뮬레이션 job) |
 | PR-5 ★ | SSE | `GET /jobs/{job_id}/events`, `Last-Event-ID`, ping, 종료 후 닫기, 연결 풀(R14) | PR-2 | FE |
 | PR-6 | 세션 | HMAC 쿠키 발급·검증, `user_id` 바디 병행 | PR-1 | FE (R6 팀 결정 후) |
 | PR-7 | 공용 텍스트 검사 | `backend/verification/text_rules.py`, 토론 L1 import 교체 | — | 유민 리뷰 |
@@ -127,12 +134,12 @@ frontend/src/                   # types.ts · api/client.ts (봉투·Badge·Clai
 
 | 귀속 | PR | 기획서 |
 | --- | --- | --- |
-| **공통 인프라** (세 에이전트와 토론이 같이 씀, 태은 소유) | PR-0 계약, PR-1 공통 봉투, PR-6 세션, PR-7 공용 텍스트 검사, PR-11 FE 전환 | 오케스트레이터 기획서 4·8장, 트렌드 리포트 기획서 6장 |
-| **오케스트레이터 (C)** | PR-2 job 저장소, PR-3 관문1, PR-4 토론 경로, PR-5 SSE, PR-12 정리(오케스트레이터 쪽) | [orchestrator-spec.md](../../docs/orchestrator/orchestrator-spec.md) |
+| **공통 인프라** (세 에이전트와 토론이 같이 씀, 태은 소유) | PR-0 계약, PR-1 공통 봉투, **PR-R 도구 레지스트리**, **PR-L Langfuse**, PR-6 세션, PR-7 공용 텍스트 검사, PR-11 FE 전환 | 오케스트레이터 기획서 4·8·9·10장, 트렌드 리포트 기획서 6장 |
+| **오케스트레이터 (C)** | PR-2 job 저장소·워커, PR-3 관문1, PR-4 토론 경로, PR-5 SSE, PR-12 정리(오케스트레이터 쪽) | [orchestrator-spec.md](../../docs/orchestrator/orchestrator-spec.md) |
 | **트렌드 리포트 (D)** | PR-9 데이터·근거·목표주가, PR-10 생성·검증·보완, PR-12 정리(`/agents/trend-report` 삭제) | [trend-report-spec.md](../../docs/trend-report/trend-report-spec.md) |
 | **인사이트보드 (E)** | PR-8 | [insight-board-spec.md](../../docs/insight-board/insight-board-spec.md) |
 
-**일정 (12/6 범위·일정 점검 기준):** PR-0~5를 11/30까지(토론 연동 시작), PR-6~8을 12/4까지, PR-9~10을 12/6 점검일에 리뷰 중, PR-11~12를 12월 둘째 주. 12/6에 PR-9·10이 리뷰에 못 들어가면 트렌드 리포트는 PR-9(코드 계산 목표주가 + 기존 생성) 상태로 MVP를 내고 PR-10을 뒤로 미루는 안을 점검일에 결정한다.
+**일정 (12/6 범위·일정 점검 기준):** PR-0·1·R·2를 11/28까지(유민·수경 연동 시작), PR-3~5를 12/1까지(토론 E2E), PR-L·6~8을 12/4까지, PR-9~10을 12/6 점검일에 리뷰 중, PR-11~12를 12월 둘째 주. 12/6에 PR-9·10이 리뷰에 못 들어가면 트렌드 리포트는 PR-9(코드 계산 목표주가 + 기존 생성) 상태로 MVP를 내고 PR-10을 뒤로 미루는 안을 점검일에 결정한다.
 
 ## 위험과 대응
 
@@ -142,6 +149,8 @@ frontend/src/                   # types.ts · api/client.ts (봉투·Badge·Clai
 | `debate_renewal`의 `run_debate` 미완성 | PR-4 검증 불가 | 어댑터 한 곳에서 레거시 `agents/debate`를 부르고, renewal 준비되면 그 줄만 바꾼다 |
 | Upstage 구조화 출력 미지원 | PR-10 파싱 실패율 | JSON 모드 + Pydantic 검증 + 1회 재요청 (R8) |
 | 인증 결정 지연 (OQ-8) | FE가 `user_id`를 계속 보냄 | 바디 병행 허용으로 다른 PR을 막지 않음 |
+| 범위 증가 (레지스트리·Langfuse·워커를 MVP로 정정) | 11/30 토론 E2E가 빠듯함 | 레지스트리는 `invoke` 한 함수 중심으로 작게, Langfuse는 no-op 기본이라 늦어도 다른 PR을 막지 않음. 12/6 점검일에 트렌드 리포트 범위부터 조정 |
+| 계약 draft.6 합의 지연 (`JobStatus` 4종, `RunDebateInput`) | PR-2·4 구현 방향 흔들림 | PR-0에서 먼저 합의. 합의 전에는 기획서 v2.2 기준으로 진행하고 바뀌면 PR-2 열거형만 수정 |
 | 트렌드 리포트 10초 초과 | FN-TR-01 미달 | 데이터 병렬 조회(R12), 보완 예산 +3초 상한, 측정 후 근거 상한 축소 |
 
 ## Complexity Tracking

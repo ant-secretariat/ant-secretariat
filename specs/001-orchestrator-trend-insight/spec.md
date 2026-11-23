@@ -70,7 +70,8 @@
 
 - 종목 조회 DB 실패 → 503 Problem(없는 회사로 보이지 않게).
 - `ambiguous` 종목명("삼성") → 버튼 경로는 `rejected company_not_found` (FE 자동완성이 후보 제공).
-- API 프로세스 재시작으로 `running` job이 고아가 됨 → 시작 시 `failed`로 정리, 이벤트 `failed` 기록.
+- 워커 프로세스가 죽어 `running` job의 하트비트가 2분 넘게 끊김 → `failed` + `error_code=worker_lost`, 이벤트 `failed` 기록. 자동 재실행 없음.
+- 토론이 끝난 뒤 시뮬레이션 버튼을 누르지 않음 → 토론 job은 `completed`, 새 토론 시작 가능.
 - 트렌드 리포트 LLM JSON 파싱 2회 실패 → 503.
 - 모든 인사이트보드 종목 실패 → 503.
 
@@ -82,7 +83,10 @@
 - **FR-002**: 모든 사유는 `REASON_POLICY` 표의 다음 행동과 payload를 가져야 한다.
 - **FR-003**: 관문1은 종목 입력을 `EntityResolution`으로 확정하고, 조회 실패를 "없는 종목"과 구분해야 한다.
 - **FR-004**: 토론 job은 precheck를 통과한 요청만 만들어야 하고, precheck에는 `mentioned_in_query`를 넘겨야 한다.
-- **FR-005**: 같은 사용자·종목·질문의 진행 중 job은 재사용하고, 사용자당 동시 job 한도를 넘으면 409로 알려야 한다.
+- **FR-005**: 같은 사용자·종목·질문의 진행 중 job은 재사용하고, 사용자당 동시 job 한도를 넘으면 409로 알려야 한다. 끝난 job은 한도에 세지 않는다.
+- **FR-013**: 에이전트의 모든 데이터 조회는 도구 레지스트리 `invoke`를 거치고, 조회 실패를 `ToolResult.error`로 구분해야 한다.
+- **FR-014**: 요청·job마다 Langfuse trace 1개를 남기고 응답 `meta.trace_id`와 같은 값을 써야 한다(설정이 없으면 보내지 않음).
+- **FR-015**: 워커가 죽으면 2분 안에 job을 `failed(worker_lost)`로 정리해야 한다.
 - **FR-006**: job 진행 이벤트는 `job_events`에 `seq` 순서로 쌓이고 SSE로 재전송 가능해야 한다.
 - **FR-007**: 트렌드 리포트의 노출 주장은 모두 L1 인용 검사를 통과해야 하고, 숫자·목표주가 방향은 코드가 계산해야 한다.
 - **FR-008**: 트렌드 리포트는 `data_tier`별 카드 정책을 따라야 한다.
@@ -112,7 +116,8 @@
 
 ## Assumptions
 
-- 자유 질의(채팅)·플래너·도구 레지스트리·Langfuse·근거 부족 루프 S4~S5는 Post-MVP다(계약 11/5 결정).
+- 자유 질의(채팅)·플래너·레지스트리의 LLM 도구 정의(`to_llm_tools`)·근거 부족 루프 S4~S5는 Post-MVP다(계약 11/5 결정). **도구 레지스트리와 Langfuse는 MVP다**(Design Doc v1.5, 토론 기획서 v3.0).
 - `run_debate`·`precheck`는 유민, 데이터 함수·`get_agent_context`(#53)는 수경이 제공한다. 이 기능은 그 인터페이스를 호출만 한다.
-- MVP의 job 실행은 API 프로세스 안 백그라운드 작업이며 외부 큐를 쓰지 않는다.
+- job 실행은 API와 분리된 워커 프로세스가 `FOR UPDATE SKIP LOCKED`로 꺼내는 Postgres 큐다(Design Doc 4.1). 외부 큐 인프라는 쓰지 않는다.
+- 토론과 시뮬레이션은 서로 다른 job(`job_type`)이다(오케스트레이터 기획서 v2.2 6.3).
 - 인증 방식(OQ-8)은 HMAC 서명 쿠키로 제안하고 팀 확정 전까지 바디 `user_id`를 병행 허용한다.

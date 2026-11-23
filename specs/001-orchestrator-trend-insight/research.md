@@ -22,11 +22,12 @@ plan.md의 Technical Context에서 정해지지 않았던 항목을 정리한다
 - **대안:** (1) 티어로 판정 — 위 이유로 기각. (2) 에이전트마다 `resolve_company` 구현을 두기 — 데이터 함수가 소비자를 알게 되고, `data_status`는 이미 한 번의 조회로 모든 소스를 돌려줘 이득이 없다. (3) 컴포지트 Specification·라이브러리 — 지금 조건은 "하나라도 있음"뿐이라 과하다. 조합 조건이 생기면 평가 함수만 바꾼다.
 - **`data_status` 실패:** `None`이거나 `error`가 있으면 503. "데이터 없음"으로 읽지 않는다(원칙 III).
 
-## R4. 토론 job 실행 방식
+## R4. job 실행 방식 (v2.2에서 정정)
 
-- **결정:** API 프로세스 안 `asyncio` 백그라운드 작업(지금 방식 유지). 앱 시작 시 `queued`·`running` job을 `failed`(`error_code=interrupted`)로 정리하고 `failed` 이벤트를 남긴다.
-- **이유:** MVP 데모는 단일 인스턴스다. 큐 도입은 범위·일정 대비 이득이 작다.
-- **대안:** Supabase를 큐로 쓰는 별도 워커 — Post-MVP. `RunDebateInput` 계약은 그대로라 바꿀 때 호출부만 교체한다.
+- **결정:** API와 분리된 **워커 프로세스**가 `agent_jobs`에서 `status='queued'`를 `FOR UPDATE SKIP LOCKED`로 1건씩 꺼낸다. 하트비트 15초, 하트비트가 2분 넘게 끊긴 `running` job은 `failed(worker_lost)`, 토론 전체 5분·LLM 1회 60초 타임아웃, 자동 재실행 없음. 토론과 시뮬레이션은 다른 `job_type`이다.
+- **이유:** 상위 문서인 Design Doc v1.5 4.1이 이렇게 정했다(헌법 문서 우선순위: Design Doc > 에이전트 기획서). API 재시작에도 작업과 진행 상태를 잃지 않고(Design Doc 2.1 목표), 시연 중 API를 재배포해도 토론이 계속된다.
+- **처음 결정(정정 전):** API 안 `asyncio` 백그라운드 작업. 상위 문서를 확인하지 않고 지금 코드를 기준으로 정했다.
+- **대안:** PgQueuer·Procrastinate — LISTEN 의존(풀러 제약)과 학습 비용(Design Doc 5장). Celery+Redis — 인프라 추가.
 
 ## R5. 목표주가 방향 규칙 — #82에서 확정
 
@@ -83,6 +84,19 @@ plan.md의 Technical Context에서 정해지지 않았던 항목을 정리한다
 - **결정:** 같은 트랜잭션에서 `pg_advisory_xact_lock(hashtext(job_id))` 후 `max(seq)+1` 삽입.
 - **이유:** 비교 모드는 종목별 Bull·Bear가 병렬이라 같은 job에 이벤트가 동시에 들어온다(#68 리뷰).
 - **대안:** 전역 자동 증가 `seq` — 잠금은 필요 없지만 커밋 순서가 뒤바뀌면 SSE 클라이언트가 앞 번호를 놓친다. asyncio Lock — 재시작·다중 워커에서 깨진다.
+
+## R16. 도구 레지스트리 (MVP)
+
+- **결정:** `backend/tools/registry.py`에 `ToolSpec`·`register`·`get`·`list_for`·`invoke`. 모든 에이전트의 데이터 조회가 `invoke`를 거친다. 데이터 함수의 `error`(·`reason`) 필드를 `ToolResult.error`로 올려 조회 실패를 구분한다. `to_llm_tools`는 Post-MVP.
+- **이유:** 토론 기획서 v3.0("데이터는 레지스트리 경유, 직접 import 금지")과 Design Doc 4.8이 MVP 전제로 썼다. 인자 검증·권한·관측을 에이전트마다 따로 구현하지 않는다.
+- **처음 결정(정정 전):** Post-MVP. 레지스트리를 쓰는 쪽이 플래너뿐이라고 잘못 봤다.
+- **대안:** 별도 패키지(`packages/tools`, uv workspace) — 새 패키지 없이 `backend/tools/`로 충분(#59).
+
+## R17. Langfuse (MVP)
+
+- **결정:** 요청·job마다 trace 1개(trace id = #60의 `trace_id`), `invoke`·LLM 호출을 span으로. `LANGFUSE_*` 설정이 없으면 no-op.
+- **이유:** Design Doc 4.5가 토론 1건 토큰 상한·워커 동시 수를 Langfuse 실측으로 정하게 했고, 피드백 API가 `trace_id`로 연결된다(4.10).
+- **남은 결정:** Cloud 무료 vs 셀프호스트(오케스트레이터 기획서 Q7).
 
 ## R13. `mentioned_in_query`
 

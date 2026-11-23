@@ -11,7 +11,7 @@ API 스키마의 원본은 [`docs/api/openapi.yaml`](../../docs/api/openapi.yaml
 | `NextAction` | `envelope.py` | 행동별 payload 필수 항목·최소 개수(`alternatives` ≥1, `candidates` ≥3 등) |
 | `ResponseMeta` | `envelope.py` | `trace_id`는 `core.logging_setup.trace_id_var`, `data_as_of`는 기본값 없음 |
 | `CompanyContext`·`Candidate`·`EntityResolution` | `entities.py` | `companies` ≤3 (계약 draft.6), `mode`는 종목 수에서 계산 |
-| `JobStatus` | `jobs.py` | 7종. 전이는 3장 |
+| `JobStatus` | `jobs.py` | 4종(draft.6). 전이는 4장 |
 | `JobEvent` | `jobs.py` | `type`은 계약 enum 13종, 비교 모드 종목별 이벤트는 `payload.ticker` 필수 |
 
 공용 열거형 `AgendaId`·`DataTier`·`Tier`는 `processing.enums`에서 import한다(다시 정의하지 않음, 헌법 원칙 II).
@@ -32,20 +32,24 @@ API 스키마의 원본은 [`docs/api/openapi.yaml`](../../docs/api/openapi.yaml
 
 | 컬럼 | 타입 | 규칙 |
 | --- | --- | --- |
-| `job_id` | text PK | `debate_<uuid hex>` |
+| `job_id` | text PK | `<job_type>_<uuid hex>` |
 | `user_id` | text not null | 세션 사용자 |
-| `job_type` | text not null | `debate` |
-| `mode` | text not null | `single` · `compare` |
+| `job_type` | text not null | `debate` · `simulation` |
+| `parent_job_id` | text FK | 시뮬레이션 job → 원래 토론 job |
+| `mode` | text | 토론만: `single` · `compare` |
 | `tickers` | text[] not null | 1~2개, 6자리 문자열 |
-| `query` | text not null | 재사용 판정 키에 포함 |
-| `status` | text not null | `JobStatus` check 제약 |
-| `precheck` | jsonb not null | `PrecheckResult` |
-| `debate_result` · `simulation_result` | jsonb | 없으면 null |
-| `error_code` | text | `interrupted` 등 |
+| `query` | text | 토론만. 재사용 판정 키에 포함 |
+| `status` | text not null | `queued` · `running` · `completed` · `failed` |
+| `precheck` | jsonb | 토론만, `PrecheckResult` |
+| `result` | jsonb | 토론: `DebateResult`, 시뮬레이션: 요약만 |
+| `simulation_ready` | boolean | 토론 완료 시점 값 (시뮬레이션 실행 비율 분모) |
+| `trace_id` | text | 생성 요청의 trace id, 워커가 이어 씀 |
+| `locked_by` · `heartbeat_at` · `attempts` | text · timestamptz · int | 워커 큐 (R4) |
+| `error_code` · `failed_stage` | text | `worker_lost`·`timeout` 등 |
 | `created_at` · `updated_at` | timestamptz | |
 
-- 인덱스: `(user_id, status)` — 동시 한도·재사용 조회.
-- 재사용 키: `user_id`, 정렬한 `tickers`, `query`, `status in ('queued','running')`.
+- 인덱스: `(status, created_at)` — 워커 꺼내기, `(user_id, job_type, status)` — 동시 한도·재사용.
+- 재사용 키: `user_id`, `job_type`, 정렬한 `tickers`, `query`(시뮬레이션은 `parent_job_id`), `status in ('queued','running')`.
 
 ### `job_events`
 
@@ -75,17 +79,17 @@ API 스키마의 원본은 [`docs/api/openapi.yaml`](../../docs/api/openapi.yaml
 
 RLS: 세 테이블 모두 서비스 키 전용(익명 접근 없음). `core_tables_rls.sql`과 같은 방식.
 
-## 4. 상태 전이 (`JobStatus`)
+## 4. 상태 전이 (job마다 같은 4종)
 
 ```text
-queued → running ─┬─ (compare) → debate_completed                         종료
-                  └─ (single)  → simulation_pending ── 사용자 버튼 ──▶ simulation_running → completed
-                                       │ 누르지 않으면 여기서 멈춤 (토론 결과 조회 가능)
-running · simulation_running ── 실패 ──▶ failed
+토론 job       queued → running → completed (단일·비교 모두)  /  failed
+                                     │ completed payload: simulation_ready
+                                     ▼ 사용자 버튼 (simulation_ready=true)
+시뮬레이션 job  queued → running → completed / failed       (parent_job_id = 토론 job)
 ```
 
-- 버튼: `POST /orchestrate/debate/{job_id}/simulate`(계약 #46). 비교 모드·이미 실행 중·완료면 409 `invalid_job_state`, 시뮬레이션 파라미터 없는 종목이면 200 rejected `no_data`(job은 `failed`로 바꾸지 않음).
-- 토론 완료 이벤트와 job 조회 응답에 `simulation_ready`를 포함.
+- 버튼: `POST /orchestrate/debate/{job_id}/simulate`(계약 #46)가 시뮬레이션 job을 만들어 `job_started`를 돌려준다. 비교 모드·토론 미완료면 409 `invalid_job_state`, `simulation_ready=false`면 200 rejected `no_data`, 진행 중 시뮬레이션 job이 있으면 `reused=true`.
+- `running` → `failed`: 실행 실패, 타임아웃(`timeout`), 워커 중단(`worker_lost`).
+- 계약 `JobStatus` 7종을 4종으로 줄이는 변경은 draft.6(contracts C11).
 
-- `running` → `failed`: 토론 실패, 또는 앱 재시작 정리(`error_code=interrupted`).
 - 상태가 바뀔 때마다 대응 이벤트를 `job_events`에 같은 트랜잭션으로 남긴다(`job_started`, `completed`, `failed`, `simulation_*`).

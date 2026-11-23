@@ -1,0 +1,17 @@
+# 계약 변경 목록 (PR-0, draft.5 → draft.6)
+
+계약 원본은 [`docs/api/openapi.yaml`](../../../docs/api/openapi.yaml) 하나다. 이 폴더에 스키마를 복사하지 않는다. 아래는 이 기능이 계약에 넣어야 할 변경 목록이고, PR-0에서 반영한다(헌법 원칙 II: 계약을 쓰는 쪽 담당자 리뷰).
+
+| # | 대상 | 변경 | 이유 | 리뷰 |
+| --- | --- | --- | --- | --- |
+| C1 | `info.description` | 사유 정책표(`REASON_POLICY`: 코드 → 채널·HTTP·next_action·payload) 추가, OQ-1 닫기 | 표가 계약 어디에도 없음 | 전원 |
+| C2 | `EntityResolution.companies` | `maxItems: 2` → `3`, 설명에 "토론은 `max_companies=2`" | 인사이트보드는 3종목 | 유민·수경 |
+| C3 | `BrokerView` (신규) | `broker`, `opinion`, `target_price`, `published_at`, `view: Claim` | `broker_differences` 항목이 미정의 | — |
+| C4 | `VerificationSummary` (신규) | `checked`, `retracted`, `gap_filled`, `failed_checks` | `TrendReportResult.verification`이 열린 객체 | 유민 (토론도 같은 집계를 쓸지) |
+| C5 | `CompanyData.ticker` | 매크로 항목은 `"macro"` | 매크로는 종목이 없음 | — |
+| C6 | `TargetPriceTrend` | `direction` 계산 규칙(90일·2/3·±3%)을 설명에 | 코드 계산 규칙 공개 | 수경 |
+| C7 | `OrchestratorRequest.request_type` | 설명에 버튼 경로 3종이 MVP, `chat`은 Post-MVP 명시 | 범위 명확화 | — |
+| C8 | `job_not_found` · `invalid_job_state` | "제안" 표시 제거 (OQ-2 닫기) | 구현에서 사용 | 전원 |
+
+- 계약 테스트(`backend/tests/contract/`)를 같은 PR에 넣어, 이후 PR의 응답이 이 스키마로 검증되게 한다.
+- `/agents/trend-report`는 이미 `deprecated`다. 삭제는 PR-12.

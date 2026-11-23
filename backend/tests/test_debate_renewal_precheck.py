@@ -163,7 +163,7 @@ def test_three_companies_raise():
 
 
 def test_result_carries_dictionary_version():
-    assert run("").dictionary_version == "kw-0.1.1+ds-0.2.0"
+    assert run("").dictionary_version == "kw-0.2.1+ds-0.2.0"
 
 
 def test_flow_net_buy_is_not_investment_advice():
@@ -215,3 +215,43 @@ def test_default_today_uses_kst(monkeypatch):
     old = full_status(latest=date(2026, 10, 31))
     r = precheck("", (SAMSUNG,), data_status=provider(**{"005930": old}))
     assert "stale_data" in r.flags
+
+
+# ── 범위 밖 단어 (kw-0.2.0) ──────────────────────────────
+def test_out_of_scope_word_overrides_generic_keyword():
+    r = run("내일 서울 날씨 어때")  # "어때"는 일반 분석 표현이지만 "날씨"가 이긴다
+    assert r.reject_reason == ReasonCode.OUT_OF_SCOPE_TOPIC
+
+
+def test_out_of_scope_word_overrides_agenda_keyword():
+    assert run("금리 낮은 적금 상품 추천해줘").reject_reason == ReasonCode.OUT_OF_SCOPE_TOPIC
+
+
+# ── 태은 #25 리뷰 반영 ─────────────────────────────────────
+def test_covered_company_industry_words_are_not_out_of_scope():
+    # 하이브는 커버 종목. 노래·앨범 같은 업종 단어로 거절하지 않는다
+    assert run("하이브 앨범 노래 흥행이 매출에 영향").verdict != "reject"
+
+
+def test_holding_company_name_and_market_entry_are_not_advice():
+    assert "investment_advice_request" not in run("POSCO홀딩스 전망 어때").flags
+    assert "investment_advice_request" not in run("삼성전자 파운드리 시장 진입 전망").flags
+    assert "investment_advice_request" in run("삼성전자 계속 홀딩해도 될까").flags
+
+
+def test_safety_training_query_does_not_match_risk_keyword():
+    from agents.debate_renewal.precheck.config import load_default_config, normalize
+    risk = load_default_config().keywords[A.RISK].keywords
+    assert not any(k in normalize("안전 교육 자료") for k in risk)
+    assert any(k in normalize("삼성전자 안전한 종목이야?") for k in risk)
+
+
+def test_stock_price_and_holding_questions_pass_scope_gate():
+    assert run("삼성전자 주가가 왜 떨어졌어?").verdict == "full"
+    r = run("삼성전자 계속 들고 있어도 돼?")
+    assert r.verdict == "full" and r.flags == ["investment_advice_request"]
+
+
+def test_earnings_and_rate_words_do_not_form_out_of_scope_substring():
+    # "실적 금리" → 공백 제거 후 "실적금리"에 "적금"이 들어가도 거절하지 않는다
+    assert run("삼성전자 실적 금리 전망").verdict != "reject"

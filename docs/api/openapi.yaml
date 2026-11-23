@@ -476,6 +476,7 @@ paths:
         **상태:** 신규 · **릴리스:** MVP · **전송:** HTTP
 
         `debate_completed`·`simulation_pending` 상태의 본인 job만 실행합니다. 이미 실행 중이면 기존 상태를 반환합니다(멱등).
+        비교 모드(`meta.mode=compare`) job은 409 `invalid_job_state`로 거절합니다(ADR 0007, 비교 모드는 시뮬레이션 없음).
         이력 부족은 즉시 거절하지 않고 `job_started` 후 `failed` + `error_code=insufficient_history`로 끝납니다.
       x-transport: http
       x-release: mvp
@@ -2138,6 +2139,7 @@ components:
       - ambiguous
       - uncovered
       - mode
+      - mentioned_in_query
       properties:
         status:
           type: string
@@ -2168,6 +2170,9 @@ components:
           enum:
           - single
           - compare
+        mentioned_in_query:
+          type: boolean
+          description: 질의 문장에서 `companies`의 종목을 하나 이상 찾았으면 true입니다(별칭·조사 포함, `extract_company_mentions` 결과). 종목을 UI로 고르고 질의에 이름이 없으면 false입니다. 오케스트레이터가 precheck에 그대로 넘깁니다.
     OrchestratorRequest:
       type: object
       required:
@@ -2595,7 +2600,7 @@ components:
         matched_intents:
           type: array
           items:
-            type: string
+            $ref: '#/components/schemas/AgendaId'
         flags:
           type: array
           items:
@@ -2615,6 +2620,11 @@ components:
           $ref: '#/components/schemas/AgendaId'
         reason:
           type: string
+          enum:
+          - no_data
+          - tier_limited
+          - not_selected_cap
+          description: '`no_data`는 데이터가 없어 뺐음(ReasonCode.no_data와 같은 뜻), `tier_limited`는 이 종목의 데이터 등급에서 다루지 않는 아젠다, `not_selected_cap`은 3개 상한을 넘어 뺐음입니다.'
     DebateAgenda:
       type: object
       required:
@@ -2805,7 +2815,6 @@ components:
           type: object
           required:
           - user_profile
-          - overall_verdict
           properties:
             user_profile:
               type: object
@@ -2817,37 +2826,47 @@ components:
                   - string
                   - 'null'
             overall_verdict:
+              description: 단일 모드 전용입니다. 비교 모드에서는 null이고 `per_company_verdict`를 씁니다.
+              oneOf:
+              - $ref: '#/components/schemas/OverallVerdict'
+              - type: 'null'
+            per_company_verdict:
               type: object
-              required:
-              - stance
-              - confidence
-              - bull_score
-              - bear_score
-              - final_brief
-              - caution
-              - points_to_check
-              properties:
-                stance:
-                  type: string
-                  enum:
-                  - bullish
-                  - neutral
-                  - bearish
-                confidence:
-                  type: string
-                bull_score:
-                  type: integer
-                bear_score:
-                  type: integer
-                final_brief:
-                  type: string
-                caution:
-                  type: string
-                points_to_check:
-                  type: array
-                  items:
-                    type: string
-                  description: 매매 판단이 아닌 확인 포인트
+              description: 비교 모드 전용입니다. ticker → 종목별 판정이며 두 종목 모두 필수입니다. 두 종목을 묶은 stance는 두지 않고, 축별 우열은 `comparison.axes[].axis_verdict`에 둡니다. 단일 모드에서는 빈 객체입니다.
+              additionalProperties:
+                $ref: '#/components/schemas/OverallVerdict'
+    OverallVerdict:
+      type: object
+      required:
+      - stance
+      - confidence
+      - bull_score
+      - bear_score
+      - final_brief
+      - caution
+      - points_to_check
+      properties:
+        stance:
+          type: string
+          enum:
+          - bullish
+          - neutral
+          - bearish
+        confidence:
+          type: string
+        bull_score:
+          type: integer
+        bear_score:
+          type: integer
+        final_brief:
+          type: string
+        caution:
+          type: string
+        points_to_check:
+          type: array
+          items:
+            type: string
+          description: 매매 판단이 아닌 확인 포인트
     DebateComparison:
       type: object
       required:
@@ -3676,8 +3695,14 @@ components:
           type: string
         companies:
           type: array
+          maxItems: 2
           items:
             $ref: '#/components/schemas/CompanyContext'
+        company_mentioned:
+          type:
+          - boolean
+          - 'null'
+          description: EntityResolution.mentioned_in_query 값입니다. null이면 precheck가 공식 회사명·종목코드로 직접 확인합니다.
     RunDebateInput:
       type: object
       required:
@@ -3690,7 +3715,7 @@ components:
         companies:
           type: array
           minItems: 1
-          maxItems: 1
+          maxItems: 2
           items:
             $ref: '#/components/schemas/CompanyContext'
         user_id:

@@ -14,11 +14,15 @@ from dotenv import load_dotenv
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 load_dotenv(BACKEND_DIR / ".env")
 
-# 토론·트렌드 리포트·리스크 분류가 모두 Upstage를 호출한다. 없으면 요청 중에 실패하므로 시작 시 막는다
-REQUIRED_ENV = ("UPSTAGE_API_KEY",)
+# 없으면 서버는 떠도 요청마다 실패하는 값이라 시작 시 막는다
+# - UPSTAGE_API_KEY: 토론·트렌드 리포트·리스크 분류의 LLM 호출
+# - SUPABASE_DB_URL: 데이터 함수(resolve_company, get_available_data_status 등)가 모두 Supabase에서 읽음
+REQUIRED_ENV = ("UPSTAGE_API_KEY", "SUPABASE_DB_URL")
 
 
 def check_required_env() -> None:
+    # data-pipeline/.env에만 둔 값(SUPABASE_DB_URL 등)도 보이도록 그쪽 설정을 먼저 읽는다
+    import crawling.config.settings  # noqa: F401
     missing = [name for name in REQUIRED_ENV if not os.getenv(name)]
     if missing:
         raise SystemExit(f"필수 환경변수가 없습니다: {', '.join(missing)} (backend/.env 확인)")

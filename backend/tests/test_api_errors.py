@@ -46,7 +46,7 @@ def test_domain_validation_is_422(client):
 def test_unknown_company_is_company_not_found(client, monkeypatch):
     import processing.functions.resolve_company as rc
 
-    monkeypatch.setattr(rc, "resolve_company", lambda _: {"matched": False, "status": "not_found"})
+    monkeypatch.setattr(rc, "resolve_company", lambda _: {"status": "not_found", "matched": False})
     body = _assert_problem(
         client.post("/orchestrate/debate", json={"user_id": "u1", "company": "없는회사"}),
         422,
@@ -79,13 +79,38 @@ def test_unexpected_error_hides_internal_message(client, monkeypatch):
     assert "secret" not in body["detail"]
 
 
+def test_ambiguous_company_is_company_not_found(client, monkeypatch):
+    import processing.functions.resolve_company as rc
+
+    # matched가 아니라 status로 판단한다 (matched는 deprecated)
+    monkeypatch.setattr(rc, "resolve_company", lambda _: {"status": "ambiguous", "matched": True})
+    _assert_problem(
+        client.post("/orchestrate/debate", json={"user_id": "u1", "company": "삼성"}),
+        422,
+        "company_not_found",
+    )
+
+
+def test_data_status_failure_is_503(client, monkeypatch):
+    import processing.functions.get_available_data_status as ds
+
+    monkeypatch.setattr(
+        ds, "get_available_data_status", lambda _: {"ticker": "005930", "error": "data_status_unavailable"}
+    )
+    _assert_problem(client.get("/companies/005930/data-status"), 503, "upstream_unavailable")
+
+
 def test_success_response_carries_trace_id(client):
     response = client.get("/health")
     assert response.status_code == 200
     assert response.headers["x-trace-id"]
 
 
-def test_missing_required_env_stops_startup(monkeypatch):
-    monkeypatch.delenv("UPSTAGE_API_KEY", raising=False)
-    with pytest.raises(SystemExit, match="UPSTAGE_API_KEY"):
+@pytest.mark.parametrize("name", config.REQUIRED_ENV)
+def test_missing_required_env_stops_startup(monkeypatch, name):
+    import crawling.config.settings  # noqa: F401  먼저 읽어 두어야 그쪽 .env가 delenv를 되돌리지 않는다
+    for other in config.REQUIRED_ENV:
+        monkeypatch.setenv(other, "x")
+    monkeypatch.delenv(name)
+    with pytest.raises(SystemExit, match=name):
         config.check_required_env()

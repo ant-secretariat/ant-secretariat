@@ -54,3 +54,5 @@ backend/agents/debate_renewal/
 - 근거 본문 길이 `PREVIEW_CHARS` 600자, `data_richness`는 `data_tier == report`면 rich 그 외 limited (임시값)
 - 아젠다 하나의 Bull·Bear가 실패하면 토론 전체가 실패한다. 남은 아젠다로 계속할지(부분 결과)는 기획서에 없음
 - Judge가 아젠다 판정을 빠뜨리면 채우지 않고 `LLMOutputInvalidError`
+- 근거 부족 루프: 근거 없는 Claim의 문장으로 `fetch_evidence`를 다시 불러 Claim당 2개(`GAP_TOP_K`, 임시값)까지 `gap_fill`로 더한다. 1회 수정은 문제가 있는 노드만 다시 생성(Bull을 다시 쓰면 Bear·Judge도)
+- partial: 수정 뒤에도 실패한 Claim은 빼고 `DebateRun.removed_claim_ids`에 남긴다. 계약 `DebateResult`에 partial 고지 칸이 없어 draft.6 요청 필요. Bear가 반박한 Bull Claim이 빠지면 `bad_bull_claim_ref`가 L1에 남는데, 그 아젠다를 어떻게 보여 줄지 확정 필요

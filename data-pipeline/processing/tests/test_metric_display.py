@@ -46,6 +46,11 @@ from processing.tests.test_metric_and_status import FakeConnection, _use
         ("market_cap", 999_999_400_000.0, "원", "9,999.99억 원"),
         ("market_cap", -999_999_600_000.0, "원", "-1조 원"),
         ("close", 1_176_000.4, "원", "1,176,000원"),
+        # NaN·무한대는 예외 없이 null (#52 리뷰)
+        ("market_cap", float("nan"), "원", None),
+        ("close", float("inf"), "원", None),
+        ("insider_net_shares_90d", float("-inf"), "주", None),
+        ("revenue_growth_yoy", float("nan"), "%", None),
     ],
 )
 def test_format_display(metric_id, value, unit, expected):

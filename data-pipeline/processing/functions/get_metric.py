@@ -1,4 +1,5 @@
 import logging
+import math
 from datetime import date
 
 logger = logging.getLogger(__name__)
@@ -168,14 +169,14 @@ HUNDRED_MILLION = 10**8
 
 
 def format_display(metric_id: str, value, unit: str) -> str | None:
-    """value와 unit으로 만든 표시용 문자열. value가 null이면 null.
+    """value와 unit으로 만든 표시용 문자열. value가 null이거나 NaN·무한대면 null.
 
     배·%·%p는 소수 둘째 자리까지(끝의 0은 지움), 원은 주당 값이면 쉼표 정수, 합계면 조·억 원,
     주·건은 쉼표 정수. 증감 지표는 양수에 +를 붙인다.
     먼저 반올림하고 그 값으로 단위와 부호를 고른다(999,999,600,000원 → 1조 원, 0.004% → 0%).
     """
-    if value is None:
-        return None
+    if value is None or not math.isfinite(float(value)):
+        return None  # 문장에 "nan%"가 들어가지 않게. 토론 L1은 display가 null이면 숫자 없이 다시 쓴다
     number, decimals, suffix = _rounded(metric_id, float(value), unit)
     if number == 0:
         number = 0  # -0 → 0

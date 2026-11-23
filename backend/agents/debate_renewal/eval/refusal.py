@@ -23,7 +23,8 @@ from agents.debate_renewal.precheck.config import PrecheckConfig
 
 DEFAULT_PATH = Path(__file__).with_name("refusal_set.json")
 _TODAY = date(2026, 11, 7)
-_COMPANY = CompanyContext(ticker="005930", company="삼성전자", sector="반도체")
+_SAMSUNG = CompanyContext(ticker="005930", company="삼성전자", sector="반도체")
+_HYNIX = CompanyContext(ticker="000660", company="SK하이닉스", sector="반도체")
 _SOURCES = ("report", "news", "disclosure", "price", "macro", "target_price",
             "financials", "flow", "insider", "sensitivity", "derived")  # 뒤 5개는 수경이 추가 예정 (ds-0.2.0)
 
@@ -47,6 +48,11 @@ def _fresh_status(_: str) -> TickerDataStatus:
     return TickerDataStatus(tier=Tier.T1, sources={k: s for k in _SOURCES})
 
 
+def _company_for(query: str) -> CompanyContext:
+    """관문1이 질의에서 종목을 확정한 상황을 흉내 낸다. 질의에 종목명이 없으면 삼성전자(버튼 경로)."""
+    return _HYNIX if "하이닉스" in query else _SAMSUNG
+
+
 def split_of(cases: list[dict[str, Any]], split: str) -> list[dict[str, Any]]:
     """split=dev는 사전 튜닝에 쓰고, holdout은 튜닝 때 실패 문항을 보지 않는 확인용이다."""
     return [c for c in cases if c.get("split", "dev") == split]
@@ -57,7 +63,7 @@ def evaluate(cases: list[dict[str, Any]], config: PrecheckConfig | None = None) 
     by_reason: dict[str, list[int]] = defaultdict(lambda: [0, 0])  # 거절 사유 → [맞음, 전체]
     dictionary_version = ""
     for c in cases:
-        r = precheck(c["query"], [_COMPANY], data_status=_fresh_status, config=config, today=_TODAY)
+        r = precheck(c["query"], [_company_for(c["query"])], data_status=_fresh_status, config=config, today=_TODAY)
         if c["expect"] == "reject":
             ok = r.verdict == "reject" and r.reject_reason == ReasonCode(c["reason"])
         else:
@@ -114,4 +120,8 @@ if __name__ == "__main__":
     print(format_report(version, evaluate(split_of(cases, "dev")), "[dev]"))
     # holdout 실패 문항은 튜닝에 쓰지 않도록 기본으로 숨긴다. 확인은 --show-holdout.
     print()
-    print(format_report(version, evaluate(split_of(cases, "holdout")), "[holdout]", "--show-holdout" in sys.argv))
+    for name in ("holdout", "holdout2"):
+        sub = split_of(cases, name)
+        if sub:
+            print(format_report(version, evaluate(sub), f"[{name}]", "--show-holdout" in sys.argv))
+            print()

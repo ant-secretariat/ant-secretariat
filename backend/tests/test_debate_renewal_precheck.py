@@ -163,7 +163,7 @@ def test_three_companies_raise():
 
 
 def test_result_carries_dictionary_version():
-    assert run("").dictionary_version == "kw-0.2.1+ds-0.2.0"
+    assert run("").dictionary_version == "kw-0.3.1+ds-0.2.0"
 
 
 def test_flow_net_buy_is_not_investment_advice():
@@ -255,3 +255,44 @@ def test_stock_price_and_holding_questions_pass_scope_gate():
 def test_earnings_and_rate_words_do_not_form_out_of_scope_substring():
     # "실적 금리" → 공백 제거 후 "실적금리"에 "적금"이 들어가도 거절하지 않는다
     assert run("삼성전자 실적 금리 전망").verdict != "reject"
+
+
+# ── 약한 신호는 종목명이 있어야 통과 (kw-0.3.0) ───────────────
+def test_weak_signal_without_company_name_is_rejected():
+    assert run("고양이 사료 추천해줘").reject_reason == ReasonCode.OUT_OF_SCOPE_TOPIC
+
+
+def test_weak_signal_with_company_name_passes_with_advice_flag():
+    r = run("삼성전자 추천해줘")
+    assert r.verdict == "full" and r.flags == ["investment_advice_request"]
+
+
+def test_generic_word_without_company_name_is_rejected():
+    assert run("내 연봉 전망 어때?").reject_reason == ReasonCode.OUT_OF_SCOPE_TOPIC
+
+
+def test_company_name_is_matched_for_either_compared_company():
+    assert run("SK하이닉스 어때", companies=(SAMSUNG, HYNIX)).verdict == "full"
+
+
+def test_strong_trade_phrase_passes_without_company_name():
+    r = run("지금 팔아야 돼?")
+    assert r.verdict == "full" and r.flags == ["investment_advice_request"]
+
+
+# ── 태은 #26 리뷰 반영: 별칭은 관문1 결과를 받아 쓴다 ──────────────
+def test_alias_query_passes_when_entity_resolution_found_company():
+    r = run("하이닉스 전망 어때", companies=(HYNIX,), company_mentioned=True)
+    assert r.verdict == "full"
+
+
+def test_alias_query_without_signal_falls_back_to_official_name():
+    # 관문1 값이 없으면 공식 회사명만 보므로 별칭 질의는 거절된다 (계약 필드가 생기기 전 동작)
+    assert run("하이닉스 전망 어때", companies=(HYNIX,)).reject_reason == ReasonCode.OUT_OF_SCOPE_TOPIC
+
+
+def test_ui_selected_company_with_nameless_question_passes_when_flagged():
+    # 종목을 UI로 고르고 이름 없이 질문한 경우: 관문1이 종목을 확정했다고 넘기면 통과
+    assert run("전망 어때", company_mentioned=True).verdict == "full"
+    assert run("점심 메뉴 알려줘", company_mentioned=True).reject_reason == ReasonCode.OUT_OF_SCOPE_TOPIC
+

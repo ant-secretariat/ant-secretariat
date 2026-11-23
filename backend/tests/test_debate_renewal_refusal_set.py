@@ -5,17 +5,21 @@ import pytest
 
 from agents.debate_renewal.eval.refusal import DEFAULT_PATH, evaluate, load_cases, split_of
 
-# rs-0.2.1 기준선 (사전 kw-0.2.1). 사전을 고쳐 수치가 좋아지면 이 값도 같은 PR에서 낮춘다.
-# kw-0.2.0은 dev 5%(1/20)·holdout 40%였다. holdout 개선분(60→40%)은 holdout에만 있는 단어(맛집·노래)에서 나와
-# 오염 가능성이 있었다(태은 #25 리뷰). kw-0.2.1에서 커버 종목과 겹치는 노래·영화·드라마·레시피를 빼면서
-# hr-08이 다시 실패해 holdout 50%(5/10)가 정직한 값이다. dev는 flow 2문항을 정상 질의로 옮겨 1/18.
-DEV_WRONG_ANSWER, DEV_OVER_REFUSAL = 1 / 18, 0.0
-HOLDOUT_WRONG_ANSWER, HOLDOUT_OVER_REFUSAL = 5 / 10, 1 / 12
+# rs-0.3.1 기준선 (사전 kw-0.3.1). 사전을 고쳐 수치가 좋아지면 이 값도 같은 PR에서 낮춘다.
+# kw-0.3.1(리뷰 반영)에서 dev는 flow 2문항을 정상 질의로 옮겨 분모만 바뀌었다(1/20 → 1/18).
+# holdout·holdout2는 kw-0.3.0과 같은 2/10이다 (hr-08 "이 노래 어때"는 약한 신호 규칙으로 계속 거절).
+# 직전(kw-0.2.0)은 dev 5%/0%, holdout 40%/8.3%, holdout2 100%/0%였다.
+# holdout은 kw-0.2.0 실패를 본 뒤 규칙을 만들었으니 더는 깨끗한 검증셋이 아니고, holdout2가 새 확인용이다.
+LIMITS = {  # split → (오답변율 상한, 과잉거절률 상한)
+    "dev": (1 / 18, 0.0),
+    "holdout": (0.20, 1 / 12),
+    "holdout2": (0.20, 0.0),
+}
 
 
 def test_set_loads_and_has_enough_cases_per_reason():
     _, cases = load_cases()
-    for split in ("dev", "holdout"):
+    for split in LIMITS:
         sub = split_of(cases, split)
         per_reason = Counter(c["reason"] for c in sub if c["expect"] == "reject")
         assert per_reason and all(10 <= n <= 20 for n in per_reason.values()), (split, per_reason)  # D10: 사유별 10~20건
@@ -48,22 +52,19 @@ def test_plain_off_topic_and_agenda_queries_are_classified_correctly():
 
 def test_metrics_do_not_regress_from_baseline():
     _, cases = load_cases()
-    for split, wrong, over in (
-        ("dev", DEV_WRONG_ANSWER, DEV_OVER_REFUSAL),
-        ("holdout", HOLDOUT_WRONG_ANSWER, HOLDOUT_OVER_REFUSAL),
-    ):
+    for split, (wrong, over) in LIMITS.items():
         m = evaluate(split_of(cases, split))
         assert m["wrong_answer_rate"] <= wrong + 1e-9, split
         assert m["over_refusal_rate"] <= over + 1e-9, split
 
 
 def test_set_file_is_utf8_json():
-    assert json.loads(DEFAULT_PATH.read_text(encoding="utf-8"))["version"] == "rs-0.2.1"
+    assert json.loads(DEFAULT_PATH.read_text(encoding="utf-8"))["version"] == "rs-0.3.1"
 
 
 def test_report_carries_dictionary_version_and_per_reason_accuracy():
     _, cases = load_cases()
     m = evaluate(split_of(cases, "dev"))
-    assert m["dictionary_version"].startswith("kw-")
+    assert m["dictionary_version"].startswith("kw-0.3")
     assert set(m["by_reason"]) == {"out_of_scope_topic"}
     assert m["wrong_reason_rate"] == 0.0

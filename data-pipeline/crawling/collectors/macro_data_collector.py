@@ -58,12 +58,31 @@ class MacroDataCollector:
                 date_to,
             )
         if self.settings.macro_data_provider == "ecos":
-            return EcosMacroProvider(self.settings).collect(
-                indicators,
-                date_from,
-                date_to,
+            # 옛 파이프라인(crawler/pipeline.py)용: 지표별 최신값만 쓰고 USD_KRW는 네이버 실시간 값으로 보충한다.
+            # 기간 전체 조회는 macro_loader가 EcosMacroProvider.collect()를 직접 쓴다
+            rows = latest_per_indicator(
+                EcosMacroProvider(self.settings).collect(indicators, date_from, date_to)
             )
+            selected = indicators or list(DEFAULT_ECOS_INDICATORS) + ["USD_KRW"]
+            if "USD_KRW" in selected:
+                rows.extend(
+                    NaverMarketIndexProvider(self.settings).collect(
+                        ["USD_KRW"],
+                        date_from,
+                        date_to,
+                    )
+                )
+            return rows
         raise ValueError(f"unsupported macro data provider: {self.settings.macro_data_provider}")
+
+
+def latest_per_indicator(rows: list[dict]) -> list[dict]:
+    latest: dict[str, dict] = {}
+    for row in rows:
+        current = latest.get(row["indicator_id"])
+        if current is None or row["date"] >= current["date"]:
+            latest[row["indicator_id"]] = row
+    return list(latest.values())
 
 
 @dataclass(frozen=True)

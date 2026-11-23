@@ -17,6 +17,14 @@ def connect(settings: Settings | None = None) -> psycopg.Connection:
     return psycopg.connect(settings.supabase_db_url, autocommit=True)
 
 
+def dedupe(rows: Iterable[dict[str, Any]], key_columns: Sequence[str]) -> list[dict[str, Any]]:
+    """같은 충돌 키가 여러 번 있으면 마지막 행만 남긴다.
+
+    Postgres는 한 INSERT ... ON CONFLICT DO UPDATE에서 같은 행을 두 번 고칠 수 없어 전체가 실패한다.
+    """
+    return list({tuple(row[key] for key in key_columns): row for row in rows}.values())
+
+
 def upsert(
     connection: psycopg.Connection,
     table: str,
@@ -32,7 +40,7 @@ def upsert(
     keep_existing_on_null이면 새 값이 null인 컬럼은 기존 값을 그대로 둔다. 외부 응답 일부가 비어도
     이미 저장된 값을 지우지 않게 할 때 쓴다("빈 응답을 전부 지움으로 해석하지 않는다").
     """
-    rows = list(rows)
+    rows = dedupe(rows, key_columns)
     if not rows:
         return 0
 

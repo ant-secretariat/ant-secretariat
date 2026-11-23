@@ -40,9 +40,9 @@ def _env_float(*names: str, default: float) -> float:
 @dataclass(frozen=True)
 class Settings:
     source: str = os.getenv("CRAWLER_SOURCE", os.getenv("COLLECTION_SOURCE", "naver"))
-    naver_research_url: str = os.getenv(
-        "NAVER_RESEARCH_URL",
-        "https://finance.naver.com/research/company_list.naver",
+    naver_research_api_url: str = os.getenv(
+        "NAVER_RESEARCH_API_URL",
+        "https://stock.naver.com/api/stockSecurity/researches/v2/company",
     )
     kirs_research_url: str = os.getenv(
         "KIRS_RESEARCH_URL",
@@ -78,7 +78,7 @@ class Settings:
         default=1.5,
     )
     download_retries: int = _env_int("MAX_RETRIES", "DOWNLOAD_RETRIES", default=3)
-    max_pages: int = _env_int("MAX_PAGES", default=3)
+    max_pages: int = _env_int("MAX_PAGES", default=50)
     months: int = _env_int("COLLECTION_MONTHS", default=1)
     max_reports_per_company: int = _env_int("MAX_REPORTS_PER_COMPANY", default=10)
     max_total_reports: int = _env_int("MAX_TOTAL_REPORTS", default=50)

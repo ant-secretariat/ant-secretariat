@@ -1,0 +1,127 @@
+"""거절셋 측정기 (기획서 D10). `precheck()`가 거절셋을 얼마나 맞히는지 센다.
+
+    cd backend && python -m agents.debate_renewal.eval.refusal
+
+지표
+- 오답변율  = 거절해야 하는데 통과시킨 비율 (≤ 5% 목표). 거절은 했지만 사유가 틀린 것은 따로 센다
+- 과잉거절률 = 답해야 하는데 거절한 비율
+- flag 일치율 = 답해야 하는 질의 중 기대 flag(투자 권유 등)와 정확히 같은 비율
+
+질의로만 판정되는 사유를 재므로 종목 데이터는 항상 충분한 T1로 둔다.
+"""
+from __future__ import annotations
+
+import json
+from collections import defaultdict
+from datetime import date
+from pathlib import Path
+from typing import Any
+
+from agents.debate_renewal.contracts import CompanyContext, ReasonCode, Tier
+from agents.debate_renewal.precheck import SourceStatus, TickerDataStatus, precheck
+from agents.debate_renewal.precheck.config import PrecheckConfig
+
+DEFAULT_PATH = Path(__file__).with_name("refusal_set.json")
+_TODAY = date(2026, 11, 7)
+_SAMSUNG = CompanyContext(ticker="005930", company="삼성전자", sector="반도체")
+_HYNIX = CompanyContext(ticker="000660", company="SK하이닉스", sector="반도체")
+_SOURCES = ("report", "news", "disclosure", "price", "macro", "target_price",
+            "financials", "flow", "insider", "sensitivity", "derived")  # 뒤 5개는 수경이 추가 예정 (ds-0.2.0)
+
+
+def load_cases(path: Path = DEFAULT_PATH) -> tuple[str, list[dict[str, Any]]]:
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    cases = doc["cases"]
+    ids = [c["id"] for c in cases]
+    if len(ids) != len(set(ids)):
+        raise ValueError("거절셋 id가 중복됐다")
+    for c in cases:
+        if c["expect"] == "reject":
+            ReasonCode(c["reason"])  # 사전에 없는 코드면 ValueError
+        elif c["expect"] != "answer":
+            raise ValueError(f"{c['id']}: expect는 reject|answer")
+    return doc["version"], cases
+
+
+def _fresh_status(_: str) -> TickerDataStatus:
+    s = SourceStatus(count=10, latest=_TODAY)
+    return TickerDataStatus(tier=Tier.T1, sources={k: s for k in _SOURCES})
+
+
+def _company_for(query: str) -> CompanyContext:
+    """관문1이 질의에서 종목을 확정한 상황을 흉내 낸다. 질의에 종목명이 없으면 삼성전자(버튼 경로)."""
+    return _HYNIX if "하이닉스" in query else _SAMSUNG
+
+
+def split_of(cases: list[dict[str, Any]], split: str) -> list[dict[str, Any]]:
+    """split=dev는 사전 튜닝에 쓰고, holdout은 튜닝 때 실패 문항을 보지 않는 확인용이다."""
+    return [c for c in cases if c.get("split", "dev") == split]
+
+
+def evaluate(cases: list[dict[str, Any]], config: PrecheckConfig | None = None) -> dict[str, Any]:
+    rows, by_cat = [], defaultdict(lambda: [0, 0])  # category → [맞음, 전체]
+    by_reason: dict[str, list[int]] = defaultdict(lambda: [0, 0])  # 거절 사유 → [맞음, 전체]
+    dictionary_version = ""
+    for c in cases:
+        r = precheck(c["query"], [_company_for(c["query"])], data_status=_fresh_status, config=config, today=_TODAY)
+        if c["expect"] == "reject":
+            ok = r.verdict == "reject" and r.reject_reason == ReasonCode(c["reason"])
+        else:
+            ok = r.verdict != "reject" and sorted(r.flags) == sorted(c.get("expect_flags", []))
+        dictionary_version = r.dictionary_version
+        by_cat[c["category"]][0] += ok
+        by_cat[c["category"]][1] += 1
+        if c["expect"] == "reject":
+            by_reason[c["reason"]][0] += ok
+            by_reason[c["reason"]][1] += 1
+        rows.append({**c, "ok": ok, "got_verdict": r.verdict, "got_reason": r.reject_reason, "got_flags": list(r.flags)})
+
+    rej = [x for x in rows if x["expect"] == "reject"]
+    ans = [x for x in rows if x["expect"] == "answer"]
+    return {
+        "dictionary_version": dictionary_version,
+        "wrong_answer_rate": sum(x["got_verdict"] != "reject" for x in rej) / len(rej) if rej else 0.0,
+        "wrong_reason_rate": sum(x["got_verdict"] == "reject" and not x["ok"] for x in rej) / len(rej) if rej else 0.0,
+        "over_refusal_rate": sum(x["got_verdict"] == "reject" for x in ans) / len(ans) if ans else 0.0,
+        "flag_match_rate": sum(x["ok"] for x in ans) / len(ans) if ans else 0.0,
+        "counts": {"reject": len(rej), "answer": len(ans)},
+        "by_category": {k: tuple(v) for k, v in by_cat.items()},
+        "by_reason": {k: tuple(v) for k, v in by_reason.items()},
+        "failures": [x for x in rows if not x["ok"]],
+    }
+
+
+def format_report(version: str, m: dict[str, Any], title: str = "", show_failures: bool = True) -> str:
+    out = [
+        f"거절셋 {version} {title} · 사전 {m['dictionary_version']} (거절 {m['counts']['reject']}건 · 답변 {m['counts']['answer']}건)",
+        f"  오답변율    {m['wrong_answer_rate']:.1%}  (목표 ≤ 5%)",
+        f"  사유 오류율 {m['wrong_reason_rate']:.1%}  (거절은 했지만 사유가 다름)",
+        f"  과잉거절률  {m['over_refusal_rate']:.1%}",
+        f"  flag 일치율 {m['flag_match_rate']:.1%}",
+        "  카테고리별 정답:",
+    ]
+    out += [f"    {k}: {a}/{b}" for k, (a, b) in sorted(m["by_category"].items())]
+    out.append("  사유별 정답:")
+    out += [f"    {k}: {a}/{b}" for k, (a, b) in sorted(m["by_reason"].items())]
+    if not show_failures:
+        return "\n".join(out)
+    out.append("  실패 문항:")
+    for x in m["failures"]:
+        exp = x["reason"] if x["expect"] == "reject" else f"answer {x.get('expect_flags', [])}"
+        got = x["got_reason"].value if x["got_reason"] else f"{x['got_verdict']} {x['got_flags']}"
+        out.append(f"    {x['id']} 「{x['query']}」 기대={exp} 실제={got}")
+    return "\n".join(out)
+
+
+if __name__ == "__main__":
+    import sys
+
+    version, cases = load_cases()
+    print(format_report(version, evaluate(split_of(cases, "dev")), "[dev]"))
+    # holdout 실패 문항은 튜닝에 쓰지 않도록 기본으로 숨긴다. 확인은 --show-holdout.
+    print()
+    for name in ("holdout", "holdout2"):
+        sub = split_of(cases, name)
+        if sub:
+            print(format_report(version, evaluate(sub), f"[{name}]", "--show-holdout" in sys.argv))
+            print()

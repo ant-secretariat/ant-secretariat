@@ -1,0 +1,387 @@
+<title>개미비서단 온톨로지 기획서</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+:root {
+  --bg:#0A0A0F;--bg1:#13131F;--bg2:#0F0F1A;
+  --blue:#4F8EF7;--blue-bg:#1A2744;--blue-light:#93C5FD;
+  --white:#FFFFFF;--gray:#9CA3AF;--gray-light:#D1D5DB;
+  --border:#1E2A45;--red:#F87171;--red-bg:#2A1515;
+  --green:#34D399;--green-bg:#0D2E1F;--amber:#FBBF24;--amber-bg:#2A2010;
+  --purple:#A78BFA;--purple-bg:#1E1433;
+  --teal:#2DD4BF;--teal-bg:#0D2926;
+  --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans KR',system-ui,sans-serif;
+  --serif:'Noto Serif KR',serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--white);font-family:var(--sans);font-size:14px;line-height:1.7;padding:0 16px 80px}
+.wrap{max-width:960px;margin:0 auto;padding-top:40px}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--blue);margin-bottom:12px;text-transform:uppercase}
+h1.title{font-family:var(--serif);font-size:clamp(22px,4vw,34px);font-weight:700;margin-bottom:10px;line-height:1.2}
+.lede{color:var(--gray);font-size:15px;margin-bottom:20px;max-width:62ch}
+.meta-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:28px}
+.meta-cell{background:var(--bg1);padding:10px 14px}
+.meta-cell dt{font-size:11px;color:var(--gray);font-family:var(--mono);margin-bottom:2px}
+.meta-cell dd{font-size:13px;color:var(--white);font-weight:500}
+nav.toc{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px;margin-bottom:44px}
+nav.toc a{display:block;text-decoration:none;color:var(--gray);background:var(--bg1);border:1px solid var(--border);border-radius:6px;padding:7px 11px;font-size:12px;transition:border-color .15s,color .15s}
+nav.toc a:hover{border-color:var(--blue);color:var(--white)}
+nav.toc .num{font-family:var(--mono);color:var(--blue);margin-right:5px;font-size:10px}
+section{margin-top:52px;scroll-margin-top:20px}
+.sec-head{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.sec-num{font-family:var(--mono);font-size:11px;color:var(--blue);background:var(--blue-bg);border-radius:5px;padding:3px 8px;white-space:nowrap}
+h2.sec-title{font-size:19px;font-weight:700;font-family:var(--serif)}
+.sec-sub{color:var(--gray);font-size:13px;margin:5px 0 18px}
+h3.sub{font-size:14px;font-weight:600;margin:26px 0 10px;color:var(--blue-light)}
+.card{background:var(--bg1);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:12px}
+dl.f{display:grid;grid-template-columns:110px 1fr;gap:7px 12px}
+@media(max-width:520px){dl.f{grid-template-columns:1fr}}
+dl.f dt{font-size:11.5px;font-weight:600;color:var(--gray);font-family:var(--mono);padding-top:2px}
+dl.f dd{font-size:13.5px;color:var(--gray-light)}
+dl.f dd strong{color:var(--white)}
+.tbl{overflow-x:auto;margin:10px 0 14px;border:1px solid var(--border);border-radius:8px;background:var(--bg1)}
+table{border-collapse:collapse;width:100%;font-size:13px;min-width:480px}
+th{text-align:left;font-weight:600;color:var(--gray);font-size:11px;padding:8px 12px;border-bottom:1px solid var(--border);white-space:nowrap;font-family:var(--mono)}
+td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top;color:var(--gray-light);line-height:1.5}
+tr:last-child td{border-bottom:none}
+td code{font-family:var(--mono);font-size:12px;color:var(--blue-light);background:var(--blue-bg);padding:1px 5px;border-radius:3px}
+.badge{font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:999px;white-space:nowrap;display:inline-block}
+.b-a{background:var(--green-bg);color:var(--green);border:1px solid var(--green)}
+.b-b{background:var(--blue-bg);color:var(--blue-light);border:1px solid var(--blue)}
+.b-both{background:var(--purple-bg);color:var(--purple);border:1px solid var(--purple)}
+.b-amber{background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber)}
+.b-red{background:var(--red-bg);color:var(--red);border:1px solid var(--red)}
+pre{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;overflow-x:auto;font-family:var(--mono);font-size:12px;line-height:1.65;color:var(--gray-light);margin:10px 0 14px}
+pre .kw{color:var(--blue)}pre .str{color:var(--green)}pre .cm{color:var(--gray)}pre .fn{color:var(--amber)}pre .tp{color:var(--purple)}
+.note{background:var(--amber-bg);border:1px solid var(--amber);border-radius:8px;padding:11px 14px;margin:10px 0;font-size:13px;color:var(--amber)}
+.note strong{color:var(--white)}
+.dec-box{background:var(--green-bg);border:1px solid var(--green);border-radius:6px;padding:8px 13px;font-size:13px;color:var(--green);margin-bottom:10px}
+.dec-box strong{color:var(--white)}
+.toss-box{background:var(--purple-bg);border:1px solid var(--purple);border-radius:8px;padding:14px 16px;margin:12px 0;font-size:13px;color:var(--gray-light)}
+.toss-box .label{font-family:var(--mono);font-size:10px;color:var(--purple);letter-spacing:.05em;margin-bottom:6px}
+.toss-box strong{color:var(--white)}
+
+/* 노드 카드 */
+.node-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:10px;margin:14px 0}
+.node-card{background:var(--bg1);border:1px solid var(--border);border-radius:10px;padding:14px 15px}
+.node-type{font-size:10px;font-family:var(--mono);letter-spacing:.07em;margin-bottom:8px;font-weight:600}
+.node-name{font-size:14px;font-weight:700;color:var(--white);margin-bottom:4px}
+.node-props{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.prop-tag{font-size:11px;padding:2px 7px;border-radius:4px;font-family:var(--mono);background:var(--bg2);color:var(--gray);border:1px solid var(--border)}
+
+/* 엣지 */
+.edge-row{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg1);border:1px solid var(--border);border-radius:7px;margin-bottom:6px;flex-wrap:wrap}
+.edge-from{font-family:var(--mono);font-size:12px;color:var(--blue-light);background:var(--blue-bg);padding:2px 8px;border-radius:4px}
+.edge-arrow{color:var(--gray);font-size:12px;flex:none}
+.edge-rel{font-size:12px;font-weight:600;color:var(--amber);background:var(--amber-bg);padding:2px 8px;border-radius:4px;font-family:var(--mono)}
+.edge-to{font-family:var(--mono);font-size:12px;color:var(--teal);background:var(--teal-bg);padding:2px 8px;border-radius:4px}
+.edge-w{font-size:11px;color:var(--gray);margin-left:auto}
+.edge-use{font-size:11.5px;color:var(--gray-light);width:100%;padding-top:4px;border-top:1px solid var(--border);margin-top:4px}
+
+/* 아젠다 연동 */
+.agenda-block{background:var(--bg1);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.agenda-header{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.agenda-id{font-family:var(--mono);font-size:11px;color:var(--blue);background:var(--blue-bg);padding:2px 8px;border-radius:4px}
+.agenda-name{font-size:14px;font-weight:700;color:var(--white)}
+.agenda-path{font-size:12px;color:var(--gray);margin-bottom:6px}
+.agenda-path .arrow{color:var(--amber)}
+.agenda-use{font-size:12.5px;color:var(--gray-light)}
+
+/* 로드맵 */
+.roadmap{display:flex;flex-direction:column;gap:0;margin:14px 0}
+.rm-item{display:flex;gap:14px;padding:14px;background:var(--bg1);border:1px solid var(--border)}
+.rm-item:first-child{border-radius:10px 10px 0 0}
+.rm-item:last-child{border-radius:0 0 10px 10px}
+.rm-item:not(:last-child){border-bottom:none}
+.rm-phase{font-family:var(--mono);font-size:11px;font-weight:600;white-space:nowrap;padding-top:2px;min-width:90px}
+.rm-content{flex:1}
+.rm-title{font-size:13.5px;font-weight:600;color:var(--white);margin-bottom:3px}
+.rm-desc{font-size:12.5px;color:var(--gray)}
+.rm-badge{font-size:11px;margin-top:5px}
+
+/* OI */
+.oi{display:flex;align-items:flex-start;gap:9px;padding:9px 13px;background:var(--bg1);border:1px solid var(--border);border-radius:8px;margin-bottom:7px}
+.oi-num{font-family:var(--mono);font-size:11px;color:var(--amber);background:var(--amber-bg);padding:2px 7px;border-radius:4px;flex:none;margin-top:1px}
+.oi-title{font-size:13px;font-weight:600;color:var(--white);margin-bottom:2px}
+.oi-meta{font-size:11.5px;color:var(--gray)}
+
+.flow{display:flex;flex-direction:column;margin:14px 0}
+.flow-item{display:flex;align-items:flex-start;gap:10px;padding:9px 13px;background:var(--bg1);border:1px solid var(--border)}
+.flow-item:first-child{border-radius:8px 8px 0 0}
+.flow-item:last-child{border-radius:0 0 8px 8px}
+.flow-item:not(:last-child){border-bottom:none}
+.flow-item.hl{background:var(--blue-bg);border-color:var(--blue)}
+.flow-item.hl2{background:var(--green-bg);border-color:var(--green)}
+.flow-item.hlp{background:var(--purple-bg);border-color:var(--purple)}
+.flow-step{font-family:var(--mono);font-size:10px;color:var(--blue);background:var(--bg);border:1px solid var(--blue);border-radius:4px;padding:2px 6px;white-space:nowrap;flex:none;margin-top:2px}
+.flow-step.p{color:var(--purple);border-color:var(--purple)}
+.flow-step.g{background:var(--green);color:var(--bg);border-color:var(--green)}
+.flow-title{font-weight:600;font-size:13px;color:var(--white);margin-bottom:2px}
+.flow-desc{font-size:12px;color:var(--gray)}
+
+hr{border:none;border-top:1px solid var(--border);margin:36px 0}
+
+:root{color-scheme:dark}
+</style>
+<div class="wrap">
+
+<header style="border-bottom:1px solid var(--border);padding-bottom:26px;margin-bottom:28px;">
+  <div class="eyebrow">ant-secretariat · ontology product spec · v1.2</div>
+  <h1 class="title">개미비서단 온톨로지<br>프로덕트 기획서</h1>
+  <p class="lede">에이전트가 지식을 검색하는 것이 아니라, 지도를 따라 추론하게 만드는 의미 계층 설계. 투자 도메인 특화 지식 그래프.</p>
+  <dl class="meta-grid">
+    <div class="meta-cell"><dt>담당자</dt><dd>이유민</dd></div>
+    <div class="meta-cell"><dt>버전</dt><dd>v1.2</dd></div>
+    <div class="meta-cell"><dt>작성일</dt><dd>2026-10-21</dd></div>
+    <div class="meta-cell"><dt>상태</dt><dd>✅ 1차 기획 확정 + 멀티에이전트 설계 반영</dd></div>
+    <div class="meta-cell"><dt>연계</dt><dd>Agent F 기획서 v3.0 · 멀티에이전트 설계 최종본(10/14)</dd></div>
+    <div class="meta-cell"><dt>구현 담당</dt><dd>태은 (저장소·탐색)</dd></div>
+  </dl>
+  <div class="note"><strong>v1.1 → v1.2 변경</strong> — ① 저장소를 Phase A부터 Supabase <code>ontology_nodes</code>·<code>ontology_edges</code> 원본 + 서버 시작 시 메모리 로드로 변경 · ② 레지스트리 도구로 노출, 기능 플래그 이름·단계 정리 · ③ <code>SENSITIVE_TO</code> weight에 <code>source</code>·추정 기간·기준일 기록, 실제 계수 전까지 placeholder로 두고 플래그 꺼둠 · ④ ISSUE 노드에 근거 청크 ID·유효 기간 필수, 자동화 역할 분담 확정 · ⑤ <code>get_reasoning_path</code>의 <code>stance</code> 인자 제거 · ⑥ Judge의 성향별 채점 가중 삭제 — 성향은 <code>points_to_check</code>·<code>caution</code>에만 · ⑦ Neo4j 전환 조건을 팀 합의안으로 정렬 · ⑧ 로드맵 날짜 제거(팀 협의 후 재확정)</div>
+</header>
+
+<nav class="toc">
+  <a href="#s1"><span class="num">01</span>포지셔닝</a>
+  <a href="#s2"><span class="num">02</span>전체 아키텍처</a>
+  <a href="#s3"><span class="num">03</span>노드 설계</a>
+  <a href="#s4"><span class="num">04</span>엣지 설계</a>
+  <a href="#s5"><span class="num">05</span>실행 계층</a>
+  <a href="#s6"><span class="num">06</span>아젠다 연동</a>
+  <a href="#s7"><span class="num">07</span>평가 체계</a>
+  <a href="#s8"><span class="num">08</span>구현 로드맵</a>
+  <a href="#s9"><span class="num">09</span>미결 사항</a>
+</nav>
+
+<!-- 01 -->
+<section id="s1">
+  <div class="sec-head"><span class="sec-num">01</span><h2 class="sec-title">온톨로지 포지셔닝</h2></div>
+  <p class="sec-sub">왜 온톨로지인가 — RAG의 한계를 넘어 관계 기반 추론으로</p>
+  <div class="dec-box"><strong>"온톨로지는 검색이 아니라 실행이어야 합니다"</strong> — 에이전트가 지식 그래프를 탐색해 인과 체인을 구성하고, 그 경로 자체가 논거가 된다. 하네스(프롬프트 골격 + 도메인 컨텍스트 + 골든셋)는 도메인의 자산이 아니라 플랫폼의 자산이다.</div>
+  <h3 class="sub">핵심 원칙</h3>
+  <div class="card"><dl class="f">
+    <dt>기존 방식</dt><dd>RAG 검색 → 관련 청크 반환 → LLM이 알아서 추론. "기준금리가 삼성전자에 미치는 영향"을 직접 언급한 청크가 없으면 답 못 함.</dd>
+    <dt>온톨로지 방식</dt><dd>사전 정의된 노드·엣지를 따라 <strong>기준금리 → 반도체 섹터 멀티플 압축 → 삼성전자 밸류에이션 하락</strong> 경로를 구성. 청크가 없어도 관계에서 논거의 뼈대를 만든다.</dd>
+    <dt>핵심 차이</dt><dd>RAG는 <strong>"이미 쓰여진 것"</strong>을 찾는다. 온톨로지는 <strong>"관계에서 새로운 논거"</strong>를 만든다.</dd>
+  </dl></div>
+  <h3 class="sub">설계 방향</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>구분</th><th>내용</th><th>이유</th></tr></thead>
+    <tbody>
+      <tr><td><span class="badge b-a">채택</span></td><td>온톨로지 = 실행 — 에이전트가 지도를 따라 논거 구성</td><td>RAG 단독으로는 관계 기반 추론 불가</td></tr>
+      <tr><td><span class="badge b-a">채택</span></td><td>골든셋 자가 검증 + 켬/끔 비교</td><td>쓰는 양이 아니라 효과로 평가</td></tr>
+      <tr><td><span class="badge b-a">채택</span></td><td>하네스 구조 (프롬프트 골격 + 도메인 컨텍스트)</td><td>precheck 아젠다 사전과 같은 <code>AgendaId</code> 체계 공유</td></tr>
+      <tr><td><span class="badge b-red">제외</span></td><td>Text-to-SQL (정형 DW 쿼리)</td><td>수치는 시맨틱 레이어 <code>get_metric</code>이 단일 정의로 계산</td></tr>
+      <tr><td><span class="badge b-red">제외</span></td><td>별도 그래프 DB 상시 운영</td><td>T1 100종목·깊이 2 규모에서 이득이 작고 동기화 비용이 큼 (08)</td></tr>
+      <tr><td><span class="badge b-both">차별점</span></td><td>투자 도메인 관계 추론</td><td>금리·환율 → 섹터 밸류에이션 경로. 금융 인과 체인 특화</td></tr>
+      <tr><td><span class="badge b-both">차별점</span></td><td>아젠다 연동 온톨로지</td><td>탐색 경로가 아젠다별로 정의되어 Bull/Bear 논거 구성에 직결</td></tr>
+      <tr><td><span class="badge b-both">차별점</span></td><td>사실 층 / 판단 층 분리</td><td>탐색 결과는 성향과 무관하게 동일. 성향은 Judge의 <code>points_to_check</code>·<code>caution</code> 강조에만 반영</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- 02 -->
+<section id="s2">
+  <div class="sec-head"><span class="sec-num">02</span><h2 class="sec-title">전체 아키텍처</h2></div>
+  <p class="sec-sub">온톨로지는 도구 레지스트리 뒤의 "관계 사전"으로 연결됨. 에이전트는 직접 import하지 않음.</p>
+  <div class="flow">
+    <div class="flow-item"><span class="flow-step">입력</span><div><div class="flow-title">사용자 질의 → EntityResolution → PrecheckResult</div><div class="flow-desc">precheck 키워드 사전과 온톨로지 아젠다 경로가 같은 <code>AgendaId</code>를 씀</div></div></div>
+    <div class="flow-item"><span class="flow-step">FLAG</span><div><div class="flow-title">기능 플래그 확인</div><div class="flow-desc">관계 종류 × 에이전트 단위. 꺼져 있으면 호출하지 않음(기본값)</div></div></div>
+    <div class="flow-item hlp"><span class="flow-step p">ONTO-A</span><div><div class="flow-title">컨텍스트 주입 (Phase A)</div><div class="flow-desc"><code>get_ontology_context(ticker, agenda_id)</code> — 토론 job에서 아젠다별 1회 호출, 그래프 상태에 캐시</div></div></div>
+    <div class="flow-item hl"><span class="flow-step">BULL·BEAR</span><div><div class="flow-title">같은 컨텍스트를 공유</div><div class="flow-desc">입장별 필터링 없음. Bull은 강세 쪽, Bear는 약세 쪽 해석을 하도록 프롬프트로 역할만 구분</div></div></div>
+    <div class="flow-item hlp"><span class="flow-step p">ONTO-B</span><div><div class="flow-title">추론 경로 생성 (Phase B)</div><div class="flow-desc"><code>get_reasoning_path(ticker, agenda_id)</code> — 방향(positive/negative)이 붙은 경로 전체를 반환하고, 어떤 경로를 논거로 쓸지는 Bull·Bear가 선택</div></div></div>
+    <div class="flow-item"><span class="flow-step">JUDGE</span><div><div class="flow-title">경로 일치 확인</div><div class="flow-desc">Claim이 인용한 경로가 실제 엣지와 맞는지, 근거 앵커가 있는지 확인. 성향으로 채점을 바꾸지 않음</div></div></div>
+    <div class="flow-item hl2"><span class="flow-step g">검증</span><div><div class="flow-title">관계 정확도·추론 체인 평가 + 켬/끔 비교</div><div class="flow-desc">07 참고</div></div></div>
+  </div>
+  <h3 class="sub">레이어 구조</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>레이어</th><th>역할</th><th>구현체</th><th>담당</th></tr></thead>
+    <tbody>
+      <tr><td><strong>스키마</strong></td><td>노드·엣지 타입과 관계 규칙</td><td>이 기획서</td><td>유민 설계</td></tr>
+      <tr><td><strong>저장</strong></td><td>노드·엣지 원본</td><td>Supabase <code>ontology_nodes</code>·<code>ontology_edges</code> (Phase A부터)</td><td>태은 구현 · 수경 데이터 연동</td></tr>
+      <tr><td><strong>탐색</strong></td><td>컨텍스트·경로 계산</td><td>서버 시작 시 메모리 로드 → Phase A dict 순회, Phase B networkx</td><td>태은 구현</td></tr>
+      <tr><td><strong>노출</strong></td><td>에이전트 호출 창구</td><td>도구 레지스트리 <code>ToolSpec</code> (인자 검증·권한·Langfuse span)</td><td>태은</td></tr>
+      <tr><td><strong>주입</strong></td><td>탐색 결과 → 프롬프트 형식</td><td><code>OntologyContext</code> 타입</td><td>유민 정의</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- 03 -->
+<section id="s3">
+  <div class="sec-head"><span class="sec-num">03</span><h2 class="sec-title">노드 설계</h2></div>
+  <p class="sec-sub">5가지 노드 타입. 노드에는 잘 바뀌지 않는 속성만 저장함.</p>
+  <div class="node-grid">
+    <div class="node-card"><div class="node-type" style="color:var(--blue-light);">COMPANY</div><div class="node-name">종목 노드</div><div class="node-props"><span class="prop-tag">ticker</span><span class="prop-tag">name</span><span class="prop-tag">sector_id</span><span class="prop-tag">tier</span></div></div>
+    <div class="node-card"><div class="node-type" style="color:var(--teal);">SECTOR</div><div class="node-name">섹터 노드</div><div class="node-props"><span class="prop-tag">sector_id</span><span class="prop-tag">name</span><span class="prop-tag">cycle_type</span><span class="prop-tag">rate_sensitivity</span><span class="prop-tag">fx_sensitivity</span></div></div>
+    <div class="node-card"><div class="node-type" style="color:var(--amber);">MACRO</div><div class="node-name">매크로 지표 노드</div><div class="node-props"><span class="prop-tag">indicator_id</span><span class="prop-tag">name</span><span class="prop-tag">category</span><span class="prop-tag">unit</span><span class="prop-tag">source</span></div></div>
+    <div class="node-card"><div class="node-type" style="color:var(--purple);">ISSUE</div><div class="node-name">이슈 노드</div><div class="node-props"><span class="prop-tag">issue_id</span><span class="prop-tag">name</span><span class="prop-tag">polarity</span><span class="prop-tag">agenda_ids</span><span class="prop-tag">evidence_chunk_ids</span><span class="prop-tag">valid_from</span><span class="prop-tag">valid_to</span><span class="prop-tag">origin</span></div></div>
+    <div class="node-card"><div class="node-type" style="color:var(--green);">COMPETITOR</div><div class="node-name">경쟁사 노드</div><div class="node-props"><span class="prop-tag">ticker</span><span class="prop-tag">name</span><span class="prop-tag">country</span><span class="prop-tag">market</span><span class="prop-tag">overlap_products</span></div></div>
+  </div>
+  <h3 class="sub">노드 속성 상세</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>노드</th><th>속성</th><th>값 예시</th><th>출처</th></tr></thead>
+    <tbody>
+      <tr><td>COMPANY</td><td><code>tier</code></td><td>T1 / T0 / T2</td><td>데이터 에이전트 (<code>resolve_company</code>)</td></tr>
+      <tr><td>COMPANY</td><td colspan="3">PER·PBR·ROE·부채비율처럼 매일 바뀌는 지표는 저장하지 않음 → 주입 시점에 <code>get_metric(ticker, metric_id, as_of)</code>로 조회하고 기준일을 함께 표기</td></tr>
+      <tr><td>SECTOR</td><td><code>rate_sensitivity</code> · <code>fx_sensitivity</code></td><td>high / medium / low</td><td>섹터 회귀 계수 기반 등급 (계수 확정 전 placeholder)</td></tr>
+      <tr><td>SECTOR</td><td><code>cycle_type</code></td><td>cyclical / defensive / growth</td><td>도메인 분류 (유민)</td></tr>
+      <tr><td>MACRO</td><td><code>category</code></td><td>rate / fx / commodity / market</td><td>ECOS · KIS · pykrx</td></tr>
+      <tr><td>ISSUE</td><td><code>polarity</code> · <code>agenda_ids</code></td><td>positive·negative·neutral / <code>[AgendaId.growth, AgendaId.risk]</code></td><td>유민 라벨링</td></tr>
+      <tr><td>ISSUE</td><td><code>evidence_chunk_ids</code> · <code>valid_from</code>/<code>valid_to</code></td><td>근거 뉴스 청크 ID, 유효 기간</td><td>필수. 근거·기간 없는 이슈는 적재하지 않음</td></tr>
+      <tr><td>ISSUE</td><td><code>origin</code></td><td>manual / tagged</td><td>Phase A는 manual, 자동화 후 tagged</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- 04 -->
+<section id="s4">
+  <div class="sec-head"><span class="sec-num">04</span><h2 class="sec-title">엣지 설계</h2></div>
+  <p class="sec-sub">관계 유형 7종 — 방향성 있는 경로의 기반</p>
+  <div class="edge-row"><span class="edge-from">COMPANY</span><span class="edge-arrow">──</span><span class="edge-rel">BELONGS_TO</span><span class="edge-arrow">──▶</span><span class="edge-to">SECTOR</span><span class="edge-w">단방향</span><div class="edge-use">종목이 속한 섹터. 섹터 특성을 종목에 상속.</div></div>
+  <div class="edge-row"><span class="edge-from">SECTOR / COMPANY</span><span class="edge-arrow">──</span><span class="edge-rel">SENSITIVE_TO</span><span class="edge-arrow">──▶</span><span class="edge-to">MACRO</span><span class="edge-w">weight −1.0~+1.0 · source · window · as_of</span><div class="edge-use">상관 기반 민감도(일별 수익률과 코스피·환율·국채금리의 단순회귀 표준화 계수). 인과로 표현하지 않음. 실제 계수 전까지 <code>source="placeholder"</code>.</div></div>
+  <div class="edge-row"><span class="edge-from">ISSUE</span><span class="edge-arrow">──</span><span class="edge-rel">BENEFITS</span><span class="edge-arrow">──▶</span><span class="edge-to">COMPANY / SECTOR</span><span class="edge-w">strength low·mid·high</span><div class="edge-use">이슈 발생 시 수혜 종목·섹터.</div></div>
+  <div class="edge-row"><span class="edge-from">ISSUE</span><span class="edge-arrow">──</span><span class="edge-rel">HURTS</span><span class="edge-arrow">──▶</span><span class="edge-to">COMPANY / SECTOR</span><span class="edge-w">strength low·mid·high</span><div class="edge-use">이슈 발생 시 타격 종목·섹터.</div></div>
+  <div class="edge-row"><span class="edge-from">COMPANY</span><span class="edge-arrow">──</span><span class="edge-rel">COMPETES_WITH</span><span class="edge-arrow">──▶</span><span class="edge-to">COMPETITOR</span><span class="edge-w">양방향 · overlap 0~1</span><div class="edge-use">경쟁 관계. 직접 경쟁(1.0) ~ 간접 경쟁(0.3).</div></div>
+  <div class="edge-row"><span class="edge-from">MACRO</span><span class="edge-arrow">──</span><span class="edge-rel">IMPACTS</span><span class="edge-arrow">──▶</span><span class="edge-to">MACRO</span><span class="edge-w">direction</span><div class="edge-use">매크로 지표 간 관계. 예: 기준금리 → 원/달러 환율.</div></div>
+  <div class="edge-row"><span class="edge-from">COMPANY</span><span class="edge-arrow">──</span><span class="edge-rel">EXPOSED_TO</span><span class="edge-arrow">──▶</span><span class="edge-to">ISSUE</span><span class="edge-w">exposure 0~1</span><div class="edge-use">종목이 특정 이슈에 노출된 정도.</div></div>
+
+  <h3 class="sub">엣지 데이터 예시 (삼성전자, 수치는 형식 예시)</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>From</th><th>관계</th><th>To</th><th>속성</th></tr></thead>
+    <tbody>
+      <tr><td><code>005930</code></td><td>BELONGS_TO</td><td><code>semiconductor</code></td><td>—</td></tr>
+      <tr><td><code>semiconductor</code></td><td>SENSITIVE_TO</td><td><code>ktb_rate</code></td><td>weight −0.6 · source placeholder</td></tr>
+      <tr><td><code>005930</code></td><td>SENSITIVE_TO</td><td><code>usd_krw</code></td><td>weight +0.42 · source regression · window·as_of 기록</td></tr>
+      <tr><td><code>hbm_growth</code></td><td>BENEFITS</td><td><code>005930</code></td><td>strength high</td></tr>
+      <tr><td><code>china_regulation</code></td><td>HURTS</td><td><code>005930</code></td><td>strength mid</td></tr>
+      <tr><td><code>005930</code></td><td>COMPETES_WITH</td><td><code>000660</code></td><td>overlap 0.8</td></tr>
+      <tr><td><code>bok_rate</code></td><td>IMPACTS</td><td><code>usd_krw</code></td><td>direction positive</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- 05 -->
+<section id="s5">
+  <div class="sec-head"><span class="sec-num">05</span><h2 class="sec-title">실행 계층 설계</h2></div>
+  <p class="sec-sub">A: 컨텍스트 주입 → B: 추론 경로. 두 함수 모두 레지스트리 도구로 노출되고 성향·입장 인자가 없음.</p>
+  <pre><span class="cm"># Phase A — 컨텍스트 주입</span>
+<span class="kw">def</span> <span class="fn">get_ontology_context</span>(
+    ticker: str,
+    agenda_id: <span class="tp">AgendaId</span>,     <span class="cm"># 공용 열거형 import, 문자열 하드코딩 금지</span>
+    depth: int = 2,
+) -> <span class="tp">OntologyContext</span>
+
+<span class="kw">class</span> <span class="fn">OntologyContext</span>(BaseModel):
+    ticker: str
+    agenda_id: <span class="tp">AgendaId</span>
+    key_relations: list[Relation]          <span class="cm"># 엣지 + source(placeholder/regression/manual)</span>
+    macro_exposures: list[MacroExposure]   <span class="cm"># 상관 기반 민감도 + window·as_of</span>
+    related_issues: list[IssueRef]         <span class="cm"># 유효 기간 안의 이슈만, evidence_chunk_ids 포함</span>
+    competitors: list[CompetitorRef]
+    path_summary: str                      <span class="cm"># 프롬프트 앞단 한 줄 요약</span>
+    graph_version: str                     <span class="cm"># 평가 재현성</span>
+
+<span class="cm"># Phase B — 추론 경로</span>
+<span class="kw">def</span> <span class="fn">get_reasoning_path</span>(ticker: str, agenda_id: <span class="tp">AgendaId</span>) -> list[<span class="tp">ReasoningPath</span>]
+
+<span class="kw">class</span> <span class="fn">ReasoningPath</span>(BaseModel):
+    steps: list[PathStep]
+    direction: <span class="fn">Literal</span>[<span class="str">"positive"</span>, <span class="str">"negative"</span>, <span class="str">"mixed"</span>]   <span class="cm"># Bull·Bear가 이걸 보고 선택</span>
+    chain_summary: str                     <span class="cm"># "금리 상승 → 멀티플 압축 → PER 하락"</span>
+    evidence_anchors: list[str]            <span class="cm"># 단계별 근거 chunk_id</span>
+    evidence_coverage: float               <span class="cm"># 근거 있는 단계 ÷ 전체 단계</span>
+
+<span class="kw">class</span> <span class="fn">PathStep</span>(BaseModel):
+    from_node: str; relation: str; to_node: str
+    weight: float | <span class="kw">None</span>                    <span class="cm"># 상관 기반 민감도</span>
+    direction: <span class="fn">Literal</span>[<span class="str">"positive"</span>, <span class="str">"negative"</span>, <span class="str">"neutral"</span>]</pre>
+  <div class="dec-box"><strong>v1.2 변경:</strong> <code>get_reasoning_path</code>에서 <code>stance</code> 인자를 뺌. 입장별로 다른 경로를 계산하면 Bull과 Bear가 서로 다른 사실 위에서 토론하게 되어 "탐색 결과 공유·입장별 필터링 없음" 원칙과 충돌함. 방향 라벨이 붙은 경로 전체를 같이 받고 선택만 각자 함.</div>
+  <h3 class="sub">risk_profile 적용 범위</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>레이어</th><th>성향 영향</th><th>설명</th></tr></thead>
+    <tbody>
+      <tr><td>사실 층<br><code>get_ontology_context</code> · <code>get_reasoning_path</code></td><td>없음</td><td>같은 결과를 Bull·Bear·Judge가 공유. 경로 억제·입장 필터링 없음</td></tr>
+      <tr><td>판정<br>Judge <code>verdict</code> · <code>stance</code> · <code>score</code></td><td>없음</td><td>성향으로 채점 가중을 주면 사실 불변성 지표(≥95%)와 충돌하므로 v1.1의 "성향별 경로 가중"은 삭제</td></tr>
+      <tr><td>판단 층<br>Judge <code>points_to_check</code> · <code>caution</code></td><td>강조 순서·표현</td><td>예: 안정추구형은 경로상의 하방 요인을 먼저 짚음. 적합/부적합 label은 노출하지 않음</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- 06 -->
+<section id="s6">
+  <div class="sec-head"><span class="sec-num">06</span><h2 class="sec-title">아젠다 연동 설계</h2></div>
+  <p class="sec-sub"><code>AgendaId</code>별로 탐색할 노드·엣지가 다름. 같은 결과를 Bull·Bear가 함께 사용.</p>
+  <div class="agenda-block"><div class="agenda-header"><span class="agenda-id">valuation</span><span class="agenda-name">실적 및 밸류에이션</span></div><div class="agenda-path">COMPANY <span class="arrow">→</span> SECTOR <span class="arrow">→</span> MACRO(금리) [SENSITIVE_TO]</div><div class="agenda-use">현재 지표는 <code>get_metric</code>, 금리 민감도는 그래프. 저평가 근거와 멀티플 압축 위험을 같은 사실에서 각자 해석.</div></div>
+  <div class="agenda-block"><div class="agenda-header"><span class="agenda-id">macro</span><span class="agenda-name">산업 및 매크로 환경</span></div><div class="agenda-path">MACRO <span class="arrow">→</span> [IMPACTS] <span class="arrow">→</span> MACRO <span class="arrow">→</span> [SENSITIVE_TO] <span class="arrow">→</span> SECTOR <span class="arrow">→</span> COMPANY</div><div class="agenda-use">금리 → 환율 → 수출 기업 수익 경로. 시뮬레이션은 토론 결과의 <code>macro</code> 아젠다를 <code>job_id</code>로 조회함.</div></div>
+  <div class="agenda-block"><div class="agenda-header"><span class="agenda-id">risk</span><span class="agenda-name">리스크 요인</span></div><div class="agenda-path">COMPANY <span class="arrow">→</span> [EXPOSED_TO] <span class="arrow">→</span> ISSUE(polarity=negative) + COMPETES_WITH</div><div class="agenda-use">노출된 부정 이슈와 경쟁 위협.</div></div>
+  <div class="agenda-block"><div class="agenda-header"><span class="agenda-id">growth</span><span class="agenda-name">성장 동력</span></div><div class="agenda-path">ISSUE(polarity=positive, agenda_ids∋growth) <span class="arrow">→</span> [BENEFITS] <span class="arrow">→</span> COMPANY</div><div class="agenda-use">수혜 이슈와 종목의 연결 강도.</div></div>
+  <div class="agenda-block"><div class="agenda-header"><span class="agenda-id">shareholder_return</span><span class="agenda-name">주주환원</span></div><div class="agenda-path">COMPANY + MACRO(금리)</div><div class="agenda-use">부채비율·ROE는 <code>get_metric</code>으로 조회하고 금리 환경과 묶어 배당 여력 판단.</div></div>
+  <div class="agenda-block"><div class="agenda-header"><span class="agenda-id">flow</span><span class="agenda-name">수급·투자자 동향</span></div><div class="agenda-path">재확인 중</div><div class="agenda-use"><code>investor_flow_daily</code> 확보 여부에 따라 활성화. 활성화되면 수급은 시점 데이터라 노드가 아니라 <code>get_metric</code>으로 조회.</div></div>
+</section>
+
+<!-- 07 -->
+<section id="s7">
+  <div class="sec-head"><span class="sec-num">07</span><h2 class="sec-title">온톨로지 평가 체계</h2></div>
+  <p class="sec-sub">많이 넣고 많이 쓰는지가 아니라, 켰을 때 토론이 실제로 나아지는지로 평가.</p>
+  <h3 class="sub">기능 플래그</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>단계</th><th>동작</th><th>넘어가는 조건</th></tr></thead>
+    <tbody>
+      <tr><td><span class="badge b-red">off</span> 기본값</td><td>호출하지 않음</td><td>해당 관계의 데이터 준비 완료(placeholder 아님)</td></tr>
+      <tr><td><span class="badge b-amber">shadow</span></td><td>호출·로그만, 프롬프트에 주입하지 않음</td><td>관계 정확도셋 통과, 지연·비용 증가 허용 범위</td></tr>
+      <tr><td><span class="badge b-a">on</span></td><td>프롬프트에 주입</td><td>토론 루브릭셋 관계 질문 하위셋에서 켬/끔 블라인드 비교로 개선 확인</td></tr>
+    </tbody>
+  </table></div>
+  <p style="color:var(--gray);font-size:13px;">단위는 관계 종류 × 에이전트 (예: 토론 에이전트의 <code>SENSITIVE_TO</code>만 on). 설정은 코드의 플래그 테이블 한 곳에서 관리.</p>
+  <h3 class="sub">평가셋</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>평가셋</th><th>내용</th><th>지표</th><th>목표</th></tr></thead>
+    <tbody>
+      <tr><td>관계 정확도셋</td><td>정답 엣지 vs 탐색된 엣지. 예: 삼성전자–금리 관계 방향</td><td>엣지 방향 정확도</td><td>≥ 90%</td></tr>
+      <tr><td>추론 체인셋</td><td>정답 인과 체인 vs 생성된 체인 (Phase B)</td><td>체인 단계 일치율</td><td>≥ 70%</td></tr>
+      <tr><td>켬/끔 비교</td><td>토론 루브릭셋의 관계 질문 하위셋, 같은 질문·근거로 블라인드 채점</td><td>루브릭 점수 차이 · 비용·지연 증가</td><td>개선 확인 시에만 on</td></tr>
+    </tbody>
+  </table></div>
+  <h3 class="sub">품질 지표</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>지표</th><th>정의</th><th>목표</th></tr></thead>
+    <tbody>
+      <tr><td>노드 커버리지</td><td>T1 종목 중 COMPANY 노드가 있는 비율</td><td>Phase A 시작 시 100%</td></tr>
+      <tr><td>placeholder 비율</td><td><code>SENSITIVE_TO</code> 중 <code>source="placeholder"</code> 비율</td><td>0%가 되어야 플래그 검토 시작</td></tr>
+      <tr><td>evidence_coverage</td><td>경로 단계 중 근거 앵커가 붙은 비율 (Phase B)</td><td>측정 후 기준값 설정</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note"><strong>삭제 유지:</strong> 경로 포함률·context 활용률·노드당 엣지 수는 많이 쓸수록 점수가 오르는 지표라 사용하지 않음.</div>
+</section>
+
+<!-- 08 -->
+<section id="s8">
+  <div class="sec-head"><span class="sec-num">08</span><h2 class="sec-title">구현 로드맵</h2></div>
+  <p class="sec-sub">단계만 확정, 날짜는 팀 협의 후 재확정.</p>
+  <div class="roadmap">
+    <div class="rm-item"><div class="rm-phase" style="color:var(--green);">Phase 1<br>기획</div><div class="rm-content"><div class="rm-title">스키마·인터페이스 확정 ✅</div><div class="rm-desc">노드·엣지 타입, <code>OntologyContext</code>·<code>ReasoningPath</code> 계약, 저장 구조, 플래그 단계 확정. 대상은 T1 전체.</div><div class="rm-badge">유민: 설계 · 태은: 구현 계획</div></div></div>
+    <div class="rm-item"><div class="rm-phase" style="color:var(--purple);">Phase A<br>MVP</div><div class="rm-content"><div class="rm-title">컨텍스트 주입 — 플래그 off 상태로 구축</div><div class="rm-desc">Supabase <code>ontology_nodes</code>·<code>ontology_edges</code> 생성 → 서버 시작 시 메모리 로드 → dict 순회로 <code>get_ontology_context</code> 구현 → 레지스트리 등록. weight는 placeholder로 적재 후 수경 회귀 계수로 교체. ISSUE 시드 20~30개 수동 정의(근거 청크 ID·유효 기간 필수).</div><div class="rm-badge">태은: 저장·탐색 · 수경: 계수·데이터 · 유민: ISSUE 시드·주입 형식</div></div></div>
+    <div class="rm-item"><div class="rm-phase" style="color:var(--blue-light);">Phase B<br>고도화</div><div class="rm-content"><div class="rm-title">추론 경로 + 효과 검증</div><div class="rm-desc">networkx로 <code>get_reasoning_path</code> 구현, <code>ReasoningPath</code> → Claim <code>evidence_anchors</code> 연결, 추론 체인셋 평가, shadow → 켬/끔 비교 → on 판단.<br>Neo4j는 탐색 깊이 4 이상·그래프 알고리즘 필요 / 노드 수십만 개 / 관계 탐색 1초 초과 중 하나를 만족할 때만 재검토.</div><div class="rm-badge">태은: 경로 탐색 · 유민: 평가셋·판단</div></div></div>
+    <div class="rm-item"><div class="rm-phase" style="color:var(--amber);">Phase C<br>확장</div><div class="rm-content"><div class="rm-title">T0 확장 + ISSUE 자동화</div><div class="rm-desc">ISSUE 분류 체계는 유민, 기사 태깅은 데이터 파이프라인이 종목별 뉴스 수집 직후 <code>issue_id</code> 메타데이터 부착(검색 필터에도 재사용), 그래프 반영은 온톨로지. 데이터 갱신 주기와 그래프 동기화 자동화.</div><div class="rm-badge">유민: 분류 체계 · 수경: 태깅 · 태은: 그래프 반영</div></div></div>
+  </div>
+</section>
+
+<!-- 09 -->
+<section id="s9">
+  <div class="sec-head"><span class="sec-num">09</span><h2 class="sec-title">미결 사항</h2></div>
+  <div class="oi"><span class="oi-num">Q1</span><div><div class="oi-title">weight 추정 기간 확정 → placeholder 교체</div><div class="oi-meta">일별 3변수(코스피·환율·국채금리) 단순회귀 표준화 계수로 확정, 추정 기간 미정. 교체 시 window·as_of를 엣지에 기록 · 수경</div></div></div>
+  <div class="oi"><span class="oi-num">Q2</span><div><div class="oi-title">플래그 on 판단 기준값</div><div class="oi-meta">켬/끔 비교에서 루브릭 점수 몇 점 이상 개선, 지연·토큰 증가 몇 % 이내면 켤지 · 유민</div></div></div>
+  <div class="oi"><span class="oi-num">Q3</span><div><div class="oi-title">COMPETITOR 노드를 COMPANY로 합칠지</div><div class="oi-meta">국내 상장 경쟁사는 이미 COMPANY 노드라 중복됨. 해외 경쟁사만 <code>listed=false</code> COMPANY로 두고 COMPETES_WITH를 COMPANY 간 엣지로 단순화하는 안 제안 · 유민 제안, 태은 검토</div></div></div>
+  <div class="oi"><span class="oi-num">Q4</span><div><div class="oi-title">레지스트리 <code>ToolSpec</code>에 플래그 상태를 포함할지</div><div class="oi-meta">꺼진 도구를 레지스트리가 거절할지, 호출 측이 확인할지 · 태은</div></div></div>
+  <h3 class="sub">종결</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>항목</th><th>결론</th></tr></thead>
+    <tbody>
+      <tr><td>대상 종목</td><td>T1 전체 (시총 상위 100)</td></tr>
+      <tr><td>호출 시점</td><td>토론 job에서 아젠다별 1회, 캐시 공유, 입장별 필터링 없음</td></tr>
+      <tr><td>구현체</td><td>Supabase 원본 + 메모리 로드, Phase B networkx, Neo4j 조건부</td></tr>
+      <tr><td>ISSUE 시드·자동화</td><td>Phase A 수동 20~30개(근거 청크·유효 기간 필수), 자동화 역할 분담 확정 (08)</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<p style="margin-top:48px;color:var(--gray);font-size:12px;font-family:var(--mono);">개미비서단 온톨로지 프로덕트 기획서 · v1.2 · 2026-10-21 · 이유민 · 멀티에이전트 설계 최종본(10/14) 반영</p>
+</div>

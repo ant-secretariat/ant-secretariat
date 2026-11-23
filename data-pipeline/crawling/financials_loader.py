@@ -4,6 +4,9 @@
     python -m crawling.financials_loader --recent            # 작년·올해만 다시 받기 (공시 시즌 갱신)
 
 --all을 붙이면 T1/T2가 아니라 상장 전종목을 대상으로 한다.
+
+같은 접수번호는 덮어쓰고, 정정공시로 접수번호가 바뀌면 새 줄로 쌓는다. DART는 최신
+버전만 주므로 원래 값을 남기려면 공시 시즌에 정정이 나오기 전에 받아 두어야 한다.
 """
 
 from __future__ import annotations
@@ -33,14 +36,21 @@ def load(connection: psycopg.Connection, years: list[int], all_tickers: bool) ->
     logger.info("재무 적재: %s년, 대상 %s종목", ", ".join(map(str, years)), len(corp_codes))
 
     client = DartFinancialsClient(SETTINGS)
+    failed: list[int] = []
     for year in years:
-        rows = financial_rows(client.fetch_year(corp_codes, year), set(targets))
-        upsert(
-            connection,
-            "financials",
-            rows,
-            key_columns=["ticker", "fiscal_year", "quarter", "fs_div", "account"],
-        )
+        # 한 해가 실패해도 다음 해는 계속 받는다. 실패한 해는 마지막에 종료 코드로 알린다
+        try:
+            rows = financial_rows(client.fetch_year(corp_codes, year), set(targets))
+            upsert(
+                connection,
+                "financials",
+                rows,
+                key_columns=["ticker", "fiscal_year", "quarter", "fs_div", "account", "rcept_no"],
+            )
+        except Exception as exc:
+            logger.error("%s년 재무 적재 실패: %s", year, exc)
+            failed.append(year)
+            continue
         quarters = Counter(row["quarter"] for row in rows)
         logger.info(
             "%s년: %s행, 종목 %s개, 분기별 %s",
@@ -49,6 +59,8 @@ def load(connection: psycopg.Connection, years: list[int], all_tickers: bool) ->
             len({row["ticker"] for row in rows}),
             dict(sorted(quarters.items())),
         )
+    if failed:
+        raise SystemExit(f"재무 적재 실패 연도: {failed}")
 
 
 def _targets(connection: psycopg.Connection, all_tickers: bool) -> dict[str, str]:

@@ -6,6 +6,7 @@ data-pipeline의 crawling.db.database.Database를 db.py를 통해 재사용한�
 import json
 import logging
 
+from core.errors import InvalidRequestError
 from db import Database, utc_now
 from onboarding.processor import process_onboarding
 
@@ -48,21 +49,24 @@ def save_onboarding(
 
     missing = [k for k in REQUIRED_KEYS if k not in form_data]
     if missing:
-        raise ValueError(f"필수 항목 누락: {missing}")
+        raise InvalidRequestError(f"필수 항목 누락: {missing}")
     if not isinstance(form_data["q6"], list):
-        raise ValueError("q6는 리스트여야 합니다.")
+        raise InvalidRequestError("q6는 리스트여야 합니다.")
     if len(form_data["q6"]) > 3:
-        raise ValueError("관심 산업은 최대 3개까지만 선택 가능합니다.")
+        raise InvalidRequestError("관심 산업은 최대 3개까지만 선택 가능합니다.")
 
-    result = process_onboarding(
-        q1_choice=form_data["q1"],
-        q2_choice=form_data["q2"],
-        q3_choice=form_data.get("q3", ""),
-        q3_1_choice=form_data["q3_1"],
-        q4_choice=form_data["q4"],
-        q5_choice=form_data["q5"],
-        q6_choices=form_data["q6"],
-    )
+    try:
+        result = process_onboarding(
+            q1_choice=form_data["q1"],
+            q2_choice=form_data["q2"],
+            q3_choice=form_data.get("q3", ""),
+            q3_1_choice=form_data["q3_1"],
+            q4_choice=form_data["q4"],
+            q5_choice=form_data["q5"],
+            q6_choices=form_data["q6"],
+        )
+    except (ValueError, KeyError) as exc:  # 선택지 문구가 프런트와 다르면 KeyError
+        raise InvalidRequestError(f"온보딩 응답을 처리할 수 없습니다: {exc}") from exc
 
     now = utc_now()
     interest_sectors_json = json.dumps(result["interest_sectors"], ensure_ascii=False)

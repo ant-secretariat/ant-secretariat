@@ -181,3 +181,20 @@ def test_summarize_ticker_rows_keep_ci_and_sector_rows_aggregate():
 def test_cli_monthly_args():
     args = parse_args(["monthly", "--out-dir", "out"])
     assert args.command == "monthly" and str(args.out_dir) == "out" and args.seed is None
+
+
+@pytest.mark.parametrize("industry, product, label", [
+    # #61 리뷰에서 나온 오분류
+    ("기초 화학물질 제조업", "합성수지,유화부문(LDPE,LLDPE)제품 제조,플라스틱가공품(PVC),CA,무기화학제품,부동산업", "화학"),
+    ("특수 목적용 기계 제조업", "협동로봇, 모바일휴머노이드, 4족보행로봇, 천문마운트시스템 등", "로봇"),
+    ("전자부품 제조업", "정밀기기(육해공군관련전자제어시스템,열영상감시장비,탐지추적장치,전투지휘체계시스템) 제조", "방산"),
+    # 바뀌지 않아야 하는 것
+    ("무기 및 총포탄 제조업", "정밀유도무기 등", "방산"),
+    ("항공기,우주선 및 부품 제조업", "정부방산 및 완제기 수출", "방산·항공"),
+    ("특수 목적용 기계 제조업", "반도체 후공정장비,반도체금형 제조", "반도체 장비"),
+    ("전자부품 제조업", "P.C.B(인쇄회로기판),M.L.B 제조", "전자부품·PCB"),
+    ("일차전지 및 이차전지 제조업", "2차전지 (소형,ESS,자동차전지)", "2차전지"),
+    ("일차전지 및 이차전지 제조업", "양극활물질", "2차전지 소재"),
+])
+def test_sub_industry_rules_fixed_cases(industry, product, label):
+    assert oi.sub_industry_candidate(industry, product)[0] == label

@@ -57,7 +57,9 @@ API 스키마의 원본은 [`docs/api/openapi.yaml`](../../docs/api/openapi.yaml
 | `payload` | jsonb | |
 | `created_at` | timestamptz | |
 
-- PK `(job_id, seq)`. 같은 `seq` 충돌은 PK 위반으로 드러난다(조용히 덮지 않음).
+- PK `(job_id, seq)`. `append_event`가 `pg_advisory_xact_lock(hashtext(job_id))`로 직렬화한다(research R15). 그래도 충돌하면 PK 위반으로 드러난다(조용히 덮지 않음).
+- 보관: 끝난 job의 이벤트는 7일 뒤 삭제. `agent_jobs` 행과 결과는 유지.
+- `simulation_result`는 요약(분위수·시나리오별 결과)만 저장.
 
 ### `uncovered_query_log`
 
@@ -76,13 +78,14 @@ RLS: 세 테이블 모두 서비스 키 전용(익명 접근 없음). `core_tabl
 ## 4. 상태 전이 (`JobStatus`)
 
 ```text
-queued ──▶ running ──▶ debate_completed ──(compare: 종료)
-                │              │
-                │              └─(single)─▶ simulation_pending ──▶ simulation_running ──▶ completed
-                │                                                          │
-                └──────────────────▶ failed ◀──────────────────────────────┘
+queued → running ─┬─ (compare) → debate_completed                         종료
+                  └─ (single)  → simulation_pending ── 사용자 버튼 ──▶ simulation_running → completed
+                                       │ 누르지 않으면 여기서 멈춤 (토론 결과 조회 가능)
+running · simulation_running ── 실패 ──▶ failed
 ```
+
+- 버튼: `POST /orchestrate/debate/{job_id}/simulate`(계약 #46). 비교 모드·이미 실행 중·완료면 409 `invalid_job_state`, 시뮬레이션 파라미터 없는 종목이면 200 rejected `no_data`(job은 `failed`로 바꾸지 않음).
+- 토론 완료 이벤트와 job 조회 응답에 `simulation_ready`를 포함.
 
 - `running` → `failed`: 토론 실패, 또는 앱 재시작 정리(`error_code=interrupted`).
 - 상태가 바뀔 때마다 대응 이벤트를 `job_events`에 같은 트랜잭션으로 남긴다(`job_started`, `completed`, `failed`, `simulation_*`).
-- 비교 모드에서 `simulate` 요청은 409 `invalid_job_state` (계약 #46).

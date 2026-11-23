@@ -18,7 +18,7 @@
 
 **Language/Version**: Python 3.12 (backend), TypeScript (frontend, 타입 갱신만)
 
-**Primary Dependencies**: FastAPI, Pydantic v2, LangGraph(기존 라우팅 유지), openai SDK(Upstage 호환), psycopg(데이터 함수 경유). 테스트 전용: `pyyaml`, `jsonschema` (research R9)
+**Primary Dependencies**: FastAPI, Pydantic v2, LangGraph(기존 라우팅 유지), openai SDK(Upstage 호환), psycopg(데이터 함수 경유), `psycopg_pool`(SSE 조회, R14). 테스트 전용: `pyyaml`, `jsonschema` (research R9)
 
 **Storage**: Supabase Postgres — 신규 `agent_jobs`·`job_events`·`uncovered_query_log` (R2). `users`는 SQLite 유지(범위 밖)
 
@@ -80,6 +80,7 @@ backend/
 ├── verification/              # 신규: text_rules.py (금지 표현·자리표시, 토론과 공용)
 ├── orchestrator/
 │   ├── companies.py           # resolve_companies (관문1) — resolve_company_context 대체
+│   ├── requirements.py        # ROUTE_REQUIREMENTS · check_coverage (경로별 실행 조건, R3)
 │   ├── uncovered.py           # log_uncovered_query
 │   ├── jobs.py                # 토론 job 생성·재사용·한도, append_event, 시작 시 정리
 │   ├── graph.py · router.py   # trend_report 경로 추가, 노드가 Envelope 반환
@@ -110,10 +111,10 @@ frontend/src/                   # types.ts · api/client.ts (봉투·Badge·Clai
 | --- | --- | --- | --- | --- |
 | PR-0 | 계약 draft.6 | `REASON_POLICY` 표(OQ-1), `EntityResolution.companies` maxItems 3, `BrokerView`·`VerificationSummary`, 매크로 항목 `ticker="macro"`, 계약 테스트(R9) | — | 유민·수경 리뷰 |
 | PR-1 ★ | 공통 봉투 | `backend/contracts/envelope.py`·`entities.py`, `core/errors`가 `REASON_POLICY` 사용 | PR-0 | 전원 (응답 형식) |
-| PR-2 ★ | job 저장소 | 마이그레이션 `agent_jobs`·`job_events`, `functions/agent_jobs.py` Supabase 교체, `JobStatus`, `append_event`(seq 단일 지점), 시작 시 정리 | PR-1 | 유민 (`run_debate`가 이벤트 기록) |
-| PR-3 ★ | 관문1 | `resolve_companies`, `mentioned_in_query`, 커버 판정, `uncovered_query_log` 마이그레이션·`log_uncovered_query` | PR-1 | 유민 (precheck 입력) |
-| PR-4 ★ | 토론 경로 | precheck 호출, 재사용·동시 한도, `job_started`/`rejected` 봉투, `run_debate` 어댑터(레거시 → renewal 교체 지점 하나) | PR-2, PR-3 | 유민·수경 (시뮬레이션 상태) |
-| PR-5 ★ | SSE | `GET /jobs/{job_id}/events`, `Last-Event-ID`, ping, 종료 후 닫기 | PR-2 | FE |
+| PR-2 ★ | job 저장소 | 마이그레이션 `agent_jobs`·`job_events`, `functions/agent_jobs.py` Supabase 교체, `JobStatus`, `append_event`(advisory lock, R15), 시작 시 정리, 끝난 job 이벤트 7일 보관 | PR-1 | 유민 (`run_debate`가 이벤트 기록) |
+| PR-3 ★ | 관문1 | `resolve_companies`, `mentioned_in_query`, `ROUTE_REQUIREMENTS`·`check_coverage`, 대안 3개(`suggest_alternatives`), `uncovered_query_log` 마이그레이션·`log_uncovered_query` | PR-1, 수경 `suggest_alternatives` | 유민 (precheck 입력) |
+| PR-4 ★ | 토론 경로 | precheck 호출(`data_status` provider, `DataStatusUnavailable`→503), 거절 payload 채우기, 재사용·동시 한도, `job_started`/`rejected` 봉투, `run_debate` 어댑터, `simulate` 버튼 처리(409·`no_data`) | PR-2, PR-3, 유민 provider 어댑터 | 유민·수경 (시뮬레이션 상태) |
+| PR-5 ★ | SSE | `GET /jobs/{job_id}/events`, `Last-Event-ID`, ping, 종료 후 닫기, 연결 풀(R14) | PR-2 | FE |
 | PR-6 | 세션 | HMAC 쿠키 발급·검증, `user_id` 바디 병행 | PR-1 | FE (R6 팀 결정 후) |
 | PR-7 | 공용 텍스트 검사 | `backend/verification/text_rules.py`, 토론 L1 import 교체 | — | 유민 리뷰 |
 | PR-8 | 인사이트보드 | 종목별 실패 판정, `Badge`, `summarize_for_comment`, `verify_comment`, `InsightBoardResult`, 봉투 라우트 | PR-1, PR-7 | FE |

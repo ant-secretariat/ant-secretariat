@@ -15,11 +15,12 @@ plan.md의 Technical Context에서 정해지지 않았던 항목을 정리한다
 - **대안:** SQLite 유지 — 배포 인스턴스가 둘 이상이면 깨지고, 데이터 함수는 이미 Supabase다. 외부 큐(Redis 등) — MVP 규모에 비해 운영 비용이 크다.
 - **범위 밖:** `users`·온보딩 테이블의 Supabase 이전은 별도 이슈로 둔다(시뮬레이션도 읽으므로 수경과 함께). 이 기능은 `user_id` 문자열만 저장한다.
 
-## R3. 커버 종목 판정 — 확인 필요 (수경)
+## R3. 커버 종목 판정과 경로별 실행 조건 (#68 리뷰로 확정)
 
-- **결정:** `resolve_company`가 `exact`이고 `is_preferred=false`이면 커버로 본다. 티어(T0~T2)로는 거절하지 않는다. 우선주는 `uncovered_company`.
-- **이유:** 계약이 "T0·T2는 거절하지 않고 축소 실행"으로 정했다. `companies` 테이블에 있는 상장 보통주는 모두 데이터 함수 대상이다.
-- **대안:** `data_status`로 판정 — 데이터가 적은 종목의 처리는 precheck(토론)와 `data_tier`(트렌드 리포트)가 이미 맡는다.
+- **결정:** 커버 = 우선주가 아님 + `data_status.sources`에 적재된 소스가 1개 이상. 경로마다 필요한 소스는 선언형 표 `ROUTE_REQUIREMENTS`(`requires_any`, precheck의 `intent_data_sources.json`과 같은 형식)로 두고, 판정 함수 `check_coverage` 하나가 `unavailable`·`uncovered`·`no_data`·`ok` 네 상태를 돌려준다(오케스트레이터 기획서 5.3).
+- **이유:** `companies` 2,867종목이 모두 티어를 가져서 "티어 있음"으로는 거의 전부 커버가 된다. 실제 적재는 T1 100종목뿐이다(수경, 11/23). 조건을 코드 분기 대신 표로 두면 경로를 추가할 때 판정 로직을 건드리지 않는다(Specification 패턴의 파라미터형).
+- **대안:** (1) 티어로 판정 — 위 이유로 기각. (2) 에이전트마다 `resolve_company` 구현을 두기 — 데이터 함수가 소비자를 알게 되고, `data_status`는 이미 한 번의 조회로 모든 소스를 돌려줘 이득이 없다. (3) 컴포지트 Specification·라이브러리 — 지금 조건은 "하나라도 있음"뿐이라 과하다. 조합 조건이 생기면 평가 함수만 바꾼다.
+- **`data_status` 실패:** `None`이거나 `error`가 있으면 503. "데이터 없음"으로 읽지 않는다(원칙 III).
 
 ## R4. 토론 job 실행 방식
 
@@ -69,6 +70,18 @@ plan.md의 Technical Context에서 정해지지 않았던 항목을 정리한다
 
 - **결정:** `run_trend_report`를 async로 바꾸고 `get_agent_context`·`get_disclosure_data`·90일 전 목표주가·`get_available_data_status`를 `asyncio.to_thread`로 병렬 호출한다. LLM은 1회(+재요청 1회, 보완 후 재생성 없음).
 - **이유:** 지금은 검색 3종이 순차라 10초 목표의 대부분을 데이터 조회가 쓴다. `get_agent_context` 내부의 순차 검색은 수경 쪽 개선 대상으로 따로 요청한다.
+
+## R14. SSE 조회 연결
+
+- **결정:** 앱에 작은 연결 풀(`psycopg_pool`, 최대 5)을 두고 SSE는 1초 조회 때만 빌린다.
+- **이유:** 데이터 함수의 `connect()`는 호출마다 새 연결을 만든다. 1초마다 새 연결은 비용이 크고, 스트림마다 연결을 붙잡으면 Supabase 무료 플랜의 동시 연결 한도에 걸린다(#68 리뷰).
+- **대안:** `pg_notify` — ADR 0009에서 기각(트랜잭션 풀러에서 LISTEN 불가).
+
+## R15. `append_event` 직렬화
+
+- **결정:** 같은 트랜잭션에서 `pg_advisory_xact_lock(hashtext(job_id))` 후 `max(seq)+1` 삽입.
+- **이유:** 비교 모드는 종목별 Bull·Bear가 병렬이라 같은 job에 이벤트가 동시에 들어온다(#68 리뷰).
+- **대안:** 전역 자동 증가 `seq` — 잠금은 필요 없지만 커밋 순서가 뒤바뀌면 SSE 클라이언트가 앞 번호를 놓친다. asyncio Lock — 재시작·다중 워커에서 깨진다.
 
 ## R13. `mentioned_in_query`
 

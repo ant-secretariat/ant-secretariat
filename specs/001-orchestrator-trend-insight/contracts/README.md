@@ -12,6 +12,8 @@
 | C6 | `TargetPriceTrend` | `direction` 계산 규칙(90일·2/3·±3%)을 설명에 | 코드 계산 규칙 공개 | 수경 |
 | C7 | `OrchestratorRequest.request_type` | 설명에 버튼 경로 3종이 MVP, `chat`은 Post-MVP 명시 | 범위 명확화 | — |
 | C8 | `job_not_found` · `invalid_job_state` | "제안" 표시 제거 (OQ-2 닫기) | 구현에서 사용 | 전원 |
+| C9 | `suggest_alternatives(ticker, n=3)` (신규 데이터 함수) | 중분류 → 대분류 → 전체 시총순, `alternatives` 3개 | 거절 대안 선정 (#68 리뷰) | 수경 |
+| C10 | `JobEvent` 토론 완료 payload · job 조회 응답 | `simulation_ready` 추가 | 버튼 미리 끄기 (#68 리뷰) | 수경 |
 
 - 계약 테스트(`backend/tests/contract/`)를 같은 PR에 넣어, 이후 PR의 응답이 이 스키마로 검증되게 한다.
 - `/agents/trend-report`는 이미 `deprecated`다. 삭제는 PR-12.

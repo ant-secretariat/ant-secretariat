@@ -2,7 +2,7 @@
 
 | 항목 | 값 |
 | --- | --- |
-| 버전 | **v2.0** (2026-11-23) |
+| 버전 | **v2.1** (2026-11-23) |
 | 상태 | 검토 중 |
 | 담당 | 태은 |
 | 상위 문서 | [헌법](../../.specify/memory/constitution.md) > [ADR](../decisions/) > PRD v1.6 > 기능 명세서 v0.8 > 이 문서 |
@@ -15,7 +15,8 @@
 | --- | --- | --- |
 | v1.0 | 2026-10-13 | Notion "오케스트레이터 & 에이전트 아키텍처 설계 초안" |
 | v1.1 | 2026-11-05 | Notion "시그니처 계약" (봉투·`resolve_entities`·플래너 시그니처) |
-| **v2.0** | 2026-11-23 | 저장소로 이관. 레포 현황에 맞춰 수정: 자유 질의·플래너를 Post-MVP로, 2종목 비교(ADR 0007)·SSE(ADR 0009)·Problem 오류(#60) 반영, 작업 저장소를 Supabase로 |
+| v2.0 | 2026-11-23 | 저장소로 이관. 레포 현황에 맞춰 수정: 자유 질의·플래너를 Post-MVP로, 2종목 비교(ADR 0007)·SSE(ADR 0009)·Problem 오류(#60) 반영, 작업 저장소를 Supabase로 |
+| **v2.1** | 2026-11-23 | #68 리뷰 반영: 경로별 실행 조건(5.3, 선언형 표), 커버 판정을 `data_status.sources`로, precheck에 `data_status` 전달, 거절 payload는 오케스트레이터가 채움, `append_event` 직렬화, 시뮬레이션 시작 흐름(6.3), 보관 기간·연결 풀 |
 
 ### v1.1 → v2.0 무엇이 바뀌었나
 
@@ -66,20 +67,24 @@ FE ── 세션 쿠키 ──▶ API (api/orchestrator.py)        HTTP 입력 �
                      ▼
               [C] run_orchestrator_request
                      │
-       ① 관문1  resolve_companies(inputs, query, max_companies)
-                     │   not_found → rejected company_not_found
-                     │   ambiguous → rejected company_not_found (버튼 경로는 FE 자동완성이 후보를 이미 보여 줌)
-                     │   uncovered → rejected uncovered_company (+ 같은 섹터 대안)
+       ① 관문1  resolve_companies(inputs, query, max_companies)          종목 확정 (5.1·5.2)
+                     │   not_found·ambiguous → rejected company_not_found
                      │   too_many / partial_covered → rejected (토론만)
-                     │   조회 실패 → 503 upstream_unavailable (Problem)
+                     │   check_coverage(data_status, ROUTE_REQUIREMENTS[경로])   실행 조건 (5.3)
+                     │     uncovered → rejected uncovered_company / no_data → rejected no_data (+ 대안 3개)
+                     │   조회 실패(resolve_company·data_status) → 503 upstream_unavailable (Problem)
                      │   거절이면 log_uncovered_query(gate=1)
                      ▼
        ② 라우팅  decide_route(request)  ── insight_board ──▶ [E] run_insight_board ──▶ Envelope
                      │                   ── trend_report  ──▶ [D] run_trend_report  ──▶ Envelope
                      │                   ── debate
                      ▼
-       ③ 토론    precheck(query, companies, company_mentioned)   [F, 유민]
-                     │   reject → rejected (사유별 next_action) + log_uncovered_query(gate=2·3)
+       ③ 토론    precheck(query, companies,                              [F, 유민]
+                     │            data_status=<관문1의 data_status로 만든 provider>,
+                     │            company_mentioned=<5.2>)
+                     │   reject → rejected (사유 코드는 precheck, payload는 오케스트레이터가 채움, 4.1)
+                     │            + log_uncovered_query(gate=2·3)
+                     │   DataStatusUnavailable → 503 upstream_unavailable (조회 실패 ≠ 데이터 없음)
                      ▼
        ④ job     find_reusable_job(user, tickers, query)  → 있으면 job_started reused=true
                      │   진행 중 job이 한도 이상 → 409 concurrent_job_limit (Problem)
@@ -88,7 +93,8 @@ FE ── 세션 쿠키 ──▶ API (api/orchestrator.py)        HTTP 입력 �
               job_started {job_id, reused:false}
 ```
 
-- 인사이트보드·트렌드 리포트는 precheck를 거치지 않는다. 두 에이전트는 데이터가 적어도 범위를 줄여 실행한다(계약: "T0·T2는 거절하지 않고 축소 실행").
+- 인사이트보드·트렌드 리포트는 precheck를 거치지 않는다. 관문1의 실행 조건(5.3)만 통과하면 실행하고, 데이터가 적으면 범위를 줄인다(계약: "T0·T2는 거절하지 않고 축소 실행"). 티어는 노출 범위에만 쓰고 거절 기준으로 쓰지 않는다.
+- 종목 상태 조회(`get_available_data_status`, 종목당 약 0.3초)는 관문1의 `resolve_company`에서 한 번만 한다. precheck와 실행 조건 판정은 그 결과를 넘겨받는다.
 - 오케스트레이터는 하위 에이전트의 결과 내용을 해석하지 않는다. 봉투의 `status`만 정한다.
 
 ## 4. 공통 봉투와 사유 정책 (`backend/contracts/envelope.py`)
@@ -101,8 +107,8 @@ FE ── 세션 쿠키 ──▶ API (api/orchestrator.py)        HTTP 입력 �
 
 | 사유 코드 | 채널 | HTTP | `next_action.type` | payload |
 | --- | --- | --- | --- | --- |
-| `uncovered_company` | rejected | 200 | `choose_alternative_company` | `alternatives` ≥1 (같은 섹터 커버 종목, 없으면 커버 종목 시총순) |
-| `no_data` | rejected | 200 | `choose_alternative_company` | `alternatives` ≥1 |
+| `uncovered_company` | rejected | 200 | `choose_alternative_company` | `alternatives` 3개 (아래 대안 규칙) |
+| `no_data` | rejected | 200 | `choose_alternative_company` | `alternatives` 3개 (아래 대안 규칙) |
 | `company_not_found` | rejected | 200 | `rephrase_company` | 없음 |
 | `too_many_companies` | rejected | 200 | `select_companies` | `candidates` ≥3, `max_select=2` |
 | `partial_coverage` | rejected | 200 | `run_single_analysis` | `company` |
@@ -118,6 +124,9 @@ FE ── 세션 쿠키 ──▶ API (api/orchestrator.py)        HTTP 입력 �
 | `upstream_unavailable` | Problem | 503 | `retry` | 없음 |
 | `internal_error` | Problem | 500 | `retry` | 없음 |
 
+- **payload는 오케스트레이터가 채운다.** precheck는 사유 코드(`out_of_scope_topic`·`data_collecting`·`no_data`)만 돌려준다.
+  - `alternatives`: 데이터 함수 `suggest_alternatives(ticker, n=3)`(수경, 계약 draft.6에 추가). 커버 종목 중 **같은 WICS 중분류 → 같은 대분류 → 전체** 순서로 시가총액 큰 순. 요청 종목의 업종이 비어 있으면 바로 전체 시총순.
+  - `topics`: 토론이 지원하는 아젠다 목록(`precheck` 설정의 `AGENDA_TITLES`).
 - **#60에서 바뀌는 점:** 지금 `CompanyNotFoundError`는 422 Problem이다. 봉투로 옮기면 `company_not_found`는 200 `rejected`가 된다(계약대로). 사용자를 못 찾은 404도 `job_not_found`를 같이 쓰는데, 사용자 조회는 세션 도입 후 401 `unauthenticated`로 바뀌므로 별도 코드를 만들지 않는다.
 - `ResponseMeta.trace_id`는 #60의 요청별 `trace_id`를 그대로 쓴다. `data_as_of`는 기본값 없이 각 에이전트가 채운다(없으면 명시적으로 `null`).
 
@@ -140,17 +149,46 @@ def resolve_companies(
 
 | 순서 | 조건 | `status` | 처리 |
 | --- | --- | --- | --- |
-| 1 | `resolve_company` 결과에 `error` | — | `UpstreamUnavailableError` (503) |
+| 1 | `resolve_company` 결과에 `error`, 또는 `data_status`가 `None`, 또는 `data_status.error` | — | `UpstreamUnavailableError` (503). "데이터 없음"으로 읽지 않는다 |
 | 2 | 입력 개수 > `max_companies` | `too_many` | 토론만 rejected `too_many_companies` |
 | 3 | 하나라도 `not_found` | `not_found` | rejected `company_not_found` |
 | 4 | 하나라도 `ambiguous` | `ambiguous` | 버튼 경로: rejected `company_not_found` (FE 자동완성이 후보를 이미 보여 주므로). 자유 질의(Post-MVP): `clarification_needed` |
-| 5 | 확정됐지만 커버 밖 | `uncovered` / `partial_covered` | 단일: rejected `uncovered_company`. 비교 한쪽만: rejected `partial_coverage` |
-| 6 | 모두 확정·커버 | `ok` | `mode` = 1개 single, 2개 compare |
+| 5 | 확정됐지만 커버 밖 (5.3의 `uncovered`) | `uncovered` / `partial_covered` | 단일: rejected `uncovered_company`. 비교 한쪽만: rejected `partial_coverage` |
+| 6 | 모두 확정·커버 | `ok` | `mode` = 1개 single, 2개 compare. 이어서 5.3 실행 조건 |
 
-- **커버 판정:** `resolve_company`의 `tier`가 있고 우선주가 아니면 커버로 본다. 계약상 T0·T2도 축소 실행하므로 티어로 거절하지 않는다. 정확한 기준은 수경과 확인한다(research R3).
+- **커버 판정:** 우선주가 아니고, `data_status.sources`에 적재된 소스가 하나라도 있으면 커버다. 지금 `companies` 2,867종목은 모두 티어가 있지만 시세·재무·수급은 T1 100종목만 적재돼 있어(11/23), 티어로는 커버를 가를 수 없다.
 - **`mentioned_in_query`:** `extract_company_mentions(query)`로 찾은 ticker 집합과 확정 종목이 하나라도 겹치면 true, 겹치지 않으면 false. precheck의 `company_mentioned`로 넘긴다(#26 별칭 문제 해결).
   - 함수가 빈 목록을 돌려주면 조회 실패와 "언급 없음"을 구분할 수 없으므로 precheck에는 `None`을 넘겨 공식명으로 직접 확인하게 한다(research R13). 계약 필드는 bool이라 응답에는 false로 둔다.
+- **precheck 입력:** 관문1의 `data_status`를 `TickerDataStatus`로 바꾸는 provider를 넘긴다. 어댑터는 `debate_renewal` 쪽(유민)에 둔다.
 - **계약 불일치:** `EntityResolution.companies`가 `maxItems: 2`인데 인사이트보드는 3개까지다. 계약을 `maxItems: 3`으로 바꾸고 "토론은 2개"를 `max_companies`로 표현한다(계약 PR 필요, 헌법 원칙 II).
+
+### 5.3 경로별 실행 조건 (선언형 표)
+
+종목 확정은 모든 경로가 같고, **"이 경로를 실행하려면 어떤 데이터가 있어야 하는가"만 경로마다 다르다.** 조건은 코드 분기 대신 표로 선언하고, 판정 함수 하나가 모든 경로를 처리한다(Specification 패턴의 파라미터형). 형식은 precheck의 `intent_data_sources.json`(`requires_any`)과 같다.
+
+```python
+# backend/orchestrator/requirements.py
+ROUTE_REQUIREMENTS = {
+    ("insight_board", "price"):      {"requires_any": ["price"]},
+    ("insight_board", "disclosure"): {"requires_any": ["disclosure"]},
+    ("insight_board", "macro"):      {"requires_any": []},          # 종목 데이터 불필요
+    ("trend_report", None):          {"requires_any": ["report", "news", "disclosure", "derived"]},
+    # 토론은 precheck가 아젠다별로 판정 (intent_data_sources.json)
+}
+
+def check_coverage(data_status: dict | None, requirement: dict) -> Coverage: ...
+```
+
+| 판정 | 조건 | 응답 |
+| --- | --- | --- |
+| `unavailable` | `data_status`가 `None` 또는 `error` | 503 `upstream_unavailable` |
+| `uncovered` | `sources`가 모두 0건 (적재되지 않은 T0) | rejected `uncovered_company` |
+| `no_data` | 커버 종목이지만 `requires_any`의 소스가 모두 0건 | rejected `no_data` |
+| `ok` | `requires_any`가 비었거나 하나 이상 있음 | 실행 |
+
+- 각 행의 조건은 그 에이전트 기획서가 소유한다(트렌드 리포트·인사이트보드 기획서 "실행 조건"). 바꿀 때는 기획서와 이 표를 같은 PR에서 고친다.
+- 조건 조합(AND·NOT)이 실제로 필요해지면 평가 함수만 컴포지트 형태로 바꾼다. 표 형식은 유지한다.
+- `uncovered`와 `no_data`를 나누는 이유: `uncovered_company`는 T0 수집 우선순위 큐(`uncovered_query_log`)의 입력이고, `no_data`는 커버 종목의 데이터 공백이다. 사용자에게는 둘 다 "대안 종목 고르기"로 같다.
 
 ## 6. 토론 job
 
@@ -170,7 +208,11 @@ job_events (job_id text, seq int, type text, payload jsonb, created_at timestamp
 ```
 
 - `JobStatus`는 계약의 7종(`queued`·`running`·`debate_completed`·`simulation_pending`·`simulation_running`·`completed`·`failed`)을 공용 열거형으로 둔다. 비교 모드 job은 `debate_completed`에서 끝난다(ADR 0007).
-- `seq`는 그 job을 실행하는 워커 한 곳에서만 매긴다(ADR 0009). `append_event(job_id, type, payload)`가 `max(seq)+1`을 같은 트랜잭션에서 넣는다.
+- `seq`는 그 job을 실행하는 워커 한 곳에서만 매긴다(ADR 0009). `append_event(job_id, type, payload)`가 같은 트랜잭션에서 `pg_advisory_xact_lock(hashtext(job_id))`로 잠근 뒤 `max(seq)+1`을 넣는다.
+  - 비교 모드는 종목별 Bull·Bear가 병렬이라 같은 job에 이벤트가 동시에 들어온다. 잠금이 없으면 PK 충돌로 이벤트가 실패한다.
+  - 전역 자동 증가 번호는 잠금이 필요 없지만, 커밋 순서가 뒤바뀌면 SSE 클라이언트가 앞 번호를 영영 놓칠 수 있어 쓰지 않는다.
+- **보관 기간:** 끝난 job(`completed`·`failed`, 비교 모드 `debate_completed`)의 `job_events`는 7일 뒤 지운다. `agent_jobs` 행과 결과는 남긴다(DB 무료 한도 500MB 중 약 440MB 사용, 11/23).
+- `simulation_result`에는 요약(분위수·시나리오별 결과)만 저장한다. 경로 전체는 넣지 않는다.
 
 ### 6.2 생성 규칙
 
@@ -179,10 +221,28 @@ job_events (job_id text, seq int, type text, payload jsonb, created_at timestamp
 - **실행:** MVP는 API 프로세스 안의 `asyncio` 백그라운드 작업이다(지금과 같음). 프로세스가 재시작되면 `running` job은 `failed`로 정리한다(시작 시 1회). 외부 큐는 Post-MVP.
 - `run_debate(companies, user_id, query, precheck, job_id)`(계약 `RunDebateInput`)는 유민 소유. 오케스트레이터는 job을 만들고 넘기기만 한다. 레거시 `agents/debate`는 `debate_renewal`이 연결될 때 교체한다.
 
-### 6.3 진행 상황 SSE (ADR 0009)
+### 6.3 시뮬레이션 시작 (사용자 버튼)
+
+계약의 `POST /orchestrate/debate/{job_id}/simulate`(#46)를 쓴다. 새 경로를 만들지 않는다.
+
+```text
+queued → running ─┬─ (compare) → debate_completed                      종료
+                  └─ (single)  → simulation_pending ── 버튼 ──▶ simulation_running → completed
+                                       │ 누르지 않으면 여기서 멈춤 (토론 결과는 조회 가능)
+running·simulation_running ── 실패 ──▶ failed
+```
+
+- 토론 완료 이벤트와 job 조회 응답에 `simulation_ready`(`data_status.simulation_ready`, #53)를 같이 내려 FE가 버튼을 미리 끌 수 있게 한다.
+- 버튼 요청 처리:
+  - 비교 모드이거나 이미 `simulation_running`·`completed` → 409 `invalid_job_state`
+  - 시뮬레이션 파라미터가 없는 종목(정상 95종목 밖) → 200 rejected `no_data`. job을 `failed`로 바꾸지 않는다(끝난 토론까지 실패처럼 보이지 않게)
+- 시뮬레이션 봉투의 `data_as_of`는 `sim_params.as_of`다(수경).
+
+### 6.4 진행 상황 SSE (ADR 0009)
 
 - `GET /jobs/{job_id}/events`: 본인 job만. `Last-Event-ID` 다음 `seq`부터 보낸다.
-- 1초마다 `job_events`를 조회, 15초마다 `: ping`, 종료 이벤트(`completed`·`failed`, 비교 모드는 토론 완료) 뒤 연결을 닫는다.
+- 1초마다 `job_events`를 조회, 15초마다 `: ping`, 종료 이벤트(`completed`·`failed`, 비교 모드는 토론 완료, 단일 모드는 `simulation_pending` 도달) 뒤 연결을 닫는다.
+- 조회할 때만 작은 연결 풀(`psycopg_pool`, 최대 5)에서 연결을 빌린다. 스트림마다 연결을 붙잡거나 1초마다 새로 연결하지 않는다(Supabase 무료 플랜 동시 연결 제한).
 
 ## 7. 미커버 로그
 
@@ -193,6 +253,7 @@ def log_uncovered_query(event: UncoveredQueryEvent) -> None
 
 - 테이블 `uncovered_query_log` (Supabase, 신규). 커버리지 우선순위 큐의 입력이다.
 - `user_hash`는 `HMAC(SESSION_SECRET, user_id)`. `query_masked`는 숫자 6자리 이상·이메일·전화번호를 가린 원문(헌법 원칙 IV: 분석 이벤트에 질문 원문 금지 → 가린 문장만).
+- `entity`에는 확정된 종목코드가 있으면 반드시 넣는다(데이터 쪽 T0 수집 우선순위 입력).
 - 적재 실패는 요청을 막지 않는다(로그만). 단, 실패 사실은 `logger.error`로 남긴다.
 
 ## 8. 인증 (계약 OQ-8, 팀 결정 필요)
@@ -224,8 +285,8 @@ def log_uncovered_query(event: UncoveredQueryEvent) -> None
 
 | # | 내용 | 상대 |
 | --- | --- | --- |
-| Q1 | 커버 판정 기준 (티어·우선주·`data_status`) | 수경 |
+| ~~Q1~~ | 커버 판정 기준 → **해결:** 우선주 아님 + 적재 소스 1개 이상, 경로별 조건은 5.3 (#68 리뷰) | 수경 |
 | Q2 | 인증 방식 확정 (OQ-8) | 팀 |
 | Q3 | `EntityResolution.companies` maxItems 3으로 계약 변경 | 유민·수경 (계약 리뷰) |
-| Q4 | `uncovered_company` 대안 종목 선정 규칙 (같은 섹터 시총순) | 수경 |
+| ~~Q4~~ | 대안 종목 규칙 → **해결:** 중분류 → 대분류 → 전체 시총순 3개, `suggest_alternatives`(수경) (#68 리뷰) | 수경 |
 | Q5 | 사용자당 동시 job 한도 1개가 데모에 충분한지 | 팀 |

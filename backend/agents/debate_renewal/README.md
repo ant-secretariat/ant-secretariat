@@ -8,9 +8,10 @@
 | --- | --- |
 | 공용 계약 타입(`contracts.py`) + 키워드 사전 + `intent_data_sources.json` 로더 | 완료 |
 | `precheck()` 관문2·3 엔진 + 테스트 24개 | 다음 PR (이 PR 위에 쌓임) |
-| Pydantic 스키마 (Bull·Bear·Judge·DebateResult) | 예정 |
-| 거절셋 v0.3 (dev 47·holdout 22·holdout2 22) + 측정기 + 키워드 사전 kw-0.3.0 | 완료 — `python -m agents.debate_renewal.eval.refusal` |
-| 프롬프트 v3, 검증 레이어, 비교 모드 | 예정 |
+| Pydantic 스키마 (Bull·Bear·Judge·DebateResult, 단일·비교) | 완료 (테스트 10개) |
+| 거절셋 v0.3 (dev 47·holdout 22·holdout2 22) + 측정기 + 키워드 사전 kw-0.3.1 | 완료 — `python -m agents.debate_renewal.eval.refusal` |
+| 검증 레이어 L1 (결정적 검사) | 완료 (테스트 10개) |
+| 프롬프트 v3, 근거 부족 루프, 비교 모드 실행 | 예정 |
 
 ## 실행
 

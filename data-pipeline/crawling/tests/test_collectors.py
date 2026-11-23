@@ -147,6 +147,14 @@ class MacroDataCollectorTest(unittest.TestCase):
 
         self.assertTrue(requested[0].endswith("/901Y033/M/202609/202609/A00/2"))
 
+    def test_dram_export_price_uses_dollar_basis_item(self) -> None:
+        indicator = DEFAULT_ECOS_INDICATORS["DRAM_EXPORT_PRICE"]
+
+        self.assertEqual((indicator.stat_code, indicator.cycle), ("402Y016", "M"))
+        # D램 품목 / 달러기준 (원화기준 W는 환율이 섞임)
+        self.assertEqual(indicator.item_code, "30911201AA/D")
+        self.assertEqual((indicator.frequency, indicator.country), ("monthly", "KR"))
+
     def test_trade_balance_is_exports_minus_imports_for_matching_months(self) -> None:
         values = {
             ("T002", "202608"): "60000",
@@ -228,6 +236,25 @@ class NewsCollectorTest(unittest.TestCase):
                 "2026-06-18T00:00:00"
             )
         )
+
+    def test_news_rows_keep_only_company_articles_and_drop_duplicates(self) -> None:
+        from crawling.collectors.news_collector import NaverNewsProvider, mentions_company
+
+        self.assertTrue(mentions_company("SK 하이닉스, HBM 증설", ["SK하이닉스"]))
+        self.assertFalse(mentions_company("용인 반도체 산단 교통대책", ["삼성전자"]))
+        items = [
+            {"title": "<b>삼성전자</b> 3분기 실적", "description": "", "pubDate": "Mon, 09 Nov 2026 10:00:00 +0900",
+             "originallink": "https://www.hankyung.com/a"},
+            {"title": "삼성전자 3분기 실적!", "description": "", "pubDate": "Mon, 09 Nov 2026 10:05:00 +0900",
+             "originallink": "https://www.mk.co.kr/b"},
+            {"title": "100대 기업 여성 임원", "description": "삼성 등", "pubDate": "Mon, 09 Nov 2026 11:00:00 +0900",
+             "originallink": "https://x.com/c"},
+        ]
+        rows = NaverNewsProvider(Settings())._build_rows(
+            None, items, "005930", "삼성전자", "2026-11-01", None, [], fetch_content=False
+        )
+
+        self.assertEqual([row["press"] for row in rows], ["hankyung.com"])
 
     def test_extract_article_text_from_common_article_node(self) -> None:
         body = " ".join(["삼성전자가 반도체 투자 계획을 발표했다."] * 20)

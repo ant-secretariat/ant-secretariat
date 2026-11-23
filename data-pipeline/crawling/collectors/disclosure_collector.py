@@ -10,6 +10,7 @@ from xml.etree import ElementTree
 
 import httpx
 
+from crawling.collectors.dart_api import has_data, mask_key
 from crawling.config.settings import SETTINGS, Settings
 from crawling.crawler.http import create_ssl_context
 
@@ -84,8 +85,13 @@ class DartDisclosureProvider:
             follow_redirects=True,
             verify=create_ssl_context(),
         ) as client:
-            response = client.get("https://opendart.fss.or.kr/api/list.json", params=params)
-            response.raise_for_status()
+            try:
+                response = client.get("https://opendart.fss.or.kr/api/list.json", params=params)
+                response.raise_for_status()
+            except httpx.HTTPError as exc:
+                # httpx 오류 메시지에는 인증키가 든 요청 URL이 들어가므로 가린 뒤 올린다
+                message = mask_key(str(exc), self.settings.dart_api_key)
+                raise RuntimeError(f"OpenDART list 조회 실패: {corp_code} - {message}") from None
 
             payload = response.json()
             rows = self._build_rows(client, payload, ticker, company, corp_code)
@@ -99,8 +105,8 @@ class DartDisclosureProvider:
         company: str,
         corp_code: str,
     ) -> list[dict]:
-        if payload.get("status") not in {"000", "013"}:
-            raise RuntimeError(f"OpenDART list API error: {payload.get('status')} {payload.get('message')}")
+        if not has_data(payload, f"OpenDART list API error: {corp_code}"):
+            return []
         rows: list[dict] = []
         for item in payload.get("list", []):
             disclosed_at = _normalize_dart_date(item.get("rcept_dt", ""))

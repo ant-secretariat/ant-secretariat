@@ -642,7 +642,8 @@ result = get_chunks_by_ids(["NAVER_000660_20261104_1:3f2a…", "NEWS_1f2e…:9c1
 - `collection_job_status`: T2 수집이 Post-MVP라 `null`
 - `sources`: 소스 11개의 `{"count", "latest"}`. 토론 precheck의 `intent_data_sources.json` `requires_any`와 같은 키라 어댑터 없이 씀. `count`의 단위는 아래 표
 - `as_of_dates`: 데이터 종류별 최신 기준일 (오래된 데이터 표시용)
-- Supabase 조회가 실패하면 예외 대신 `"error": "data_status_unavailable"`을 붙이고 `sources`는 `{}`, 건수는 0. **`error`가 있으면 "데이터 없음"이 아니라 "모름"으로 처리**해 주세요(backend는 503)
+- Supabase 조회가 실패하면 예외 대신 `"error": "data_status_unavailable"`을 붙임. 키 모양은 같고, 모르는 값(건수·`derived_snapshot_available`·`simulation_ready`·`company`·`available`·`latest`)은 0·false가 아니라 `null`, `sources`는 `{}`. **`error`가 있으면 "데이터 없음"이 아니라 "모름"으로 처리**해 주세요(backend는 503)
+- 종목명이 없으면 `company`는 `null`
 
 | `sources` 키 | `count` | `latest` |
 | --- | --- | --- |
@@ -765,7 +766,8 @@ result = get_metric(ticker="005930", metric_id="roe_ttm", as_of="2026-09-01")
 
 - 결과에 항상 `data_tier`(근거 종류: `report` → `news_only` → `disclosure_only` → `derived_only` → `macro_only` 순으로 있는 것)가 붙음. 계산은 `processing.enums.data_tier_for`
 - 데이터 상태 조회가 실패하면 `data_tier`는 `null`이고 `"error": "data_status_unavailable"`. 근거 종류를 모르는데 정하지 않음
-- `intent`(아젠다 ID, `AgendaId`)를 받아 결과에 그대로 담음. 없는 아젠다면 `ValueError`. 아직 묶음 내용은 바꾸지 않음
+- `data_status`에 이미 가진 `get_available_data_status` 결과(또는 `resolve_company`의 `data_status`)를 넘기면 상태를 다시 조회하지 않음. 아젠다마다 부를 때 쓰면 종목당 0.3~1초씩 반복되는 조회가 없어짐. 다른 종목의 결과면 `ValueError`
+- `intent`(아젠다 ID, `AgendaId`)를 받아 결과에 그대로 담음. 없는 아젠다면 `ValueError`(호출 코드의 실수). 아직 묶음 내용은 바꾸지 않음
 
 ```python
 from processing.functions.get_agent_context import get_agent_context
@@ -775,6 +777,7 @@ result = get_agent_context(
     agent_type="trend_report",  # trend_report(D용) / debate(F용) / simulation(G용)
     query="HBM 수요 전망",
     intent="valuation",         # 선택
+    data_status=status,         # 선택: 이미 가진 get_available_data_status 결과
     relational_db=db,
     embedding_model=embedding_model,
     vector_db=vector_db,

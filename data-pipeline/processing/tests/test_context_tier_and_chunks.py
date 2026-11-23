@@ -75,6 +75,33 @@ def test_agent_context_echoes_intent_and_rejects_unknown(quiet_sources):
         get_agent_context("005930", "debate", intent="weather")
 
 
+
+def test_agent_context_uses_given_data_status_without_querying(quiet_sources, monkeypatch):
+    def fail(ticker):
+        raise AssertionError("상태를 다시 조회하면 안 됨")
+
+    monkeypatch.setattr("processing.functions.get_available_data_status.get_available_data_status", fail)
+    status = {"ticker": "005930", **_status(news=4)}
+
+    assert get_agent_context("005930", "debate", data_status=status)["data_tier"] == "news_only"
+
+
+def test_agent_context_rejects_data_status_of_other_ticker(quiet_sources):
+    quiet_sources(_status(report=1))
+
+    with pytest.raises(ValueError):
+        get_agent_context("005930", "debate", data_status={"ticker": "000660", **_status(report=1)})
+
+
+def test_agent_context_with_failed_data_status_has_null_tier(quiet_sources):
+    quiet_sources(_status(report=1))   # 넘긴 상태를 우선한다
+    failed = {"ticker": "005930", "report_count": None, "news_count": None, "disclosure_count": None,
+              "derived_snapshot_available": None, "error": "data_status_unavailable"}
+
+    result = get_agent_context("005930", "debate", data_status=failed)
+
+    assert result["data_tier"] is None and result["error"] == "data_status_unavailable"
+
 CHUNK = {
     "chunk_id": "R1:a", "doc_id": "R1", "document_type": "report", "ticker": "000660", "company": "SK하이닉스",
     "broker": "KB증권", "published_at": date(2026, 11, 4), "title": "HBM", "url": "https://example.com/r1",

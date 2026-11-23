@@ -285,10 +285,30 @@ def test_status_failure_is_not_reported_as_no_data(monkeypatch, caplog):
 
     result = get_available_data_status("005930")
 
-    # 실패는 "데이터 없음"과 구분된다: error가 붙고 sources는 비어 있다
+    # 실패는 "데이터 없음"과 구분된다: error가 붙고, 모르는 값은 0·false가 아니라 null이다
     assert result["error"] == "data_status_unavailable"
     assert result["sources"] == {}
-    assert set(result) >= STATUS_KEYS   # 계약서 필수 키는 유지
-    assert result["simulation_ready"] is False
-    assert result["available"]["price_data"] is False
+    assert set(result) >= STATUS_KEYS   # 키 모양은 성공과 같다
+    assert (result["report_count"], result["news_count"], result["disclosure_count"]) == (None, None, None)
+    assert result["derived_snapshot_available"] is None
+    assert result["simulation_ready"] is None
+    assert result["company"] is None
+    assert set(result["available"]) == {"reports", "news", "disclosures", "price_data", "macro_data",
+                                        "target_price_data"}
+    assert all(value is None for value in result["available"].values())
+    assert all(value is None for value in result["latest"].values())
     assert "SECRET" not in caplog.text
+
+
+def test_status_unknown_company_name_is_null(monkeypatch):
+    _use(monkeypatch, FakeConnection((None,) + STRUCTURED_ROW[1:] + NO_DOCUMENTS))
+
+    assert get_available_data_status("999999")["company"] is None
+
+
+def test_status_reads_each_document_type_once(monkeypatch):
+    connection = _use(monkeypatch, FakeConnection(STRUCTURED_ROW + NO_DOCUMENTS))
+
+    get_available_data_status("005930")
+
+    assert connection.queries[0][0].count("from document_chunks") == 3

@@ -97,3 +97,35 @@ def test_golden_agendas_are_validated_and_summarized():
     ])
     assert "아젠다별 nDCG@10" in text and "risk (1)" in text and "growth (1)" in text
     assert "문항이 없는 아젠다: ['valuation', 'macro', 'shareholder_return', 'flow']" in text
+
+
+def test_query_embedding_has_timeout(monkeypatch):
+    # 임베딩 응답이 멈춰도 오래 기다리지 않는다 (#35 리뷰, #41)
+    import openai
+
+    from processing.search import chunk_search
+
+    created: dict = {}
+
+    class FakeOpenAI:
+        def __init__(self, **kwargs):
+            created.update(kwargs)
+            self.embeddings = self
+
+        def create(self, model, input):
+            class Item:
+                embedding = [0.0] * chunk_search.DIMENSION
+
+            class Response:
+                data = [Item()]
+
+            return Response()
+
+    monkeypatch.setenv("UPSTAGE_API_KEY", "test-key")
+    monkeypatch.setattr(openai, "OpenAI", FakeOpenAI)
+    chunk_search._embed_query_cached.cache_clear()
+
+    chunk_search.embed_query("타임아웃 확인용 질문")
+    assert created["timeout"] == chunk_search.EMBED_TIMEOUT_SECONDS == 10
+    assert created["max_retries"] == 1
+    chunk_search._embed_query_cached.cache_clear()

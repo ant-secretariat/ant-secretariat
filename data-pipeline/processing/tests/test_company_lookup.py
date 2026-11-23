@@ -134,3 +134,9 @@ def test_terms_file_is_consistent():
     assert all(re.match(r"^[0-9A-Z]{6}$", t) for t in tickers)
     assert {v for k, v in terms["metric_terms"].items() if not k.startswith("_")} <= set(METRIC_IDS)
     assert all(value[0] in ("l1", "l2") for k, value in terms["sector_terms"].items() if not k.startswith("_"))
+
+
+def test_common_words_are_excluded_from_sentence_extraction():
+    # 흔한 2글자 낱말이 종목으로 잡히지 않게 한다 (#32 리뷰, #41)
+    names = set(load_terms()["extract_exclude"]["names"])
+    assert {"한창", "전방", "남성"} <= names

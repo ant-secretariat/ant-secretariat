@@ -41,6 +41,7 @@ financial_research_data_agent/
 ├── functions/
 │   ├── search_documents.py         # Vector DB 의미 기반 검색
 │   ├── get_report_chunks.py        # 특정 리포트 chunk 전체 조회
+│   ├── get_chunks_by_ids.py        # chunk_id 목록으로 본문 조회 (비활성 포함)
 │   ├── resolve_company.py          # 회사명 → ticker 변환
 │   ├── get_report_metadata.py      # 리포트 메타데이터 조회
 │   ├── get_target_price_data.py    # 목표주가 / 투자의견 조회
@@ -589,6 +590,47 @@ result = get_disclosure_data(
 
 ---
 
+### get_chunks_by_ids()
+
+`chunk_id` 목록으로 청크 본문을 꺼냅니다. 골든셋·기준선에 근거 `chunk_id`만 저장해 두고 나중에 같은 본문을 다시 볼 때 씁니다(#28).
+
+- 비활성 청크(청킹 규칙이 바뀌어 지금 검색에는 안 쓰는 예전 청크)도 줌. `chunk_id`는 내용 기준이라 다시 적재해도 바뀌지 않음
+- 순서는 입력 순서, 중복 id는 한 번만. DB에 없는 id는 `missing`에
+- 한 번에 200개까지. 문자열 목록이 아니거나 빈 값이 있으면 `ValueError`
+- 조회 실패 시 `"error": "chunks_unavailable"` (`missing`과 구분)
+
+```python
+from processing.functions.get_chunks_by_ids import get_chunks_by_ids
+
+result = get_chunks_by_ids(["NAVER_000660_20261104_1:3f2a…", "NEWS_1f2e…:9c1d…"])
+```
+
+```json
+{
+  "chunks": [
+    {
+      "chunk_id": "NAVER_000660_20261104_1:3f2a…",
+      "doc_id": "NAVER_000660_20261104_1",
+      "document_type": "report",
+      "ticker": "000660",
+      "company": "SK하이닉스",
+      "broker": "KB증권",
+      "published_at": "2026-11-04",
+      "title": "HBM 수요 점검",
+      "url": "https://…",
+      "chunk_index": 3,
+      "section_title": "투자포인트",
+      "section_type": "body",
+      "content": "본문",
+      "is_active": true
+    }
+  ],
+  "missing": ["NEWS_1f2e…:9c1d…"]
+}
+```
+
+---
+
 ### get_available_data_status()
 
 해당 기업에 어떤 데이터가 있는지 확인 (실행 Agent 선택 전 데이터 준비 여부 확인). 반환 형식은 API 계약서 `DataStatus`이고, 이전 형식(`available`, `latest`)도 함께 줍니다.
@@ -596,10 +638,24 @@ result = get_disclosure_data(
 - 모두 Supabase에서 셉니다. 정형 데이터(시세·매크로·재무·목표주가·시뮬레이션 파라미터)는 최신 기준일, 리포트·뉴스·공시는 `document_chunks`에서 검색에 쓸 수 있는 문서(활성·면책 아닌 청크가 있는 문서) 수와 최신 게시일
 - `relational_db`, `vector_db` 인자는 기존 호출 호환용으로 받기만 함
 - `simulation_ready`: 가장 최근 `sim_params`가 `ok`인지. FE가 시뮬레이션 버튼을 미리 끄는 데 씀
-- `derived_snapshot_available`: `get_derived_snapshot` 구현 전이라 `false`
+- `derived_snapshot_available`: 시세와 재무가 둘 다 있으면 `true` (`get_derived_snapshot`이 계산 근거를 낼 수 있음)
 - `collection_job_status`: T2 수집이 Post-MVP라 `null`
+- `sources`: 소스 11개의 `{"count", "latest"}`. 토론 precheck의 `intent_data_sources.json` `requires_any`와 같은 키라 어댑터 없이 씀. `count`의 단위는 아래 표
 - `as_of_dates`: 데이터 종류별 최신 기준일 (오래된 데이터 표시용)
-- Supabase 조회가 실패해도 예외 대신 정형 데이터 항목을 비운 결과를 반환
+- Supabase 조회가 실패하면 예외 대신 `"error": "data_status_unavailable"`을 붙임. 키 모양은 같고, 모르는 값(건수·`derived_snapshot_available`·`simulation_ready`·`company`·`available`·`latest`)은 0·false가 아니라 `null`, `sources`는 `{}`. **`error`가 있으면 "데이터 없음"이 아니라 "모름"으로 처리**해 주세요(backend는 503)
+- 종목명이 없으면 `company`는 `null`
+
+| `sources` 키 | `count` | `latest` |
+| --- | --- | --- |
+| `report`, `news`, `disclosure` | 검색에 쓸 수 있는 문서 수 | 최신 게시일 |
+| `price` | 시세 거래일 수 | 최신 거래일 |
+| `macro` | 값이 있는 매크로 지표 수 (종목 무관) | 최신 기준일 |
+| `financials` | 공시된 분기 수 | 최신 공시 접수일 |
+| `target_price` | 증권사 의견 수 | 최신 발표일 |
+| `flow` | 수급 거래일 수 | 최신 거래일 |
+| `insider` | 지분공시 보고 수 (보고가 없는 기간이 흔함) | 최신 접수일 |
+| `sensitivity` | 최신 적합의 요인 수 | 최신 적합 기준일 |
+| `derived` | 시세·재무가 둘 다 있으면 1, 아니면 0 | 시세 최신 거래일 |
 
 ```python
 from processing.functions.get_available_data_status import get_available_data_status
@@ -618,9 +674,15 @@ result = get_available_data_status(
   "report_count": 12,
   "news_count": 30,
   "disclosure_count": 8,
-  "derived_snapshot_available": false,
+  "derived_snapshot_available": true,
   "collection_job_status": null,
   "simulation_ready": true,
+  "sources": {
+    "report": {"count": 12, "latest": "2026-11-05"},
+    "price": {"count": 741, "latest": "2026-11-06"},
+    "financials": {"count": 14, "latest": "2026-08-14"},
+    "...": "11개 키 모두"
+  },
   "as_of_dates": {
     "price": "2026-11-06",
     "macro": "2026-11-06",
@@ -702,6 +764,11 @@ result = get_metric(ticker="005930", metric_id="roe_ttm", as_of="2026-09-01")
 
 특정 Agent에 필요한 데이터 묶음을 한 번에 반환
 
+- 결과에 항상 `data_tier`(근거 종류: `report` → `news_only` → `disclosure_only` → `derived_only` → `macro_only` 순으로 있는 것)가 붙음. 계산은 `processing.enums.data_tier_for`
+- 데이터 상태 조회가 실패하면 `data_tier`는 `null`이고 `"error": "data_status_unavailable"`. 근거 종류를 모르는데 정하지 않음
+- `data_status`에 이미 가진 `get_available_data_status` 결과(또는 `resolve_company`의 `data_status`)를 넘기면 상태를 다시 조회하지 않음. 아젠다마다 부를 때 쓰면 종목당 0.3~1초씩 반복되는 조회가 없어짐. 다른 종목의 결과면 `ValueError`
+- `intent`(아젠다 ID, `AgendaId`)를 받아 결과에 그대로 담음. 없는 아젠다면 `ValueError`(호출 코드의 실수). 아직 묶음 내용은 바꾸지 않음
+
 ```python
 from processing.functions.get_agent_context import get_agent_context
 
@@ -709,6 +776,8 @@ result = get_agent_context(
     ticker="005930",
     agent_type="trend_report",  # trend_report(D용) / debate(F용) / simulation(G용)
     query="HBM 수요 전망",
+    intent="valuation",         # 선택
+    data_status=status,         # 선택: 이미 가진 get_available_data_status 결과
     relational_db=db,
     embedding_model=embedding_model,
     vector_db=vector_db,
@@ -719,6 +788,8 @@ result = get_agent_context(
 {
   "ticker": "005930",
   "agent_type": "trend_report",
+  "intent": "valuation",
+  "data_tier": "report",
   "target_prices": { "...": "..." },
   "price_data": { "...": "..." },
   "macro_data": { "...": "..." },

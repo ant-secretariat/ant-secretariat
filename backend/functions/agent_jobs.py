@@ -5,6 +5,7 @@ import json
 import uuid
 from typing import Any, Optional
 
+from core.errors import NotFoundError
 from db import Database, utc_now
 
 JOB_STATUSES = {
@@ -101,7 +102,7 @@ def get_agent_job(
             (job_id,),
         ).fetchone()
     if not row:
-        raise ValueError(f"작업을 찾을 수 없습니다: {job_id}")
+        raise NotFoundError(f"작업을 찾을 수 없습니다: {job_id}")
     return _row_to_job(dict(row), include_results=include_results)
 
 
@@ -144,7 +145,7 @@ def update_agent_job_status(
             (status, error_message, utc_now(), job_id),
         )
     if cursor.rowcount == 0:
-        raise ValueError(f"작업을 찾을 수 없습니다: {job_id}")
+        raise NotFoundError(f"작업을 찾을 수 없습니다: {job_id}")
     return get_agent_job(job_id=job_id, relational_db=relational_db)
 
 
@@ -167,7 +168,7 @@ def save_partial_debate_result(
             (_dumps(partial_result), utc_now(), job_id),
         )
     if cursor.rowcount == 0:
-        raise ValueError(f"작업을 찾을 수 없습니다: {job_id}")
+        raise NotFoundError(f"작업을 찾을 수 없습니다: {job_id}")
     return get_agent_job(job_id=job_id, relational_db=relational_db)
 
 
@@ -190,7 +191,7 @@ def save_debate_result(
             (_dumps(debate_result), utc_now(), job_id),
         )
     if cursor.rowcount == 0:
-        raise ValueError(f"작업을 찾을 수 없습니다: {job_id}")
+        raise NotFoundError(f"작업을 찾을 수 없습니다: {job_id}")
     return get_agent_job(job_id=job_id, relational_db=relational_db)
 
 
@@ -213,5 +214,5 @@ def save_simulation_result(
             (_dumps(simulation_result), utc_now(), job_id),
         )
     if cursor.rowcount == 0:
-        raise ValueError(f"작업을 찾을 수 없습니다: {job_id}")
+        raise NotFoundError(f"작업을 찾을 수 없습니다: {job_id}")
     return get_agent_job(job_id=job_id, relational_db=relational_db)

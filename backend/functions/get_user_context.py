@@ -2,6 +2,7 @@
 import json
 import logging
 
+from core.errors import NotFoundError
 from db import Database
 
 logger = logging.getLogger(__name__)
@@ -10,7 +11,7 @@ logger = logging.getLogger(__name__)
 def get_user_context(user_id: str, relational_db: Database = None) -> dict:
     """users 테이블에서 유저 컨텍스트를 조회한다.
 
-    row가 없으면 ValueError를 발생시킨다 (호출자가 온보딩 미완료/잘못된
+    row가 없으면 NotFoundError(ValueError 하위)를 발생시킨다 (호출자가 온보딩 미완료/잘못된
     user_id를 명확히 구분할 수 있도록).
     """
     if relational_db is None:
@@ -18,7 +19,7 @@ def get_user_context(user_id: str, relational_db: Database = None) -> dict:
 
     row = relational_db.get_row("users", "user_id", user_id)
     if row is None:
-        raise ValueError(f"사용자를 찾을 수 없습니다: {user_id}")
+        raise NotFoundError(f"사용자를 찾을 수 없습니다: {user_id}")
 
     return {
         "user_id": row["user_id"],

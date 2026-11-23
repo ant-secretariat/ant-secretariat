@@ -1,13 +1,15 @@
-"""FastAPI 앱 진입점.
+"""FastAPI 앱 진입점(조립 지점).
 
-api/ 아래의 모든 라우터(users, onboarding, orchestrator)를 한 곳에 모아 등록한다.
-지금까지는 각 라우터 파일만 존재하고 이걸 실제로 include_router로 묶어 띄우는
-지점이 없어서, HTTP로는 아무것도 호출할 수 없는 상태였다.
+라우터 등록, 설정 확인, 로깅, 오류 응답 형식을 여기서 한 번에 묶는다.
+각 라우터는 HTTP 입출력만 다루고, 오류는 core.errors의 AppError로 던진다.
 
 로컬 실행:
     uvicorn main:app --reload
 """
-from fastapi import FastAPI
+from contextlib import asynccontextmanager
+from uuid import uuid4
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.companies import router as companies_router
@@ -16,16 +18,43 @@ from api.onboarding import router as onboarding_router
 from api.orchestrator import router as orchestrator_router
 from api.trend_report import router as trend_report_router
 from api.users import router as users_router
+from core.config import check_required_env, cors_allow_origins, log_level
+from core.errors import register_exception_handlers, unexpected_error
+from core.logging_setup import configure_logging, trace_id_var
 
-app = FastAPI(title="ant-secretariat-backend")
 
-# 개발 단계라 프론트 오리진을 넓게 허용한다. 실제 배포 전에는 origin을 좁혀야 한다.
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    configure_logging(log_level())
+    check_required_env()
+    yield
+
+
+app = FastAPI(title="ant-secretariat-backend", lifespan=lifespan)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_allow_origins(),
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Trace-Id"],
 )
+register_exception_handlers(app)
+
+
+@app.middleware("http")
+async def trace_id_middleware(request: Request, call_next):
+    token = trace_id_var.set(uuid4().hex)
+    try:
+        try:
+            response = await call_next(request)
+        except Exception as exc:  # 처리하지 못한 예외도 같은 trace_id로 Problem 응답을 만든다
+            response = await unexpected_error(request, exc)
+        response.headers["X-Trace-Id"] = trace_id_var.get()
+        return response
+    finally:
+        trace_id_var.reset(token)
+
 
 app.include_router(users_router)
 app.include_router(onboarding_router)

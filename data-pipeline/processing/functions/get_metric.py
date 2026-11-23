@@ -35,7 +35,16 @@ FLOW_METRICS = {
 }
 # 공매도 잔고는 KRX가 약 2거래일 늦게 공개해서, 그날 기준으로는 2거래일 전 값까지만 알 수 있다
 SHORT_BALANCE_LAG_DAYS = 2
-METRIC_IDS = sorted([*MARKET_METRICS, *PRICE_METRICS, *FINANCIAL_METRICS, *FLOW_METRICS, "short_balance_ratio"])
+# 지분공시: 그날까지 접수된 최근 90일 보고. metric_id → (단위, 보고 종류, 집계식, 설명)
+INSIDER_WINDOW_DAYS = 90
+INSIDER_METRICS = {
+    "insider_net_shares_90d": ("주", "insider", "sum(shares_change)", "임원·주요주주 주식수 증감 합계"),
+    "insider_sell_reports_90d": ("건", "insider", "count(*) filter (where shares_change < 0)", "임원·주요주주 매도(감소) 보고 수"),
+    "major_holder_ratio_change_90d": ("%p", "major", "sum(ratio_change)", "5% 이상 대량보유자 지분율 증감 합계"),
+}
+METRIC_IDS = sorted([
+    *MARKET_METRICS, *PRICE_METRICS, *FINANCIAL_METRICS, *FLOW_METRICS, *INSIDER_METRICS, "short_balance_ratio",
+])
 
 # 은행·증권·보험은 예금·보험부채가 부채로 잡혀 부채비율이 의미 없다
 FINANCIALS_SECTOR = "금융"
@@ -108,6 +117,8 @@ def get_metric(ticker: str, metric_id: str, as_of: str) -> dict:
                 return _flow_metric(connection, ticker, metric_id, as_of)
             if metric_id == "short_balance_ratio":
                 return _short_balance_metric(connection, ticker, as_of)
+            if metric_id in INSIDER_METRICS:
+                return _insider_metric(connection, ticker, metric_id, as_of)
             return _daily_metric(connection, ticker, metric_id, as_of)
     except Exception as exc:
         logger.error("지표 조회 실패: %s %s(%s)", ticker, metric_id, type(exc).__name__)
@@ -189,6 +200,32 @@ def _short_balance_metric(connection, ticker: str, as_of: str) -> dict:
     return _result(ticker, "short_balance_ratio", _number(value), "%", basis, trade_date.isoformat(), source, None)
 
 
+def _insider_metric(connection, ticker: str, metric_id: str, as_of: str) -> dict:
+    from psycopg import sql
+
+    unit, report_kind, aggregate, label = INSIDER_METRICS[metric_id]
+    source = ["insider_holdings"]
+    row = connection.execute(
+        sql.SQL(
+            "select {aggregate}, max(rcept_dt), count(*),"
+            " exists (select 1 from insider_holdings where ticker = %s)"
+            " from insider_holdings"
+            " where ticker = %s and report_kind = %s"
+            " and rcept_dt <= %s::date and rcept_dt > %s::date - %s"
+        ).format(aggregate=sql.SQL(aggregate)),
+        (ticker, ticker, report_kind, as_of, as_of, INSIDER_WINDOW_DAYS),
+    ).fetchone()
+    value, last_date, reports, tracked = row
+    # 지분공시를 받지 않는 종목은 데이터가 없는 것이고, 받는 종목에서 보고가 없으면 0이다
+    if not tracked:
+        return _result(ticker, metric_id, None, unit, "", as_of, source, "no_data")
+    basis = f"최근 {INSIDER_WINDOW_DAYS}일 {label} (보고 {reports}건)"
+    return _result(
+        ticker, metric_id, _number(value) if reports else 0.0, unit, basis,
+        last_date.isoformat() if last_date else as_of, source, None,
+    )
+
+
 def _financial_metric(connection, ticker: str, metric_id: str, as_of: str) -> dict:
     unit = FINANCIAL_METRICS[metric_id]
     source = ["financials"]
@@ -235,7 +272,10 @@ def _unit(metric_id: str) -> str:
         return FINANCIAL_METRICS[metric_id]
     if metric_id == "short_balance_ratio":
         return "%"
-    return (MARKET_METRICS.get(metric_id) or PRICE_METRICS.get(metric_id) or FLOW_METRICS[metric_id])[0]
+    for catalog in (MARKET_METRICS, PRICE_METRICS, FLOW_METRICS, INSIDER_METRICS):
+        if metric_id in catalog:
+            return catalog[metric_id][0]
+    return ""
 
 
 def _number(value):

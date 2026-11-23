@@ -36,14 +36,21 @@ def load(connection: psycopg.Connection, years: list[int], all_tickers: bool) ->
     logger.info("재무 적재: %s년, 대상 %s종목", ", ".join(map(str, years)), len(corp_codes))
 
     client = DartFinancialsClient(SETTINGS)
+    failed: list[int] = []
     for year in years:
-        rows = financial_rows(client.fetch_year(corp_codes, year), set(targets))
-        upsert(
-            connection,
-            "financials",
-            rows,
-            key_columns=["ticker", "fiscal_year", "quarter", "fs_div", "account", "rcept_no"],
-        )
+        # 한 해가 실패해도 다음 해는 계속 받는다. 실패한 해는 마지막에 종료 코드로 알린다
+        try:
+            rows = financial_rows(client.fetch_year(corp_codes, year), set(targets))
+            upsert(
+                connection,
+                "financials",
+                rows,
+                key_columns=["ticker", "fiscal_year", "quarter", "fs_div", "account", "rcept_no"],
+            )
+        except Exception as exc:
+            logger.error("%s년 재무 적재 실패: %s", year, exc)
+            failed.append(year)
+            continue
         quarters = Counter(row["quarter"] for row in rows)
         logger.info(
             "%s년: %s행, 종목 %s개, 분기별 %s",
@@ -52,6 +59,8 @@ def load(connection: psycopg.Connection, years: list[int], all_tickers: bool) ->
             len({row["ticker"] for row in rows}),
             dict(sorted(quarters.items())),
         )
+    if failed:
+        raise SystemExit(f"재무 적재 실패 연도: {failed}")
 
 
 def _targets(connection: psycopg.Connection, all_tickers: bool) -> dict[str, str]:

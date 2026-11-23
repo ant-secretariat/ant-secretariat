@@ -78,10 +78,15 @@ FINANCIAL_QUERY = """
             max(rcept_dt) over (order by seq rows between 4 preceding and current row) as rcept_dt,
             round(100.0 * total_liabilities / nullif(total_equity, 0), 2) as debt_ratio,
             round(100.0 * operating_income / nullif(revenue, 0), 2)        as operating_margin,
-            case when lag(seq, 4) over w = seq - 4
+            -- 전년 동기와 연결·별도 기준이 같을 때만 비교한다
+            case when lag(seq, 4) over w = seq - 4 and lag(fs_div, 4) over w = fs_div
                 then round(100.0 * revenue / nullif(lag(revenue, 4) over w, 0) - 100, 2)
             end as revenue_growth_yoy,
+            -- 4개 분기 순이익이 모두 있고, 평균 자본에 쓰는 1년 전 분기까지 5개 분기가 같은 기준일 때만 계산한다
             case when lag(seq, 4) over w = seq - 4
+                  and count(net_income) over (w rows between 3 preceding and current row) = 4
+                  and min(fs_div) over (w rows between 4 preceding and current row)
+                    = max(fs_div) over (w rows between 4 preceding and current row)
                 then round(
                     100.0 * sum(net_income) over (w rows between 3 preceding and current row)
                     / nullif((total_equity + lag(total_equity, 4) over w) / 2.0, 0), 2)

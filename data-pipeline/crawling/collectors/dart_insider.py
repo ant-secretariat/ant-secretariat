@@ -8,6 +8,7 @@ from datetime import date, datetime
 
 import httpx
 
+from crawling.collectors.dart_api import has_data, mask_key
 from crawling.config.settings import SETTINGS, Settings
 from crawling.crawler.http import create_ssl_context
 
@@ -16,7 +17,6 @@ logger = logging.getLogger(__name__)
 DART_BASE_URL = "https://opendart.fss.or.kr/api"
 # report_kind → DART API 이름
 REPORT_APIS = {"major": "majorstock", "insider": "elestock"}
-DART_NO_DATA = "013"
 
 
 class DartInsiderClient:
@@ -45,22 +45,14 @@ class DartInsiderClient:
             response.raise_for_status()
             payload = response.json()
         except Exception as exc:
-            # httpx 오류 메시지에는 인증키가 든 URL이 들어간다
-            message = self._mask(str(exc))
+            message = mask_key(str(exc), self.settings.dart_api_key)
             raise RuntimeError(f"DART {api} 조회 실패: {corp_code} - {message}") from None
         finally:
             time.sleep(self.settings.request_delay_seconds)
 
-        status = payload.get("status")
-        if status == DART_NO_DATA:
+        if not has_data(payload, f"DART {api} 조회 실패: {corp_code}"):
             return []
-        if status != "000":
-            raise RuntimeError(f"DART {api} 조회 실패: {corp_code} - {status} {payload.get('message')}")
         return payload.get("list") or []
-
-    def _mask(self, text: str) -> str:
-        key = self.settings.dart_api_key
-        return text.replace(key, "***") if key else text
 
 
 def insider_rows(report_kind: str, ticker: str, raw_rows: list[dict]) -> list[dict]:

@@ -7,7 +7,8 @@
 | 항목 | 상태 |
 | --- | --- |
 | 공용 계약 타입(`contracts.py`) + 키워드 사전 + `intent_data_sources.json` 로더 | 완료 |
-| `precheck()` 관문2·3 엔진 + 테스트 24개 | 다음 PR (이 PR 위에 쌓임) |
+| `precheck()` 관문2·3 엔진 + 테스트 24개 | 완료 |
+| precheck 어댑터(관문1 `resolve_company` 결과 → `CompanyContext`·`data_status`) | 완료 (테스트 14개) |
 | Pydantic 스키마 (Bull·Bear·Judge·DebateResult, 단일·비교) | 완료 (테스트 10개) |
 | 거절셋 v0.3 (dev 47·holdout 22·holdout2 22) + 측정기 + 키워드 사전 kw-0.3.1 | 완료 — `python -m agents.debate_renewal.eval.refusal` |
 | 검증 레이어 L1 (결정적 검사) | 완료 (테스트 10개) |
@@ -19,7 +20,20 @@
 ```bash
 cd backend
 pip install pydantic pytest pytest-asyncio -e ../data-pipeline
-pytest tests/test_debate_renewal_precheck.py
+pytest tests/test_debate_renewal_precheck.py tests/test_debate_renewal_precheck_adapter.py
+```
+
+오케스트레이터(관문1)에서 부르는 법:
+
+```python
+from agents.debate_renewal.precheck import DataStatusUnavailable, company_context, data_status_provider, precheck
+
+resolved = {t: resolve_company(t) for t in tickers}   # 관문1에서 이미 받은 값 재사용
+try:
+    result = precheck(query, [company_context(resolved[t]) for t in tickers],
+                      data_status=data_status_provider(resolved), company_mentioned=mentioned)
+except DataStatusUnavailable:
+    raise UpstreamUnavailableError(...)  # 503, 조회 실패를 "데이터 없음"으로 바꾸지 않음
 ```
 
 ## 구조
@@ -28,6 +42,7 @@ pytest tests/test_debate_renewal_precheck.py
 backend/agents/debate_renewal/
   contracts.py              # AgendaId·Tier·DataTier·ReasonCode·NextAction·PrecheckResult (임시 위치)
   precheck/                 # 규칙 기반 순수 함수, LLM 없음
+    adapter.py              # 관문1 결과 → precheck 입력. 조회 실패는 None → DataStatusUnavailable (503)
   data/keyword_dictionary.json
   data/intent_data_sources.json   # 수경 제안값 반영 (소유자는 데이터 에이전트)
 ```

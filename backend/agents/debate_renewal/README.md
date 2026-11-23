@@ -11,6 +11,7 @@
 | Pydantic 스키마 (Bull·Bear·Judge·DebateResult, 단일·비교) | 완료 (테스트 10개) |
 | 거절셋 v0.3 (dev 47·holdout 22·holdout2 22) + 측정기 + 키워드 사전 kw-0.3.1 | 완료 — `python -m agents.debate_renewal.eval.refusal` |
 | 검증 레이어 L1 (결정적 검사) | 완료 (테스트 10개) |
+| 기준선 비교 실험 루브릭(6항목)·문항(48개)·블라인드 채점 집계(승률 포함) | 완료 (테스트 13개) — 실험 실행은 출력 생성 후 |
 | 프롬프트 v3, 근거 부족 루프, 비교 모드 실행 | 예정 |
 
 ## 실행

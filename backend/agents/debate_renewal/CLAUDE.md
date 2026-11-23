@@ -70,7 +70,7 @@
 | 3 | Pydantic 스키마: Evidence·Claim·DebateResult(단일→비교), Bull·Bear·Judge 출력 | 완료 (`schemas.py`, 10 tests) |
 | 3b | Bull·Bear·Judge 프롬프트 v3 (D6 `agreed_points`, Bear의 Bull Claim 인용) | 예정 |
 | 4 | 검증 레이어 L1 + 근거 부족 루프(1회 수정) | L1 완료 (`validation/l1.py`, 10 tests). 근거 부족 루프·1회 수정은 검색·LLM 연동 후 |
-| 5 | 기준선 비교 실험 루브릭 5~6항목 + 문항 30~50개 | 예정 |
+| 5 | 기준선 비교 실험 루브릭 5~6항목 + 문항 30~50개 | 루브릭 6항목·문항 48개(6아젠다×8, qs-0.2.0)·블라인드 채점 집계(승률·항목별 일치율·재현 정보) 완료 (`eval/baseline/`, 13 tests). 실제 실험은 토론·단일 출력 생성 후 |
 | 6 | 온톨로지 ISSUE 시드 20~30개 | 예정 (온톨로지 기획서) |
 
 ## 확정 필요한 임시값 (코드 곳곳에 TODO)
@@ -83,6 +83,7 @@
 - 거절셋 기준선(rs-0.1.0, 사전 kw-0.1.0): 오답변율 35%(목표 ≤5%), 과잉거절률 22%. 주가 변동 이유("주가가 왜 떨어졌어?")·보유 여부("들고 있어도 돼?")처럼 `valuation`·`risk`로 볼 만한 질의를 범위 안으로 볼지, 키워드 사전을 어디까지 넓힐지 확정 필요
 - `validation/l1.py` 금지 표현(`FORBIDDEN_PATTERNS`)은 권유형 어미까지 포함한 정규식이다. 테스트의 차단 10문장·통과 7문장으로 고정했고, 문장을 추가할 때는 두 목록에 같이 넣는다. 기획서에 목록이 없어 확정은 거절셋처럼 문항 측정 후
 - `schemas.py`는 계약 draft.5(PR #46) DebateResult와 같은 필드다(점수 integer, `data_richness`·`ontology`, `companies[].data_tier`). `confidence`는 계약에도 타입이 `str`뿐이라 값 목록이 없다. 근거 제외 후 `partial` 고지를 담을 필드 위치도 기획서에 없어 아직 없음(검증 레이어 구현 때 결정)
+- 기준선 실험 `rubric.json`(rb-0.1.0)은 초안이다. 시험 채점 후 채점자 일치율이 낮은 항목부터 다듬는다. 채점자 2명이 누구인지 확정 필요. "같은 근거"는 수경 제안(#28)대로 문항별 `as_of` + 검색된 `chunk_id` 목록을 스냅샷 태그(`2026-11-10-baseline-v1`)로 묶어 저장한다. 문항 `as_of` 2026-11-10은 임시값. 승률은 동점을 승으로 세지 않는다(임시 규칙). 채점용 텍스트 형식 정규화(Bull·Bear 표기로 시스템이 드러나는 문제)는 출력 생성 단계에서 정한다
 - `AgendaId`·`DataTier`·`Tier`는 `processing.enums`(#30, main)에서 import한다. 멤버 이름은 `UPPER_SNAKE`(예: `AgendaId.VALUATION`). `ReasonCode`·`NextAction`·`PrecheckResult`는 `backend/contracts/`가 생기면 옮긴다
 - `data/intent_data_sources.json` — 값은 수경 제안(#21 리뷰 2026-11-10) 반영. `financials`·`flow`·`insider`·`sensitivity`·`derived` 키는 데이터 쪽이 `get_available_data_status`에 추가할 예정(#35 병합 후)이라 그 전에는 해당 키가 provider에 없다 — 남은 키로 판정된다
 - 아젠다 대체 우선순위(`data/keyword_dictionary.json`의 `selection_rules`) — 기획서에 "최대 3개 유지"만 있음

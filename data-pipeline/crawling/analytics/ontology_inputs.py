@@ -90,6 +90,8 @@ class TickerSensitivity:
     adjusted: float
     ci_low: float | None
     ci_high: float | None
+    window_start: pd.Timestamp | None = None  # 실제로 쓴 첫 날(월별은 첫 달)
+    window_end: pd.Timestamp | None = None
 
     @property
     def certain(self) -> bool:
@@ -107,7 +109,8 @@ def ticker_sensitivity(ticker: str, factor: str, frequency: str, stock: pd.Serie
     raw = float(frame["y"].corr(frame["f"]))
     adjusted = partial_correlation(frame["y"].values, frame["f"].values, frame[["m"]].values)
     low, high = correlation_ci(adjusted, len(frame), n_controls=1)
-    return TickerSensitivity(ticker, factor, frequency, len(frame), raw, adjusted, low, high)
+    return TickerSensitivity(ticker, factor, frequency, len(frame), raw, adjusted, low, high,
+                             frame.index.min(), frame.index.max())
 
 
 def sign(x: float) -> int:
@@ -131,7 +134,15 @@ def sector_summary(rows: list[TickerSensitivity]) -> dict:
         "certain_neg": sum(1 for r in certain if r.adjusted < 0),
         "n_obs_min": min(r.n for r in rows),
         "n_obs_max": max(r.n for r in rows),
+        **_window(rows),
     }
+
+
+def _window(rows: list[TickerSensitivity]) -> dict:
+    starts = [r.window_start for r in rows if r.window_start is not None]
+    ends = [r.window_end for r in rows if r.window_end is not None]
+    return {"window_start": min(starts).date().isoformat() if starts else None,
+            "window_end": max(ends).date().isoformat() if ends else None}
 
 
 def passes_exposure_rule(summary: dict, min_ratio: float = 0.7, min_tickers: int = 3) -> bool:

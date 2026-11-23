@@ -26,7 +26,7 @@ import csv
 import json
 import logging
 import sys
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import numpy as np
@@ -35,7 +35,7 @@ import psycopg
 
 from crawling.analytics import ontology_inputs as oi
 from crawling.analytics.monthly_correlation import LEAD_MONTHS, WINDOW_MONTHS, monthly_log_changes
-from crawling.config.clock import today_kst
+from crawling.config.clock import KST, today_kst
 from crawling.db.postgres import connect
 
 logger = logging.getLogger(__name__)
@@ -123,6 +123,8 @@ def _monthly_change(series: pd.Series, how: str = "log") -> pd.Series:
 
 # ───────────────────────── 명령 ─────────────────────────
 
+# 계산 방식과 시장 대용. 저장 표(ontology_sensitivity_inputs)의 method 칸
+METHOD = {"daily": "partial_corr_daily_kospi", "monthly": "partial_corr_monthly_core_equal_weight_lead1"}
 FACTOR_FREQUENCY = [*[(f, "daily") for f in DAILY_FACTORS], *[(f, "monthly") for f in MONTHLY_FACTORS]]
 
 
@@ -170,10 +172,11 @@ def summarize(per_ticker: dict, groups: dict[str, list[str]], level: str, end: d
             rows = [per_ticker[(t, factor)] for t in members if (t, factor) in per_ticker]
             if not rows:
                 continue
-            base = {"level": level, "group": group, "factor": factor, "frequency": frequency, "as_of": end.isoformat()}
+            base = {"level": level, "group": group, "factor": factor, "frequency": frequency, "as_of": end.isoformat(),
+                    "method": METHOD[frequency]}
             if level == "ticker":
                 r = rows[0]
-                out.append({**base, "n_obs": r.n, "raw": round(r.raw, 4), "adjusted": round(r.adjusted, 4),
+                out.append({**base, **oi._window(rows), "n_obs": r.n, "raw": round(r.raw, 4), "adjusted": round(r.adjusted, 4),
                             "ci_low": round(r.ci_low, 4), "ci_high": round(r.ci_high, 4), "certain": r.certain,
                             "p_value": oi.correlation_p_value(r.adjusted, r.n, n_controls=1)})
             else:
@@ -197,8 +200,55 @@ def add_q_values(rows: list[dict]) -> None:
         row.setdefault("q_value", None)
 
 
-def compute_monthly(connection, as_of: date, out_dir: Path, seed: Path | None) -> list[Path]:
-    """매달 자동 계산: 민감도(종목·l1·l2)·섹터 등급·매크로 방향·IMPACTS를 한 번에 out_dir/<기준일>/에 쓴다."""
+TABLE = "ontology_sensitivity_inputs"
+TABLE_KEY = ("as_of", "level", "group_id", "factor")
+_TICKER_COLUMNS = ("n_obs", "raw", "adjusted", "ci_low", "ci_high", "certain", "p_value", "q_value")
+_SECTOR_COLUMNS = {"n_tickers": "n_tickers", "raw_median": "raw_median", "adjusted_median": "adjusted_median",
+                   "same_sign": "same_sign", "same_sign_ratio": "same_sign_ratio", "certain": "n_certain",
+                   "certain_pos": "n_certain_pos", "certain_neg": "n_certain_neg", "n_obs_min": "n_obs_min",
+                   "n_obs_max": "n_obs_max"}
+
+
+def table_rows(rows: list[dict]) -> list[dict]:
+    """summarize 결과 → ontology_sensitivity_inputs 행. 모든 행이 같은 칸을 갖게 하고, 없는 칸은 None."""
+    out = []
+    for row in rows:
+        record = {"as_of": row["as_of"], "level": row["level"], "group_id": row["group"], "factor": row["factor"],
+                  "frequency": row["frequency"], "method": row["method"], "window_start": row["window_start"],
+                  "window_end": row["window_end"]}
+        record.update({c: None for c in (*_TICKER_COLUMNS, *_SECTOR_COLUMNS.values())})
+        if row["level"] == "ticker":
+            record.update({c: row.get(c) for c in _TICKER_COLUMNS})
+        else:
+            record.update({dst: row.get(src) for src, dst in _SECTOR_COLUMNS.items()})
+        out.append(record)
+    return out
+
+
+def save_sensitivities(connection, rows: list[dict]) -> int:
+    """기준일별로 쌓는다. 같은 기준일을 다시 저장하면 그 기준일 행을 모두 지우고 새로 넣는다(한 트랜잭션).
+
+    다시 계산할 때 표본이 모자라 빠진 종목·지표의 예전 행이 남지 않게 하고, computed_at은 저장한 시각(KST)으로 바뀐다.
+    """
+    from crawling.db.postgres import upsert
+
+    records = table_rows(rows)
+    if not records:
+        return 0
+    computed_at = datetime.now(KST)
+    for record in records:
+        record["computed_at"] = computed_at
+    as_ofs = sorted({date.fromisoformat(r["as_of"]) for r in records})
+    with connection.transaction():
+        connection.execute(f"delete from {TABLE} where as_of = any(%s)", (as_ofs,))
+        return upsert(connection, TABLE, records, key_columns=list(TABLE_KEY))
+
+
+def compute_monthly(connection, as_of: date, out_dir: Path, seed: Path | None, save: bool = False) -> list[Path]:
+    """매달 자동 계산: 민감도(종목·l1·l2)·섹터 등급·매크로 방향·IMPACTS를 한 번에 out_dir/<기준일>/에 쓴다.
+
+    save면 민감도(종목·l1·l2)를 ontology_sensitivity_inputs에도 저장한다. 나머지 결과는 CSV만 쓴다.
+    """
     end, per_ticker = ticker_sensitivities(connection, as_of)
     folder = out_dir / end.isoformat()
     folder.mkdir(parents=True, exist_ok=True)
@@ -214,6 +264,9 @@ def compute_monthly(connection, as_of: date, out_dir: Path, seed: Path | None) -
         path = folder / f"{name}.csv"
         write_csv(rows, path)
         paths.append(path)
+    if save:
+        saved = save_sensitivities(connection, [r for lv in ("ticker", "l1", "l2") for r in results[f"sensitivities_{lv}"]])
+        logger.info("%s에 %s행 저장 (as_of %s)", TABLE, saved, end)
     return paths
 
 
@@ -420,6 +473,8 @@ def parse_args(argv=None) -> argparse.Namespace:
         if name == "monthly":
             p.add_argument("--out-dir", type=Path, default=Path("ontology_inputs_out"), help="기준일 폴더를 만들 위치")
             p.add_argument("--seed", type=Path, default=None, help="온톨로지 시드 JSON (섹터 민감도에 가설·상태 붙임)")
+            p.add_argument("--save", action="store_true",
+                           help=f"민감도(종목·l1·l2)를 {TABLE} 표에 저장 (이 옵션만 DB에 씀)")
         if name == "issue-evidence":
             p.add_argument("--seed", type=Path, required=True)
             p.add_argument("--top-k", type=int, default=3, help="종목마다 검색할 조각 수")
@@ -437,9 +492,10 @@ def main(argv=None) -> None:
                   args.out)
         return
     with connect() as connection:
-        connection.execute("set session characteristics as transaction read only")
+        if not (args.command == "monthly" and args.save):
+            connection.execute("set session characteristics as transaction read only")
         if args.command == "monthly":
-            compute_monthly(connection, as_of, args.out_dir, args.seed)
+            compute_monthly(connection, as_of, args.out_dir, args.seed, save=args.save)
             return
         if args.command == "sensitivities":
             rows = compute_sensitivities(connection, as_of, args.level)

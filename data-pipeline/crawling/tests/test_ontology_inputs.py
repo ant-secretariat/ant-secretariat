@@ -271,3 +271,94 @@ def test_compute_kind_compares_with_seed(tmp_path):
     assert rows["000500"]["sub_industry_differs"] is False and rows["000500"]["holding_differs"] is False
     assert rows["402340"]["seed_sub_industry"] == "SK하이닉스 지분 투자회사" and rows["402340"]["sub_industry_differs"] is True
     assert rows["402340"]["seed_holding_type"] == "legal" and rows["402340"]["holding_differs"] is False
+
+
+def test_ticker_sensitivity_records_actual_window():
+    rng = np.random.default_rng(5)
+    m = _series(rng.normal(size=300))
+    f = _series(rng.normal(size=300))
+    row = oi.ticker_sensitivity("A", "F", "daily", m + f, f, m, min_obs=100, max_obs=200)
+    assert row.window_start == m.index[100] and row.window_end == m.index[-1]
+    summary = oi.sector_summary([row])
+    assert (summary["window_start"], summary["window_end"]) == (m.index[100].date().isoformat(), m.index[-1].date().isoformat())
+
+
+def test_table_rows_map_ticker_and_sector_rows_to_one_shape():
+    from datetime import date
+    from crawling.ontology_inputs import METHOD, TABLE_KEY, summarize, table_rows
+    start, end = pd.Timestamp("2023-11-24"), pd.Timestamp("2026-11-23")
+    per_ticker = {("A", "USD_KRW"): oi.TickerSensitivity("A", "USD_KRW", "daily", 700, -0.1, -0.09, -0.16, -0.02, start, end),
+                  ("B", "USD_KRW"): oi.TickerSensitivity("B", "USD_KRW", "daily", 700, 0.0, 0.01, -0.06, 0.08, start, end)}
+    rows = table_rows(summarize(per_ticker, {"A": ["A"], "B": ["B"]}, "ticker", date(2026, 11, 23))
+                      + summarize(per_ticker, {"IT": ["A", "B"]}, "l1", date(2026, 11, 23)))
+    assert len({tuple(r) for r in rows}) == 1  # 모든 행의 칸이 같음 (upsert는 첫 행 칸을 씀)
+    assert len({tuple(r[k] for k in TABLE_KEY) for r in rows}) == 3
+    ticker, sector = rows[0], rows[-1]
+    assert (ticker["group_id"], ticker["certain"], ticker["n_tickers"], ticker["method"]) == ("A", True, None, METHOD["daily"])
+    assert ticker["window_start"] == "2023-11-24" and ticker["window_end"] == "2026-11-23"
+    assert ticker["q_value"] is not None and ticker["n_obs"] == 700
+    assert (sector["level"], sector["group_id"], sector["n_tickers"], sector["n_certain"], sector["n_obs"], sector["certain"]) == (
+        "l1", "IT", 2, 1, None, None)
+
+
+def test_cli_monthly_save_flag():
+    assert parse_args(["monthly"]).save is False
+    assert parse_args(["monthly", "--save"]).save is True
+
+
+def test_migration_columns_match_table_rows():
+    import pathlib, re
+    from datetime import date
+    from crawling.ontology_inputs import summarize, table_rows
+    sql = next(pathlib.Path(__file__).resolve().parents[3].glob("supabase/migrations/*_ontology_sensitivity_inputs.sql")).read_text(encoding="utf-8")
+    body = sql[sql.index("create table"):sql.index("computed_at")]
+    columns = set(re.findall(r"^\s{4}(\w+)\s", body, re.M))
+    t = pd.Timestamp("2026-11-23")
+    per_ticker = {("A", "USD_KRW"): oi.TickerSensitivity("A", "USD_KRW", "daily", 700, 0.1, 0.1, 0.03, 0.17, t, t)}
+    import crawling.ontology_inputs as cli
+    cli_rows = table_rows(cli.summarize(per_ticker, {"A": ["A"]}, "ticker", date(2026, 11, 23)))
+    assert set(cli_rows[0]) == columns
+
+
+class _RecordingConnection:
+    def __init__(self):
+        self.calls = []
+
+    def transaction(self):
+        import contextlib
+
+        @contextlib.contextmanager
+        def tx():
+            self.calls.append("begin")
+            yield
+            self.calls.append("commit")
+        return tx()
+
+    def execute(self, query, params=None):
+        self.calls.append((query, params))
+        return self
+
+
+def test_save_sensitivities_replaces_same_as_of_in_one_transaction(monkeypatch):
+    from datetime import date
+    import crawling.db.postgres as pg
+    from crawling.ontology_inputs import TABLE, save_sensitivities, summarize
+    saved = {}
+
+    def fake_upsert(connection, table, rows, key_columns):
+        connection.calls.append("upsert")
+        saved.update(table=table, rows=rows, key=key_columns)
+        return len(rows)
+
+    monkeypatch.setattr(pg, "upsert", fake_upsert)
+    t = pd.Timestamp("2026-11-23")
+    per_ticker = {("A", "USD_KRW"): oi.TickerSensitivity("A", "USD_KRW", "daily", 700, 0.1, 0.1, 0.03, 0.17, t, t)}
+    connection = _RecordingConnection()
+    assert save_sensitivities(connection, summarize(per_ticker, {"A": ["A"]}, "ticker", date(2026, 11, 23))) == 1
+    # 지우기와 넣기가 한 트랜잭션 안에서, 지우기 먼저
+    assert connection.calls[0] == "begin" and connection.calls[-1] == "commit"
+    delete = connection.calls[1]
+    assert delete[0].startswith(f"delete from {TABLE}") and delete[1] == ([date(2026, 11, 23)],)
+    assert connection.calls[2] == "upsert"
+    assert saved["rows"][0]["computed_at"].tzinfo is not None  # 저장 시각이 매번 새로 들어감
+    assert save_sensitivities(_RecordingConnection(), []) == 0

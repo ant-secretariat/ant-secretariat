@@ -83,14 +83,17 @@ SDD의 각 단계를 우리 문서에 대응시키면 아래와 같습니다.
 | --- | --- | --- |
 | 헌법 | 이 문서, `AGENTS.md`, `docs/CODE_CONVENTIONS.md`, `docs/ENVIRONMENT.md` | 저장소 |
 | 명세 (무엇을, 왜) | PRD, 기능 명세서(FN-ID, Given/When/Then 인수 조건) | 노션 할일 → PRD |
-| 명세 (에이전트 단위) | 에이전트 기획서(토론, 온톨로지, 데이터, 시뮬레이션) | 저장소 `specs/` (Markdown) |
+| 명세 (에이전트 단위) | 에이전트 기획서(토론, 온톨로지, 데이터, 시뮬레이션) | 저장소 `docs/<영역>/` (Markdown, 예: `docs/debate-renewal/`) |
 | 계획 (어떻게) | 멀티에이전트 설계 최종 확정, MVP Design Doc, ADR, `openapi.yaml` | 노션, 저장소 |
 | 작업 | GitHub 이슈. 제목이나 본문에 FN-ID 또는 명세 경로를 적음 | GitHub |
 | 구현 | PR | GitHub |
 
 - 저장소의 명세는 Markdown으로 씁니다. HTML이나 이미지만으로 된 명세는 줄 단위 리뷰가 안 되고,
   AI 에이전트가 읽기도 어렵습니다.
+- 에이전트 기획서는 원본을 저장소 한 곳에만 둡니다. 아직 노션에 있는 기획서는 다음에 그 기획서를 고칠 때
+  저장소로 옮기고, 노션에는 저장소 링크만 남깁니다.
 - 여러 PR로 나뉘는 기능은 `specs/<번호>-<이름>/`에 `spec.md`, `plan.md`, `tasks.md`를 둡니다(`/speckit-specify`로 시작).
+  `specs/`는 이 Spec Kit 기능 폴더 전용이고, 에이전트 기획서는 두지 않습니다.
   작은 버그 수정이나 한 PR로 끝나는 변경은 이슈만으로 충분합니다.
 
 **문서끼리 충돌할 때의 우선순위** (위가 우선)

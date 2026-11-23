@@ -2,7 +2,7 @@
 openapi: 3.1.0
 info:
   title: 개미비서단 에이전트 계약 명세
-  version: 1.0.0-draft.4
+  version: 1.0.0-draft.5
   description: |
     MVP 목표 구조(TO-BE) 기준의 API·에이전트 계약입니다. 현재 코드가 아니라 구현해야 할 계약을 설명합니다.
 
@@ -20,7 +20,8 @@ info:
     **기준 문서 우선순위**
     1. 멀티에이전트 설계 최종 확정(10/14) 2. MVP 기술 설계 문서·PRD(10/27) 3. 시그니처 계약 4. 각 에이전트 수정안(10/3)
 
-    11/4 결정(관계 사전 MVP 포함)과 11/5 결정(자유 질의·2종목 비교는 MVP 이후)을 반영했습니다.
+    11/4 결정(관계 사전 MVP 포함)과 11/5 결정(자유 질의는 MVP 이후)을 반영했습니다.
+    draft.5(11/17)는 ADR 0007(2종목 비교 MVP 포함), 0008(관계 사전 플래그 기본 꺼짐), 0009(SSE 전달 방식·`claim_completed`)를 반영했습니다. 문서와 다르면 `docs/decisions/`의 ADR이 우선합니다.
 
     **출처:** 토론 수정안 v2.3, 데이터 수정안, 시뮬레이션 수정안, 오케스트레이터 설계 초안, 시그니처 계약.
   x-open-questions:
@@ -475,6 +476,7 @@ paths:
         **상태:** 신규 · **릴리스:** MVP · **전송:** HTTP
 
         `debate_completed`·`simulation_pending` 상태의 본인 job만 실행합니다. 이미 실행 중이면 기존 상태를 반환합니다(멱등).
+        비교 모드(`meta.mode=compare`) job은 409 `invalid_job_state`로 거절합니다(ADR 0007, 비교 모드는 시뮬레이션 없음).
         이력 부족은 즉시 거절하지 않고 `job_started` 후 `failed` + `error_code=insufficient_history`로 끝납니다.
       x-transport: http
       x-release: mvp
@@ -764,10 +766,12 @@ paths:
                 companies:
                   type: array
                   minItems: 1
-                  maxItems: 1
+                  maxItems: 2
                   items:
                     type: string
-                  description: MVP는 단일 종목입니다. 2종목 비교는 MVP 이후 범위입니다.
+                  description: |-
+                    1개면 단일 모드, 2개면 비교 모드입니다(ADR 0007).
+                    3개 이상은 job을 만들지 않고 `too_many_companies` + `select_companies`로, 한쪽만 커버되면 `partial_coverage` + `run_single_analysis`로 거절합니다.
               required:
               - companies
             examples:
@@ -776,6 +780,13 @@ paths:
                 value:
                   companies:
                   - 삼성전자
+                  query: null
+              compare:
+                summary: 2종목 비교
+                value:
+                  companies:
+                  - 삼성전자
+                  - SK하이닉스
                   query: null
       responses:
         '200':
@@ -900,6 +911,7 @@ paths:
         **상태:** 신규 · **릴리스:** MVP · **전송:** SSE
 
         `Last-Event-ID` 다음 `seq`부터 전송합니다. 15초마다 `: ping`을 보내고 종료 이벤트 후 연결을 닫습니다.
+        서버는 `job_events`를 1초마다 읽어 보내며 `pg_notify`는 쓰지 않습니다(ADR 0009). 본인 job만 열 수 있고 세션 쿠키로 인증합니다.
       x-transport: sse
       x-release: mvp
       x-status: new
@@ -1322,6 +1334,7 @@ components:
       - disclosure
     JobStatus:
       type: string
+      description: 비교 모드 job은 시뮬레이션이 없어 `debate_completed`에서 끝납니다(ADR 0007).
       enum:
       - queued
       - running
@@ -1374,7 +1387,9 @@ components:
       - internal_error
       - job_not_found
       - invalid_job_state
-      description: 마지막 두 값은 제안입니다(OQ-2). 사용자 문구는 reason.message를 사용합니다.
+      description: |-
+        마지막 두 값은 제안입니다(OQ-2). 사용자 문구는 reason.message를 사용합니다.
+        `no_data`: 종목은 커버되지만 고를 수 있는 아젠다에 쓸 데이터가 하나도 없을 때입니다. precheck 관문3이 범위를 줄이다가 남는 아젠다가 없으면 이 코드로 거절하고, 다음 행동은 `choose_alternative_company`입니다. 토론 기획서의 임시 이름 `insufficient_data`는 쓰지 않습니다(11/17 결정).
     NextAction:
       description: 사유 코드와 1:1로 대응합니다(REASON_POLICY).
       oneOf:
@@ -2124,6 +2139,7 @@ components:
       - ambiguous
       - uncovered
       - mode
+      - mentioned_in_query
       properties:
         status:
           type: string
@@ -2154,6 +2170,9 @@ components:
           enum:
           - single
           - compare
+        mentioned_in_query:
+          type: boolean
+          description: 질의 문장에서 `companies`의 종목을 하나 이상 찾았으면 true입니다(별칭·조사 포함, `extract_company_mentions` 결과). 종목을 UI로 고르고 질의에 이름이 없으면 false입니다. 오케스트레이터가 precheck에 그대로 넘깁니다.
     OrchestratorRequest:
       type: object
       required:
@@ -2542,6 +2561,7 @@ components:
       type: object
       required:
       - verdict
+      - mode
       - allowed_agendas
       - excluded
       - selection_reason
@@ -2555,6 +2575,12 @@ components:
           - full
           - reduced
           - reject
+        mode:
+          type: string
+          enum:
+          - single
+          - compare
+          description: EntityResolution.mode를 이어받습니다. run_debate는 이 값으로 모드를 정하고 다시 판정하지 않습니다(ADR 0007).
         reject_reason:
           oneOf:
           - $ref: '#/components/schemas/ReasonCode'
@@ -2562,6 +2588,7 @@ components:
         allowed_agendas:
           type: array
           maxItems: 3
+          description: 비교 모드에서는 비교 축이며, 두 종목 모두 데이터가 있는 아젠다만 들어갑니다.
           items:
             $ref: '#/components/schemas/AgendaId'
         excluded:
@@ -2573,7 +2600,7 @@ components:
         matched_intents:
           type: array
           items:
-            type: string
+            $ref: '#/components/schemas/AgendaId'
         flags:
           type: array
           items:
@@ -2593,6 +2620,11 @@ components:
           $ref: '#/components/schemas/AgendaId'
         reason:
           type: string
+          enum:
+          - no_data
+          - tier_limited
+          - not_selected_cap
+          description: '`no_data`는 데이터가 없어 뺐음(ReasonCode.no_data와 같은 뜻), `tier_limited`는 이 종목의 데이터 등급에서 다루지 않는 아젠다, `not_selected_cap`은 3개 상한을 넘어 뺐음입니다.'
     DebateAgenda:
       type: object
       required:
@@ -2684,17 +2716,48 @@ components:
           - $ref: '#/components/schemas/ResponseMeta'
           - type: object
             required:
-            - ticker
-            - company
-            - sector
+            - mode
+            - companies
             - data_richness
             properties:
+              mode:
+                type: string
+                enum:
+                - single
+                - compare
+              companies:
+                type: array
+                minItems: 1
+                maxItems: 2
+                description: 단일 모드는 1개, 비교 모드는 2개입니다. 순서는 사용자가 고른 순서입니다.
+                items:
+                  type: object
+                  required:
+                  - ticker
+                  - company
+                  - sector
+                  - data_tier
+                  properties:
+                    ticker:
+                      $ref: '#/components/schemas/TickerValue'
+                    company:
+                      type: string
+                    sector:
+                      type: string
+                    data_tier:
+                      $ref: '#/components/schemas/DataTier'
               ticker:
                 $ref: '#/components/schemas/TickerValue'
+                deprecated: true
+                description: 단일 모드 호환용. `companies[0].ticker`와 같습니다. 비교 모드에서는 보내지 않습니다.
               company:
                 type: string
+                deprecated: true
+                description: 단일 모드 호환용
               sector:
                 type: string
+                deprecated: true
+                description: 단일 모드 호환용
               data_richness:
                 type: string
                 enum:
@@ -2731,22 +2794,27 @@ components:
             $ref: '#/components/schemas/AgendaId'
         agendas:
           type: array
+          description: 단일 모드의 아젠다별 토론입니다. 비교 모드에서는 빈 배열이고 `comparison`을 씁니다.
           items:
             $ref: '#/components/schemas/DebateAgenda'
+        comparison:
+          oneOf:
+          - $ref: '#/components/schemas/DebateComparison'
+          - type: 'null'
+          description: 비교 모드에서만 채웁니다(ADR 0007). 단일 모드는 null입니다.
         evidence:
           type: array
           items:
             $ref: '#/components/schemas/Evidence'
         ontology:
           type: array
-          description: 아젠다별 관계 컨텍스트 캐시입니다. 필드 위치는 제안입니다.
+          description: 아젠다별 관계 컨텍스트 캐시입니다. 필드 위치는 제안입니다. 관계 사전 플래그가 꺼져 있으면(기본, ADR 0008) 빈 배열입니다.
           items:
             $ref: '#/components/schemas/OntologyContext'
         judge:
           type: object
           required:
           - user_profile
-          - overall_verdict
           properties:
             user_profile:
               type: object
@@ -2758,37 +2826,116 @@ components:
                   - string
                   - 'null'
             overall_verdict:
+              description: 단일 모드 전용입니다. 비교 모드에서는 null이고 `per_company_verdict`를 씁니다.
+              oneOf:
+              - $ref: '#/components/schemas/OverallVerdict'
+              - type: 'null'
+            per_company_verdict:
               type: object
-              required:
-              - stance
-              - confidence
-              - bull_score
-              - bear_score
-              - final_brief
-              - caution
-              - points_to_check
-              properties:
-                stance:
-                  type: string
-                  enum:
-                  - bullish
-                  - neutral
-                  - bearish
-                confidence:
-                  type: string
-                bull_score:
-                  type: integer
-                bear_score:
-                  type: integer
-                final_brief:
-                  type: string
-                caution:
-                  type: string
-                points_to_check:
-                  type: array
-                  items:
-                    type: string
-                  description: 매매 판단이 아닌 확인 포인트
+              description: 비교 모드 전용입니다. ticker → 종목별 판정이며 두 종목 모두 필수입니다. 두 종목을 묶은 stance는 두지 않고, 축별 우열은 `comparison.axes[].axis_verdict`에 둡니다. 단일 모드에서는 빈 객체입니다.
+              additionalProperties:
+                $ref: '#/components/schemas/OverallVerdict'
+    OverallVerdict:
+      type: object
+      required:
+      - stance
+      - confidence
+      - bull_score
+      - bear_score
+      - final_brief
+      - caution
+      - points_to_check
+      properties:
+        stance:
+          type: string
+          enum:
+          - bullish
+          - neutral
+          - bearish
+        confidence:
+          type: string
+        bull_score:
+          type: integer
+        bear_score:
+          type: integer
+        final_brief:
+          type: string
+        caution:
+          type: string
+        points_to_check:
+          type: array
+          items:
+            type: string
+          description: 매매 판단이 아닌 확인 포인트
+    DebateComparison:
+      type: object
+      required:
+      - axes
+      description: 비교 모드 결과입니다. 구조는 토론 기획서 v3.0 1.7을 따릅니다(ADR 0007).
+      properties:
+        axes:
+          type: array
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/ComparisonAxis'
+    ComparisonAxis:
+      type: object
+      required:
+      - agenda_id
+      - comparable
+      - not_comparable_reason
+      - as_of_dates
+      - as_of_gap_warning
+      - per_company
+      - axis_verdict
+      properties:
+        agenda_id:
+          $ref: '#/components/schemas/AgendaId'
+        comparable:
+          type: boolean
+          description: 한쪽 근거가 없으면 false이고, 이 축은 판정하지 않습니다
+        not_comparable_reason:
+          type:
+          - string
+          - 'null'
+        as_of_dates:
+          type: object
+          description: 종목코드별 근거 기준일
+          additionalProperties:
+            type: string
+            format: date
+        as_of_gap_warning:
+          type: boolean
+          description: 두 종목의 기준일 격차가 임계값을 넘으면 true
+        per_company:
+          type: object
+          description: 종목코드별 같은 축의 Bull·Bear입니다. 형식은 단일 모드 `DebateAgenda`의 bull·bear와 같습니다.
+          additionalProperties:
+            type: object
+            required:
+            - bull
+            - bear
+            properties:
+              bull:
+                type: object
+                additionalProperties: true
+              bear:
+                type: object
+                additionalProperties: true
+        axis_verdict:
+          oneOf:
+          - type: object
+            required:
+            - stronger
+            - reason
+            properties:
+              stronger:
+                type: string
+                description: 이 축에서 근거가 더 강한 종목의 종목코드 또는 `tie`. 매수 판단이 아닙니다.
+              reason:
+                type: string
+          - type: 'null'
+          description: '`comparable=false`이면 null'
     Relation:
       type: object
       required:
@@ -3072,6 +3219,7 @@ components:
           enum:
           - job_started
           - data_collected
+          - claim_completed
           - bull_completed
           - round2_started
           - bear_completed
@@ -3082,10 +3230,25 @@ components:
           - simulation_started
           - simulation_completed
           - simulation_failed
-          description: simulation_* 세부 이름은 Design Doc의 와일드카드를 구체화한 제안입니다.
+          description: |-
+            단계 이벤트 이름은 PRD 6.4 문구와 1:1입니다. `claim_completed`는 주장 1개가 완성될 때마다 보내며 FE가 주장 카드를 하나씩 채웁니다(ADR 0009).
+            토큰 단위 이벤트와 LangGraph `stream_mode="messages"` 중계는 쓰지 않습니다. simulation_* 세부 이름은 Design Doc의 와일드카드를 구체화한 제안입니다.
         payload:
           type: object
           additionalProperties: true
+          description: |-
+            공통 선택 필드 `ticker`: 비교 모드의 종목별 이벤트(`data_collected`·`claim_completed`·`bull_completed`·`bear_completed`)에 넣습니다. job 전체 이벤트에는 넣지 않습니다.
+            `claim_completed` payload: `role`(bull·bear), `agenda_id`, `claim`(Claim), 비교 모드면 `ticker`.
+          examples:
+          - role: bull
+            agenda_id: valuation
+            ticker: '005930'
+            claim:
+              claim_id: c1
+              text: HBM 수요 증가로 실적 개선이 예상됩니다 [S1]
+              claim_type: opinion
+              evidence_ids:
+              - S1
     OnboardingSubmission:
       type: object
       required:
@@ -3532,8 +3695,14 @@ components:
           type: string
         companies:
           type: array
+          maxItems: 2
           items:
             $ref: '#/components/schemas/CompanyContext'
+        company_mentioned:
+          type:
+          - boolean
+          - 'null'
+          description: EntityResolution.mentioned_in_query 값입니다. null이면 precheck가 공식 회사명·종목코드로 직접 확인합니다.
     RunDebateInput:
       type: object
       required:
@@ -3546,7 +3715,7 @@ components:
         companies:
           type: array
           minItems: 1
-          maxItems: 1
+          maxItems: 2
           items:
             $ref: '#/components/schemas/CompanyContext'
         user_id:

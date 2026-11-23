@@ -89,6 +89,26 @@ class SensitivityTest(unittest.TestCase):
             market["beta"] / market["factor_sigma"], 1.5, delta=0.3
         )
 
+    def test_ten_year_rate_is_simple_only(self) -> None:
+        rng = np.random.default_rng(1)
+        factors = self.factors.assign(
+            KTB_10Y_KR=self.factors["KTB_3Y_KR"] + rng.normal(0, 0.01, len(self.factors)).cumsum()
+        )
+        rows = {
+            (row["factor"], row["method"]): row
+            for row in sensitivity.compute_sensitivities(self.closes, factors)
+        }
+
+        self.assertEqual(len(rows), 7)
+        self.assertIn(("KTB_10Y_KR", "simple"), rows)
+        self.assertNotIn(("KTB_10Y_KR", "multi"), rows)
+        # 10년물이 있어도 세 요인 multi 회귀는 그대로
+        base = {
+            (row["factor"], row["method"]): row
+            for row in sensitivity.compute_sensitivities(self.closes, self.factors)
+        }
+        self.assertAlmostEqual(rows[("KOSPI", "multi")]["beta"], base[("KOSPI", "multi")]["beta"])
+
     def test_short_overlap_returns_nothing(self) -> None:
         rows = sensitivity.compute_sensitivities(self.closes.iloc[:200], self.factors)
 

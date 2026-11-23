@@ -13,8 +13,8 @@ from agents.debate_renewal.precheck import (
     ticker_data_status,
 )
 
-SOURCE_KEYS = ("report", "news", "disclosure", "price", "macro", "target_price",
-               "financials", "flow", "insider", "sensitivity", "derived")  # #53 get_available_data_status
+# 데이터 쪽 상수를 그대로 쓴다. 키 이름이 바뀌면 이 테스트가 깨지게(#72 리뷰)
+from processing.functions.get_available_data_status import SOURCE_KEYS  # noqa: E402
 
 
 def _resolved(ticker="005930", *, tier="T1", sources=None, error=None, data_status="default"):

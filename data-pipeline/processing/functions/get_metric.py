@@ -79,7 +79,9 @@ FINANCIAL_QUERY = """
         select
             fiscal_year, quarter, fs_div, seq,
             max(rcept_dt) over (order by seq rows between 4 preceding and current row) as rcept_dt,
-            round(100.0 * total_liabilities / nullif(total_equity, 0), 2) as debt_ratio,
+            -- 자본잠식(자본 0 이하)이면 부채비율은 의미가 없어 null (get_financials와 같은 규칙)
+            case when total_equity > 0 then round(100.0 * total_liabilities / total_equity, 2) end as debt_ratio,
+            total_equity <= 0 as capital_impaired,
             round(100.0 * operating_income / nullif(revenue, 0), 2)        as operating_margin,
             -- 전년 동기와 연결·별도 기준이 같을 때만 비교한다
             case when lag(seq, 4) over w = seq - 4 and lag(fs_div, 4) over w = fs_div
@@ -97,7 +99,8 @@ FINANCIAL_QUERY = """
         from chosen
         window w as (order by seq)
     )
-    select fiscal_year, quarter, fs_div, rcept_dt, debt_ratio, operating_margin, revenue_growth_yoy, roe_ttm
+    select fiscal_year, quarter, fs_div, rcept_dt, debt_ratio, operating_margin, revenue_growth_yoy, roe_ttm,
+           capital_impaired
     from calc
     order by seq desc
     limit 1
@@ -158,6 +161,7 @@ REASONS = {
     "no_value": "데이터 행은 있지만 이 지표 값이 비어 있음(예: 적자라 PER 없음)",
     "partial_window": "계산 창(예: 최근 20거래일) 중 값이 빈 날이 있어 일부 날짜만으로는 계산하지 않음",
     "not_applicable_financials": "금융업이라 의미 없는 지표(부채비율)",
+    "capital_impaired": "자본잠식(자본 0 이하)이라 부채비율이 의미 없음",
 }
 # 주당 값·가격은 그대로(1,176,000원), 합계 금액은 조·억 단위로(−1.17조 원)
 PER_SHARE_WON = {"close", "eps", "bps", "dps"}
@@ -325,16 +329,18 @@ def _financial_metric(connection, ticker: str, metric_id: str, as_of: str) -> di
     row = connection.execute(FINANCIAL_QUERY, (as_of, ticker)).fetchone()
     if row is None:
         return _result(ticker, metric_id, None, unit, "", as_of, source, "no_data")
-    fiscal_year, quarter, fs_div, rcept_dt, *values = row
+    fiscal_year, quarter, fs_div, rcept_dt, *values, capital_impaired = row
     value = dict(zip(FINANCIAL_COLUMNS, values))[metric_id]
+    reason = None if value is not None else "no_value"
+    if metric_id == "debt_ratio" and value is None and capital_impaired:
+        reason = "capital_impaired"
     basis = f"{fiscal_year}Q{quarter} {FS_LABELS.get(fs_div, fs_div)}"
     if metric_id == "roe_ttm":
         basis += ", 최근 4개 분기 순이익 합 / 평균 자본"
     elif metric_id == "revenue_growth_yoy":
         basis += ", 전년 동기 대비"
     result = _result(
-        ticker, metric_id, _number(value), unit, basis, rcept_dt.isoformat(), source,
-        None if value is not None else "no_value",
+        ticker, metric_id, _number(value), unit, basis, rcept_dt.isoformat(), source, reason,
     )
     result["period"] = f"{fiscal_year}Q{quarter}"
     return result

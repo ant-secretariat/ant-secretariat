@@ -155,9 +155,11 @@ def news_chunk_rows(article: dict, body: str, extraction: str) -> list[dict]:
     return rows
 
 
-def collect(connection: psycopg.Connection, targets: list[dict], date_from: date) -> int:
+def collect(connection: psycopg.Connection, targets: list[dict], date_from: date) -> tuple[int, list[str]]:
+    """(적재 대상 기사 수, 목록을 못 받은 종목). 한 종목 실패로 멈추지 않지만 실패는 돌려준다."""
     collector = NewsCollector(SETTINGS)
     total = 0
+    list_failed: list[str] = []
     for target in targets:
         query, names = names_for(target["ticker"], target["name"], target["aliases"] or [])
         try:
@@ -166,6 +168,7 @@ def collect(connection: psycopg.Connection, targets: list[dict], date_from: date
             )
         except httpx.HTTPError as exc:
             logger.warning("%s 뉴스 목록 실패: %s", target["ticker"], type(exc).__name__)
+            list_failed.append(target["ticker"])
             continue
         articles = select_articles(rows, names)
         for article in articles:
@@ -191,7 +194,9 @@ def collect(connection: psycopg.Connection, targets: list[dict], date_from: date
         where d.doc_id = n.news_id and d.mentioned_tickers is distinct from n.mentioned_tickers
         """
     )
-    return total
+    if list_failed:
+        logger.warning("뉴스 목록 실패 종목 %s개: %s", len(list_failed), list_failed)
+    return total, list_failed
 
 
 def pending(connection: psycopg.Connection, date_from: date, limit: int | None) -> list[dict]:
@@ -218,7 +223,7 @@ def load(connection: psycopg.Connection, articles: list[dict]) -> int:
     ) as client:
         for position, article in enumerate(articles, start=1):
             try:
-                body = provider._fetch_article_content(client, article["original_url"])
+                body = provider._fetch_article_content(client, article["original_url"], raise_transient=True)
                 extraction = "html"
                 if len(body) < MIN_BODY_CHARS:
                     body, extraction = article["summary"], "summary"
@@ -273,9 +278,12 @@ def main() -> None:
     parser.add_argument("--expire-days", type=int, default=EXPIRE_DAYS, help="이보다 오래된 뉴스 청크는 비활성")
     parser.add_argument("--embed", action="store_true", help="끝나고 빈 임베딩 채우기 (Upstage 비용)")
     args = parser.parse_args()
+    # 키가 없으면 모든 종목이 경고만 남기고 성공으로 끝나므로 시작할 때 막는다
+    if not SETTINGS.naver_client_id or not SETTINGS.naver_client_secret:
+        raise SystemExit("NAVER_CLIENT_ID, NAVER_CLIENT_SECRET이 .env에 없음")
     date_from = today_kst() - timedelta(days=args.days)
     with connect() as connection:
-        found = collect(connection, _targets(connection, args.tickers), date_from)
+        found, list_failed = collect(connection, _targets(connection, args.tickers), date_from)
         articles = pending(connection, date_from, args.limit)
         logger.info("목록 %s건, 본문 받을 기사 %s건", found, len(articles))
         failed = load(connection, articles)
@@ -286,7 +294,8 @@ def main() -> None:
             chunks = targets(connection, None)
             if chunks:
                 embed(connection, chunks)
-    if failed:
+    # 목록 실패도 종료 코드에 반영해야 스케줄러(GitHub Actions)가 실패로 본다
+    if failed or list_failed:
         raise SystemExit(1)
 
 

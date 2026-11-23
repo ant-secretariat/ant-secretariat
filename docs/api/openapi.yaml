@@ -1919,7 +1919,12 @@ components:
                 type:
                 - number
                 - 'null'
-                description: 목표주가
+                description: 목표주가(KIS 원래 값). 액면분할 전 의견은 분할 전 기준 가격이라 지금 주가와 바로 비교할 수 없습니다. 비교에는 `target_price_adjusted`를 씁니다.
+              target_price_adjusted:
+                type:
+                - number
+                - 'null'
+                description: 액면분할을 지금 기준으로 환산한 목표주가입니다.
               invt_opnn:
                 type:
                 - string
@@ -3635,8 +3640,10 @@ components:
           $ref: '#/components/schemas/TickerValue'
         metric_id:
           type: string
+          description: 지원하는 지표 ID는 `processing/functions/get_metric.py`의 `METRIC_IDS`(형식 문서 `processing/docs/get_metric.md`)입니다. 없는 ID면 `reason=unknown_metric`입니다.
           examples:
-          - per_ttm
+          - per
+          - operating_margin
         as_of:
           type: string
           format: date

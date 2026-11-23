@@ -52,6 +52,7 @@ get_metric("000660", "foreign_net_buy_20d", "2026-11-10")
 | `no_value` | 데이터 행은 있지만 이 지표 값이 비어 있음(예: 적자라 PER 없음, 금융업이라 매출 없음) | 숫자 없이 서술 |
 | `not_applicable_financials` | 금융업이라 의미 없는 지표(부채비율) | 그 지표 대신 다른 지표 사용 |
 | `partial_window` | 계산 창(예: 최근 20거래일) 중 값이 빈 날이 있어 일부 날짜만으로는 계산하지 않음(적재 공백·거래정지) | 숫자 없이 서술 |
+| `capital_impaired` | 자본잠식(자본 0 이하)이라 부채비율이 의미 없음. `get_financials`도 같은 경우 `debt_ratio`를 null로 두고 `debt_ratio_note`에 같은 사유를 담음 | 숫자 없이 "자본잠식"으로 서술 |
 
 ## display 규칙
 

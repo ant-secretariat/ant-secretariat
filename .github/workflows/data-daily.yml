@@ -1,6 +1,6 @@
 # 데이터 파이프라인 정기 적재 (data-pipeline/crawling)
 # - 평일 19:30 KST: 정형 데이터(시세·지수·수급·목표가·지분공시·매크로)와 공시. 재무제표는 월요일만
-# - 매달 1일 20:00 KST: 민감도·시뮬레이션 파라미터, 월말 종가와 월별 상관 재계산
+# - 매달 1일 20:00 KST: 민감도·시뮬레이션 파라미터, 월말 종가와 월별 상관 재계산, 온톨로지 입력값 계산(CSV는 실행 결과 파일로 90일 보관)
 # - 리포트·뉴스는 Supabase 무료 한도(500MB) 때문에 기본은 끔. 레포 변수 LOAD_REPORTS / LOAD_NEWS = true 로 켬
 # - 비밀값은 레포 Settings → Secrets and variables → Actions 에 등록 (코드가 읽는 환경변수 이름 그대로)
 name: 데이터 적재
@@ -19,7 +19,7 @@ on:
         type: boolean
         default: true
       run_monthly:
-        description: "월간 재계산 (민감도·시뮬레이션·월별 상관)"
+        description: "월간 재계산 (민감도·시뮬레이션·월별 상관·온톨로지 입력값)"
         type: boolean
         default: false
       include_reports:
@@ -134,3 +134,15 @@ jobs:
       - name: 월말 종가와 월별 상관
         if: ${{ !cancelled() }}
         run: python -m crawling.monthly_corr_loader
+      # 온톨로지 입력값 (DB는 읽기만 함). 저장 테이블 형식이 정해지기 전까지는 CSV를 실행 결과 파일로 남긴다 (#56)
+      - name: 온톨로지 입력값 계산
+        if: ${{ !cancelled() }}
+        run: python -m crawling.ontology_inputs monthly --out-dir ontology_inputs_out ${{ inputs.date && format('--as-of {0}', inputs.date) || '' }}
+      - name: 온톨로지 입력값 CSV 보관 (90일)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ontology-inputs-${{ github.run_id }}
+          path: data-pipeline/ontology_inputs_out/
+          if-no-files-found: warn
+          retention-days: 90

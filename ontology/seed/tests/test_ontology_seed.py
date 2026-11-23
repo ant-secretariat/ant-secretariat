@@ -39,18 +39,31 @@ def test_company_context_returns_only_reviewed_identity_by_default():
     assert all(e["weight_frequency"] == "monthly" for e in ctx["sector_sensitivities"]["monthly"])
 
 
-def test_mismatched_sensitivity_is_not_exposed():
-    # 금융 ← 국고채 3년: 가설은 +(NIM)인데 섹터 중앙값은 −0.087 → needs_review
-    assert not any(e["dst"] == "KTB_3Y_KR" for e in o.company_context("105560")["sector_sensitivities"]["daily"])
-    draft = o.company_context("105560", include_draft=True)
-    e = next(e for e in draft["sector_sensitivities"]["daily"] if e["dst"] == "KTB_3Y_KR")
-    assert e["status"] == "needs_review" and e["review_reason"] == "mismatch"
+def test_rejected_sensitivity_is_never_shown_and_keeps_its_basis():
+    # 금융 ← 국고채 3년: 가설 +(NIM), 중앙값 −0.087, 시장 효과를 빼면 관계가 사라짐 → rejected (v0.7)
+    for draft in (False, True):
+        ctx = o.company_context("105560", include_draft=draft)
+        assert not any(e["dst"] == "KTB_3Y_KR" for e in ctx["sector_sensitivities"]["daily"])
+    e = next(e for e in o.load()["edges"]["sensitive_to"] if (e["src"], e["dst"]) == ("SEC_FIN", "KTB_3Y_KR"))
+    assert e["status"] == "rejected" and e["reviewed"] and e["rejection"]["decided_by"] == "유민"
+    assert "시장 제거" in e["rejection"]["detail"]
+    assert sum(x["status"] == "rejected" for x in o.load()["edges"]["sensitive_to"]) == 9
 
 
-def test_include_draft_shows_drafts_but_never_inactive():
+def test_market_unadjusted_sensitivity_waits_for_review():
+    # 시장 효과를 빼지 않은 상관은 KOSPI(시장 자체)만 노출한다 (v0.7)
+    exposed = o.edges("sensitive_to")
+    assert [(e["src"], e["dst"]) for e in exposed] == [("SEC_FIN", "KOSPI")]
+    pending = [e for e in o.load()["edges"]["sensitive_to"] if e["review_reason"] == "market_unadjusted"]
+    assert len(pending) == 10 and all(e["status"] == "needs_review" and not e["market_adjusted"] for e in pending)
+    ctx = o.company_context("005930", include_draft=True)  # 검수용으로는 보인다
+    assert any(e["review_reason"] == "market_unadjusted" for e in ctx["sector_sensitivities"]["daily"])
+
+
+def test_include_draft_shows_drafts_but_never_inactive_or_rejected():
     ctx = o.company_context("005930", include_draft=True)
     assert len(ctx["issues"]) >= 4 and "fx_sensitivity" in ctx["sector"]
-    assert all(e["status"] != "inactive" for k in o.load()["edges"] for e in o.edges(k, include_draft=True))
+    assert all(e["status"] not in ("inactive", "rejected") for k in o.load()["edges"] for e in o.edges(k, include_draft=True))
 
 
 def test_unknown_ticker_returns_empty():

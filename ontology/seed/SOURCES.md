@@ -1,11 +1,11 @@
-# 온톨로지 관계사전 시드 v0.6 — 값의 출처와 결정 근거
+# 온톨로지 관계사전 시드 v0.7 — 값의 출처와 결정 근거
 
 작성: 유민 · 2026-11-10 (v0.2 2026-11-09) · 기준 스펙: 온톨로지 프로덕트 기획서 v1.2
 
 이 문서는 시드에 채워진 값이 **어디서 왔고, 어떤 규칙으로 정했고, 얼마나 검증됐는지**를 항목별로 정리한다.
 JSON 레코드에도 `*_source` / `status` / `inactive_reason` / `pipeline_status` / `weight_status` 필드로 같은 정보가 들어 있다.
 
-v0.6은 태은 리뷰(PR #29)를 반영해 노출 규칙을 바꾼 버전이다. 노출 = `status == "active"` 이고 `reviewed == true` 인 노드·엣지만이며(ADR 0008), Claude 초안과 가설과 어긋난 민감도는 기본값에서 빠진다. 원본은 `ontology_seed.json` 하나이고 `ontology_seed.py`는 손으로 쓴 로더다. v0.5는 수경이 PR #29에 남긴 섹터별 weight·DRAM 대체 지표·`KTB_10Y_KR` 답변(2026-11-10, 값은 PR #34 기준)을 반영해 weight를 채운 버전이다. v0.4는 v0.3에 "수집 계획 없는 매크로는 삭제하지 않고 비활성 보관" 결정(유민)을 반영한 버전이다(6번 SENSITIVE_TO). v0.3은 수경(nasuzz) 데이터 파이프라인의 실제 코드·답변(2026-11-10)과 대조해 맞춘 버전이다. 파이프라인 값으로 바꾼 항목은 검증 상태를 ✅로 올리고 출처에 파일 경로를 적었다. 파이프라인 코드 경로는 PR #10~#19(open) 기준이다.
+v0.7은 수경 검증(PR #29 코멘트 2026-11-23)을 반영해 가설과 어긋난 SENSITIVE_TO 9개를 기각(`rejected`)하고, 시장 효과를 빼지 않은 상관은 노출하지 않도록 바꾼 버전이다(노출되는 SENSITIVE_TO는 금융 ← `KOSPI` 하나). v0.6은 태은 리뷰(PR #29)를 반영해 노출 규칙을 바꾼 버전이다. 노출 = `status == "active"` 이고 `reviewed == true` 인 노드·엣지만이며(ADR 0008), Claude 초안과 가설과 어긋난 민감도는 기본값에서 빠진다. 원본은 `ontology_seed.json` 하나이고 `ontology_seed.py`는 손으로 쓴 로더다. v0.5는 수경이 PR #29에 남긴 섹터별 weight·DRAM 대체 지표·`KTB_10Y_KR` 답변(2026-11-10, 값은 PR #34 기준)을 반영해 weight를 채운 버전이다. v0.4는 v0.3에 "수집 계획 없는 매크로는 삭제하지 않고 비활성 보관" 결정(유민)을 반영한 버전이다(6번 SENSITIVE_TO). v0.3은 수경(nasuzz) 데이터 파이프라인의 실제 코드·답변(2026-11-10)과 대조해 맞춘 버전이다. 파이프라인 값으로 바꾼 항목은 검증 상태를 ✅로 올리고 출처에 파일 경로를 적었다. 파이프라인 코드 경로는 PR #10~#19(open) 기준이다.
 
 ## 0. 한눈에 보기
 
@@ -170,8 +170,12 @@ BENEFITS/HURTS 중 종목 대상 엣지를 뒤집고 `strength`를 숫자로 바
 | 유틸리티 | `USD_KRW` | - | -0.032 | 1 | 2026-11-06 | match · 종목 수 적음 |
 | 유틸리티 | `KTB_10Y_KR` | - | -0.155 | 1 | 2026-11-06 | match · 종목 수 적음 |
 
-  - **mismatch 4개 (검토 필요):** 경기소비재→`CPI_KR`(가설 − / 실측 +), 금융→`KTB_3Y_KR`(가설 + / 실측 −), 산업재→`BRENT`(가설 − / 실측 +), 유틸리티→`BRENT`(가설 − / 실측 +, **종목 1개라 불안정**). 회귀가 맞고 가설이 틀렸는지 판단하려면 `direction_uncertain`(신뢰구간이 0 포함)과 함께 봐야 한다. 금융→`KTB_3Y_KR`은 v0.4에서 `BASE_RATE_KR`(+)을 합친 엣지라 합친 근거(NIM)도 같이 재검토 대상이다.
-  - **near_zero 5개:** `USD_KRW`가 거의 모든 섹터에서 0 근처라 엣지가 약하다 (수경 지적). IT·경기소비재·필수소비재·건강관리·산업재. 유의한 관계로 주입하면 안 되고, 플래그를 켜기 전에 엣지 유지 여부를 판단한다.
+  - **v0.7: mismatch 4개·near_zero 5개는 모두 기각(`status: rejected`).** 수경이 섹터 소속 종목별로 같은 부호 비율·방향이 확실한 종목 수를 세고, 시장 효과(일별 코스피, 월별 핵심 98종목 평균 수익률)를 뺀 상관을 다시 냈다(PR #29 코멘트 2026-11-23).
+    - 금융→`KTB_3Y_KR`: 은행만 봐도 6/6 음수라 업종이 섞여 뒤집힌 것은 아니다. 시장을 빼면 중앙값 은행 −0.007·증권 +0.010·보험 +0.047, 시장·환율을 통제한 30일 베타도 방향 확실 0개. NIM 효과는 은행 이자이익 데이터가 없어 확인 못 함.
+    - 산업재→`BRENT`: 임시 기준(같은 부호 70%·방향 확실 과반·3종목 이상)은 통과했지만, 시장을 빼면 자본재 +0.001·운송 +0.100(유의하지 않음). 주식시장이 t+1월 유가를 앞서 움직인 결과다.
+    - 경기소비재→`CPI_KR`(방향 확실 1/7), 유틸리티→`BRENT`(1종목), `USD_KRW` 5개(같은 부호 53~71%, 방향 확실 0~5개): 기준 미달.
+    - 엣지마다 `rejection`(결정자·날짜·근거·수치)을 남겼다. 지우지 않는 이유는 같은 가설을 다시 넣지 않게 하려는 것이다.
+  - **v0.7: 시장 효과를 빼지 않은 상관은 노출하지 않는다.** 위 검증에서 상관의 상당 부분이 시장 전체 움직임으로 설명됐다(코스피 일별 수익률과 국고채 3년 변화 상관 −0.18, 시장과 t+1월 유가 변화 상관 +0.33). 지금 weight는 모두 시장 효과를 빼지 않은 섹터 중앙값이라, `KOSPI`(시장 자체) 엣지를 뺀 10개를 `needs_review`(`review_reason: market_unadjusted`)로 돌렸다. 시장 효과를 뺀 값이 오면 `market_adjusted: true`로 다시 판정한다. 기준에 "시장 효과를 뺀 뒤에도 같은 부호가 남는가"를 넣자는 수경 제안을 따른 것이다.
   - **종목 수 3개 미만 섹터**(필수소비재 2, 유틸리티 1)는 `weight_low_n: true`.
   - **섹터 중앙값은 관련 없는 종목이 섞여 희석된다.** 예: D램은 IT 섹터 0.121이지만 삼성전자 0.27, SK하이닉스 0.26이라 핵심 경로는 **종목 단위 SENSITIVE_TO**가 더 적합하다 (기획서 v1.2 엣지 정의는 `SECTOR / COMPANY → MACRO`). 이번 PR에는 섹터 값만 넣었다. 종목 단위 엣지는 수경에게 종목별 값(출처·as_of 포함)을 받은 뒤 후속으로 추가한다.
 - **BASE_RATE_KR 합침(v0.4).** 기준금리는 일별로 저장되지만 정책 결정일에만 바뀌는 계단식 값이라 일별 수익률과의 상관이 의미 없다. 같은 방향의 금리 가설을 `KTB_3Y_KR`로 옮겼다. 합친 엣지에는 `merged_from: ["BASE_RATE_KR"]`, `meta.merged_sensitive_edges`에 3건(renamed 2, dedup 1)과 원래 `expected_sign`을 남겼다. `BASE_RATE_KR` 노드와 IMPACTS 엣지는 그대로다.
@@ -206,7 +210,8 @@ python -m pytest ontology/seed/tests -q   # 재생성 일치 · 노출 규칙 ·
 | 수경 | 섹터별 weight 집계, `KTB_10Y_KR`·`CPI_KR`·`BRENT` 요인, DRAM 대체 지표 | ✅ 2026-11-10 PR #29 코멘트로 회신 (v0.5 반영) |
 | 수경 | IT→`DRAM_EXPORT_PRICE` 등 핵심 경로의 **종목 단위** 월별 상관값(삼성전자 0.27·SK하이닉스 0.26 등)과 출처·as_of | 요청 필요 |
 | 유민 | 수집 계획 없는 지표 6개 | ✅ 결정: 삭제 않고 `inactive` 보관 (v0.4) |
-| 유민 | 부호 불일치 4개(경기소비재→CPI, 금융→KTB_3Y, 산업재→BRENT, 유틸리티→BRENT)와 `USD_KRW` near_zero 5개 엣지 유지 여부 | 검토 필요 |
+| 유민 | 부호 불일치 4개(경기소비재→CPI, 금융→KTB_3Y, 산업재→BRENT, 유틸리티→BRENT)와 `USD_KRW` near_zero 5개 엣지 유지 여부 | ✅ 결정: 9개 모두 `rejected` (v0.7, 수경 검증 근거) |
+| 수경 | `market_unadjusted` 10개 엣지의 시장 효과를 뺀 섹터 중앙값(일별은 코스피, 월별은 핵심 종목 평균 기준)과 종목 부호 일치·방향 확실 수 | 요청 (v0.7) |
 | 유민 | KOSDAQ 신규 10종목의 이슈 엣지 라벨링, `is_holding`·`sub_industry` 검토 | 후속 |
 | 태은 | 노출 규칙·엣지 공통 필드·JSON 단일화 (PR #29 리뷰 1·2·3·6) | ✅ v0.6 반영 |
 | 태은 | ADR 0003 월별 예외 문서화 (리뷰 4, 태은 작성 제안) · DB 적재기 (`ontology_nodes`·`ontology_edges`) | 후속 |
@@ -227,3 +232,4 @@ python -m pytest ontology/seed/tests -q   # 재생성 일치 · 노출 규칙 ·
 | v0.4 | 2026-11-10 | 수집 계획 없는 매크로 7개와 엣지(SENSITIVE_TO 9·IMPACTS 10) `inactive` 보관, BASE_RATE_KR 대상 SENSITIVE_TO 3개 → KTB_3Y_KR 합침(29→28), `weight_coverage`를 `weight_status`(aggregation_pending / factor_requested)·`weight_frequency`로 대체, 헬퍼에 active 필터 추가 |
 | v0.5 | 2026-11-10 | 수경 섹터 중앙값으로 SENSITIVE_TO weight 채움(활성 20개, 출처·기간·as_of·종목 수·`weight_frequency`), `DRAM_PRICE`→`DRAM_EXPORT_PRICE`(ECOS 402Y016) 교체·활성화, 금리 엣지 섹터당 1개 검사 추가, `sign_check`·`weight_low_n` 필드, `weight_status`를 filled / not_available로 정리 (SENSITIVE_TO 활성 20·비활성 8, IMPACTS 활성 6·비활성 9) |
 | v0.6 | 2026-11-22 | 태은 리뷰 반영. 모든 노드·엣지에 `status`·`reviewed`, 노출 = active + reviewed. 엣지 공통 필드(`relation`·`src`·`dst`·`source`·`method`·`as_of`·`valid_from`·`valid_to`·`evidence_ids`), IMPACTS 방향은 `direction`. Claude 초안 엣지·이슈는 `draft`, SENSITIVE_TO mismatch 4·near_zero 5는 `needs_review`(노출 11개). 노드 초안 속성은 `draft_fields`. 섹터 이름 WICS, `valid_until`→`valid_to`, `weight_low_n` bool, `W_N` 검증. 원본 JSON 하나(`ontology_seed.json`)·손으로 쓴 로더·pytest |
+| v0.7 | 2026-11-23 | 수경 검증(PR #29 코멘트) 반영. mismatch 4·near_zero 5 SENSITIVE_TO를 `rejected`(근거 `rejection` 필드), 시장 효과를 빼지 않은 KOSPI 외 10개를 `needs_review`(`market_unadjusted`), `market_adjusted` 필드 추가. 노출 SENSITIVE_TO 11 → 1(금융 ← KOSPI). 로더 `include_draft`도 `rejected`는 보여 주지 않음 |

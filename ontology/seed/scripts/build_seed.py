@@ -1,8 +1,14 @@
-"""온톨로지 관계사전 시드 v0.6 생성 — 기획서 v1.2 엣지 7종 정의 기준
+"""온톨로지 관계사전 시드 v0.7 생성 — 기획서 v1.2 엣지 7종 정의 기준
 
 사용법: python build_seed.py <core_companies.csv> <출력 폴더>
   - core_companies.csv 는 수경 파이프라인 companies.is_core 내보내기 (extract_t1.py 로 형식 검증)
   - 출력 폴더의 ontology_seed.json 하나만 덮어쓴다 (원본은 이 파일 하나. 읽기는 ontology_seed.py 로더)
+
+v0.7 변경 (수경 PR #29 검증 코멘트 2026-11-23, 유민 결정)
+  - needs_review 였던 SENSITIVE_TO 9개 → status "rejected" (시장 효과를 빼면 관계가 남지 않음, REJECTED 표에 근거)
+  - 시장 효과를 빼지 않은 상관은 노출하지 않는다: KOSPI(시장 자체)가 아닌 엣지는 market_adjusted 값이 올 때까지
+    status "needs_review", review_reason "market_unadjusted". 노출되는 SENSITIVE_TO 는 금융 ← KOSPI 하나
+  - 엣지에 market_adjusted 필드 (지금은 모두 False — 수경 값은 시장 효과를 빼지 않은 상관)
 
 v0.6 변경 (태은 PR #29 리뷰, ADR 0008 · 헌법 원칙 III·IV)
   - 모든 노드·엣지에 status·reviewed. 노출 = status "active" 이고 reviewed True 인 것만 (로더 is_exposed)
@@ -38,7 +44,7 @@ RAW, OUT = sys.argv[1], sys.argv[2]
 CORE_EXPORT = "2026-11-09"      # core_companies.csv 내보낸 날 (수경)
 TIER_ASSIGNED = "2026-10-22"    # 파이프라인이 시총 순위로 T1을 지정한 날. 이후 고정
 SENS_AS_OF = "2026-11-06"       # sensitivities 최신 as_of (수경)
-GENERATED = "2026-11-22"        # 이 시드를 만든 날 (Claude 초안 엣지의 as_of)
+GENERATED = "2026-11-23"        # 이 시드를 만든 날 (Claude 초안 엣지의 as_of)
 os.makedirs(OUT, exist_ok=True)
 
 
@@ -337,26 +343,54 @@ def _sign_check(sign, w):
     if abs(w) < NEAR_ZERO: return "near_zero"
     return "match" if (w > 0) == (sign == "+") else "mismatch"
 
+# v0.7: 수경 검증(#29 코멘트 2026-11-23)으로 기각한 엣지. 유민 결정 2026-11-23.
+# 기준: 시장 효과(일별 코스피, 월별 핵심 98종목 평균)를 뺀 뒤에도 같은 부호가 남고, 섹터 종목의 70% 이상이 같은 부호,
+# 방향이 확실한 종목이 과반, 종목 3개 이상. 9개 모두 미달.
+_REJ = "수경 #29 코멘트 2026-11-23 (일별 as_of 2026-11-06, 월별 BRENT 2026-09-01·CPI 2026-10-01)"
+REJECTED = {
+    ("SEC_FIN", "KTB_3Y_KR"): "시장 제거 후 중앙값 은행 −0.007·증권 +0.010·보험 +0.047, 시장·환율 통제 30일 베타 방향 확실 0개",
+    ("SEC_INDUS", "BRENT"): "시장 제거 후 중앙값 자본재 +0.001(27종목)·운송 +0.100(4종목, 유의하지 않음). 시장이 t+1월 유가를 앞서 움직인 결과",
+    ("SEC_CONS_DISC", "CPI_KR"): "같은 부호 6/7이나 신뢰구간이 0을 포함하지 않는 종목 1/7",
+    ("SEC_UTIL", "BRENT"): "종목 1개(한국전력)라 판단 불가",
+    ("SEC_IT", "USD_KRW"): "같은 부호 10/19(53%), 방향 확실 3/19",
+    ("SEC_CONS_DISC", "USD_KRW"): "같은 부호 4/7(57%), 방향 확실 2/7",
+    ("SEC_CONS_STAP", "USD_KRW"): "종목 2개, 방향 확실 0/2",
+    ("SEC_HEALTH", "USD_KRW"): "같은 부호 5/7(71%)이나 방향 확실 1/7",
+    ("SEC_INDUS", "USD_KRW"): "같은 부호 18/31(58%), 방향 확실 5/31",
+}
+MARKET_FACTORS = {"KOSPI"}  # 시장 자체라 시장 효과를 뺄 대상이 아님
+
+
 def _sens_edge(s, m, sign, why):
     inactive = m in INACTIVE_MACROS
     w = None if inactive else WEIGHTS.get((s, m))
     freq = WEIGHT_FREQ.get(m)
     n = None if w is None else W_N_MONTHLY_OVERRIDE.get((s, m), W_N[s])
     check = _sign_check(sign, w)
-    # status: inactive = 수집 계획 없는 매크로 / needs_review = 가설과 부호가 반대이거나 0 근처 / active
-    # reviewed: 수경 회귀 값이 있고 가설과 어긋나지 않을 때만 True (회귀 값으로 가설을 덮어쓰지 않는다)
+    # status: inactive = 수집 계획 없는 매크로 / rejected = 검증으로 기각(REJECTED) /
+    #   needs_review = 가설과 부호가 반대·0 근처, 또는 시장 효과를 빼지 않은 상관(market_unadjusted) / active
+    # reviewed: 사람이 검토를 끝낸 것(active·rejected). 노출은 active 이면서 reviewed 일 때만
+    market_adjusted = False  # 수경 섹터 중앙값은 시장 효과를 빼지 않은 상관이다 (#29 코멘트 2026-11-23)
+    reason = None
     if inactive:
         status = "inactive"
+    elif (s, m) in REJECTED:
+        status = "rejected"
     elif w is None or check in ("mismatch", "near_zero"):
-        status = "needs_review"
+        status, reason = "needs_review", check
+    elif m not in MARKET_FACTORS and not market_adjusted:
+        status, reason = "needs_review", "market_unadjusted"
     else:
         status = "active"
-    return edge("SENSITIVE_TO", s, "SECTOR", m, "MACRO", status=status, reviewed=status == "active",
+    return edge("SENSITIVE_TO", s, "SECTOR", m, "MACRO", status=status, reviewed=status in ("active", "rejected"),
                 source=WSRC[freq]["src"] if w is not None else None,
                 method=f"corr_{freq}_sector_median" if w is not None else None,
                 as_of=W_AS_OF[m] if w is not None else None,
                 inactive_reason="no_data_source" if inactive else None,
-                review_reason=check if status == "needs_review" else None,
+                review_reason=reason,
+                rejection=dict(decided_by="유민", decided_on="2026-11-23", basis=_REJ, detail=REJECTED[(s, m)])
+                if status == "rejected" else None,
+                market_adjusted=market_adjusted,
                 weight=w, weight_window=WSRC[freq]["window"] if w is not None else None, weight_n_tickers=n,
                 expected_sign=sign, sign_check=check,
                 weight_low_n=None if w is None else n < LOW_N,
@@ -419,13 +453,14 @@ edges = dict(belongs_to=BELONGS, sensitive_to=SENSITIVE, impacts=IMPACTS,
 # 노출 가능한 노드·엣지는 출처·방법·기준일이 반드시 있다 (헌법 원칙 IV)
 for k, v in edges.items():
     for e in v:
-        assert isinstance(e["reviewed"], bool) and e["status"] in ("active", "draft", "needs_review", "inactive"), e
+        assert isinstance(e["reviewed"], bool) and e["status"] in ("active", "draft", "needs_review", "inactive", "rejected"), e
         if e["status"] == "active" and e["reviewed"]:
             assert e["source"] and e["method"] and e["as_of"], e
 for k, v in nodes.items():
     for n in v:
         assert isinstance(n["reviewed"], bool) and n["status"] in ("active", "draft", "inactive"), n
-meta = dict(version="seed-v0.6", generated=GENERATED, spec="온톨로지 기획서 v1.2",
+assert set(REJECTED) <= {(e["src"], e["dst"]) for e in SENSITIVE}, "REJECTED에 없는 엣지가 있다"
+meta = dict(version="seed-v0.7", generated=GENERATED, spec="온톨로지 기획서 v1.2",
             exposure_rule='status == "active" and reviewed == True (ADR 0008). draft_fields 는 include_draft 일 때만',
             merged_sensitive_edges=MERGED, inactive_macros=sorted(INACTIVE_MACROS),
             t1_definition="KOSPI+KOSDAQ 통합 시가총액 상위 100 보통주(우선주 제외). 수경 파이프라인 companies.is_core, 2026-10-22 지정 후 고정",
@@ -441,7 +476,7 @@ print("nodes:", {k: len(v) for k, v in nodes.items()})
 print("edges:", {k: len(v) for k, v in edges.items()})
 print("markets:", {m: sum(c["market"] == m for c in COMPANIES) for m in ("KOSPI", "KOSDAQ")})
 print("macros collecting:", sum(m["in_pipeline"] for m in MACROS), "/", len(MACROS))
-print("sensitive_to status:", {k: sum(e["status"] == k for e in SENSITIVE) for k in ("active", "needs_review", "inactive")},
+print("sensitive_to status:", {k: sum(e["status"] == k for e in SENSITIVE) for k in ("active", "needs_review", "rejected", "inactive")},
       "| weight_status:", {k: sum(e["weight_status"] == k for e in SENSITIVE) for k in ("filled", "not_available")},
       "| sign_check:", {k: sum(e["sign_check"] == k for e in SENSITIVE) for k in ("match", "mismatch", "near_zero")})
 print("impacts status:", {k: sum(e["status"] == k for e in IMPACTS) for k in ("draft", "inactive")})

@@ -5,9 +5,10 @@
 노출 규칙 (ADR 0008 · 헌법 원칙 IV)
 - 노드·엣지는 status == "active" 이고 reviewed 가 True 일 때만 돌려준다.
   Claude 초안(ISSUE·BENEFITS/HURTS·EXPOSED_TO·IMPACTS, status "draft"), 가설과 부호가 어긋난 민감도
-  (status "needs_review"), 수집 계획 없는 매크로(status "inactive")는 기본값에서 빠진다.
+  (status "needs_review"), 시장 효과를 빼지 않은 민감도(needs_review, market_unadjusted),
+  수집 계획 없는 매크로(status "inactive"), 검증으로 기각한 관계(status "rejected")는 기본값에서 빠진다.
 - 노드의 draft_fields 에 적힌 속성(섹터 경기 성격, 종목 세부 산업 등)도 기본값에서 뺀다.
-- include_draft=True 는 검수용이다. inactive 를 뺀 전부와 draft_fields 를 그대로 돌려준다. 주입 경로에서는 쓰지 않는다.
+- include_draft=True 는 검수용이다. inactive·rejected 를 뺀 전부와 draft_fields 를 그대로 돌려준다. 주입 경로에서는 쓰지 않는다.
 """
 from __future__ import annotations
 
@@ -28,7 +29,7 @@ def load() -> dict[str, Any]:
 
 def is_exposed(record: dict, include_draft: bool = False) -> bool:
     if include_draft:
-        return record["status"] != "inactive"
+        return record["status"] not in ("inactive", "rejected")
     return record["status"] == "active" and record["reviewed"] is True
 
 

@@ -52,8 +52,8 @@ def test_rejected_sensitivity_is_never_shown_and_keeps_its_basis():
 
 
 def test_market_adjusted_check_rejects_the_ten_pending_edges():
-    # #56: 시장 효과를 양쪽에서 뺀 값도 기준 미달 → 보류 10개 모두 rejected, 노출은 KOSPI 8개 그대로
-    exposed = o.edges("sensitive_to")
+    # #56: 시장 효과를 양쪽에서 뺀 값도 기준 미달 → 보류 10개 모두 rejected, 섹터 노출은 KOSPI 8개 그대로
+    exposed = [e for e in o.edges("sensitive_to") if e["src_type"] == "SECTOR"]
     assert {e["dst"] for e in exposed} == {"KOSPI"} and len(exposed) == 8
     sens = o.load()["edges"]["sensitive_to"]
     assert not any(e["review_reason"] == "market_unadjusted" for e in sens)
@@ -120,3 +120,19 @@ def test_holdings_and_reviewed_sub_industry():
     assert cs["009830"]["sub_industry"] == "화학·태양광" and cs["277810"]["sub_industry"] == "로봇"  # KIND 후보 정정
     assert "sub_industry" not in cs["278470"]  # KIND 후보가 없는 초안은 기본값에서 숨김
     assert sum("sub_industry" in c for c in cs.values()) == 34
+
+
+def test_company_sensitivity_edges_follow_the_exposure_rule():
+    # v0.9 (#56): 종목 → 매크로 10개. 확실·|값|≥0.10·가설 부호 일치
+    co = [e for e in o.edges("sensitive_to") if e["src_type"] == "COMPANY"]
+    assert len(co) == 10 and all(e["market_adjusted"] and abs(e["weight"]) >= 0.10 for e in co)
+    assert all(e["weight_ci95"][0] > 0 or e["weight_ci95"][1] < 0 for e in co)
+    assert all(e["sign_check"] == "match" for e in co)
+    assert all(e["weight_q_value_hypothesis"] < 0.05 for e in co)  # 가설 엣지끼리 BH 보정 (수경 #56 제안)
+    assert sum(e["weight_q_value_all"] < 0.05 for e in co) == 4  # 99종목 전체 보정은 참고값 (대한항공·한국전력)
+    ctx = o.company_context("005930")
+    assert [e["dst"] for e in ctx["company_sensitivities"]["monthly"]] == ["DRAM_EXPORT_PRICE"]
+    assert ctx["company_sensitivities"]["daily"] == []
+    assert all(e["src_type"] == "SECTOR" for f in ("daily", "monthly") for e in ctx["sector_sensitivities"][f])
+    assert o.company_context("278470")["company_sensitivities"] == {"daily": [], "monthly": []}  # 가설과 반대라 제외
+

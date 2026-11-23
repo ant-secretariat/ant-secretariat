@@ -1,8 +1,13 @@
-"""온톨로지 관계사전 시드 v0.8 생성 — 기획서 v1.2 엣지 7종 정의 기준
+"""온톨로지 관계사전 시드 v0.9 생성 — 기획서 v1.2 엣지 7종 정의 기준
 
 사용법: python build_seed.py <core_companies.csv> <출력 폴더>
   - core_companies.csv 는 수경 파이프라인 companies.is_core 내보내기 (extract_t1.py 로 형식 검증)
   - 출력 폴더의 ontology_seed.json 하나만 덮어쓴다 (원본은 이 파일 하나. 읽기는 ontology_seed.py 로더)
+
+v0.9 변경 (#56 종목 단위 값, 유민 제안 기준 — 이 PR 리뷰가 팀 합의)
+  - 종목 → 매크로 SENSITIVE_TO 10개 추가(src_type COMPANY). 기준: 시장 효과 뺀 값의 95% 구간이 0 미포함,
+    |값| ≥ 0.10, 경제적 가설이 있고 부호가 같음, 가설 엣지끼리 BH 보정 q < 0.05(수경 제안). weight 는 시장 효과를 뺀 값(market_adjusted True)
+  - 로더 company_context 에 company_sensitivities 추가
 
 v0.8 변경 (수경 #61 온톨로지 입력값 2026-11-23, 유민 결정 #61 코멘트)
   - MACRO direction: 데이터(시장과 지표 변화 상관, Fisher 95%)와 초안이 같은 4개(KTB_3Y_KR·KTB_10Y_KR up_negative,
@@ -489,6 +494,72 @@ def _sens_edge(s, m, sign, why):
                 weight_frequency=freq, merged_from=MERGED_FROM.get((s, m), []), rationale=why)
 SENSITIVE = [_sens_edge(*t) for t in SENS]
 
+# v0.9: 종목 → 매크로 SENSITIVE_TO (#56, 수경 종목 단위 값 2026-11-23). 섹터 중앙값은 관련 없는 종목이 섞여 작아지지만
+# 핵심 종목은 시장 효과를 빼도 관계가 남는다. 노출 기준(유민 제안, PR 리뷰로 합의):
+#   1) 시장 효과 뺀 값의 95% 구간이 0을 포함하지 않음  2) |값| ≥ 0.10  3) 경제적 가설이 있고 부호가 같음
+#   4) 가설 엣지끼리 BH 보정한 q값 < 0.05 (수경 #56 제안 2026-11-23: 보정은 "몇 개를 봤는가"에 맞춘다.
+#      가설 없이 데이터에서 찾는 관계는 지표별 99종목 q값으로 거른다 — 지금은 넣지 않음)
+# 3)은 다중 비교 대비다(지표마다 99종목이라 5% 기준이면 우연히 ~5개가 확실로 나옴). 가설 없이 데이터에서만 나온 관계
+# (레인보우로보틱스→D램, 크래프톤→CPI, 은행·보험→유가 등)와 가설과 부호가 반대인 관계(에이피알→원/달러)는 넣지 않는다.
+CO_SENS_MIN = 0.10
+_CO_SRC = "수경 #56 2026-11-23 (crawling.ontology_inputs sensitivities --level ticker, PR #62)"
+# p값·지표별 99종목 BH q값은 수경 #56 코멘트(2026-11-23, #62 sensitivities_ticker). 가설 엣지 q값은 아래에서 계산
+CO_P = {("003490", "KTB_3Y_KR"): (0.000001, 0.0001), ("003490", "KTB_10Y_KR"): (0.00002, 0.002),
+        ("015760", "KTB_3Y_KR"): (0.0010, 0.032), ("015760", "KTB_10Y_KR"): (0.0014, 0.033),
+        ("180640", "KTB_3Y_KR"): (0.0066, 0.109), ("035720", "KTB_10Y_KR"): (0.0043, 0.084),
+        ("010950", "BRENT"): (0.0008, 0.075), ("096770", "BRENT"): (0.0138, 0.269),
+        ("005930", "DRAM_EXPORT_PRICE"): (0.0170, 0.404), ("000660", "DRAM_EXPORT_PRICE"): (0.0193, 0.404)}
+CO_Q_MAX = 0.05
+
+
+def bh_q_values(ps):
+    """Benjamini-Hochberg q값 (#62 crawling.analytics.ontology_inputs.bh_q_values 와 같은 계산)."""
+    m = len(ps)
+    order = sorted(range(m), key=lambda i: ps[i])
+    q, running = [0.0] * m, 1.0
+    for rank in range(m, 0, -1):
+        i = order[rank - 1]
+        running = min(running, ps[i] * m / rank)
+        q[i] = running
+    return q
+
+
+CO_SENS = [  # (ticker, macro, 가설 부호, 가설, raw, adjusted, ci_low, ci_high, n_obs)
+    ("003490", "KTB_3Y_KR", "-", "부채·항공기 리스 부담이 커서 금리가 오르면 이자 비용 증가", -0.235, -0.179, -0.25, -0.11, 727),
+    ("003490", "KTB_10Y_KR", "-", "부채·항공기 리스 부담이 커서 금리가 오르면 이자 비용 증가", -0.200, -0.156, -0.23, -0.08, 727),
+    ("015760", "KTB_3Y_KR", "-", "부채가 큰 규제 유틸리티라 금리가 오르면 이자 비용 증가", -0.180, -0.122, -0.19, -0.05, 727),
+    ("015760", "KTB_10Y_KR", "-", "부채가 큰 규제 유틸리티라 금리가 오르면 이자 비용 증가", -0.163, -0.119, -0.19, -0.05, 727),
+    ("180640", "KTB_3Y_KR", "-", "대한항공 지주라 대한항공의 금리 부담을 따라감", -0.144, -0.101, -0.17, -0.03, 727),
+    ("035720", "KTB_10Y_KR", "-", "먼 미래 이익 비중이 큰 성장주라 장기 할인율에 민감", -0.151, -0.106, -0.18, -0.03, 727),
+    ("010950", "BRENT", "+", "유가가 오르면 정유 재고 평가이익·마진 개선", 0.408, 0.303, 0.13, 0.46, 120),
+    ("096770", "BRENT", "+", "유가가 오르면 정유 재고 평가이익·마진 개선", 0.361, 0.225, 0.05, 0.39, 120),
+    ("005930", "DRAM_EXPORT_PRICE", "+", "메모리 매출 비중이 커서 D램 가격이 이익을 좌우", 0.267, 0.218, 0.04, 0.38, 120),
+    ("000660", "DRAM_EXPORT_PRICE", "+", "메모리 매출 비중이 커서 D램 가격이 이익을 좌우", 0.264, 0.214, 0.04, 0.38, 120),
+]
+
+
+assert set(CO_P) == {(x[0], x[1]) for x in CO_SENS}
+CO_Q_HYP = dict(zip([(x[0], x[1]) for x in CO_SENS], bh_q_values([CO_P[(x[0], x[1])][0] for x in CO_SENS])))
+
+
+def _co_sens_edge(tk, m, sign, why, raw, adj, lo, hi, n):
+    freq = WEIGHT_FREQ[m]
+    p, q_all = CO_P[(tk, m)]
+    q_hyp = round(CO_Q_HYP[(tk, m)], 6)
+    assert (lo > 0 or hi < 0) and abs(adj) >= CO_SENS_MIN and _sign_check(sign, adj) == "match" and q_hyp < CO_Q_MAX, (tk, m)
+    return edge("SENSITIVE_TO", tk, "COMPANY", m, "MACRO", status="active", reviewed=True, source=_CO_SRC,
+                method=f"partial_corr_{freq}_market_adjusted", as_of="2026-11-23",
+                inactive_reason=None, review_reason=None, rejection=None, market_adjusted=True,
+                weight=adj, weight_raw=raw, weight_ci95=[lo, hi], weight_n_obs=n,
+                weight_p_value=p, weight_q_value_hypothesis=q_hyp, weight_q_value_all=q_all,
+                weight_window="최근 3년 일별" if freq == "daily" else "최근 최대 120개월, t+1월 지표 변화",
+                weight_n_tickers=None, expected_sign=sign, sign_check="match", weight_low_n=False,
+                weight_status="filled", weight_frequency=freq, merged_from=[], rationale=why,
+                decided_by="유민", decided_on="2026-11-23")
+
+
+COMPANY_SENSITIVE = [_co_sens_edge(*x) for x in CO_SENS]
+
 # IMPACTS: MACRO → MACRO (지표 간 전이). relation: same = 같은 방향, opposite = 반대 방향
 IMP = [
  ("US_FFR","US_10Y_YIELD","same","정책금리→장기금리"),("US_FFR","USD_KRW","same","미 금리↑ 달러 강세"),
@@ -558,7 +629,9 @@ assert all(c == 1 for c in _rate_cnt.values()), _rate_cnt
 assert len({(e["src"], e["dst"]) for e in SENSITIVE}) == len(SENSITIVE), "SENSITIVE_TO 쌍 중복"
 
 nodes = dict(sectors=SECTORS, macros=MACROS, issues=ISSUES, companies_t1=COMPANIES)
-edges = dict(belongs_to=BELONGS, sensitive_to=SENSITIVE, impacts=IMPACTS,
+for e in COMPANY_SENSITIVE: assert e["src"] in TICKERS and e["dst"] in mac_ids and e["dst"] not in INACTIVE_MACROS, e
+assert len({(e["src"], e["dst"]) for e in COMPANY_SENSITIVE}) == len(COMPANY_SENSITIVE), "종목 SENSITIVE_TO 쌍 중복"
+edges = dict(belongs_to=BELONGS, sensitive_to=SENSITIVE + COMPANY_SENSITIVE, impacts=IMPACTS,
              benefits_hurts=IMPACT_EDGES, exposed_to=EXPOSED)
 # 노출 가능한 노드·엣지는 출처·방법·기준일이 반드시 있다 (헌법 원칙 IV)
 for k, v in edges.items():
@@ -570,7 +643,7 @@ for k, v in nodes.items():
     for n in v:
         assert isinstance(n["reviewed"], bool) and n["status"] in ("active", "draft", "inactive"), n
 assert set(REJECTED) <= {(e["src"], e["dst"]) for e in SENSITIVE}, "REJECTED에 없는 엣지가 있다"
-meta = dict(version="seed-v0.8", generated=GENERATED, spec="온톨로지 기획서 v1.2",
+meta = dict(version="seed-v0.9", generated=GENERATED, spec="온톨로지 기획서 v1.2",
             exposure_rule='status == "active" and reviewed == True (ADR 0008). draft_fields 는 include_draft 일 때만',
             merged_sensitive_edges=MERGED, inactive_macros=sorted(INACTIVE_MACROS),
             t1_definition="KOSPI+KOSDAQ 통합 시가총액 상위 100 보통주(우선주 제외). 수경 파이프라인 companies.is_core, 2026-10-22 지정 후 고정",
@@ -589,6 +662,7 @@ print("macros collecting:", sum(m["in_pipeline"] for m in MACROS), "/", len(MACR
 print("sensitive_to status:", {k: sum(e["status"] == k for e in SENSITIVE) for k in ("active", "needs_review", "rejected", "inactive")},
       "| weight_status:", {k: sum(e["weight_status"] == k for e in SENSITIVE) for k in ("filled", "not_available")},
       "| sign_check:", {k: sum(e["sign_check"] == k for e in SENSITIVE) for k in ("match", "mismatch", "near_zero")})
+print("company sensitive_to:", len(COMPANY_SENSITIVE))
 print("impacts status:", {k: sum(e["status"] == k for e in IMPACTS) for k in ("active", "draft", "inactive")})
 print("exposed edges:", {k: sum(e["status"] == "active" and e["reviewed"] for e in v) for k, v in edges.items()})
 print("macros inactive:", sorted(INACTIVE_MACROS))

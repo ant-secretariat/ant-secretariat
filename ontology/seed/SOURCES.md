@@ -1,11 +1,11 @@
-# 온톨로지 관계사전 시드 v0.8 — 값의 출처와 결정 근거
+# 온톨로지 관계사전 시드 v0.9 — 값의 출처와 결정 근거
 
 작성: 유민 · 2026-11-10 (v0.2 2026-11-09) · 기준 스펙: 온톨로지 프로덕트 기획서 v1.2
 
 이 문서는 시드에 채워진 값이 **어디서 왔고, 어떤 규칙으로 정했고, 얼마나 검증됐는지**를 항목별로 정리한다.
 JSON 레코드에도 `*_source` / `status` / `inactive_reason` / `pipeline_status` / `weight_status` 필드로 같은 정보가 들어 있다.
 
-v0.8은 수경 온톨로지 입력값(이슈 #61, 계산 코드 PR #62, 기준일 2026-11-23)을 반영해 데이터와 초안이 같은 매크로 방향 4개·IMPACTS 1개를 확정하고, 지주사·세부 업종을 KRX KIND 후보로 확정한 버전이다. 섹터 금리·환율 등급은 계속 초안이다. v0.7은 수경 검증(PR #29 코멘트 2026-11-23)을 반영해 가설과 어긋난 SENSITIVE_TO 9개를 기각(`rejected`)하고, 시장 효과를 빼지 않은 상관은 노출하지 않도록 바꾼 버전이다. 대신 모든 섹터에 → `KOSPI`(시장 동조) 엣지를 두어, 노출되는 SENSITIVE_TO는 KOSPI 엣지 8개다. 이어서 수경이 보류 10개의 시장 효과를 뺀 값을 냈고(이슈 #56), 10개 모두 기준 미달이라 기각했다(기각 19개). v0.6은 태은 리뷰(PR #29)를 반영해 노출 규칙을 바꾼 버전이다. 노출 = `status == "active"` 이고 `reviewed == true` 인 노드·엣지만이며(ADR 0008), Claude 초안과 가설과 어긋난 민감도는 기본값에서 빠진다. 원본은 `ontology_seed.json` 하나이고 `ontology_seed.py`는 손으로 쓴 로더다. v0.5는 수경이 PR #29에 남긴 섹터별 weight·DRAM 대체 지표·`KTB_10Y_KR` 답변(2026-11-10, 값은 PR #34 기준)을 반영해 weight를 채운 버전이다. v0.4는 v0.3에 "수집 계획 없는 매크로는 삭제하지 않고 비활성 보관" 결정(유민)을 반영한 버전이다(6번 SENSITIVE_TO). v0.3은 수경(nasuzz) 데이터 파이프라인의 실제 코드·답변(2026-11-10)과 대조해 맞춘 버전이다. 파이프라인 값으로 바꾼 항목은 검증 상태를 ✅로 올리고 출처에 파일 경로를 적었다. 파이프라인 코드 경로는 PR #10~#19(open) 기준이다.
+v0.9는 종목 → 매크로 SENSITIVE_TO 10개를 추가한 버전이다(#56, 시장 효과를 뺀 종목 단위 값). v0.8은 수경 온톨로지 입력값(이슈 #61, 계산 코드 PR #62, 기준일 2026-11-23)을 반영해 데이터와 초안이 같은 매크로 방향 4개·IMPACTS 1개를 확정하고, 지주사·세부 업종을 KRX KIND 후보로 확정한 버전이다. 섹터 금리·환율 등급은 계속 초안이다. v0.7은 수경 검증(PR #29 코멘트 2026-11-23)을 반영해 가설과 어긋난 SENSITIVE_TO 9개를 기각(`rejected`)하고, 시장 효과를 빼지 않은 상관은 노출하지 않도록 바꾼 버전이다. 대신 모든 섹터에 → `KOSPI`(시장 동조) 엣지를 두어, 노출되는 SENSITIVE_TO는 KOSPI 엣지 8개다. 이어서 수경이 보류 10개의 시장 효과를 뺀 값을 냈고(이슈 #56), 10개 모두 기준 미달이라 기각했다(기각 19개). v0.6은 태은 리뷰(PR #29)를 반영해 노출 규칙을 바꾼 버전이다. 노출 = `status == "active"` 이고 `reviewed == true` 인 노드·엣지만이며(ADR 0008), Claude 초안과 가설과 어긋난 민감도는 기본값에서 빠진다. 원본은 `ontology_seed.json` 하나이고 `ontology_seed.py`는 손으로 쓴 로더다. v0.5는 수경이 PR #29에 남긴 섹터별 weight·DRAM 대체 지표·`KTB_10Y_KR` 답변(2026-11-10, 값은 PR #34 기준)을 반영해 weight를 채운 버전이다. v0.4는 v0.3에 "수집 계획 없는 매크로는 삭제하지 않고 비활성 보관" 결정(유민)을 반영한 버전이다(6번 SENSITIVE_TO). v0.3은 수경(nasuzz) 데이터 파이프라인의 실제 코드·답변(2026-11-10)과 대조해 맞춘 버전이다. 파이프라인 값으로 바꾼 항목은 검증 상태를 ✅로 올리고 출처에 파일 경로를 적었다. 파이프라인 코드 경로는 PR #10~#19(open) 기준이다.
 
 ## 0. 한눈에 보기
 
@@ -203,6 +203,25 @@ BENEFITS/HURTS 중 종목 대상 엣지를 뒤집고 `strength`를 숫자로 바
 - **비활성 8개** (수집 계획 없는 매크로 6개): IT→`US_10Y_YIELD`·`VIX`, 경기소비재→`CHINA_PMI_MFG`, 필수소비재→`PPI_KR`, 금융→`VIX`, 산업재→`CHINA_PMI_MFG`, 소재→`CHINA_PMI_MFG`·`USD_CNY`. `weight_status: null`.
 - 삭제: `SEC_REAL_ESTATE → KTB_10Y_KR` (섹터 삭제, 2번 참고).
 
+### SENSITIVE_TO (COMPANY → MACRO, 10개) — v0.9
+섹터 엣지는 시장 효과를 빼면 전부 기준 미달이었지만(위), 핵심 종목은 관계가 남는다. 수경이 99종목 × 6지표의 시장 효과 뺀 편상관을 냈고(#56 2026-11-23, #62 `sensitivities --level ticker`), 아래 기준을 **모두** 만족하는 것만 넣었다.
+
+1. 시장 효과 뺀 값의 95% 신뢰구간이 0을 포함하지 않음
+2. |값| ≥ 0.10 (일별 표본이 약 730일이라 작은 값도 확실로 나옴)
+3. 경제적 가설이 있고 부호가 같음 — 다중 비교 대비. 가설 없이 데이터에서만 나온 관계(레인보우로보틱스 → D램 −0.37, 크래프톤 → CPI, 은행·보험 → 유가)와 가설과 반대인 관계(에이피알 → 원/달러 −0.104)는 넣지 않음
+4. 가설 엣지끼리 BH 보정한 q < 0.05 (수경 제안: 보정은 실제로 본 개수에 맞춘다). 지표별 99종목 전체 보정 q(`weight_q_value_all`)는 참고값으로 남김 — 이 기준이면 대한항공·한국전력 4개만 0.05 미만
+
+| 종목 | 지표 | 시장 효과 뺀 값 | 95% 구간 | q(가설 10개) | q(99종목) | 가설 |
+|---|---|---|---|---|---|---|
+| 대한항공 | `KTB_3Y_KR` / `KTB_10Y_KR` | −0.179 / −0.156 | −0.25~−0.11 / −0.23~−0.08 | 0.00001 / 0.0001 | 0.0001 / 0.002 | 부채·리스 부담 |
+| 한국전력 | `KTB_3Y_KR` / `KTB_10Y_KR` | −0.122 / −0.119 | −0.19~−0.05 | 0.002 / 0.003 | 0.032 / 0.033 | 부채가 큰 규제 유틸리티 |
+| 한진칼 | `KTB_3Y_KR` | −0.101 | −0.17~−0.03 | 0.009 | 0.109 | 대한항공 지주 |
+| 카카오 | `KTB_10Y_KR` | −0.106 | −0.18~−0.03 | 0.007 | 0.084 | 성장주 장기 할인율 |
+| S-Oil / SK이노베이션 | `BRENT` (월) | +0.303 / +0.225 | +0.13~+0.46 / +0.05~+0.39 | 0.002 / 0.017 | 0.075 / 0.269 | 정유 재고·마진 |
+| 삼성전자 / SK하이닉스 | `DRAM_EXPORT_PRICE` (월) | +0.218 / +0.214 | +0.04~+0.38 | 0.019 / 0.019 | 0.404 / 0.404 | 메모리 가격 |
+
+`weight`는 시장 효과를 뺀 값(`market_adjusted: true`)이라 섹터 엣지(원래 상관)와 크기를 바로 비교하지 않는다. 로더 `company_context`는 `company_sensitivities`로 따로 돌려준다. 보류: S-Oil·GS → 국고채(+0.13, 확실)는 금리와 직접 이어지는 경로를 못 찾아 넣지 않았다. 매달 값은 수경 월간 계산(`ontology_sensitivity_inputs`, #56)이 생기면 그걸 읽게 바꾼다.
+
 ### IMPACTS (MACRO → MACRO, 15개: 노출 1 · 초안 5 · 비활성 9) — ⚠️
 **v0.8 (#61): `CPI_KR → BASE_RATE_KR`(같은 방향)만 노출한다.** 월별 변화 1달 시차 상관 +0.166(95% +0.04 ~ +0.29, 240개월)로 초안과 같다. 근거는 `evidence` 필드. 나머지는 방향이 불분명해서 초안이다: 기준금리 변경 −1 → +5거래일 사건 분석에서 국고채 3년·10년·환율과 같은 방향 52~57%(기준 65%), `USD_KRW → CPI_KR` 상관 −0.016, `DRAM_EXPORT_PRICE → KOSPI` 상관 +0.158(구간이 0 포함). 기준금리는 시장이 미리 반영하는 경우가 많아 짧은 사건 창으로는 방향이 잘 안 보인다.
 
@@ -260,5 +279,6 @@ python -m pytest ontology/seed/tests -q   # 재생성 일치 · 노출 규칙 ·
 | v0.4 | 2026-11-10 | 수집 계획 없는 매크로 7개와 엣지(SENSITIVE_TO 9·IMPACTS 10) `inactive` 보관, BASE_RATE_KR 대상 SENSITIVE_TO 3개 → KTB_3Y_KR 합침(29→28), `weight_coverage`를 `weight_status`(aggregation_pending / factor_requested)·`weight_frequency`로 대체, 헬퍼에 active 필터 추가 |
 | v0.5 | 2026-11-10 | 수경 섹터 중앙값으로 SENSITIVE_TO weight 채움(활성 20개, 출처·기간·as_of·종목 수·`weight_frequency`), `DRAM_PRICE`→`DRAM_EXPORT_PRICE`(ECOS 402Y016) 교체·활성화, 금리 엣지 섹터당 1개 검사 추가, `sign_check`·`weight_low_n` 필드, `weight_status`를 filled / not_available로 정리 (SENSITIVE_TO 활성 20·비활성 8, IMPACTS 활성 6·비활성 9) |
 | v0.6 | 2026-11-22 | 태은 리뷰 반영. 모든 노드·엣지에 `status`·`reviewed`, 노출 = active + reviewed. 엣지 공통 필드(`relation`·`src`·`dst`·`source`·`method`·`as_of`·`valid_from`·`valid_to`·`evidence_ids`), IMPACTS 방향은 `direction`. Claude 초안 엣지·이슈는 `draft`, SENSITIVE_TO mismatch 4·near_zero 5는 `needs_review`(노출 11개). 노드 초안 속성은 `draft_fields`. 섹터 이름 WICS, `valid_until`→`valid_to`, `weight_low_n` bool, `W_N` 검증. 원본 JSON 하나(`ontology_seed.json`)·손으로 쓴 로더·pytest |
+| v0.9 | 2026-11-23 | 종목 → 매크로 SENSITIVE_TO 10개(#56). 기준: 확실 + |값| ≥ 0.10 + 가설 부호 일치 + 가설 엣지끼리 BH q < 0.05. `weight_p_value`·`weight_q_value_hypothesis`·`weight_q_value_all`. 로더 `company_sensitivities`. 노출 SENSITIVE_TO 8 → 18 |
 | v0.8 | 2026-11-23 | 수경 #61(PR #62 계산) 반영. MACRO `direction` 4개(`KTB_3Y_KR`·`KTB_10Y_KR`·`USD_KRW`·`BRENT`)에 `direction_evidence`를 붙여 노출, IMPACTS `CPI_KR → BASE_RATE_KR` 노출(`evidence`). `is_holding` 확정(19개, `holding_type`·`holding_source`), `sub_industry` 34개 확정. 섹터 금리·환율 등급은 초안 유지 |
 | v0.7 | 2026-11-23 | 수경 검증(PR #29 코멘트) 반영. mismatch 4·near_zero 5 SENSITIVE_TO를 `rejected`(근거 `rejection` 필드), 시장 효과를 빼지 않은 KOSPI 외 10개를 `needs_review`(`market_unadjusted`), `market_adjusted` 필드 추가. 섹터 → KOSPI 엣지 9개 추가(종목 3개 미만 2개는 `low_n` 보류). 노출 SENSITIVE_TO 11 → 8(전부 KOSPI). 로더 `include_draft`도 `rejected`는 보여 주지 않음. 이어서 #56(시장 효과 양쪽 제거 편상관) 반영: 보류 10개도 `rejected`(`REJECTED_56`), 기각 19개·`needs_review` 2개(KOSPI `low_n`) |

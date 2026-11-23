@@ -2,7 +2,7 @@
 
 | 항목 | 값 |
 | --- | --- |
-| 버전 | **v2.1** (2026-11-23) |
+| 버전 | **v2.2** (2026-11-24) |
 | 상태 | 검토 중 |
 | 담당 | 태은 |
 | 상위 문서 | [헌법](../../.specify/memory/constitution.md) > [ADR](../decisions/) > PRD v1.6 > 기능 명세서 v0.8 > 이 문서 |
@@ -16,14 +16,15 @@
 | v1.0 | 2026-10-13 | Notion "오케스트레이터 & 에이전트 아키텍처 설계 초안" |
 | v1.1 | 2026-11-05 | Notion "시그니처 계약" (봉투·`resolve_entities`·플래너 시그니처) |
 | v2.0 | 2026-11-23 | 저장소로 이관. 레포 현황에 맞춰 수정: 자유 질의·플래너를 Post-MVP로, 2종목 비교(ADR 0007)·SSE(ADR 0009)·Problem 오류(#60) 반영, 작업 저장소를 Supabase로 |
-| **v2.1** | 2026-11-23 | #68 리뷰 반영: 경로별 실행 조건(5.3, 선언형 표), 커버 판정을 `data_status.sources`로, precheck에 `data_status` 전달, 거절 payload는 오케스트레이터가 채움, `append_event` 직렬화, 시뮬레이션 시작 흐름(6.3), 보관 기간·연결 풀 |
+| v2.1 | 2026-11-23 | #68 리뷰 반영: 경로별 실행 조건(5.3, 선언형 표), 커버 판정을 `data_status.sources`로, precheck에 `data_status` 전달, 거절 payload는 오케스트레이터가 채움, `append_event` 직렬화, 시뮬레이션 시작 흐름(6.3), 보관 기간·연결 풀 |
+| **v2.2** | 2026-11-24 | **상위 문서(Design Doc v1.5·토론 기획서 v3.0)와 어긋난 세 곳 정정:** 도구 레지스트리·Langfuse를 MVP로(8·9장), 작업 실행을 API 안 `asyncio`에서 워커 프로세스(`FOR UPDATE SKIP LOCKED`·하트비트·복구)로(6.2). #68 리뷰 반영: 시뮬레이션을 별도 job으로 분리(6.3), `run_debate` 순수 함수화(6.5), 미커버 판정에서 `macro` 제외(5.3) |
 
 ### v1.1 → v2.0 무엇이 바뀌었나
 
 | 항목 | v1.1 (Notion) | v2.0 | 근거 |
 | --- | --- | --- | --- |
 | 자유 질의(채팅)·플래너 | 1차 릴리스 포함 | **Post-MVP.** MVP는 버튼 경로 3개 | 계약서 11/5 결정 |
-| 도구 레지스트리 | 우선순위 1 | **Post-MVP.** 플래너가 생길 때 함께. MVP 에이전트는 데이터 함수를 직접 호출 | 레지스트리를 쓰는 쪽(플래너·후속 질문)이 MVP에 없음 |
+| 도구 레지스트리 | 우선순위 1 | ~~Post-MVP~~ → **v2.2에서 MVP로 정정** (8장). LLM 도구 정의(`to_llm_tools`)만 Post-MVP | 토론 기획서 v3.0 "데이터는 레지스트리 경유", Design Doc 4.8 |
 | 공통 봉투 `envelope.py` | "구현 완료, 커밋 안 함" | 어느 브랜치에도 없음(계약 OQ-1). **`backend/contracts/envelope.py`로 새로 구현**, `REASON_POLICY` 표를 이 문서 4장에 확정 | 계약 OQ-1 |
 | 오류 응답 | 설계만 | `core/errors.py`(#60)에 Problem 구현됨. 사유 정책을 봉투와 같은 표로 합침 | #60 |
 | 종목 해석 | `resolve_company`의 `matched` | `status`(exact·ambiguous·not_found) + `error`. 문장 속 종목은 `extract_company_mentions` | #32, #60 |
@@ -42,10 +43,13 @@
 | --- | --- | --- | --- |
 | 인사이트보드 | `POST /orchestrate/insight-board` | Agent E | 동기, `ok`·`partial`·`rejected` |
 | 트렌드 리포트 | `POST /orchestrate/trend-report` | Agent D | 동기, `ok`·`partial`·`rejected` |
-| 토론 | `POST /orchestrate/debate` | precheck → Agent F (→ G) | job 생성 후 즉시 `job_started`, 진행은 SSE |
+| 토론 | `POST /orchestrate/debate` | precheck → Agent F | 토론 job 생성 후 즉시 `job_started`, 워커가 실행, 진행은 SSE |
+| 시뮬레이션 | `POST /orchestrate/debate/{job_id}/simulate` | Agent G | 사용자 버튼으로 시뮬레이션 job 생성 (6.3) |
 | 진행 상황 | `GET /jobs/{job_id}/events` | `job_events` | SSE, 1초 조회 |
 
-**Post-MVP:** `POST /orchestrate/chat`, `.../clarify`, 플래너(`make_plan`·`validate_plan`·`execute_plan`), 도구 레지스트리, Langfuse 트레이스, 근거 부족 루프의 S4~S5. 설계는 9장에 남겨 둔다.
+**공통 인프라 (MVP, 태은 소유):** 공통 봉투(4장), 도구 레지스트리(8장), Langfuse 추적(9장), 작업 큐 워커(6.2).
+
+**Post-MVP:** `POST /orchestrate/chat`, `.../clarify`, 플래너(`make_plan`·`validate_plan`·`execute_plan`), 레지스트리의 LLM 도구 정의(`to_llm_tools`), 근거 부족 루프의 S4~S5. 설계는 11장에 남겨 둔다.
 
 ## 2. 설계 원칙: 제한된 자율성
 
@@ -88,7 +92,7 @@ FE ── 세션 쿠키 ──▶ API (api/orchestrator.py)        HTTP 입력 �
                      ▼
        ④ job     find_reusable_job(user, tickers, query)  → 있으면 job_started reused=true
                      │   진행 중 job이 한도 이상 → 409 concurrent_job_limit (Problem)
-                     │   create_job → job_events(job_started) → 백그라운드 run_debate
+                     │   create_job(status=queued) → 워커가 꺼내 run_debate (6.2·6.5)
                      ▼
               job_started {job_id, reused:false}
 ```
@@ -182,67 +186,119 @@ def check_coverage(data_status: dict | None, requirement: dict) -> Coverage: ...
 | 판정 | 조건 | 응답 |
 | --- | --- | --- |
 | `unavailable` | `data_status`가 `None` 또는 `error` | 503 `upstream_unavailable` |
-| `uncovered` | `sources`가 모두 0건 (적재되지 않은 T0) | rejected `uncovered_company` |
+| `uncovered` | **종목 소스**(`macro` 제외)가 모두 0건 (적재되지 않은 T0) | rejected `uncovered_company` |
 | `no_data` | 커버 종목이지만 `requires_any`의 소스가 모두 0건 | rejected `no_data` |
 | `ok` | `requires_any`가 비었거나 하나 이상 있음 | 실행 |
 
 - 각 행의 조건은 그 에이전트 기획서가 소유한다(트렌드 리포트·인사이트보드 기획서 "실행 조건"). 바꿀 때는 기획서와 이 표를 같은 PR에서 고친다.
 - 조건 조합(AND·NOT)이 실제로 필요해지면 평가 함수만 컴포지트 형태로 바꾼다. 표 형식은 유지한다.
+- `macro`는 종목과 상관없는 시장 지표 수라 T0 종목에도 늘 13으로 나온다. 그래서 미커버 판정에서 뺀다(#68 리뷰, precheck ds-0.3.0과 같은 이유). `count` 단위는 소스마다 다르다(#75, 계약 `DataStatus`).
 - `uncovered`와 `no_data`를 나누는 이유: `uncovered_company`는 T0 수집 우선순위 큐(`uncovered_query_log`)의 입력이고, `no_data`는 커버 종목의 데이터 공백이다. 사용자에게는 둘 다 "대안 종목 고르기"로 같다.
 
-## 6. 토론 job
+## 6. 작업(job): 토론과 시뮬레이션
+
+Design Doc v1.5 4.1을 따른다. **토론과 시뮬레이션은 서로 다른 job**(`job_type`)이고, API 프로세스와 워커 프로세스는 DB로만 소통한다.
 
 ### 6.1 저장소 (Supabase, 신규 마이그레이션)
 
 ```sql
 agent_jobs (
-  job_id text primary key, user_id text not null, job_type text not null,      -- 'debate'
-  mode text not null,                                                           -- single | compare
-  tickers text[] not null, query text not null,
-  status text not null,                                                         -- JobStatus 7종
-  precheck jsonb not null, debate_result jsonb, simulation_result jsonb,
-  error_code text, created_at timestamptz, updated_at timestamptz
+  job_id text primary key, user_id text not null,
+  job_type text not null,                   -- 'debate' | 'simulation'
+  parent_job_id text references agent_jobs, -- 시뮬레이션 job → 원래 토론 job
+  mode text,                                -- 토론만: single | compare
+  tickers text[] not null, query text,
+  status text not null,                     -- queued | running | completed | failed
+  precheck jsonb, result jsonb,             -- 토론: DebateResult, 시뮬레이션: 요약만
+  simulation_ready boolean,                 -- 토론 완료 시점 값 (Design Doc 4.10 분모)
+  locked_by text, heartbeat_at timestamptz, attempts int default 0,
+  error_code text, failed_stage text,
+  created_at timestamptz, updated_at timestamptz
 )
 job_events (job_id text, seq int, type text, payload jsonb, created_at timestamptz,
             primary key (job_id, seq))
 ```
 
-- `JobStatus`는 계약의 7종(`queued`·`running`·`debate_completed`·`simulation_pending`·`simulation_running`·`completed`·`failed`)을 공용 열거형으로 둔다. 비교 모드 job은 `debate_completed`에서 끝난다(ADR 0007).
+- **상태는 job마다 4종**(`queued`·`running`·`completed`·`failed`)이다. 토론이 끝났는지와 시뮬레이션을 했는지가 한 칸에 섞이지 않는다. 계약 `JobStatus` 7종을 이렇게 줄이는 변경은 draft.6에서 한다(아래 6.3 이유).
 - `seq`는 그 job을 실행하는 워커 한 곳에서만 매긴다(ADR 0009). `append_event(job_id, type, payload)`가 같은 트랜잭션에서 `pg_advisory_xact_lock(hashtext(job_id))`로 잠근 뒤 `max(seq)+1`을 넣는다.
   - 비교 모드는 종목별 Bull·Bear가 병렬이라 같은 job에 이벤트가 동시에 들어온다. 잠금이 없으면 PK 충돌로 이벤트가 실패한다.
   - 전역 자동 증가 번호는 잠금이 필요 없지만, 커밋 순서가 뒤바뀌면 SSE 클라이언트가 앞 번호를 영영 놓칠 수 있어 쓰지 않는다.
-- **보관 기간:** 끝난 job(`completed`·`failed`, 비교 모드 `debate_completed`)의 `job_events`는 7일 뒤 지운다. `agent_jobs` 행과 결과는 남긴다(DB 무료 한도 500MB 중 약 440MB 사용, 11/23).
-- `simulation_result`에는 요약(분위수·시나리오별 결과)만 저장한다. 경로 전체는 넣지 않는다.
+- **보관 기간:** 끝난 job의 `job_events`는 7일 뒤 지운다. `agent_jobs` 행과 결과는 남긴다(DB 무료 한도 500MB 중 약 440MB 사용, 11/23).
+- 시뮬레이션 `result`에는 요약(분위수·시나리오별 결과)만 저장한다. 경로 전체는 넣지 않는다.
 
-### 6.2 생성 규칙
+### 6.2 실행: 워커 프로세스 (Design Doc 4.1)
 
-- **재사용:** 같은 사용자·같은 종목 집합·같은 질문으로 `queued`·`running` job이 있으면 새로 만들지 않고 `job_started` + `reused=true`(FN-DBT-01).
-- **동시 실행 한도:** 사용자당 진행 중 job 1개. 넘으면 409 `concurrent_job_limit` + `view_existing_job`.
-- **실행:** MVP는 API 프로세스 안의 `asyncio` 백그라운드 작업이다(지금과 같음). 프로세스가 재시작되면 `running` job은 `failed`로 정리한다(시작 시 1회). 외부 큐는 Post-MVP.
-- `run_debate(companies, user_id, query, precheck, job_id)`(계약 `RunDebateInput`)는 유민 소유. 오케스트레이터는 job을 만들고 넘기기만 한다. 레거시 `agents/debate`는 `debate_renewal`이 연결될 때 교체한다.
+| 항목 | 규칙 |
+| --- | --- |
+| 꺼내기 | 워커가 `status='queued'` 행을 `FOR UPDATE SKIP LOCKED`로 1건씩 가져가 `running`, `locked_by` 기록. 워커가 여럿이어도 중복 실행 없음 |
+| 하트비트 | 실행 중 15초마다 `heartbeat_at` 갱신 |
+| 복구 | 워커 시작 시와 1분마다, `running`인데 하트비트가 2분 넘게 끊긴 job → `failed` + `error_code=worker_lost`. 자동 재실행 안 함(LLM 비용 중복 방지), FE가 "다시 시도" 제공 |
+| 타임아웃 | 토론 전체 5분, LLM 호출 1회 60초 → `failed` + `error_code=timeout` |
+| 동시 실행 | 워커 동시 job 3 (Design Doc 4.5, Langfuse 실측 후 조정) |
+| 프로세스 | API와 같은 이미지, 진입점만 다름(`python -m orchestrator.worker`). 연결은 세션 모드(5432) |
 
-### 6.3 시뮬레이션 시작 (사용자 버튼)
+**생성 규칙 (API 쪽)**
 
-계약의 `POST /orchestrate/debate/{job_id}/simulate`(#46)를 쓴다. 새 경로를 만들지 않는다.
+- **재사용:** 같은 사용자·`job_type`·정렬한 종목·질문으로 `queued`·`running` job이 있으면 새로 만들지 않고 `job_started` + `reused=true`(FN-DBT-01).
+- **동시 한도:** 사용자당 `queued`·`running`인 토론 job 1개, 시뮬레이션 job 1개. 넘으면 409 `concurrent_job_limit` + `view_existing_job`. 끝난 job(`completed`)은 세지 않으므로, 토론이 끝난 뒤 시뮬레이션 버튼을 누르지 않아도 새 토론을 시작할 수 있다.
+- **사용자당 하루 토론 수** 10 (Design Doc 4.5) → 넘으면 429 `rate_limited`.
+
+### 6.3 시뮬레이션 시작 (사용자 버튼 → 별도 job)
 
 ```text
-queued → running ─┬─ (compare) → debate_completed                      종료
-                  └─ (single)  → simulation_pending ── 버튼 ──▶ simulation_running → completed
-                                       │ 누르지 않으면 여기서 멈춤 (토론 결과는 조회 가능)
-running·simulation_running ── 실패 ──▶ failed
+토론 job      queued → running → completed (단일·비교 모두 여기서 끝)
+                                   │ completed 이벤트 payload: simulation_ready
+                                   ▼ 사용자 버튼 (simulation_ready=true일 때만 켜짐)
+시뮬레이션 job queued → running → completed / failed      parent_job_id = 토론 job
 ```
 
-- 토론 완료 이벤트와 job 조회 응답에 `simulation_ready`(`data_status.simulation_ready`, #53)를 같이 내려 FE가 버튼을 미리 끌 수 있게 한다.
-- 버튼 요청 처리:
-  - 비교 모드이거나 이미 `simulation_running`·`completed` → 409 `invalid_job_state`
-  - 시뮬레이션 파라미터가 없는 종목(정상 95종목 밖) → 200 rejected `no_data`. job을 `failed`로 바꾸지 않는다(끝난 토론까지 실패처럼 보이지 않게)
+계약의 `POST /orchestrate/debate/{job_id}/simulate`(#46)를 그대로 쓴다. 이 요청이 **시뮬레이션 job을 새로 만들고** `job_started {job_id: <시뮬레이션 job>}`를 돌려준다. FE는 그 job의 이벤트를 구독한다.
+
+| 버튼 요청 상황 | 응답 |
+| --- | --- |
+| 토론 job이 비교 모드이거나 아직 `completed`가 아님 | 409 `invalid_job_state` |
+| `simulation_ready=false` (파라미터 없는 종목: 정상 95종목 밖) | 200 rejected `no_data` (토론 job은 그대로) |
+| 같은 토론의 시뮬레이션 job이 `queued`·`running` | `job_started` + `reused=true` |
+| 그 외 | 시뮬레이션 job 생성 → `job_started` |
+
+**왜 별도 job인가 (계약의 `simulation_pending` 대신)**
+
+- 계약 흐름(`running → simulation_pending → simulation_running`)은 토론과 시뮬레이션이 상태 한 칸을 같이 써서, 버튼을 누르지 않은 job이 `simulation_pending`에 계속 남는다. 그 결과 동시 한도·재사용에서 무엇을 "진행 중"으로 셀지, 시뮬레이션 불가 종목은 어디서 끝낼지를 따로 정해야 했다(#68 수경 리뷰 2·3번).
+- 시뮬레이션이 실패하면 job 전체가 `failed`가 되어 끝난 토론까지 실패처럼 보인다.
+- Design Doc 4.1이 이미 큐 종류를 `debate`·`simulation` 두 가지(`job_type`)로 정해 두었다.
+- 별도 job으로 두면 위 문제가 규칙 추가 없이 사라지고, 토론의 종료 상태가 단일·비교 모두 `completed` 하나가 된다.
+- 비용: 계약 변경(`JobStatus` 4종, `simulate` 응답 설명, 이벤트 `simulation_*`는 시뮬레이션 job에 기록). draft.6에서 유민·수경 리뷰.
+
 - 시뮬레이션 봉투의 `data_as_of`는 `sim_params.as_of`다(수경).
 
 ### 6.4 진행 상황 SSE (ADR 0009)
 
 - `GET /jobs/{job_id}/events`: 본인 job만. `Last-Event-ID` 다음 `seq`부터 보낸다.
-- 1초마다 `job_events`를 조회, 15초마다 `: ping`, 종료 이벤트(`completed`·`failed`, 비교 모드는 토론 완료, 단일 모드는 `simulation_pending` 도달) 뒤 연결을 닫는다.
+- 1초마다 `job_events`를 조회, 15초마다 `: ping`, 그 job의 종료 이벤트(`completed`·`failed`) 뒤 연결을 닫는다.
 - 조회할 때만 작은 연결 풀(`psycopg_pool`, 최대 5)에서 연결을 빌린다. 스트림마다 연결을 붙잡거나 1초마다 새로 연결하지 않는다(Supabase 무료 플랜 동시 연결 제한).
+- 폴링(`GET /debate/jobs/{id}`)은 SSE 실패 시 FE 보조 경로로 유지한다(Design Doc 4.2).
+
+### 6.5 `run_debate` 연결 (#68 유민 제안)
+
+`run_debate`는 **job 상태와 `job_events`를 건드리지 않고 결과만 돌려준다.** 저장·상태 전환은 워커(오케스트레이터)가 한 곳에서 맡는다.
+
+```python
+# 유민 #76
+async def run_debate(*, query, company: CompanyMeta, precheck: PrecheckResult,
+                     fetch_evidence, trace_id, data_as_of, profile=None, emit=None) -> DebateRun
+```
+
+| 인자 | 워커가 넘기는 것 |
+| --- | --- |
+| `emit` | `append_event(job_id, type, payload)`로 연결. `type`·`payload`는 계약 `JobEvent` 타입으로 검증 |
+| `fetch_evidence` | 도구 레지스트리 `invoke("get_agent_context", …, caller="debate")` (8장) |
+| `profile` | `user_id`로 조회한 투자 성향 |
+| `company.data_tier` | 관문1의 `data_status` 건수로 `processing.enums.data_tier_for()` 계산. `get_agent_context`를 따로 한 번 더 부르지 않는다 |
+| `trace_id` | 9장 Langfuse trace |
+
+- **상태 전환:** 결과를 받으면 `result` 저장 + `completed`(+ `simulation_ready` 기록), 예외면 `failed` + `failed_stage`.
+- **이벤트 저장 실패:** 진행 이벤트는 표시용이라 로그만 남기고 토론은 계속한다. 최종 결과 저장이 실패하면 `failed`.
+- 계약 `RunDebateInput`·note("`run_debate`가 `job_events` 기록")를 이 방식으로 바꾸는 건 draft.6에서 한다. 레거시 `agents/debate`는 이 연결이 끝나면 교체한다.
 
 ## 7. 미커버 로그
 
@@ -256,22 +312,57 @@ def log_uncovered_query(event: UncoveredQueryEvent) -> None
 - `entity`에는 확정된 종목코드가 있으면 반드시 넣는다(데이터 쪽 T0 수집 우선순위 입력).
 - 적재 실패는 요청을 막지 않는다(로그만). 단, 실패 사실은 `logger.error`로 남긴다.
 
-## 8. 인증 (계약 OQ-8, 팀 결정 필요)
+## 8. 도구 레지스트리 (MVP)
+
+에이전트(C·D·E·F)의 **모든 데이터 조회는 레지스트리 `invoke()`를 거친다.** 데이터 함수를 직접 import하지 않는다(토론 기획서 v3.0). 인자 검증·권한·관측을 한 곳에서 처리하기 위해서다.
+
+```python
+# backend/tools/registry.py
+class ToolSpec(BaseModel):
+    name: ToolName
+    description: str
+    args_schema: type[BaseModel]
+    fn: Callable                           # data-pipeline 함수 (동기)
+    cost_class: Literal["db", "vector", "external_api", "llm"]
+    allowed_callers: set[AgentId]          # orchestrator · trend_report · insight_board · debate · simulation
+    side_effects: Literal["none", "enqueue"] = "none"
+
+def register(spec: ToolSpec) -> None
+def get(name: ToolName) -> ToolSpec
+def list_for(caller: AgentId) -> list[ToolSpec]
+async def invoke(name: ToolName, args: dict, *, caller: AgentId) -> ToolResult
+```
+
+- **`invoke`가 하는 일:** 인자 스키마 검증(실패 시 `InvalidRequestError`) → 호출자 권한 확인 → `asyncio.to_thread`로 실행 → 지연·결과 크기 로깅 + Langfuse span(9장).
+- **실패 구분 (원칙 III):** 데이터 함수는 실패해도 예외 대신 `error`(또는 `search_documents`는 `reason`) 필드를 붙여 돌려준다. `invoke`는 이 필드를 읽어 `ToolResult.error`로 올린다. 호출자는 "데이터 없음"과 "조회 실패"를 `ToolResult`만 보고 구분한다.
+- **MVP 등록 도구:** `resolve_company`, `extract_company_mentions`, `get_available_data_status`, `suggest_alternatives`, `get_agent_context`, `search_documents`, `get_target_price_data`, `get_price_data`, `get_macro_data`, `get_disclosure_data`, `get_derived_snapshot`, `get_financials`, `get_metric`, `get_ontology_context`.
+- **Post-MVP:** `to_llm_tools(caller)` (LLM 도구 정의 생성) — 이걸 쓰는 플래너·후속 질문이 Post-MVP다.
+- 위치: `backend/tools/`. Notion 초안의 별도 패키지(`packages/tools`, uv workspace)는 만들지 않는다(#59, 새 패키지 없음).
+
+## 9. 추적 기록: Langfuse (MVP)
+
+- **단위:** 요청 1건(동기 경로) 또는 job 1건마다 trace 1개. trace id는 #60의 요청 `trace_id`를 그대로 쓰고, job은 생성 요청의 `trace_id`를 job 행에 저장해 워커가 이어 쓴다. 응답 `meta.trace_id`와 같은 값이다.
+- **span:** 레지스트리 `invoke`(8장), LLM 호출(모델·토큰·지연), 검증 결과.
+- **용도:** 토론 1건 토큰 상한·워커 동시 수를 실측으로 정한다(Design Doc 4.5). 피드백 API가 `trace_id`로 연결된다(4.10).
+- **설정:** `LANGFUSE_*` 환경변수가 없으면 아무것도 보내지 않는다(로컬·테스트). 필수 환경변수에 넣지 않는다.
+- **개인정보:** 질문 원문이 trace에 남는 점을 사용자 고지에 적는다(Design Doc 6장). 성향 답변·관심 종목은 trace에 넣지 않는다.
+
+## 10. 인증 (계약 OQ-8, 팀 결정 필요)
 
 - 계약: httpOnly 서명 쿠키 `session`, `user_id`는 바디에 받지 않는다.
 - MVP 제안: `POST /users`가 `HMAC(SESSION_SECRET, user_id)` 서명 쿠키를 발급하고, 의존성 `current_user_id()`가 검증한다. 추가 라이브러리 없이 표준 `hmac`으로 구현한다. `SameSite=Lax`, 배포 시 `Secure`.
 - 이행 기간에는 바디의 `user_id`도 받되 쿠키가 있으면 쿠키를 우선한다. FE 전환 후 바디 필드를 지운다.
 
-## 9. Post-MVP 설계 (v1.0·v1.1 유지)
+## 11. Post-MVP 설계 (v1.0·v1.1 유지)
 
 아래는 MVP 이후 구현한다. 시그니처는 계약서에 있다.
 
 - **자유 질의 경로:** `resolve_entities` → precheck → `make_plan`(LLM 1회) → `validate_plan` → `execute_plan` → 검증 → 응답 조합. ReAct 대신 plan-then-execute(경로를 미리 검증·로깅).
 - **되묻기:** `conversations` 테이블에 `pending_clarification` 저장, `clarify`로 재개.
-- **도구 레지스트리:** `ToolSpec`(이름·인자 스키마·비용 등급·허용 호출자·부작용) + `invoke()`에서 인자 검증·권한·트레이스를 한 곳에서 처리.
-- **근거 부족 루프 S4~S5**, **L2 함의 판정**, **Langfuse 작업 단위 트레이스**.
+- **레지스트리 LLM 도구 정의:** `to_llm_tools(caller)` — `args_schema.model_json_schema()`로 플래너·후속 질문에 도구 목록 제공.
+- **근거 부족 루프 S4~S5**, **L2 함의 판정**.
 
-## 10. 평가 지표 (MVP)
+## 12. 평가 지표 (MVP)
 
 | 지표 | 측정 | 목표 |
 | --- | --- | --- |
@@ -280,8 +371,10 @@ def log_uncovered_query(event: UncoveredQueryEvent) -> None
 | precheck 경유율 | 토론 job 중 precheck 통과 후 생성된 비율 | 100% |
 | 봉투 계약 일치 | 응답이 `openapi.yaml` 스키마 검증 통과 | 100% (계약 테스트) |
 | 토론 시작 지연 | 요청 → `job_started` p95 | ≤ 1초 |
+| 레지스트리 경유율 | 에이전트 데이터 조회 중 `invoke` 경유 비율 (직접 import 검사) | 100% |
+| job 복구 | 워커 중단 시 2분 안에 `failed(worker_lost)` 처리 | 100% (자동 테스트) |
 
-## 11. 미결 사항
+## 13. 미결 사항
 
 | # | 내용 | 상대 |
 | --- | --- | --- |
@@ -289,4 +382,6 @@ def log_uncovered_query(event: UncoveredQueryEvent) -> None
 | Q2 | 인증 방식 확정 (OQ-8) | 팀 |
 | Q3 | `EntityResolution.companies` maxItems 3으로 계약 변경 | 유민·수경 (계약 리뷰) |
 | ~~Q4~~ | 대안 종목 규칙 → **해결:** 중분류 → 대분류 → 전체 시총순 3개, `suggest_alternatives`(수경) (#68 리뷰) | 수경 |
-| Q5 | 사용자당 동시 job 한도 1개가 데모에 충분한지 | 팀 |
+| Q5 | 사용자당 동시 job 한도(토론 1·시뮬레이션 1)가 데모에 충분한지 | 팀 |
+| Q6 | 계약 draft.6: `JobStatus` 4종·시뮬레이션 별도 job, `RunDebateInput` 순수 함수화 | 유민·수경 |
+| Q7 | Langfuse 호스팅 (Cloud 무료 vs 셀프호스트) | 팀 |

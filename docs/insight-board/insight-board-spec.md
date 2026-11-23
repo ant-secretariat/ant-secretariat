@@ -2,7 +2,7 @@
 
 | 항목 | 값 |
 | --- | --- |
-| 버전 | **v2.1** (2026-11-23) |
+| 버전 | **v2.2** (2026-11-24) |
 | 상태 | 검토 중 |
 | 담당 | 태은 |
 | 계약 | [`openapi.yaml`](../api/openapi.yaml) `POST /orchestrate/insight-board`, `InsightBoardResult` |
@@ -15,7 +15,8 @@
 | v1.0 | 2026-10-13 | Notion 아키텍처 초안 7.2 |
 | v1.1 | 2026-11-05 | Notion 시그니처 계약 4장 (`CompanyData`·`Badge`·`Comment`) |
 | v2.0 | 2026-11-23 | 저장소로 이관. SQLite 경로 제거(데이터 함수가 Supabase로 바뀜), 종목별 실패를 함수의 `error` 필드로 판정, 변동성 배지를 `get_derived_snapshot` 단일 정의로, 코멘트 요약·검증 규칙 확정 |
-| **v2.1** | 2026-11-23 | 실행 조건(1.1) 추가 — 오케스트레이터 기획서 v2.1 5.3 경로별 실행 조건 표와 연결 (#68 리뷰) |
+| v2.1 | 2026-11-23 | 실행 조건(1.1) 추가 — 오케스트레이터 기획서 v2.1 5.3 경로별 실행 조건 표와 연결 (#68 리뷰) |
+| **v2.2** | 2026-11-24 | 데이터 조회를 도구 레지스트리 `invoke` 경유로 (오케스트레이터 기획서 v2.2 8장, 레지스트리 MVP 정정) |
 
 ### v1.1 → v2.0 무엇이 바뀌었나
 
@@ -103,6 +104,7 @@ class InsightBoardResult(BaseModel):
              모든 종목이 error면 503 upstream_unavailable
 ```
 
+- **조회 경로:** ①의 데이터 함수는 도구 레지스트리 `invoke(name, args, caller="insight_board")`로 부른다(오케스트레이터 기획서 8장). ②의 실패 판정은 `ToolResult.error`(함수의 `error` 필드를 레지스트리가 올린 값)와 예외로 한다.
 - 매크로는 종목이 없으므로 `items`에 `ticker="macro"` 항목 하나만 둔다. 계약 `CompanyData.ticker`가 필수라서다.
 - `meta.data_as_of`: 성공한 항목의 최신 데이터 날짜 중 가장 이른 날(서로 다른 기준일이면 보수적으로).
 

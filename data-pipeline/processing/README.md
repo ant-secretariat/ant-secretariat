@@ -377,9 +377,9 @@ result = get_report_metadata(
 
 - `records`: 계약서 필드 `hts_goal_prc`(목표가), `invt_opnn`(투자의견), `rgbf_invt_opnn`(직전 투자의견), `mbcr_name`(증권사)은 KIS 원래 값 그대로
 - `records` 추가 필드: `published_at`(발표일), `target_price_adjusted`(액면분할 환산 목표가), `opinion_norm`(매수 / 중립 / 매도 또는 `null`), `valid_from`(발표일), `superseded_at`(같은 증권사의 다음 발표일, 아직 없으면 `null`)
-- `consensus`: 증권사마다 가장 최근 의견 1건의 환산 목표가로 계산한 평균·최고·최저. 최근 의견에 목표가가 없는 증권사는 빼고, `broker_count`에 계산에 쓴 증권사 수를 담음
-- `as_of`: 주면 그날까지 발표된 의견만 쓰고, 그 뒤에 나온 의견은 `superseded_at`에도 드러내지 않음. 기본값은 오늘
-- `target_prices`, `summary`: 트렌드 리포트가 계약서 형식으로 옮겨 갈 때까지 함께 주는 이전 형식(`summary`는 기간 안 모든 의견의 환산 목표가 기준)
+- `consensus`: 증권사마다 가장 최근 의견 1건의 환산 목표가로 계산한 평균·최고·최저(원 단위 정수, 0.5 올림). **`as_of`로부터 최근 180일 안에 발표된 의견만** 씀(ADR 0010). 최신 의견이 180일보다 오래되거나 목표가가 없는 증권사는 빼고, 그 증권사의 더 오래된 의견으로 채우지 않음. `broker_count`에 계산에 쓴 증권사 수, `basis`에 "증권사별 최신 1건, 최근 180일, 증권사 N곳". 180일 안에 의견이 없으면 평균·최고·최저는 `null`
+- `as_of`: 주면 그날까지 발표된 의견만 쓰고, 그 뒤에 나온 의견은 `superseded_at`에도 드러내지 않음. 기본값은 오늘(KST). 형식이 틀리면 `ValueError`
+- `target_prices`, `summary`: 트렌드 리포트가 계약서 형식으로 옮겨 갈 때까지 함께 주는 이전 형식(`summary`의 평균·최고·최저는 `consensus`와 같고, `count`는 기간 안 의견 수)
 - `relational_db` 인자: 기존 호출과의 호환을 위해 받기만 하고 쓰지 않음. `report_type` 인자는 계약서대로 삭제
 - 조회 실패 시 예외 대신 빈 결과와 `"error": "target_price_unavailable"`을 반환
 - 현재 T1/T2만 적재되어 있어 그 외 종목은 빈 결과
@@ -417,7 +417,7 @@ result = get_target_price_data(
     "max_target_price": 95000,
     "min_target_price": 95000,
     "broker_count": 1,
-    "basis": "증권사별 최신 1건"
+    "basis": "증권사별 최신 1건, 최근 180일, 증권사 1곳"
   },
   "target_prices": [
     {

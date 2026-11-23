@@ -177,3 +177,29 @@ def test_company_edges_read_from_inputs_snapshot():
 ])
 def test_exposure_criteria(row, sign, q, failed):
     assert co_failed_criteria(row, sign, q) == failed
+
+
+# ── ISSUE 근거 후보 (사람이 고르기 전 단계) ──
+def test_issue_candidates_search_top_exposed_tickers_and_dedupe():
+    from issue_evidence_candidates import candidates, to_markdown
+    seed = {"nodes": {"issues": [{"issue_id": "ISS_A", "name": "이슈", "notes": "메모"}]},
+            "edges": {"exposed_to": [{"dst": "ISS_A", "src": t, "exposure": x}
+                                     for t, x in [("000001", .3), ("000002", .9), ("000003", .6), ("000004", .6)]]}}
+    calls = []
+
+    def search(query, ticker, top_k, as_of):
+        calls.append((query, ticker, top_k))
+        return [{"chunk_id": "c-same", "content": "본문 " * 200, "title": "t"}, {"chunk_id": f"c-{ticker}"}]
+    found = candidates(seed, search, 2, None)
+    assert [c[1] for c in calls] == ["000002", "000004", "000003"]  # 노출도 높은 3종목
+    assert calls[0][0] == "이슈 메모" and calls[0][2] == 2
+    assert [r["chunk_id"] for r in found["ISS_A"]] == ["c-same", "c-000002", "c-000004", "c-000003"]
+    md = to_markdown(seed, found)
+    assert "- [ ] `c-same` 000002" in md and len(md.split("> ")[1].splitlines()[0]) <= 220
+
+
+def test_issue_evidence_csv_has_header_only_until_reviewed():
+    lines = (SEED / "issue_evidence.csv").read_text(encoding="utf-8").splitlines()
+    assert lines[0] == "issue_id,chunk_id,ticker,published_at,decided_by,decided_on"
+    linked = {i["issue_id"] for i in o.load()["nodes"]["issues"] if i["evidence_chunk_ids"]}
+    assert len(linked) == len({l.split(",")[0] for l in lines[1:]})

@@ -51,6 +51,6 @@ backend/agents/debate_renewal/
 
 - 거절 코드는 계약 이름을 쓴다: 데이터가 없어 남는 아젠다가 없으면 `no_data` (11/17 결정)
 - 공용 계약 위치(`backend/contracts`, data-pipeline)가 생기면 `contracts.py`를 import로 교체
-- `intent_data_sources.json`: 아젠다별 필요 데이터·신선도 기준·T0 가능 여부 (수경과 확정)
+- `intent_data_sources.json`: 아젠다별 필요 데이터·신선도 기준·T0 가능 여부 (수경과 확정). ds-0.3.0부터 매크로 아젠다는 종목 데이터(`sensitivity`·`news`·`report`) 중 하나가 있어야 함 — `macro` 건수는 시장 전체 지표 수라서(#72 리뷰)
 - 아젠다 대체 우선순위(`selection_rules`): 기획서에 "최대 3개 유지"만 있고 무엇을 빼는지는 없음
 - `flow` 아젠다는 `active: false` (investor_flow_daily 확보 후 활성화)

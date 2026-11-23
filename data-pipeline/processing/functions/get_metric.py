@@ -25,7 +25,17 @@ FINANCIAL_METRICS = {
     "revenue_growth_yoy": "%",
     "roe_ttm": "%",
 }
-METRIC_IDS = sorted([*MARKET_METRICS, *PRICE_METRICS, *FINANCIAL_METRICS])
+# 수급: 그날까지 최근 20거래일 합계(순매수) 또는 평균(공매도 비중)
+FLOW_WINDOW = 20
+FLOW_METRICS = {
+    "foreign_net_buy_20d": ("원", "foreign_net_value", "sum"),
+    "inst_net_buy_20d": ("원", "inst_net_value", "sum"),
+    "individual_net_buy_20d": ("원", "individual_net_value", "sum"),
+    "short_volume_ratio_20d": ("%", "short_volume_ratio", "avg"),
+}
+# 공매도 잔고는 KRX가 약 2거래일 늦게 공개해서, 그날 기준으로는 2거래일 전 값까지만 알 수 있다
+SHORT_BALANCE_LAG_DAYS = 2
+METRIC_IDS = sorted([*MARKET_METRICS, *PRICE_METRICS, *FINANCIAL_METRICS, *FLOW_METRICS, "short_balance_ratio"])
 
 # 은행·증권·보험은 예금·보험부채가 부채로 잡혀 부채비율이 의미 없다
 FINANCIALS_SECTOR = "금융"
@@ -94,6 +104,10 @@ def get_metric(ticker: str, metric_id: str, as_of: str) -> dict:
         with connect() as connection:
             if metric_id in FINANCIAL_METRICS:
                 return _financial_metric(connection, ticker, metric_id, as_of)
+            if metric_id in FLOW_METRICS:
+                return _flow_metric(connection, ticker, metric_id, as_of)
+            if metric_id == "short_balance_ratio":
+                return _short_balance_metric(connection, ticker, as_of)
             return _daily_metric(connection, ticker, metric_id, as_of)
     except Exception as exc:
         logger.error("지표 조회 실패: %s %s(%s)", ticker, metric_id, type(exc).__name__)
@@ -123,6 +137,56 @@ def _daily_metric(connection, ticker: str, metric_id: str, as_of: str) -> dict:
         ticker, metric_id, _number(value), unit, basis, trade_date.isoformat(), [table],
         None if value is not None else "no_value",
     )
+
+
+def _flow_metric(connection, ticker: str, metric_id: str, as_of: str) -> dict:
+    from psycopg import sql
+
+    unit, column, aggregate = FLOW_METRICS[metric_id]
+    source = ["investor_flow_daily"]
+    row = connection.execute(
+        sql.SQL(
+            "with recent as ("
+            " select {column}, trade_date from investor_flow_daily"
+            " where ticker = %s and trade_date <= %s::date"
+            " order by trade_date desc limit %s"
+            ") select {aggregate}({column}), max(trade_date), count({column}) from recent"
+        ).format(column=sql.Identifier(column), aggregate=sql.SQL(aggregate)),
+        (ticker, as_of, FLOW_WINDOW),
+    ).fetchone()
+    value, last_date, days = row
+    if last_date is None:
+        return _result(ticker, metric_id, None, unit, "", as_of, source, "no_data")
+    label = "합계" if aggregate == "sum" else "평균"
+    basis = f"최근 {FLOW_WINDOW}거래일 {label}" + (f" (값이 있는 날 {days}일)" if days < FLOW_WINDOW else "")
+    if aggregate == "avg" and value is not None:
+        value = round(float(value), 4)
+    return _result(
+        ticker, metric_id, _number(value), unit, basis, last_date.isoformat(), source,
+        None if value is not None else "no_value",
+    )
+
+
+def _short_balance_metric(connection, ticker: str, as_of: str) -> dict:
+    source = ["investor_flow_daily"]
+    row = connection.execute(
+        """
+        select short_balance_ratio, trade_date from investor_flow_daily
+        where ticker = %s and short_balance_ratio is not null
+          and trade_date <= (
+              select trade_date from investor_flow_daily
+              where ticker = %s and trade_date <= %s::date
+              order by trade_date desc offset %s limit 1
+          )
+        order by trade_date desc limit 1
+        """,
+        (ticker, ticker, as_of, SHORT_BALANCE_LAG_DAYS),
+    ).fetchone()
+    if row is None:
+        return _result(ticker, "short_balance_ratio", None, "%", "", as_of, source, "no_data")
+    value, trade_date = row
+    basis = f"상장주식수 대비 공매도 잔고, 공개 지연 {SHORT_BALANCE_LAG_DAYS}거래일 반영"
+    return _result(ticker, "short_balance_ratio", _number(value), "%", basis, trade_date.isoformat(), source, None)
 
 
 def _financial_metric(connection, ticker: str, metric_id: str, as_of: str) -> dict:
@@ -169,7 +233,9 @@ def _result(ticker, metric_id, value, unit, basis, as_of, source, reason) -> dic
 def _unit(metric_id: str) -> str:
     if metric_id in FINANCIAL_METRICS:
         return FINANCIAL_METRICS[metric_id]
-    return (MARKET_METRICS.get(metric_id) or PRICE_METRICS[metric_id])[0]
+    if metric_id == "short_balance_ratio":
+        return "%"
+    return (MARKET_METRICS.get(metric_id) or PRICE_METRICS.get(metric_id) or FLOW_METRICS[metric_id])[0]
 
 
 def _number(value):

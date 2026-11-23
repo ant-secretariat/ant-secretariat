@@ -75,10 +75,12 @@ def test_all_defaults_mentioned_then_extra_is_dropped_by_cap():
     assert r.verdict == "full"  # reduced는 데이터 사유일 때만. 상한 제외는 excluded로만 고지
 
 
-def test_flow_inactive_alone_is_out_of_scope():
-    r = run("외국인 순매수 알려줘")
-    assert r.reject_reason == ReasonCode.OUT_OF_SCOPE_TOPIC
-
+def test_flow_question_selects_flow_agenda():
+    # kw-0.1.1: 수경 확인(#20·#21)으로 flow 활성화. 수급 질문은 macro 자리를 대체한다(임시 규칙)
+    s = full_status()
+    s.sources["flow"] = SourceStatus(count=10, latest=FRESH)
+    r = run("외국인 순매수 알려줘", data_status=provider(**{"005930": s}))
+    assert r.verdict == "full" and A.FLOW in r.allowed_agendas and A.MACRO not in r.allowed_agendas
 
 def test_spacing_and_case_are_normalized():
     assert A.SHAREHOLDER_RETURN in run("자 사 주 소각").matched_intents
@@ -161,7 +163,7 @@ def test_three_companies_raise():
 
 
 def test_result_carries_dictionary_version():
-    assert run("").dictionary_version == "kw-0.1.0+ds-0.2.0"
+    assert run("").dictionary_version == "kw-0.1.1+ds-0.2.0"
 
 
 def test_flow_net_buy_is_not_investment_advice():

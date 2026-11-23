@@ -35,6 +35,7 @@
 - **체크리스트**: 해당 항목을 `[x]`로 체크하고, 해당 없는 항목에는 이유를 괄호로 적는다
 - **리뷰 포인트**: 판단이 애매했던 선택, 임시값(`envelope.py` 이름 등), 수경·태은이 확인할 부분은 `@멘션`으로 적는다
 - **남은 작업**: 이번에 안 한 것. 없으면 "없음"
+- **라벨·담당자**: 수경 PR처럼 유형(`작업`/`문서`)·상태(`리뷰중`) 라벨과 담당자를 붙이고, 우리 에이전트 라벨 `토론 에이전트`를 함께 단다. `03 에이전트`는 쓰지 않는다
 - **Draft**: 방향 확인이 필요하면 Draft로 먼저 연다
 - **쌓인 PR(스택)**: 앞 PR이 머지되기 전에 그 위에서 다음 작업을 해야 하면, 다음 PR의 대상(base)을 앞 PR 브랜치로 열고 본문 맨 위에 인용문(`>`)으로 "N개 중 몇 번째, 머지 순서, 앞 PR 먼저 머지할 것, 앞 PR 머지 후 대상 변경은 작성자가 함"을 적는다 (PR #17 형식). 가능하면 main 기준 독립 PR을 우선한다
 - **PR 크기**: 400줄 이하. 기획서 HTML(`docs/debate-renewal/`)은 줄 수가 커서 코드 PR에서 빼고 별도 `docs:` PR로 올린다
@@ -65,7 +66,7 @@
 | # | 항목 | 상태 |
 | --- | --- | --- |
 | 1 | `precheck()` + 키워드 사전 + `intent_data_sources.json` 로더 | 완료 (24 tests). PR 2개로 나눠 병합: 계약·설정 로더 → 엔진·테스트 |
-| 2 | 거절셋 수집 (`ReasonCode` 라벨) | 예정 — precheck 튜닝용, 키워드 사전 보강과 함께 |
+| 2 | 거절셋 수집 (`ReasonCode` 라벨) | v0 완료 (47문항 + 측정기 `eval/refusal.py`). 키워드 사전 보강은 다음 PR (평가 비교표 필요) |
 | 3 | Pydantic 스키마: Evidence·Claim·DebateResult(단일→비교), Bull·Bear·Judge 출력 | 완료 (`schemas.py`, 10 tests) |
 | 3b | Bull·Bear·Judge 프롬프트 v3 (D6 `agreed_points`, Bear의 Bull Claim 인용) | 예정 |
 | 4 | 검증 레이어 L1 + 근거 부족 루프(1회 수정) | L1 완료 (`validation/l1.py`, 10 tests). 근거 부족 루프·1회 수정은 검색·LLM 연동 후 |
@@ -77,12 +78,13 @@
 - 비교 모드 Judge 판정은 종목별로 하나씩(`judge.per_company_verdict`, ticker → 판정)이고 `overall_verdict`는 단일 모드만 쓴다(유민 결정 2026-11-22). 계약 반영은 #46에 요청
 - ~~`ReasonCode.insufficient_data`~~ → 계약의 `no_data`로 확정(11/17, 계약 draft.5 PR #46). 다음 행동은 `choose_alternative_company`
 - 관문1 거절 코드(미커버 종목·3종목 이상·비교 한쪽 미커버)의 `envelope.py` 이름. 11/9 기준 회의에서 확정되지 않았다. precheck 밖이라 이 패키지는 정의하지 않고, 확정되면 `ReasonCode`에 추가한다
+- 거절셋 기준선(rs-0.1.0, 사전 kw-0.1.0): 오답변율 35%(목표 ≤5%), 과잉거절률 22%. 주가 변동 이유("주가가 왜 떨어졌어?")·보유 여부("들고 있어도 돼?")처럼 `valuation`·`risk`로 볼 만한 질의를 범위 안으로 볼지, 키워드 사전을 어디까지 넓힐지 확정 필요
 - `validation/l1.py` 금지 표현(`FORBIDDEN_PATTERNS`)은 권유형 어미까지 포함한 정규식이다. 테스트의 차단 10문장·통과 7문장으로 고정했고, 문장을 추가할 때는 두 목록에 같이 넣는다. 기획서에 목록이 없어 확정은 거절셋처럼 문항 측정 후
 - `schemas.py`는 계약 draft.5(PR #46) DebateResult와 같은 필드다(점수 integer, `data_richness`·`ontology`, `companies[].data_tier`). `confidence`는 계약에도 타입이 `str`뿐이라 값 목록이 없다. 근거 제외 후 `partial` 고지를 담을 필드 위치도 기획서에 없어 아직 없음(검증 레이어 구현 때 결정)
 - `AgendaId`·`DataTier`·`Tier`는 `processing.enums`(#30, main)에서 import한다. 멤버 이름은 `UPPER_SNAKE`(예: `AgendaId.VALUATION`). `ReasonCode`·`NextAction`·`PrecheckResult`는 `backend/contracts/`가 생기면 옮긴다
 - `data/intent_data_sources.json` — 값은 수경 제안(#21 리뷰 2026-11-10) 반영. `financials`·`flow`·`insider`·`sensitivity`·`derived` 키는 데이터 쪽이 `get_available_data_status`에 추가할 예정(#35 병합 후)이라 그 전에는 해당 키가 provider에 없다 — 남은 키로 판정된다
 - 아젠다 대체 우선순위(`data/keyword_dictionary.json`의 `selection_rules`) — 기획서에 "최대 3개 유지"만 있음
-- `flow` 아젠다 `active: false` — 데이터 쪽은 활성화 OK(`investor_flow_daily` T1 100종목 3년 치). 키워드 사전·거절셋 라벨·기준선 문항 8개와 같이 바꿔야 해서 별도 PR로 진행
+- `flow` 아젠다는 kw-0.1.1부터 활성(수경 확인, `investor_flow_daily` T1 3년 치). 수급 질문이 어느 기본 아젠다를 대체할지(`flow_replaces`: macro → valuation → risk)는 임시값
 - 큐 라이브러리(PgQueuer vs Procrastinate), 배포 방식은 팀 결정 대기
 
 ## 명령

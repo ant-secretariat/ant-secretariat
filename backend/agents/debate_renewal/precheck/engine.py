@@ -165,6 +165,8 @@ def _select_agendas(matched: list[AgendaId], cfg: PrecheckConfig) -> tuple[list[
         swap_in(AgendaId.SHAREHOLDER_RETURN, cfg.shareholder_return_replaces)
     if AgendaId.GROWTH in matched:
         swap_in(AgendaId.GROWTH, cfg.growth_replaces)
+    if AgendaId.FLOW in matched:
+        swap_in(AgendaId.FLOW, cfg.flow_replaces)
 
     selected = sorted(set(selected), key=list(AgendaId).index)[: cfg.max_agendas]
     return selected, dropped

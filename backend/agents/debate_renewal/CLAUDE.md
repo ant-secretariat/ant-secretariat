@@ -58,19 +58,21 @@
 - 사실 층(근거·verdict·stance)은 사용자 성향과 무관하게 동일. 성향은 Judge의 `points_to_check`·`caution`에만 반영. **적합/부적합 label 노출 금지**
 - 비교 모드는 최대 2종목: 종목별 Bull→Bear(종목끼리 병렬) + Judge 축별 비교, 제시 순서 무작위화, 한쪽 실패 시 단일 분석으로 전환
 - 2라운드(D5)·시뮬레이션 버튼은 단일 모드 전용
-- job 상태: `queued → running → debate_completed → (단일) simulation_pending → … → completed/failed`. `simulation_handoff` 필드는 없다(삭제됨)
+- job 상태(계약 `RunDebateInput`, 오케스트레이터 기획서 v2.1 6.3): 단일 `queued → running → simulation_pending →(버튼) simulation_running → completed`, 비교 `queued → running → debate_completed`(종료), 실패는 `failed`. 버튼을 누르지 않으면 `simulation_pending`에 머문다. 상태 전환은 오케스트레이터 워커가 하고 `run_debate`는 결과만 돌려준다(#68 재리뷰에서 draft.6 반영 제안). `simulation_handoff` 필드는 없다(삭제됨)
 - 진행 이벤트는 노드·주장 단위(`node_started`·`claim_completed`·`agenda_completed`·`node_completed`). 토큰 단위 금지 (D8) — 단, 태은 쪽 확정 전까지는 제안 상태
 
 ## 구현 순서
 
 | # | 항목 | 상태 |
 | --- | --- | --- |
-| 1 | `precheck()` + 키워드 사전 + `intent_data_sources.json` 로더 | 완료 (24 tests). PR 2개로 나눠 병합: 계약·설정 로더 → 엔진·테스트 |
+| 1 | `precheck()` + 키워드 사전 + `intent_data_sources.json` 로더 | 완료 (24 tests). PR 2개로 나눠 병합: 계약·설정 로더 → 엔진·테스트. 관문1 결과 → precheck 입력 어댑터는 #72(ds-0.3.0: 매크로 아젠다는 종목 데이터 필요) |
 | 2 | 거절셋 수집 (`ReasonCode` 라벨) | v0.3 완료 (dev 47 + holdout 22 + holdout2 22문항, 측정기 `eval/refusal.py`). 사전 kw-0.3.1(holdout2 오답변율 20%). 남은 실패는 규칙으로 한계 — 경량 모델 승격 여부는 확정 필요 |
 | 3 | Pydantic 스키마: Evidence·Claim·DebateResult(단일→비교), Bull·Bear·Judge 출력 | 완료 (`schemas.py`, 10 tests) |
-| 3b | Bull·Bear·Judge 프롬프트 v3 (D6 `agreed_points`, Bear의 Bull Claim 인용) | 예정 |
-| 4 | 검증 레이어 L1 + 근거 부족 루프(1회 수정) | L1 완료 (`validation/l1.py`, 10 tests). 근거 부족 루프·1회 수정은 검색·LLM 연동 후 |
-| 5 | 기준선 비교 실험 루브릭 5~6항목 + 문항 30~50개 | 루브릭 6항목·문항 48개(6아젠다×8, qs-0.2.0)·블라인드 채점 집계(승률·항목별 일치율·재현 정보) 완료 (`eval/baseline/`, 13 tests). 실제 실험은 토론·단일 출력 생성 후 |
+| 3b | Bull·Bear·Judge 프롬프트 v3 (D6 `agreed_points`, Bear의 Bull Claim 인용) | #51 (pv-3.0.0, 승인됨). 기준선 비교표가 나오면 머지 |
+| 3c | Solar 호출 클라이언트 (strict json_schema + Pydantic, 형식 오류 1회 재요청) | #74 (모델 `solar-pro-4` 임시값) |
+| 3d | 단일 모드 `run_debate` (근거 → Bull→Bear 병렬 → Judge → L1, `emit`·`fetch_evidence` 주입) | #76 (실데이터 2종목 약 39초) |
+| 4 | 검증 레이어 L1 + 근거 부족 루프(1회 수정) | L1 완료 (`validation/l1.py`, 10 tests). 근거 부족 루프·1회 수정 진행 중(#76 위) |
+| 5 | 기준선 비교 실험 루브릭 5~6항목 + 문항 30~50개 | 루브릭 6항목·문항 48개(6아젠다×8, qs-0.2.0)·블라인드 채점 집계 완료 (`eval/baseline/`, 13 tests). 출력 생성기 #77. 48문항 실행은 #75(`get_agent_context(as_of)`) 머지 후, 채점은 #65 채점자 확정 후 |
 | 6 | 온톨로지 ISSUE 시드 20~30개 | 예정 (온톨로지 기획서) |
 
 ## 확정 필요한 임시값 (코드 곳곳에 TODO)

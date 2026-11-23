@@ -93,58 +93,91 @@ class FakeSupabase:
         return self.rows
 
 
+# 발표일, 증권사, 의견, 통일 의견, 직전 의견, 원래 목표가, 환산 목표가, 대체된 날, 회사명
 OPINION_ROWS = [
-    (date(2026, 6, 15), "테스트증권", "Strong BUY", "buy", 100000, "삼성전자"),
-    (date(2026, 6, 14), "다른증권", "Hold", "hold", 90000, "삼성전자"),
-    (date(2026, 6, 13), "또다른증권", "Underperform", "sell", None, "삼성전자"),
-    (date(2026, 6, 12), "마지막증권", "NotRated", None, None, "삼성전자"),
+    (date(2026, 6, 15), "테스트증권", "Strong BUY", "buy", "BUY", 500000, 100000, None, "삼성전자"),
+    (date(2026, 6, 14), "다른증권", "Hold", "hold", "Buy", 90000, 90000, None, "삼성전자"),
+    (date(2026, 6, 13), "또다른증권", "Underperform", "sell", "Hold", None, None, None, "삼성전자"),
+    (date(2026, 6, 12), "마지막증권", "NotRated", None, None, None, None, None, "삼성전자"),
+    (date(2026, 5, 1), "테스트증권", "BUY", "buy", "BUY", 400000, 80000, date(2026, 6, 15), "삼성전자"),
 ]
 
 
-def test_get_target_price_data_keeps_contract_for_agents(monkeypatch):
+def test_get_target_price_data_follows_api_contract(monkeypatch):
     monkeypatch.setattr("crawling.db.postgres.connect", lambda: FakeSupabase(OPINION_ROWS))
 
     result = get_target_price_data(ticker="005930", relational_db=object())
 
-    assert result["company"] == "삼성전자"
-    first = result["target_prices"][0]
-    assert set(first) >= {
-        "report_id", "ticker", "company", "published_at", "source", "author_org",
-        "title", "target_price", "investment_opinion", "report_type", "original_url", "pdf_url",
-    }
-    assert first["published_at"] == "2026-06-15"
-    assert first["source"] == "KIS"
-    assert first["author_org"] == "테스트증권"
-    assert (first["report_id"], first["title"], first["original_url"], first["pdf_url"]) == ("", "", "", "")
-    assert result["summary"] == {
-        "count": 4,
-        "avg_target_price": 95000,
-        "min_target_price": 90000,
-        "max_target_price": 100000,
-    }
+    assert set(result) >= {"ticker", "records", "consensus"}
+    first = result["records"][0]
+    assert first["hts_goal_prc"] == 500000
+    assert first["invt_opnn"] == "Strong BUY"
+    assert first["rgbf_invt_opnn"] == "BUY"
+    assert first["mbcr_name"] == "테스트증권"
+    assert set(result["consensus"]) >= {"avg_target_price", "max_target_price", "min_target_price"}
     assert "error" not in result
 
 
-def test_get_target_price_data_unifies_opinion_and_keeps_raw(monkeypatch):
+def test_get_target_price_data_adds_date_adjusted_price_and_validity(monkeypatch):
     monkeypatch.setattr("crawling.db.postgres.connect", lambda: FakeSupabase(OPINION_ROWS))
 
-    rows = get_target_price_data(ticker="005930")["target_prices"]
+    records = get_target_price_data(ticker="005930")["records"]
 
-    assert [row["investment_opinion"] for row in rows] == ["매수", "중립", "매도", None]
-    assert [row["opinion_raw"] for row in rows] == ["Strong BUY", "Hold", "Underperform", "NotRated"]
+    assert records[0]["published_at"] == "2026-06-15"
+    assert records[0]["target_price_adjusted"] == 100000
+    assert [r["opinion_norm"] for r in records] == ["매수", "중립", "매도", None, "매수"]
+    assert (records[0]["valid_from"], records[0]["superseded_at"]) == ("2026-06-15", None)
+    assert (records[-1]["valid_from"], records[-1]["superseded_at"]) == ("2026-05-01", "2026-06-15")
 
 
-def test_get_target_price_data_reads_adjusted_view_and_applies_dates(monkeypatch):
+def test_consensus_uses_latest_adjusted_price_per_broker(monkeypatch):
+    monkeypatch.setattr("crawling.db.postgres.connect", lambda: FakeSupabase(OPINION_ROWS))
+
+    consensus = get_target_price_data(ticker="005930")["consensus"]
+
+    # 테스트증권의 5/1 의견(8만)은 6/15 의견으로 대체됐고, 최신 의견에 목표가가 없는 증권사는 뺀다
+    assert consensus == {
+        "avg_target_price": 95000,
+        "max_target_price": 100000,
+        "min_target_price": 90000,
+        "broker_count": 2,
+        "basis": "증권사별 최신 1건",
+    }
+
+
+def test_get_target_price_data_keeps_previous_shape_during_migration(monkeypatch):
+    monkeypatch.setattr("crawling.db.postgres.connect", lambda: FakeSupabase(OPINION_ROWS))
+
+    result = get_target_price_data(ticker="005930")
+
+    assert result["company"] == "삼성전자"
+    first = result["target_prices"][0]
+    assert first["target_price"] == 100000
+    assert first["investment_opinion"] == "매수"
+    assert first["opinion_raw"] == "Strong BUY"
+    assert (first["report_id"], first["title"], first["original_url"], first["pdf_url"]) == ("", "", "", "")
+    assert result["summary"] == {
+        "count": 5,
+        "avg_target_price": 90000,
+        "min_target_price": 80000,
+        "max_target_price": 100000,
+    }
+
+
+def test_get_target_price_data_applies_as_of_and_dates(monkeypatch):
     connection = FakeSupabase([])
     monkeypatch.setattr("crawling.db.postgres.connect", lambda: connection)
 
-    result = get_target_price_data(ticker="005930", date_from="2026-01-01", date_to="2026-06-30")
+    result = get_target_price_data(
+        ticker="005930", date_from="2026-01-01", date_to="2026-06-30", as_of="2026-06-20"
+    )
 
     assert "broker_opinions_adjusted" in connection.query
-    assert "target_price_adjusted" in connection.query
-    assert connection.params == ["005930", "2026-01-01", "2026-06-30"]
-    assert result["company"] == ""
-    assert result["summary"]["avg_target_price"] is None
+    assert "superseded_at <= %s::date" in connection.query
+    assert connection.params == ["2026-06-20", "005930", "2026-06-20", "2026-01-01", "2026-06-30"]
+    assert result["records"] == []
+    assert result["consensus"]["avg_target_price"] is None
+    assert result["consensus"]["broker_count"] == 0
 
 
 def test_get_target_price_data_failure_does_not_stop_agents_or_leak_url(monkeypatch, caplog):
@@ -156,6 +189,7 @@ def test_get_target_price_data_failure_does_not_stop_agents_or_leak_url(monkeypa
     result = get_target_price_data(ticker="005930")
 
     assert result["error"] == "target_price_unavailable"
+    assert result["records"] == []
     assert result["target_prices"] == []
     assert result["summary"]["count"] == 0
     assert "SECRET" not in caplog.text

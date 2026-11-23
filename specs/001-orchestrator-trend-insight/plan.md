@@ -118,7 +118,7 @@ frontend/src/                   # types.ts · api/client.ts (봉투·Badge·Clai
 | PR-6 | 세션 | HMAC 쿠키 발급·검증, `user_id` 바디 병행 | PR-1 | FE (R6 팀 결정 후) |
 | PR-7 | 공용 텍스트 검사 | `backend/verification/text_rules.py`, 토론 L1 import 교체 | — | 유민 리뷰 |
 | PR-8 | 인사이트보드 | 종목별 실패 판정, `Badge`, `summarize_for_comment`, `verify_comment`, `InsightBoardResult`, 봉투 라우트 | PR-1, PR-7 | FE |
-| PR-9 | 트렌드 리포트 ① 데이터 | `get_agent_context` 경로, `select_evidence`, `compute_target_price_trend`, 레거시 삭제 (+운영 DB 임계값 분포) | PR-1, #53 | — |
+| PR-9 | 트렌드 리포트 ① 데이터 | `get_agent_context` 경로(`as_of` 직접 전달), `select_evidence`(상한은 #81), `compute_target_price_trend`(개정 비율, 경계값 #82), 레거시 삭제 | PR-1, 수경 `doc_id`·`broker_key` | — |
 | PR-10 | 트렌드 리포트 ② 생성·검증 | `generate_cards`(구조화 출력), `verify_cards`, `fill_card_gaps` S1~S3, `data_tier` 정책, status, `/orchestrate/trend-report` (+기준선 수치) | PR-9, PR-7 | FE |
 | PR-11 | FE 전환 | 봉투 처리, `Badge`·`Claim` 렌더링, trend-report 경로 전환, SSE 구독 | PR-4·5·8·10 | — |
 | PR-12 | 정리 | `/agents/trend-report` 삭제, `resolve_company_context`·SQLite `agent_jobs` 잔여 제거 | PR-11 | — |

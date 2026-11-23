@@ -9,7 +9,7 @@
 | C3 | `BrokerView` (신규) | `broker`, `opinion`, `target_price`, `published_at`, `view: Claim` | `broker_differences` 항목이 미정의 | — |
 | C4 | `VerificationSummary` (신규) | `checked`, `retracted`, `gap_filled`, `failed_checks` | `TrendReportResult.verification`이 열린 객체 | 유민 (토론도 같은 집계를 쓸지) |
 | C5 | `CompanyData.ticker` | 매크로 항목은 `"macro"` | 매크로는 종목이 없음 | — |
-| C6 | `TargetPriceTrend` | `direction` 계산 규칙(90일·2/3·±3%)을 설명에 | 코드 계산 규칙 공개 | 수경 |
+| C6 | `TargetPriceTrend` | `direction` 계산 규칙(개정 비율, #82 경계값)을 설명에, 상향·하향·유지 개정 수 필드 추가 | 코드 계산 규칙 공개, 화면에 숫자 표시 | 수경 |
 | C7 | `OrchestratorRequest.request_type` | 설명에 버튼 경로 3종이 MVP, `chat`은 Post-MVP 명시 | 범위 명확화 | — |
 | C8 | `job_not_found` · `invalid_job_state` | "제안" 표시 제거 (OQ-2 닫기) | 구현에서 사용 | 전원 |
 | C9 | `suggest_alternatives(ticker, n=3)` (신규 데이터 함수) | 중분류 → 대분류 → 전체 시총순, `alternatives` 3개 | 거절 대안 선정 (#68 리뷰) | 수경 |

@@ -65,6 +65,12 @@ class OpinionRowsTest(unittest.TestCase):
             self.assertIsNone(rows[0]["target_price"])
 
 
+def test_bad_date_row_is_skipped_not_fatal():
+    # 날짜를 못 읽는 행 하나 때문에 그 종목 적재가 멈추지 않는다 (#14 리뷰, #55)
+    rows = opinion_rows("005930", [_row("2026-10-30"), _row("20261030", "키움")])
+    assert [row["broker"] for row in rows] == ["키움"]
+
+
 class KisOpinionClientTest(unittest.TestCase):
     def setUp(self) -> None:
         for target in ("REQUEST_INTERVAL_SECONDS", "RETRY_WAIT_SECONDS"):

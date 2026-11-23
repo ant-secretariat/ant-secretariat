@@ -39,6 +39,7 @@ from crawling.db.postgres import connect
 from crawling.report_chunks_loader import replace_chunks
 from processing.processors.report_chunker import _chunk_id, _split_section, normalize_text
 from processing.search.korean_tokens import chunk_search_columns
+from crawling.config.clock import today_kst
 
 logger = logging.getLogger(__name__)
 
@@ -247,7 +248,7 @@ def load(connection: psycopg.Connection, articles: list[dict]) -> int:
 
 
 def expire(connection: psycopg.Connection, days: int) -> int:
-    cutoff = date.today() - timedelta(days=days)
+    cutoff = today_kst() - timedelta(days=days)
     return connection.execute(
         "update document_chunks set is_active = false where document_type = 'news' and is_active and published_at < %s",
         (cutoff,),
@@ -272,7 +273,7 @@ def main() -> None:
     parser.add_argument("--expire-days", type=int, default=EXPIRE_DAYS, help="이보다 오래된 뉴스 청크는 비활성")
     parser.add_argument("--embed", action="store_true", help="끝나고 빈 임베딩 채우기 (Upstage 비용)")
     args = parser.parse_args()
-    date_from = date.today() - timedelta(days=args.days)
+    date_from = today_kst() - timedelta(days=args.days)
     with connect() as connection:
         found = collect(connection, _targets(connection, args.tickers), date_from)
         articles = pending(connection, date_from, args.limit)

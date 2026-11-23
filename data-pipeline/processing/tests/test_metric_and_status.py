@@ -312,3 +312,15 @@ def test_status_reads_each_document_type_once(monkeypatch):
     get_available_data_status("005930")
 
     assert connection.queries[0][0].count("from document_chunks") == 3
+
+
+def test_metric_contract_lists_extra_fields():
+    # 구현이 붙이는 requested_as_of·display·period가 계약서 MetricValue에 있다 (#55)
+    from pathlib import Path
+
+    import yaml
+
+    spec = yaml.safe_load((Path(__file__).resolve().parents[3] / "docs/api/openapi.yaml").read_text(encoding="utf-8"))
+    metric = spec["components"]["schemas"]["MetricValue"]
+    assert {"requested_as_of", "display", "period"} <= set(metric["properties"])
+    assert {"requested_as_of", "display"} <= set(metric["required"])

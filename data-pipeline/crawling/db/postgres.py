@@ -31,11 +31,14 @@ def upsert(
     rows: Iterable[dict[str, Any]],
     key_columns: Sequence[str],
     update_columns: Sequence[str] | None = None,
+    keep_existing_on_null: bool = False,
 ) -> int:
     """rows를 임시 테이블에 COPY한 뒤 한 번에 INSERT ... ON CONFLICT로 반영한다.
 
     update_columns를 주면 충돌 시 그 컬럼만 갱신한다. 같은 행을 여러 소스가
     나눠 채우는 경우(예: 시세는 종목별 조회, 거래대금은 날짜별 조회)에 쓴다.
+    keep_existing_on_null이면 새 값이 null인 컬럼은 기존 값을 그대로 둔다. 외부 응답 일부가 비어도
+    이미 저장된 값을 지우지 않게 할 때 쓴다("빈 응답을 전부 지움으로 해석하지 않는다").
     """
     rows = dedupe(rows, key_columns)
     if not rows:
@@ -49,7 +52,13 @@ def upsert(
     conflict_action = (
         sql.SQL("do update set {}").format(
             sql.SQL(", ").join(
-                sql.SQL("{0} = excluded.{0}").format(sql.Identifier(column))
+                (
+                    sql.SQL("{0} = coalesce(excluded.{0}, {1}.{0})").format(
+                        sql.Identifier(column), sql.Identifier(table)
+                    )
+                    if keep_existing_on_null
+                    else sql.SQL("{0} = excluded.{0}").format(sql.Identifier(column))
+                )
                 for column in update_columns
             )
         )

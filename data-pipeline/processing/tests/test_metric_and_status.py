@@ -1,4 +1,3 @@
-import sqlite3
 from datetime import date
 
 import pytest
@@ -181,11 +180,12 @@ def test_metric_failure_does_not_leak_url(monkeypatch, caplog):
 
 
 STRUCTURED_ROW = ("삼성전자", date(2026, 11, 6), date(2026, 11, 6), date(2026, 8, 14), date(2026, 11, 4), True)
+NO_DOCUMENTS = (0, None, 0, None, 0, None)
 STATUS_KEYS = {"ticker", "report_count", "news_count", "disclosure_count", "derived_snapshot_available"}
 
 
 def test_status_follows_contract_and_keeps_previous_shape(monkeypatch):
-    _use(monkeypatch, FakeConnection(STRUCTURED_ROW))
+    _use(monkeypatch, FakeConnection(STRUCTURED_ROW + NO_DOCUMENTS))
 
     result = get_available_data_status("005930")
 
@@ -202,32 +202,17 @@ def test_status_follows_contract_and_keeps_previous_shape(monkeypatch):
     assert result["latest"]["price_date"] == "2026-11-06"
 
 
-class FakeRelationalDB:
-    def __init__(self, db_path):
-        self.db_path = str(db_path)
+def test_status_counts_documents_from_supabase_chunks(monkeypatch):
+    documents = (19, date(2026, 11, 4), 120, date(2026, 11, 9), 16, date(2026, 10, 29))
+    connection = _use(monkeypatch, FakeConnection(STRUCTURED_ROW + documents))
 
+    # relational_db를 넘겨도 SQLite는 보지 않는다
+    result = get_available_data_status("005930", relational_db=object(), vector_db=object())
 
-def test_status_counts_documents_from_sqlite(monkeypatch, tmp_path):
-    db_path = tmp_path / "reports.db"
-    conn = sqlite3.connect(db_path)
-    conn.executescript(
-        """
-        CREATE TABLE report_metadata (ticker TEXT, company TEXT, status TEXT, published_at TEXT);
-        CREATE TABLE news_metadata (ticker TEXT, published_at TEXT);
-        CREATE TABLE disclosure_metadata (ticker TEXT, disclosed_at TEXT);
-        INSERT INTO report_metadata VALUES ('005930', '삼성전자', 'success', '2026-11-01');
-        INSERT INTO report_metadata VALUES ('005930', '삼성전자', 'failed', '2026-11-02');
-        INSERT INTO news_metadata VALUES ('005930', '2026-11-05');
-        """
-    )
-    conn.commit()
-    conn.close()
-    _use(monkeypatch, FakeConnection(STRUCTURED_ROW))
-
-    result = get_available_data_status("005930", relational_db=FakeRelationalDB(db_path), vector_db=object())
-
-    assert (result["report_count"], result["news_count"], result["disclosure_count"]) == (1, 1, 0)
-    assert result["as_of_dates"]["report"] == "2026-11-01"
+    assert "document_chunks" in connection.queries[0][0] and "mentioned_tickers" in connection.queries[0][0]
+    assert (result["report_count"], result["news_count"], result["disclosure_count"]) == (19, 120, 16)
+    assert result["as_of_dates"]["report"] == "2026-11-04"
+    assert result["as_of_dates"]["disclosure"] == "2026-10-29"
     assert result["available"]["reports"] is True
 
 

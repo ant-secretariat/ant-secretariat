@@ -351,6 +351,32 @@ python -m crawling.monthly_corr_loader --skip-fetch # 상관만 다시 계산
 python main.py --run-once --source naver --include-news-data --include-disclosure-data
 ```
 
+## 온톨로지 입력값 계산
+
+온톨로지 시드의 데이터 칸을 손으로 옮기지 않고 같은 방식으로 다시 계산합니다. **DB는 읽기만 하고 결과는 CSV로만 씁니다**(테이블·뷰를 만들지 않음). 노출 여부·가설·확정 이름은 온톨로지 쪽이 정합니다.
+
+```bash
+python -m crawling.ontology_inputs sensitivities --as-of 2026-11-23 --level l1 --seed ../ontology/seed/ontology_seed.json --out sens_l1.csv
+python -m crawling.ontology_inputs sector-grades --out grades.csv
+python -m crawling.ontology_inputs macro-direction --out macro_direction.csv
+python -m crawling.ontology_inputs impacts --out impacts.csv
+python -m crawling.ontology_inputs kind --out kind_t1.csv            # KRX KIND 상장법인목록을 내려받음 (--kind-file로 대신 가능)
+python -m crawling.ontology_inputs issue-evidence --seed ../ontology/seed/ontology_seed.json --out evidence.csv
+```
+
+| 명령 | 내용 | 채우는 시드 칸 |
+| --- | --- | --- |
+| `sensitivities` | 섹터(`l1`·`l2`) 또는 종목 × 요인의 원래 상관, **시장 효과를 뺀 상관**(편상관) 중앙값, 같은 부호 비율, 방향 확실(95% 구간이 0 미포함) 종목 수. `--seed`를 주면 시드 엣지의 가설·상태, 시장 효과 기준 `sign_check`, 임시 노출 기준 통과 여부 | SENSITIVE_TO `weight`·`market_adjusted`·`sign_check` |
+| `sector-grades` | 위 값의 섹터 중앙값으로 금리(`KTB_3Y_KR`) 등급 high/medium/low, 환율(`USD_KRW`) positive/negative/neutral. 기준값은 `--high`·`--medium`·`--neutral` | SECTOR `rate_sensitivity`·`fx_sensitivity` |
+| `macro-direction` | 지표 변화와 시장 수익률의 상관 부호(기준금리는 변경일 전후 사건 분석) | MACRO `direction` |
+| `impacts` | 기준금리 변경일 전후 국고채·환율 변화 방향, 월별 지표 간 1달 시차 상관 | IMPACTS `direction` |
+| `kind` | KIND 업종·주요제품으로 T1 세부 업종 후보(`SUB_INDUSTRY_RULES`)와 지주사 후보 | COMPANY `sub_industry`·`is_holding` |
+| `issue-evidence` | 시드 ISSUE마다 수혜·타격 종목 문서에서 이슈 이름으로 검색한 근거 후보 | ISSUE `evidence_chunk_ids` |
+
+- 일별은 최근 3년(민감도 적합과 같음), 시장은 코스피 일별 수익률입니다.
+- 월별은 최근 최대 120개월, t월 종목 수익률과 t+1월 지표 변화이고, 시장은 핵심 종목 동일가중 평균 수익률입니다(DB의 코스피 지수가 3년 치뿐이라서).
+- 방향 판정(`direction`)은 신뢰구간이 0을 포함하지 않을 때만 붙고, 사건 분석은 같은 방향이 65% 이상일 때만 붙습니다.
+
 ## 로그
 
 콘솔과 `logs/crawler.log`에 다음을 기록합니다.

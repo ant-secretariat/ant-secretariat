@@ -31,7 +31,8 @@ import httpx
 import psycopg
 from psycopg.rows import dict_row
 
-from crawling.collectors.dart_api import has_data
+from crawling.collectors.dart_api import has_data, mask_key
+from crawling.config.clock import today_kst
 from crawling.config.settings import SETTINGS
 from crawling.crawler.http import create_ssl_context
 from crawling.db.postgres import connect
@@ -181,7 +182,7 @@ def list_disclosures(client: httpx.Client, corp_code: str, date_from: date, date
         })
         response.raise_for_status()
         payload = response.json()
-        if not has_data(payload, "OpenDART list 오류"):
+        if not has_data(payload, f"OpenDART list 오류: {corp_code}"):
             return items
         items.extend(payload.get("list", []))
         if page >= int(payload.get("total_page") or 1):
@@ -192,7 +193,7 @@ def list_disclosures(client: httpx.Client, corp_code: str, date_from: date, date
 
 def collect(connection: psycopg.Connection, targets: list[dict], date_from: date) -> int:
     total = 0
-    today = date.today()
+    today = today_kst()
     with _client() as client:
         for target in targets:
             try:
@@ -273,7 +274,9 @@ def load(connection: psycopg.Connection, disclosures: list[dict]) -> int:
                 failed += 1
                 connection.execute(
                     "update disclosure_metadata set chunk_status = 'failed', error_message = %s where rcept_no = %s",
-                    (f"{type(exc).__name__}: {str(exc)[:300]}", disclosure["rcept_no"]),
+                    # httpx 오류 메시지에는 인증키가 든 요청 URL이 들어가므로 가린 뒤 저장한다
+                    (f"{type(exc).__name__}: {mask_key(str(exc), SETTINGS.dart_api_key)[:300]}",
+                     disclosure["rcept_no"]),
                 )
             if position % 50 == 0 or position == len(disclosures):
                 logger.info("원문 %s/%s, 실패 %s", position, len(disclosures), failed)

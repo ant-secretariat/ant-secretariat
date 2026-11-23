@@ -35,17 +35,20 @@ def load(connection: psycopg.Connection, targets: dict[str, str]) -> list[str]:
     counts: Counter = Counter()
     with DartInsiderClient(SETTINGS) as client:
         for position, (ticker, corp_code) in enumerate(targets.items(), start=1):
+            # 파싱 오류·DB 오류 등 어떤 실패도 그 종목만 실패로 남기고 다음 종목으로 넘어간다
             try:
                 rows = [
                     row
                     for kind in REPORT_APIS
                     for row in insider_rows(kind, ticker, client.fetch(kind, corp_code))
                 ]
-            except RuntimeError as exc:
-                logger.warning("%s 실패: %s", ticker, exc)
+                upsert(connection, "insider_holdings", rows, key_columns=["report_kind", "rcept_no", "reporter"])
+            except Exception as exc:
+                if isinstance(exc, psycopg.OperationalError):
+                    raise  # DB 연결 자체가 끊기면 다음 종목도 실패하므로 멈춘다
+                logger.warning("%s 실패: %s: %s", ticker, type(exc).__name__, exc)
                 failed.append(ticker)
                 continue
-            upsert(connection, "insider_holdings", rows, key_columns=["report_kind", "rcept_no", "reporter"])
             counts.update(row["report_kind"] for row in rows)
             if position % PROGRESS_EVERY == 0 or position == len(targets):
                 logger.info("진행 %s/%s, 누적 %s", position, len(targets), dict(counts))

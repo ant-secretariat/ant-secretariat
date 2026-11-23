@@ -59,52 +59,64 @@ def insider_rows(report_kind: str, ticker: str, raw_rows: list[dict]) -> list[di
     """같은 접수번호·보고자 행은 하나만 남긴다."""
     rows: dict[tuple[str, str], dict] = {}
     for raw in raw_rows:
-        reporter = (raw.get("repror") or "").strip()
-        rcept_no = (raw.get("rcept_no") or "").strip()
-        if not reporter or not rcept_no:
+        try:
+            row = _insider_row(report_kind, ticker, raw)
+        except (KeyError, TypeError, ValueError) as exc:
+            # 날짜·숫자 형식이 다른 행 하나 때문에 그 종목 전체가 실패하지 않게 그 행만 건너뛴다
+            logger.warning("%s %s 행 건너뜀 (rcept_no=%s): %s: %s", ticker, report_kind,
+                           raw.get("rcept_no"), type(exc).__name__, exc)
             continue
-        row = {
-            "report_kind": report_kind,
-            "rcept_no": rcept_no,
-            "reporter": reporter,
-            "ticker": ticker,
-            "rcept_dt": datetime.strptime(raw["rcept_dt"], "%Y-%m-%d").date(),
-            "position": None,
-            "exec_registered": None,
-            "major_holder": None,
-            "report_type": None,
-            "report_reason": None,
-            "shares": None,
-            "shares_change": None,
-            "ratio": None,
-            "ratio_change": None,
-            "contract_shares": None,
-            "contract_ratio": None,
-            "updated_at": datetime.now().astimezone(),
-        }
-        if report_kind == "major":
-            row.update({
-                "report_type": _text(raw.get("report_tp")),
-                "report_reason": _text(raw.get("report_resn")),
-                "shares": _int(raw.get("stkqy")),
-                "shares_change": _int(raw.get("stkqy_irds")),
-                "ratio": _float(raw.get("stkrt")),
-                "ratio_change": _float(raw.get("stkrt_irds")),
-                "contract_shares": _int(raw.get("ctr_stkqy")),
-                "contract_ratio": _float(raw.get("ctr_stkrt")),
-            })
-        else:
-            row.update({
-                "position": _text(raw.get("isu_exctv_ofcps")),
-                "exec_registered": _text(raw.get("isu_exctv_rgist_at")),
-                "major_holder": _text(raw.get("isu_main_shrholdr")),
-                "shares": _int(raw.get("sp_stock_lmp_cnt")),
-                "shares_change": _int(raw.get("sp_stock_lmp_irds_cnt")),
-                "ratio": _float(raw.get("sp_stock_lmp_rate")),
-                "ratio_change": _float(raw.get("sp_stock_lmp_irds_rate")),
-            })
-        rows[(rcept_no, reporter)] = row
+        if row is not None:
+            rows[(row["rcept_no"], row["reporter"])] = row
     return list(rows.values())
+
+
+def _insider_row(report_kind: str, ticker: str, raw: dict) -> dict | None:
+    reporter = (raw.get("repror") or "").strip()
+    rcept_no = (raw.get("rcept_no") or "").strip()
+    if not reporter or not rcept_no:
+        return None
+    row = {
+        "report_kind": report_kind,
+        "rcept_no": rcept_no,
+        "reporter": reporter,
+        "ticker": ticker,
+        "rcept_dt": datetime.strptime(raw["rcept_dt"], "%Y-%m-%d").date(),
+        "position": None,
+        "exec_registered": None,
+        "major_holder": None,
+        "report_type": None,
+        "report_reason": None,
+        "shares": None,
+        "shares_change": None,
+        "ratio": None,
+        "ratio_change": None,
+        "contract_shares": None,
+        "contract_ratio": None,
+        "updated_at": datetime.now().astimezone(),
+    }
+    if report_kind == "major":
+        row.update({
+            "report_type": _text(raw.get("report_tp")),
+            "report_reason": _text(raw.get("report_resn")),
+            "shares": _int(raw.get("stkqy")),
+            "shares_change": _int(raw.get("stkqy_irds")),
+            "ratio": _float(raw.get("stkrt")),
+            "ratio_change": _float(raw.get("stkrt_irds")),
+            "contract_shares": _int(raw.get("ctr_stkqy")),
+            "contract_ratio": _float(raw.get("ctr_stkrt")),
+        })
+    else:
+        row.update({
+            "position": _text(raw.get("isu_exctv_ofcps")),
+            "exec_registered": _text(raw.get("isu_exctv_rgist_at")),
+            "major_holder": _text(raw.get("isu_main_shrholdr")),
+            "shares": _int(raw.get("sp_stock_lmp_cnt")),
+            "shares_change": _int(raw.get("sp_stock_lmp_irds_cnt")),
+            "ratio": _float(raw.get("sp_stock_lmp_rate")),
+            "ratio_change": _float(raw.get("sp_stock_lmp_irds_rate")),
+        })
+    return row
 
 
 def _text(value) -> str | None:

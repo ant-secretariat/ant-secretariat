@@ -21,6 +21,7 @@ if __package__ in (None, ""):
 import psycopg
 
 from crawling.collectors.investor_flow import fetch_investor_flow
+from crawling.config.clock import today_kst
 from crawling.db.postgres import connect, upsert
 
 logger = logging.getLogger(__name__)
@@ -37,11 +38,15 @@ def load(connection: psycopg.Connection, tickers: list[str], start: date, end: d
     for position, ticker in enumerate(tickers, start=1):
         try:
             rows = fetch_investor_flow(ticker, start, end)
+            # 공매도 응답 일부가 비어도(공개 지연·조회 실패) 이미 저장된 값을 지우지 않는다
+            upsert(connection, "investor_flow_daily", rows, key_columns=["ticker", "trade_date"],
+                   keep_existing_on_null=True)
         except Exception as exc:
-            logger.warning("%s 실패: %s", ticker, type(exc).__name__)
+            if isinstance(exc, psycopg.OperationalError):
+                raise  # DB 연결 자체가 끊기면 다음 종목도 실패하므로 멈춘다
+            logger.warning("%s 실패: %s: %s", ticker, type(exc).__name__, exc)
             failed.append(ticker)
             continue
-        upsert(connection, "investor_flow_daily", rows, key_columns=["ticker", "trade_date"])
         total += len(rows)
         if position % PROGRESS_EVERY == 0 or position == len(tickers):
             logger.info("진행 %s/%s, 누적 %s행", position, len(tickers), total)
@@ -72,7 +77,7 @@ def main() -> None:
         format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
     )
     args = parse_args()
-    end = date.today()
+    end = today_kst()
     start = end - timedelta(days=365 * args.years if args.backfill else RECENT_DAYS)
     with connect() as connection:
         tickers = args.tickers or _targets(connection)

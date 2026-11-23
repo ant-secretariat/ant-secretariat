@@ -16,6 +16,8 @@ import logging
 import math
 from datetime import date
 
+from crawling.config.clock import today_kst
+
 logger = logging.getLogger(__name__)
 
 TRADING_DAYS = {"1w": 5, "1m": 21, "3m": 63}
@@ -24,6 +26,8 @@ MIN_VOLATILITY_RETURNS = 15
 VALUATION_YEARS = 3
 MARKET_THRESHOLD_QUANTILE = 0.8
 FLOW_WINDOWS = (5, 20)
+# 거래일 달력으로 쓰는 지수(KOSPI)
+CALENDAR_INDEX = "1001"
 SHORT_BALANCE_LAG_DAYS = 2
 INDEX_BY_MARKET = {"KOSPI": "1001", "KOSDAQ": "2001"}
 FS_LABELS = {"CFS": "연결", "OFS": "별도"}
@@ -32,7 +36,7 @@ GROUPS = ("valuation", "price_trend", "fundamental_trend", "flow")
 
 def get_derived_snapshot(ticker: str, as_of: str | None = None) -> dict:
     """계산 근거 4묶음. 묶음마다 값을 못 내면 값은 null이고 reason에 사유를 담는다."""
-    as_of = date.fromisoformat(as_of).isoformat() if as_of else date.today().isoformat()
+    as_of = date.fromisoformat(as_of).isoformat() if as_of else today_kst().isoformat()
     # 조회 실패로 토론·인사이트보드가 멈추지 않게 한다. 접속 주소가 메시지에 섞일 수 있어 종류만 남긴다
     try:
         from crawling.db.postgres import connect
@@ -168,19 +172,20 @@ def flow(rows: list[dict]) -> dict:
     if not rows:
         return _group_reason("no_data", foreign_net_buy_20d=None)
     result: dict = {}
+    # rows는 거래일 달력 기준이라 수급 행이 없는 날도 값이 빈 행으로 들어 있다.
+    # 창 안에 하루라도 빈 값이 있으면 일부 날짜만으로 계산하지 않고 null로 둔다(CODE_CONVENTIONS 빈 값 처리)
     for window in FLOW_WINDOWS:
         recent = rows[:window]
         for investor in ("foreign", "inst", "individual"):
-            values = [row[f"{investor}_net_value"] for row in recent if row[f"{investor}_net_value"] is not None]
-            result[f"{investor}_net_buy_{window}d"] = sum(values) if values else None
+            result[f"{investor}_net_buy_{window}d"] = _full_window_sum(recent, f"{investor}_net_value", window)
     market_cap = rows[0].get("market_cap")
     for investor in ("foreign", "inst"):
         total = result[f"{investor}_net_buy_20d"]
         result[f"{investor}_net_buy_20d_pct_mcap"] = (
             round(100 * total / market_cap, 4) if total is not None and market_cap else None
         )
-    ratios = [row["short_volume_ratio"] for row in rows[:20] if row["short_volume_ratio"] is not None]
-    result["short_volume_ratio_20d"] = round(sum(ratios) / len(ratios), 4) if ratios else None
+    ratio_total = _full_window_sum(rows[:20], "short_volume_ratio", 20)
+    result["short_volume_ratio_20d"] = round(ratio_total / 20, 4) if ratio_total is not None else None
     # 공매도 잔고는 약 2거래일 늦게 공개되므로, 그날 기준으로 알 수 있는 가장 최근 값만 쓴다
     published = [row for row in rows[SHORT_BALANCE_LAG_DAYS:] if row["short_balance_ratio"] is not None]
     result["short_balance_ratio"] = published[0]["short_balance_ratio"] if published else None
@@ -192,6 +197,11 @@ def flow(rows: list[dict]) -> dict:
         "reason": None,
     })
     return result
+
+
+def _full_window_sum(rows: list[dict], column: str, window: int):
+    values = [row[column] for row in rows]
+    return sum(values) if len(values) == window and None not in values else None
 
 
 def annualized_volatility(values: list[float], days: int) -> float | None:
@@ -328,17 +338,25 @@ def _quarter_rows(connection, ticker: str, as_of: str) -> list[dict]:
 def _flow_rows(connection, ticker: str, as_of: str) -> list[dict]:
     columns = ("trade_date", "foreign_net_value", "inst_net_value", "individual_net_value",
                "short_volume_ratio", "short_balance_ratio", "market_cap")
+    # 행 N개가 아니라 거래일 달력(KOSPI 지수 거래일) N일. 그 종목 수급이 있는 마지막 거래일부터 센다.
+    # 수급 행이 없는 날도 빈 행으로 돌려줘서, 적재 공백이 있으면 flow()가 그 창을 계산하지 않게 한다
     rows = connection.execute(
         """
-        select f.trade_date, f.foreign_net_value, f.inst_net_value, f.individual_net_value,
+        with last as (
+            select max(trade_date) as day from investor_flow_daily where ticker = %s and trade_date <= %s::date
+        ), calendar as (
+            select i.trade_date from index_daily i, last
+            where i.index_code = %s and i.trade_date <= last.day
+            order by i.trade_date desc limit %s
+        )
+        select c.trade_date, f.foreign_net_value, f.inst_net_value, f.individual_net_value,
                f.short_volume_ratio, f.short_balance_ratio, p.market_cap
-        from investor_flow_daily f
-        left join price_data p on p.ticker = f.ticker and p.trade_date = f.trade_date
-        where f.ticker = %s and f.trade_date <= %s::date
-        order by f.trade_date desc
-        limit %s
+        from calendar c
+        left join investor_flow_daily f on f.ticker = %s and f.trade_date = c.trade_date
+        left join price_data p on p.ticker = %s and p.trade_date = c.trade_date
+        order by c.trade_date desc
         """,
-        (ticker, as_of, max(FLOW_WINDOWS) + SHORT_BALANCE_LAG_DAYS + 5),
+        (ticker, as_of, CALENDAR_INDEX, max(FLOW_WINDOWS) + SHORT_BALANCE_LAG_DAYS + 5, ticker, ticker),
     ).fetchall()
     return [dict(zip(columns, row)) for row in rows]
 

@@ -23,12 +23,12 @@ if __package__ in (None, ""):
 import pandas as pd
 import psycopg
 
+from crawling.config.clock import today_kst
 from crawling.analytics.monthly_correlation import MONTHLY_FACTORS, WINDOW_MONTHS, correlation
 from crawling.db.postgres import connect, upsert
 
 logger = logging.getLogger(__name__)
 
-RECENT_MONTHS = 3
 REQUEST_PAUSE_SECONDS = 0.2
 
 
@@ -55,11 +55,11 @@ def monthly_rows(ticker: str, frame: pd.DataFrame, current_month: date) -> list[
 def fetch_monthly_closes(connection: psycopg.Connection, tickers: list[str], start: date) -> int:
     from pykrx import stock
 
-    current = month_start(date.today())
+    current = month_start(today_kst())
     total = 0
     for position, ticker in enumerate(tickers, start=1):
         try:
-            frame = stock.get_market_ohlcv(start.strftime("%Y%m%d"), date.today().strftime("%Y%m%d"), ticker,
+            frame = stock.get_market_ohlcv(start.strftime("%Y%m%d"), today_kst().strftime("%Y%m%d"), ticker,
                                            freq="m", adjusted=True)
         except Exception as exc:  # 한 종목 실패로 전체를 멈추지 않는다
             logger.warning("%s 월봉 실패: %s", ticker, type(exc).__name__)
@@ -124,13 +124,16 @@ def _targets(connection: psycopg.Connection, tickers: list[str] | None) -> list[
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(name)s | %(message)s")
     parser = argparse.ArgumentParser(description="월말 종가 적재 + 월별 지표 상관")
-    parser.add_argument("--backfill", action="store_true", help=f"{WINDOW_MONTHS}개월 치 월말 종가부터 받기")
+    parser.add_argument("--backfill", action="store_true",
+                        help="(호환용) 지금은 매번 전체 기간을 받으므로 붙이지 않아도 같다")
     parser.add_argument("--tickers", nargs="+", default=None)
     parser.add_argument("--factors", nargs="+", default=list(MONTHLY_FACTORS))
     parser.add_argument("--skip-fetch", action="store_true", help="종가는 받지 않고 상관만 다시 계산")
     args = parser.parse_args()
-    current = month_start(date.today())
-    start = add_months(current, -(WINDOW_MONTHS + 2 if args.backfill else RECENT_MONTHS))
+    current = month_start(today_kst())
+    # 수정주가는 분할·증자가 생기면 과거 값 전체가 소급해서 바뀐다. 최근 몇 달만 다시 받으면 기준이 섞여
+    # 경계 달에 가짜 급등락이 생기므로, 매번 상관 창 전체를 다시 받는다(T1 100종목, 월 1회)
+    start = add_months(current, -(WINDOW_MONTHS + 2))
     with connect() as connection:
         tickers = _targets(connection, args.tickers)
         if not args.skip_fetch:

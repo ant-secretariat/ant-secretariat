@@ -7,7 +7,9 @@
 v0.7 변경 (수경 PR #29 검증 코멘트 2026-11-23, 유민 결정)
   - needs_review 였던 SENSITIVE_TO 9개 → status "rejected" (시장 효과를 빼면 관계가 남지 않음, REJECTED 표에 근거)
   - 시장 효과를 빼지 않은 상관은 노출하지 않는다: KOSPI(시장 자체)가 아닌 엣지는 market_adjusted 값이 올 때까지
-    status "needs_review", review_reason "market_unadjusted". 노출되는 SENSITIVE_TO 는 금융 ← KOSPI 하나
+    status "needs_review", review_reason "market_unadjusted"
+  - 섹터 → KOSPI(시장 동조) 엣지를 모든 섹터에 추가(수경 corr_daily 중앙값). 종목 3개 미만 섹터는 needs_review(low_n).
+    노출되는 SENSITIVE_TO 는 KOSPI 엣지 8개
   - 엣지에 market_adjusted 필드 (지금은 모두 False — 수경 값은 시장 효과를 빼지 않은 상관)
 
 v0.6 변경 (태은 PR #29 리뷰, ADR 0008 · 헌법 원칙 III·IV)
@@ -297,6 +299,12 @@ for s, m, sign, why in SENS:
     MERGED_FROM.setdefault((s, "KTB_3Y_KR"), []).append(m)
 SENS = _sens2
 
+# v0.7: 섹터 → KOSPI(시장 동조) 엣지를 모든 섹터에 둔다. 수경 표에 10개 섹터 값이 다 있고(corr_daily 중앙값),
+#   KOSPI는 시장 자체라 시장 효과를 뺄 대상이 아니다. 금융은 위 가설("증권 브로커리지")을 그대로 둔다.
+_has_kospi = {s for s, m, _, _ in SENS if m == "KOSPI"}
+SENS += [(s["sector_id"], "KOSPI", "+", "시장 동조(섹터 주가가 코스피와 같이 움직이는 정도)")
+         for s in SECTORS if s["sector_id"] not in _has_kospi]
+
 # v0.5: 수경이 섹터 중앙값을 집계해 줬다 (2026-11-10, PR #29 코멘트 · 값은 PR #34 뷰 기준).
 #   일별 = sector_sensitivities.corr_daily_median (KOSPI·USD_KRW·KTB_3Y_KR·KTB_10Y_KR, 최근 3년, as_of 2026-11-06)
 #   월별 = sector_monthly_correlations.corr_monthly_median (CPI_KR·BRENT·DRAM_EXPORT_PRICE, 최근 최대 120개월, 1달 시차)
@@ -380,6 +388,8 @@ def _sens_edge(s, m, sign, why):
         status, reason = "needs_review", check
     elif m not in MARKET_FACTORS and not market_adjusted:
         status, reason = "needs_review", "market_unadjusted"
+    elif n < LOW_N:  # 기각 기준과 같이 종목 3개 이상일 때만 노출 (필수소비재 2·유틸리티 1)
+        status, reason = "needs_review", "low_n"
     else:
         status = "active"
     return edge("SENSITIVE_TO", s, "SECTOR", m, "MACRO", status=status, reviewed=status in ("active", "rejected"),

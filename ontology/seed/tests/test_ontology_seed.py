@@ -53,7 +53,7 @@ def test_rejected_sensitivity_is_never_shown_and_keeps_its_basis():
 def test_market_unadjusted_sensitivity_waits_for_review():
     # 시장 효과를 빼지 않은 상관은 KOSPI(시장 자체)만 노출한다 (v0.7)
     exposed = o.edges("sensitive_to")
-    assert [(e["src"], e["dst"]) for e in exposed] == [("SEC_FIN", "KOSPI")]
+    assert {e["dst"] for e in exposed} == {"KOSPI"} and len(exposed) == 8
     pending = [e for e in o.load()["edges"]["sensitive_to"] if e["review_reason"] == "market_unadjusted"]
     assert len(pending) == 10 and all(e["status"] == "needs_review" and not e["market_adjusted"] for e in pending)
     ctx = o.company_context("005930", include_draft=True)  # 검수용으로는 보인다
@@ -82,3 +82,11 @@ def test_tickers_are_six_char_strings_and_weights_in_range():
     for e in o.load()["edges"]["sensitive_to"]:
         assert e["weight"] is None or -1 <= e["weight"] <= 1
         assert e["weight_low_n"] is None if e["weight"] is None else isinstance(e["weight_low_n"], bool)
+
+
+def test_every_sector_has_a_kospi_edge_and_low_n_ones_wait():
+    kospi = {e["src"]: e for e in o.load()["edges"]["sensitive_to"] if e["dst"] == "KOSPI"}
+    assert set(kospi) == set(o.nodes("sectors"))
+    assert all(e["weight"] is not None and e["source"] for e in kospi.values())
+    for sec in ("SEC_CONS_STAP", "SEC_UTIL"):  # 종목 2개·1개
+        assert kospi[sec]["status"] == "needs_review" and kospi[sec]["review_reason"] == "low_n"

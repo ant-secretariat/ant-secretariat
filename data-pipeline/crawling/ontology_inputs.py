@@ -26,7 +26,7 @@ import csv
 import json
 import logging
 import sys
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import numpy as np
@@ -35,7 +35,7 @@ import psycopg
 
 from crawling.analytics import ontology_inputs as oi
 from crawling.analytics.monthly_correlation import LEAD_MONTHS, WINDOW_MONTHS, monthly_log_changes
-from crawling.config.clock import today_kst
+from crawling.config.clock import KST, today_kst
 from crawling.db.postgres import connect
 
 logger = logging.getLogger(__name__)
@@ -226,10 +226,22 @@ def table_rows(rows: list[dict]) -> list[dict]:
 
 
 def save_sensitivities(connection, rows: list[dict]) -> int:
-    """기준일별로 쌓는다. 같은 기준일을 다시 돌리면 그 기준일 행만 새 값으로 바뀐다."""
+    """기준일별로 쌓는다. 같은 기준일을 다시 저장하면 그 기준일 행을 모두 지우고 새로 넣는다(한 트랜잭션).
+
+    다시 계산할 때 표본이 모자라 빠진 종목·지표의 예전 행이 남지 않게 하고, computed_at은 저장한 시각(KST)으로 바뀐다.
+    """
     from crawling.db.postgres import upsert
 
-    return upsert(connection, TABLE, table_rows(rows), key_columns=list(TABLE_KEY))
+    records = table_rows(rows)
+    if not records:
+        return 0
+    computed_at = datetime.now(KST)
+    for record in records:
+        record["computed_at"] = computed_at
+    as_ofs = sorted({date.fromisoformat(r["as_of"]) for r in records})
+    with connection.transaction():
+        connection.execute(f"delete from {TABLE} where as_of = any(%s)", (as_ofs,))
+        return upsert(connection, TABLE, records, key_columns=list(TABLE_KEY))
 
 
 def compute_monthly(connection, as_of: date, out_dir: Path, seed: Path | None, save: bool = False) -> list[Path]:

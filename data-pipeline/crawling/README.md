@@ -378,7 +378,7 @@ python -m crawling.ontology_inputs issue-evidence --seed ../ontology/seed/ontolo
 - 월별은 최근 최대 120개월, t월 종목 수익률과 t+1월 지표 변화이고, 시장은 핵심 종목 동일가중 평균 수익률입니다(DB의 코스피 지수가 3년 치뿐이라서). 이 평균에는 계산하는 종목 자신도 들어갑니다(98종목 중 1개라 영향은 작음).
 - `--as-of`로 과거 기준일을 주면 지표 값도 그날까지만 읽습니다. 월별 지표는 그 달 날짜 기준으로 자르고, 실제 공개일(공개 시차)은 반영하지 않습니다.
 - 종목 행(`--level ticker`, `monthly`의 `sensitivities_ticker`)에는 `p_value`와 지표별 Benjamini-Hochberg 보정 `q_value`가 있습니다. 한 지표를 여러 종목에서 볼 때 우연히 "방향 확실"로 나오는 것을 거를 때 씁니다.
-- `monthly --save`를 주면 민감도(종목·l1·l2)를 `ontology_sensitivity_inputs` 표에도 저장합니다(기준일별로 쌓음, 키 `as_of`·`level`·`group_id`·`factor`). 이 옵션만 DB에 쓰고, 나머지 명령은 모두 읽기만 합니다. 종목 행은 `n_obs`·`raw`·`adjusted`·`ci_low`·`ci_high`·`certain`·`p_value`·`q_value`, 섹터 행은 `n_tickers`·`raw_median`·`adjusted_median`·`same_sign`·`same_sign_ratio`·`n_certain`(+/−)·`n_obs_min`·`n_obs_max`를 채우고, 모든 행에 `method`(계산 방식·시장 대용)와 `window_start`·`window_end`(실제로 쓴 기간)가 있습니다.
+- `monthly --save`를 주면 민감도(종목·l1·l2)를 `ontology_sensitivity_inputs` 표에도 저장합니다(기준일별로 쌓음, 키 `as_of`·`level`·`group_id`·`factor`. `as_of`는 요청한 날 이전 마지막 거래일. 같은 기준일을 다시 저장하면 그 기준일 행을 지우고 새로 넣고, `computed_at`이 저장 시각으로 바뀜). 이 옵션만 DB에 쓰고, 나머지 명령은 모두 읽기만 합니다. 종목 행은 `n_obs`·`raw`·`adjusted`·`ci_low`·`ci_high`·`certain`·`p_value`·`q_value`, 섹터 행은 `n_tickers`·`raw_median`·`adjusted_median`·`same_sign`·`same_sign_ratio`·`n_certain`(+/−)·`n_obs_min`·`n_obs_max`를 채우고, 모든 행에 `method`(계산 방식·시장 대용)와 `window_start`·`window_end`(실제로 쓴 기간)가 있습니다.
 - `kind --seed`를 주면 시드 확정값(`seed_sub_industry`, `seed_is_holding`)과 차이(`sub_industry_differs`, `holding_differs`)를 같이 냅니다. 다음 달부터는 차이만 보면 됩니다.
 - 방향 판정(`direction`)은 신뢰구간이 0을 포함하지 않을 때만 붙고, 사건 분석은 같은 방향이 65% 이상일 때만 붙습니다.
 

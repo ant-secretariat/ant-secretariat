@@ -1,12 +1,14 @@
 -- 온톨로지 SENSITIVE_TO 입력값: 시장 효과를 뺀 민감도 (#56에서 형식 합의, #62 계산 코드)
 --
--- 매달 python -m crawling.ontology_inputs monthly --save 가 기준일(as_of)별로 행을 쌓는다(덮어쓰지 않음).
+-- 매달 python -m crawling.ontology_inputs monthly --save 가 기준일(as_of)별로 행을 쌓는다(다른 기준일은 덮어쓰지 않음).
+-- 같은 기준일을 다시 저장하면 그 기준일 행을 모두 지우고 새로 넣는다(한 트랜잭션, 빠진 종목의 예전 행이 남지 않게).
+-- 기본키에 method가 없다. 지금은 지표마다 방식이 하나라서이고, 시장 대용 등 방식을 바꾸면 키에 method를 넣는다.
 -- 시드는 이 표를 읽어 종목 → 매크로·섹터 → 매크로 엣지의 weight와 판정 근거를 채운다(#64).
 -- 한 표에 종목 행(level = 'ticker')과 섹터 행(level = 'l1' WICS 대분류, 'l2' 중분류)을 같이 둔다.
 --   종목 행: n_obs, raw, adjusted, ci_low, ci_high, certain, p_value, q_value
 --   섹터 행: n_tickers, raw_median, adjusted_median, same_sign, same_sign_ratio, n_certain, n_certain_pos, n_certain_neg, n_obs_min, n_obs_max
 create table public.ontology_sensitivity_inputs (
-    as_of            date not null,              -- 계산 기준일 (그날까지의 시세·지표만 씀)
+    as_of            date not null,              -- 계산 기준일 = 요청한 날 이전 마지막 거래일 (그날까지의 시세·지표만 씀)
     level            text not null check (level in ('ticker', 'l1', 'l2')),
     group_id         text not null,              -- 종목코드(ticker) 또는 섹터 이름(l1·l2)
     factor           text not null,              -- macro_data.indicator_id (KTB_3Y_KR, USD_KRW, BRENT, ...)
@@ -37,7 +39,7 @@ create table public.ontology_sensitivity_inputs (
     n_obs_min        integer,
     n_obs_max        integer,
 
-    computed_at      timestamptz not null default now(),
+    computed_at      timestamptz not null default now(),  -- 저장한 시각 (같은 기준일을 다시 저장하면 바뀜)
     primary key (as_of, level, group_id, factor),
     check (window_start <= window_end),
     check (

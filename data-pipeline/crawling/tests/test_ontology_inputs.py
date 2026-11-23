@@ -318,3 +318,47 @@ def test_migration_columns_match_table_rows():
     import crawling.ontology_inputs as cli
     cli_rows = table_rows(cli.summarize(per_ticker, {"A": ["A"]}, "ticker", date(2026, 11, 23)))
     assert set(cli_rows[0]) == columns
+
+
+class _RecordingConnection:
+    def __init__(self):
+        self.calls = []
+
+    def transaction(self):
+        import contextlib
+
+        @contextlib.contextmanager
+        def tx():
+            self.calls.append("begin")
+            yield
+            self.calls.append("commit")
+        return tx()
+
+    def execute(self, query, params=None):
+        self.calls.append((query, params))
+        return self
+
+
+def test_save_sensitivities_replaces_same_as_of_in_one_transaction(monkeypatch):
+    from datetime import date
+    import crawling.db.postgres as pg
+    from crawling.ontology_inputs import TABLE, save_sensitivities, summarize
+    saved = {}
+
+    def fake_upsert(connection, table, rows, key_columns):
+        connection.calls.append("upsert")
+        saved.update(table=table, rows=rows, key=key_columns)
+        return len(rows)
+
+    monkeypatch.setattr(pg, "upsert", fake_upsert)
+    t = pd.Timestamp("2026-11-23")
+    per_ticker = {("A", "USD_KRW"): oi.TickerSensitivity("A", "USD_KRW", "daily", 700, 0.1, 0.1, 0.03, 0.17, t, t)}
+    connection = _RecordingConnection()
+    assert save_sensitivities(connection, summarize(per_ticker, {"A": ["A"]}, "ticker", date(2026, 11, 23))) == 1
+    # 지우기와 넣기가 한 트랜잭션 안에서, 지우기 먼저
+    assert connection.calls[0] == "begin" and connection.calls[-1] == "commit"
+    delete = connection.calls[1]
+    assert delete[0].startswith(f"delete from {TABLE}") and delete[1] == ([date(2026, 11, 23)],)
+    assert connection.calls[2] == "upsert"
+    assert saved["rows"][0]["computed_at"].tzinfo is not None  # 저장 시각이 매번 새로 들어감
+    assert save_sensitivities(_RecordingConnection(), []) == 0

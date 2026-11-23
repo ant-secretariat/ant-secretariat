@@ -11,6 +11,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal, Optional, Tuple
 
+from core.errors import InvalidRequestError
+
 InsightBoardFeature = Literal["price", "macro", "disclosure"]
 RequestType = Literal["insight_board", "debate"]
 
@@ -38,10 +40,10 @@ class OrchestratorRequest:
 
     def __post_init__(self) -> None:
         if not self.companies:
-            raise ValueError("companies는 최소 1개 이상이어야 합니다.")
+            raise InvalidRequestError("companies는 최소 1개 이상이어야 합니다.")
         if len(self.companies) > 3:
-            raise ValueError("companies는 최대 3개까지만 지원합니다.")
+            raise InvalidRequestError("companies는 최대 3개까지만 지원합니다.")
         if self.request_type == "insight_board" and self.feature is None:
-            raise ValueError("insight_board 요청은 feature가 필요합니다.")
+            raise InvalidRequestError("insight_board 요청은 feature가 필요합니다.")
         if self.request_type == "debate" and len(self.companies) != 1:
-            raise ValueError("debate 요청은 기업을 1개만 선택해야 합니다.")
+            raise InvalidRequestError("debate 요청은 기업을 1개만 선택해야 합니다.")

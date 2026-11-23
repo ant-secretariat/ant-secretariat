@@ -198,9 +198,22 @@ def test_metric_failure_does_not_leak_url(monkeypatch, caplog):
     assert "SECRET" not in caplog.text
 
 
-STRUCTURED_ROW = ("삼성전자", date(2026, 11, 6), date(2026, 11, 6), date(2026, 8, 14), date(2026, 11, 4), True)
+# 회사명, (건수, 최신일) × 시세·매크로·재무·목표가·수급·지분공시·민감도, 시뮬레이션 준비
+STRUCTURED_ROW = (
+    "삼성전자",
+    740, date(2026, 11, 6),    # price
+    25, date(2026, 11, 6),     # macro (지표 수)
+    12, date(2026, 8, 14),     # financials (분기 수)
+    30, date(2026, 11, 4),     # target_price
+    700, date(2026, 11, 6),    # flow
+    0, None,                   # insider
+    4, date(2026, 11, 1),      # sensitivity (요인 수)
+    True,
+)
 NO_DOCUMENTS = (0, None, 0, None, 0, None)
 STATUS_KEYS = {"ticker", "report_count", "news_count", "disclosure_count", "derived_snapshot_available"}
+SOURCE_KEYS = {"report", "news", "disclosure", "price", "macro", "target_price",
+               "financials", "flow", "insider", "sensitivity", "derived"}
 
 
 def test_status_follows_contract_and_keeps_previous_shape(monkeypatch):
@@ -209,8 +222,9 @@ def test_status_follows_contract_and_keeps_previous_shape(monkeypatch):
     result = get_available_data_status("005930")
 
     assert set(result) >= STATUS_KEYS
+    assert "error" not in result
     assert (result["report_count"], result["news_count"], result["disclosure_count"]) == (0, 0, 0)
-    assert result["derived_snapshot_available"] is False
+    assert result["derived_snapshot_available"] is True   # 시세·재무가 있으면 계산 근거를 낼 수 있다
     assert result["collection_job_status"] is None
     assert result["simulation_ready"] is True
     assert result["company"] == "삼성전자"
@@ -219,6 +233,33 @@ def test_status_follows_contract_and_keeps_previous_shape(monkeypatch):
     assert result["available"]["price_data"] is True
     assert result["available"]["reports"] is False
     assert result["latest"]["price_date"] == "2026-11-06"
+
+
+def test_status_sources_have_eleven_keys_for_precheck(monkeypatch):
+    _use(monkeypatch, FakeConnection(STRUCTURED_ROW + NO_DOCUMENTS))
+
+    sources = get_available_data_status("005930")["sources"]
+
+    assert set(sources) == SOURCE_KEYS
+    assert all(set(value) == {"count", "latest"} for value in sources.values())
+    assert sources["price"] == {"count": 740, "latest": "2026-11-06"}
+    assert sources["financials"] == {"count": 12, "latest": "2026-08-14"}
+    assert sources["flow"] == {"count": 700, "latest": "2026-11-06"}
+    assert sources["insider"] == {"count": 0, "latest": None}
+    assert sources["sensitivity"] == {"count": 4, "latest": "2026-11-01"}
+    assert sources["derived"] == {"count": 1, "latest": "2026-11-06"}
+    assert sources["report"] == {"count": 0, "latest": None}
+
+
+def test_status_derived_needs_price_and_financials(monkeypatch):
+    row = list(STRUCTURED_ROW)
+    row[5], row[6] = 0, None   # 재무 없음
+    _use(monkeypatch, FakeConnection(tuple(row) + NO_DOCUMENTS))
+
+    result = get_available_data_status("005930")
+
+    assert result["sources"]["derived"] == {"count": 0, "latest": None}
+    assert result["derived_snapshot_available"] is False
 
 
 def test_status_counts_documents_from_supabase_chunks(monkeypatch):
@@ -230,12 +271,13 @@ def test_status_counts_documents_from_supabase_chunks(monkeypatch):
 
     assert "document_chunks" in connection.queries[0][0] and "mentioned_tickers" in connection.queries[0][0]
     assert (result["report_count"], result["news_count"], result["disclosure_count"]) == (19, 120, 16)
+    assert result["sources"]["news"] == {"count": 120, "latest": "2026-11-09"}
     assert result["as_of_dates"]["report"] == "2026-11-04"
     assert result["as_of_dates"]["disclosure"] == "2026-10-29"
     assert result["available"]["reports"] is True
 
 
-def test_status_survives_supabase_failure(monkeypatch, caplog):
+def test_status_failure_is_not_reported_as_no_data(monkeypatch, caplog):
     def fail():
         raise RuntimeError("postgresql://user:SECRET@host/db")
 
@@ -243,6 +285,30 @@ def test_status_survives_supabase_failure(monkeypatch, caplog):
 
     result = get_available_data_status("005930")
 
-    assert result["simulation_ready"] is False
-    assert result["available"]["price_data"] is False
+    # 실패는 "데이터 없음"과 구분된다: error가 붙고, 모르는 값은 0·false가 아니라 null이다
+    assert result["error"] == "data_status_unavailable"
+    assert result["sources"] == {}
+    assert set(result) >= STATUS_KEYS   # 키 모양은 성공과 같다
+    assert (result["report_count"], result["news_count"], result["disclosure_count"]) == (None, None, None)
+    assert result["derived_snapshot_available"] is None
+    assert result["simulation_ready"] is None
+    assert result["company"] is None
+    assert set(result["available"]) == {"reports", "news", "disclosures", "price_data", "macro_data",
+                                        "target_price_data"}
+    assert all(value is None for value in result["available"].values())
+    assert all(value is None for value in result["latest"].values())
     assert "SECRET" not in caplog.text
+
+
+def test_status_unknown_company_name_is_null(monkeypatch):
+    _use(monkeypatch, FakeConnection((None,) + STRUCTURED_ROW[1:] + NO_DOCUMENTS))
+
+    assert get_available_data_status("999999")["company"] is None
+
+
+def test_status_reads_each_document_type_once(monkeypatch):
+    connection = _use(monkeypatch, FakeConnection(STRUCTURED_ROW + NO_DOCUMENTS))
+
+    get_available_data_status("005930")
+
+    assert connection.queries[0][0].count("from document_chunks") == 3

@@ -64,6 +64,12 @@ get_metric("000660", "foreign_net_buy_20d", "2026-11-10")
 
 증감을 나타내는 지표(`foreign_net_buy_20d`, `inst_net_buy_20d`, `individual_net_buy_20d`, `revenue_growth_yoy`, `insider_net_shares_90d`, `major_holder_ratio_change_90d`)는 양수에 `+`를 붙입니다.
 
+반올림을 먼저 하고, 반올림한 값으로 단위와 부호를 고릅니다.
+- 999,999,600,000원은 `10,000억 원`이 아니라 `1조 원`입니다.
+- −99,999,999.6원은 `-1억 원`입니다.
+- 증감 지표 0.004%는 `+0%`가 아니라 `0%`입니다. 반올림해서 0이 되면 `+`·`-`를 붙이지 않습니다.
+- 값이 NaN·무한대면 `display`는 `null`입니다(`value`가 `null`일 때와 같음).
+
 ## 플레이스홀더 치환 (토론 검증 레이어와의 약속)
 
 - 문장에는 `{{metric_id}}`(단일 종목) 또는 `{{종목코드.metric_id}}`(비교 모드)로 적고, `get_metric` 결과의 `display`로 바꿉니다

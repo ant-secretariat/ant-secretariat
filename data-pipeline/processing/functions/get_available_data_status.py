@@ -1,4 +1,5 @@
 import logging
+from processing.functions.get_target_price_data import has_target_price_data
 from processing.interfaces import BaseRelationalDB, BaseVectorDB
 
 logger = logging.getLogger(__name__)
@@ -52,12 +53,6 @@ def get_available_data_status(
         "SELECT COUNT(*) as cnt, MAX(date) as latest FROM macro_data",
     ).fetchone()
 
-    # 목표주가
-    target_row = conn.execute(
-        "SELECT COUNT(*) as cnt FROM target_price_data WHERE ticker = ?",
-        (ticker,),
-    ).fetchone()
-
     conn.close()
 
     return {
@@ -69,7 +64,7 @@ def get_available_data_status(
             "disclosures":       disclosure_row["cnt"] > 0,
             "price_data":        price_row["cnt"] > 0,
             "macro_data":        macro_row["cnt"] > 0,
-            "target_price_data": target_row["cnt"] > 0,
+            "target_price_data": has_target_price_data(ticker),
         },
         "latest": {
             "report_date":     report_row["latest"],

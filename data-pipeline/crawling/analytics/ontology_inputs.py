@@ -53,6 +53,28 @@ def correlation_ci(r: float, n: int, n_controls: int = 0) -> tuple[float | None,
     return math.tanh(z - half), math.tanh(z + half)
 
 
+def correlation_p_value(r: float, n: int, n_controls: int = 0) -> float | None:
+    """Fisher 변환 기준 양측 p값 (신뢰구간과 같은 근사)."""
+    dof = n - n_controls - 3
+    if dof <= 0 or not math.isfinite(r):
+        return None
+    z = abs(math.atanh(max(min(r, 0.999999), -0.999999))) * math.sqrt(dof)
+    return math.erfc(z / math.sqrt(2))
+
+
+def bh_q_values(p_values: list[float]) -> list[float]:
+    """Benjamini-Hochberg 보정 q값. 같은 지표를 여러 종목에서 볼 때 우연히 확실로 나오는 비율을 줄인다."""
+    m = len(p_values)
+    order = sorted(range(m), key=lambda i: p_values[i])
+    q = [0.0] * m
+    running = 1.0
+    for rank in range(m, 0, -1):
+        i = order[rank - 1]
+        running = min(running, p_values[i] * m / rank)
+        q[i] = running
+    return q
+
+
 def is_certain(low: float | None, high: float | None) -> bool:
     """신뢰구간이 0을 포함하지 않으면 방향이 확실하다."""
     return low is not None and high is not None and (low > 0 or high < 0)
@@ -165,7 +187,8 @@ def lead_correlation(x: pd.Series, y: pd.Series, lead: int, min_obs: int) -> dic
     r = float(frame["x"].corr(frame["y"]))
     low, high = correlation_ci(r, len(frame))
     return {"corr": round(r, 4), "ci_low": round(low, 4), "ci_high": round(high, 4), "n": len(frame),
-            "certain": is_certain(low, high)}
+            "certain": is_certain(low, high),
+            "window": f"{frame.index.min():%Y-%m}~{frame.index.max():%Y-%m}"}  # x(t)의 달 기준
 
 
 def step_events(levels: pd.Series) -> list[tuple[pd.Timestamp, float]]:
@@ -226,9 +249,13 @@ SUB_INDUSTRY_RULES: list[tuple[str, str, str]] = [
     ("product", r"방산|유도무기|무기체계|총포|탄약|육해공군|전투지휘|탐지추적", "방산"),
     ("product", r"원자로|원전|터빈|터어빈", "발전설비"),
     ("product", r"로봇", "로봇"),
+    ("product", r"동박적층판", "전자소재(CCL)"),
+    ("product", r"MLCC", "MLCC·패키지기판"),
+    ("product", r"반도체 소켓|테스트 소켓", "반도체 테스트 소켓"),
+    ("product", r"카메라모듈|카메라 모듈", "카메라모듈·기판"),
+    ("product", r"P\.?C\.?B|인쇄회로기판", "PCB"),
     ("industry", r"기초 화학물질|합성수지|석유화학", "화학"),
-    ("industry", r"인쇄회로기판|전자부품", "전자부품·PCB"),
-    ("product", r"P\.?C\.?B|인쇄회로기판", "전자부품·PCB"),
+    ("industry", r"인쇄회로기판|전자부품", "전자부품"),
     ("industry", r"반도체 제조용 기계|특수 목적용 기계", "반도체 장비"),
     ("product", r"반도체.*장비|후공정장비", "반도체 장비"),
     ("industry", r"해상 운송", "해운"),
@@ -266,9 +293,16 @@ def sub_industry_candidate(industry: str, product: str) -> tuple[str | None, str
 
 
 def holding_candidate(name: str, industry: str, product: str) -> tuple[bool, str | None]:
-    """지주사 후보와 근거. 이름에 지주·홀딩스가 있거나, 업종이 기타 금융업이면서 주요제품에 지주가 있으면."""
+    """지주사 후보와 근거.
+
+    - name: 이름에 지주·홀딩스
+    - kind_industry_product: 업종이 기타 금융업이고 주요제품에 지주
+    - kind_industry_financial_name: 업종이 기타 금융업이고 이름에 금융 (금융지주. 예: KB금융은 주요제품이 비어 있음)
+    """
     if HOLDING_NAME.search(name or ""):
         return True, "name"
     if (industry or "") == HOLDING_INDUSTRY and "지주" in (product or ""):
         return True, "kind_industry_product"
+    if (industry or "") == HOLDING_INDUSTRY and "금융" in (name or ""):
+        return True, "kind_industry_financial_name"
     return False, None

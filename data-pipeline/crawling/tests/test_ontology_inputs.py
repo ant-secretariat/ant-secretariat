@@ -170,8 +170,9 @@ def test_summarize_ticker_rows_keep_ci_and_sector_rows_aggregate():
     per_ticker = {("A", "USD_KRW"): oi.TickerSensitivity("A", "USD_KRW", "daily", 700, -0.1, -0.09, -0.16, -0.02),
                   ("B", "USD_KRW"): oi.TickerSensitivity("B", "USD_KRW", "daily", 700, 0.0, 0.01, -0.06, 0.08)}
     rows = summarize(per_ticker, {"A": ["A"], "B": ["B"]}, "ticker", date(2026, 11, 23))
-    assert rows[0] == {"level": "ticker", "group": "A", "factor": "USD_KRW", "frequency": "daily", "as_of": "2026-11-23",
-                       "n_obs": 700, "raw": -0.1, "adjusted": -0.09, "ci_low": -0.16, "ci_high": -0.02, "certain": True}
+    assert {k: rows[0][k] for k in ("group", "n_obs", "raw", "adjusted", "ci_low", "ci_high", "certain")} == {
+        "group": "A", "n_obs": 700, "raw": -0.1, "adjusted": -0.09, "ci_low": -0.16, "ci_high": -0.02, "certain": True}
+    assert 0 < rows[0]["p_value"] < 0.05 and rows[0]["q_value"] >= rows[0]["p_value"]
     sector = summarize(per_ticker, {"IT": ["A", "B"]}, "l1", date(2026, 11, 23))
     assert sector[0]["n_tickers"] == 2 and sector[0]["certain"] == 1
     grades = sector_grades(sector, 0.10, 0.05, 0.05)
@@ -192,9 +193,81 @@ def test_cli_monthly_args():
     ("무기 및 총포탄 제조업", "정밀유도무기 등", "방산"),
     ("항공기,우주선 및 부품 제조업", "정부방산 및 완제기 수출", "방산·항공"),
     ("특수 목적용 기계 제조업", "반도체 후공정장비,반도체금형 제조", "반도체 장비"),
-    ("전자부품 제조업", "P.C.B(인쇄회로기판),M.L.B 제조", "전자부품·PCB"),
+    ("전자부품 제조업", "P.C.B(인쇄회로기판),M.L.B 제조", "PCB"),
     ("일차전지 및 이차전지 제조업", "2차전지 (소형,ESS,자동차전지)", "2차전지"),
     ("일차전지 및 이차전지 제조업", "양극활물질", "2차전지 소재"),
 ])
 def test_sub_industry_rules_fixed_cases(industry, product, label):
     assert oi.sub_industry_candidate(industry, product)[0] == label
+
+
+def test_p_value_matches_ci_certainty():
+    # 신뢰구간이 0을 겨우 안 포함하면 p값은 0.05 근처, 포함하면 0.05보다 큼
+    low, high = oi.correlation_ci(0.08, 727, n_controls=1)
+    assert oi.is_certain(low, high) and oi.correlation_p_value(0.08, 727, 1) < 0.05
+    low, high = oi.correlation_ci(0.05, 727, n_controls=1)
+    assert not oi.is_certain(low, high) and oi.correlation_p_value(0.05, 727, 1) > 0.05
+    assert oi.correlation_p_value(0.5, 3) is None
+
+
+def test_bh_q_values():
+    q = oi.bh_q_values([0.01, 0.04, 0.03, 0.5])
+    # 정렬: 0.01(1), 0.03(2), 0.04(3), 0.5(4) → 0.04, 0.0533, 0.0533, 0.5
+    assert q == pytest.approx([0.04, 0.16 / 3, 0.16 / 3, 0.5])
+    assert oi.bh_q_values([]) == []
+
+
+def test_add_q_values_is_per_factor():
+    from crawling.ontology_inputs import add_q_values
+    rows = [{"factor": "A", "p_value": 0.01}, {"factor": "A", "p_value": 0.04},
+            {"factor": "B", "p_value": 0.04}, {"factor": "B", "p_value": None}]
+    add_q_values(rows)
+    assert [r["q_value"] for r in rows] == [0.02, 0.04, 0.04, None]
+
+
+def test_holding_candidate_financial_holding_without_product():
+    assert oi.holding_candidate("KB금융", "기타 금융업", "-") == (True, "kind_industry_financial_name")
+    assert oi.holding_candidate("삼성생명", "보험업", "생명보험") == (False, None)
+
+
+@pytest.mark.parametrize("industry, product, label", [
+    ("전자부품 제조업", "동박적층판 등 제조 및 판매, 유압기기 등 제조 및 판매", "전자소재(CCL)"),
+    ("전자부품 제조업", "수동소자 (MLCC, Inductor, Chip Resistor 등), 모듈(카메라모듈, 통신모듈), 반도체패키지 기판", "MLCC·패키지기판"),
+    ("전자부품 제조업", "리노핀, 반도체 소켓 등", "반도체 테스트 소켓"),
+    ("전자부품 제조업", "기타 전자부품 제조업", "전자부품"),
+])
+def test_sub_industry_electronic_parts_split(industry, product, label):
+    assert oi.sub_industry_candidate(industry, product)[0] == label
+
+
+def test_lead_correlation_reports_actual_window():
+    x = _series(np.arange(48, dtype=float) % 5, start="2020-01-01", freq="MS")
+    result = oi.lead_correlation(x, x.shift(1), lead=1, min_obs=24)
+    assert result["window"] == "2020-01~2023-11"  # x(t)의 달 기준
+
+
+class _FakeConnection:
+    def __init__(self, rows):
+        self.rows = rows
+
+    def execute(self, *_):
+        return self
+
+    def fetchall(self):
+        return self.rows
+
+
+def test_compute_kind_compares_with_seed(tmp_path):
+    from crawling.ontology_inputs import compute_kind
+    kind = tmp_path / "kind.html"
+    kind.write_bytes(KIND_HTML.encode("euc-kr"))
+    seed = tmp_path / "seed.json"
+    seed.write_text(json.dumps({"nodes": {"companies_t1": [
+        {"ticker": "000500", "sub_industry": "전선", "is_holding": False},
+        {"ticker": "402340", "sub_industry": "SK하이닉스 지분 투자회사", "is_holding": True, "holding_type": "legal"},
+    ]}}), encoding="utf-8")
+    connection = _FakeConnection([("000500", "가온전선", "산업재", "자본재"), ("402340", "SK스퀘어", "IT", "반도체")])
+    rows = {r["ticker"]: r for r in compute_kind(connection, kind, seed)}
+    assert rows["000500"]["sub_industry_differs"] is False and rows["000500"]["holding_differs"] is False
+    assert rows["402340"]["seed_sub_industry"] == "SK하이닉스 지분 투자회사" and rows["402340"]["sub_industry_differs"] is True
+    assert rows["402340"]["seed_holding_type"] == "legal" and rows["402340"]["holding_differs"] is False

@@ -98,9 +98,13 @@ def _monthly_frame(connection: psycopg.Connection, as_of: date):
     return returns, market
 
 
-def _macro_series(connection: psycopg.Connection, indicator: str, frequency: str | None = None) -> pd.Series:
-    query = "select date, value from macro_data where indicator_id = %s"
-    params: list = [indicator]
+def _macro_series(connection: psycopg.Connection, indicator: str, as_of: date, frequency: str | None = None) -> pd.Series:
+    """as_of까지의 지표 값. 과거 기준일로 다시 돌려도 그 뒤 값이 섞이지 않게 한다(재현성).
+
+    월별 지표는 날짜(그 달) 기준으로 자른다. 실제 공개일은 더 늦을 수 있다(공개 시차는 반영하지 않음).
+    """
+    query = "select date, value from macro_data where indicator_id = %s and date <= %s"
+    params: list = [indicator, as_of]
     if frequency:
         query += " and frequency = %s"
         params.append(frequency)
@@ -136,7 +140,7 @@ def ticker_sensitivities(connection, as_of: date) -> tuple[date, dict[tuple[str,
 
     monthly_changes = {}
     for factor in MONTHLY_FACTORS:
-        change = monthly_log_changes(_macro_series(connection, factor, "monthly"))
+        change = monthly_log_changes(_macro_series(connection, factor, end, "monthly"))
         change.index = change.index - pd.DateOffset(months=LEAD_MONTHS)  # t+1월 변화를 t월 자리에
         monthly_changes[factor] = change
 
@@ -170,10 +174,27 @@ def summarize(per_ticker: dict, groups: dict[str, list[str]], level: str, end: d
             if level == "ticker":
                 r = rows[0]
                 out.append({**base, "n_obs": r.n, "raw": round(r.raw, 4), "adjusted": round(r.adjusted, 4),
-                            "ci_low": round(r.ci_low, 4), "ci_high": round(r.ci_high, 4), "certain": r.certain})
+                            "ci_low": round(r.ci_low, 4), "ci_high": round(r.ci_high, 4), "certain": r.certain,
+                            "p_value": oi.correlation_p_value(r.adjusted, r.n, n_controls=1)})
             else:
                 out.append({**base, **oi.sector_summary(rows)})
+    if level == "ticker":
+        add_q_values(out)
     return out
+
+
+def add_q_values(rows: list[dict]) -> None:
+    """종목 행의 p값을 지표(factor)별로 BH 보정해 q_value를 붙인다."""
+    by_factor: dict[str, list[dict]] = {}
+    for row in rows:
+        if row.get("p_value") is not None:
+            by_factor.setdefault(row["factor"], []).append(row)
+    for group in by_factor.values():
+        for row, q in zip(group, oi.bh_q_values([r["p_value"] for r in group])):
+            row["q_value"] = round(q, 4)
+    for row in rows:
+        row["p_value"] = None if row.get("p_value") is None else round(row["p_value"], 6)
+        row.setdefault("q_value", None)
 
 
 def compute_monthly(connection, as_of: date, out_dir: Path, seed: Path | None) -> list[Path]:
@@ -243,12 +264,12 @@ def compute_macro_direction(connection, as_of: date) -> list[dict]:
             out.append({"indicator": name, "frequency": "daily", "window": f"{start}~{end}", **result})
     _, m_market = _monthly_frame(connection, end)
     for name in MONTHLY_FACTORS:
-        change = monthly_log_changes(_macro_series(connection, name, "monthly")).tail(WINDOW_MONTHS)
+        change = monthly_log_changes(_macro_series(connection, name, end, "monthly")).tail(WINDOW_MONTHS)
         result = oi.macro_direction(change, m_market, oi.MIN_MONTHLY_OBS)
         if result:
             out.append({"indicator": name, "frequency": "monthly", "window": f"최근 {WINDOW_MONTHS}개월",
                         "market": "핵심 종목 동일가중 평균", **result})
-    base = _macro_series(connection, "BASE_RATE_KR")
+    base = _macro_series(connection, "BASE_RATE_KR", end)
     events = [e for e in oi.step_events(base) if e[0].date() >= start]
     kospi_level = _kospi_level(connection, start, end)
     response = oi.event_response(events, np.log(kospi_level) * 100)
@@ -270,29 +291,28 @@ def _kospi_level(connection, start: date, end: date) -> pd.Series:
 def compute_impacts(connection, as_of: date) -> list[dict]:
     end = _as_of(connection, as_of)
     out = []
-    base = _macro_series(connection, "BASE_RATE_KR")
-    events = [e for e in oi.step_events(base) if e[0].date() <= end]
+    base = _macro_series(connection, "BASE_RATE_KR", end)
+    events = oi.step_events(base)
     for src, dst in EVENT_IMPACTS:
-        target = _macro_series(connection, dst)
+        target = _macro_series(connection, dst, end)
         result = oi.event_response(events, target if dst != "USD_KRW" else np.log(target) * 100)
         if result:
             out.append({"src": src, "dst": dst, "method": "event_-1d_+5d", "window": f"{events[0][0].date()}~{end}",
                         **result})
     _, m_market = _monthly_frame(connection, end)
     for src, dst, lead in MONTHLY_IMPACTS:
-        x = _monthly_change(_macro_series(connection, src), "diff" if src == "BASE_RATE_KR" else "log")
-        y = m_market if dst == "KOSPI" else _monthly_change(_macro_series(connection, dst),
+        x = _monthly_change(_macro_series(connection, src, end), "diff" if src == "BASE_RATE_KR" else "log")
+        y = m_market if dst == "KOSPI" else _monthly_change(_macro_series(connection, dst, end),
                                                              "diff" if dst == "BASE_RATE_KR" else "log")
         result = oi.lead_correlation(x.tail(WINDOW_MONTHS * 2), y, lead, oi.MIN_MONTHLY_OBS)
         if result:
             direction = "unclear" if not result["certain"] else ("same" if result["corr"] > 0 else "opposite")
-            out.append({"src": src, "dst": dst, "method": f"monthly_corr_lead{lead}",
-                        "window": "2000년~" if src != "DRAM_EXPORT_PRICE" else "지표 전체", "direction": direction,
+            out.append({"src": src, "dst": dst, "method": f"monthly_corr_lead{lead}", "direction": direction,
                         **result})
     return out
 
 
-def compute_kind(connection, kind_file: Path | None) -> list[dict]:
+def compute_kind(connection, kind_file: Path | None, seed: Path | None = None) -> list[dict]:
     if kind_file:
         raw = kind_file.read_bytes()
     else:
@@ -303,6 +323,11 @@ def compute_kind(connection, kind_file: Path | None) -> list[dict]:
     core = connection.execute(
         "select ticker, name, sector_l1, sector_l2 from companies where is_core order by ticker"
     ).fetchall()
+    seeded = {}
+    if seed:
+        data = json.loads(seed.read_text(encoding="utf-8"))
+        nodes = data["nodes"].get("companies_t1") or data["nodes"].get("companies") or []
+        seeded = {c["ticker"]: c for c in nodes}
     out = []
     for ticker, name, l1, l2 in core:
         kind = rows.get(ticker, {})
@@ -313,6 +338,15 @@ def compute_kind(connection, kind_file: Path | None) -> list[dict]:
                     "kind_product": product, "sub_industry_candidate": label or "", "rule": rule or "",
                     "is_holding_candidate": holding, "holding_reason": holding_reason or "",
                     "in_kind": bool(kind)})
+        if seed:
+            node = seeded.get(ticker, {})
+            seed_sub = node.get("sub_industry") or ""
+            out[-1].update({
+                "seed_sub_industry": seed_sub, "seed_sub_industry_source": node.get("sub_industry_source") or "",
+                "sub_industry_differs": bool(label or seed_sub) and (label or "") != seed_sub,
+                "seed_is_holding": node.get("is_holding"), "seed_holding_type": node.get("holding_type") or "",
+                "holding_differs": node.get("is_holding") is not None and bool(node.get("is_holding")) != holding,
+            })
     return out
 
 
@@ -382,6 +416,7 @@ def parse_args(argv=None) -> argparse.Namespace:
             p.add_argument("--neutral", type=float, default=0.05)
         if name == "kind":
             p.add_argument("--kind-file", type=Path, default=None, help="미리 받은 KIND 목록 파일 (없으면 내려받음)")
+            p.add_argument("--seed", type=Path, default=None, help="온톨로지 시드 JSON (확정값과 차이를 같이 냄)")
         if name == "monthly":
             p.add_argument("--out-dir", type=Path, default=Path("ontology_inputs_out"), help="기준일 폴더를 만들 위치")
             p.add_argument("--seed", type=Path, default=None, help="온톨로지 시드 JSON (섹터 민감도에 가설·상태 붙임)")
@@ -417,7 +452,7 @@ def main(argv=None) -> None:
         elif args.command == "impacts":
             rows = compute_impacts(connection, as_of)
         else:
-            rows = compute_kind(connection, args.kind_file)
+            rows = compute_kind(connection, args.kind_file, args.seed)
     write_csv(rows, args.out)
 
 

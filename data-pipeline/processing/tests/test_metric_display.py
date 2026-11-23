@@ -34,6 +34,18 @@ from processing.tests.test_metric_and_status import FakeConnection, _use
         ("insider_net_shares_90d", -8499.0, "주", "-8,499주"),
         ("insider_sell_reports_90d", 3.0, "건", "3건"),
         ("per", None, "배", None),
+        # 반올림한 뒤 단위·부호를 고른다 (#36 리뷰)
+        ("market_cap", 999_999_600_000.0, "원", "1조 원"),
+        ("foreign_net_buy_20d", -99_999_999.6, "원", "-1억 원"),
+        ("revenue_growth_yoy", 0.004, "%", "0%"),
+        ("revenue_growth_yoy", -0.004, "%", "0%"),
+        ("individual_net_buy_20d", 0.4, "원", "0원"),
+        ("individual_net_buy_20d", -0.4, "원", "0원"),
+        ("inst_net_buy_20d", 99_999_999.4, "원", "+99,999,999원"),
+        ("inst_net_buy_20d", 99_999_999.5, "원", "+1억 원"),
+        ("market_cap", 999_999_400_000.0, "원", "9,999.99억 원"),
+        ("market_cap", -999_999_600_000.0, "원", "-1조 원"),
+        ("close", 1_176_000.4, "원", "1,176,000원"),
     ],
 )
 def test_format_display(metric_id, value, unit, expected):

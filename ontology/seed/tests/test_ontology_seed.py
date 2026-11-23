@@ -136,3 +136,13 @@ def test_company_sensitivity_edges_follow_the_exposure_rule():
     assert all(e["src_type"] == "SECTOR" for f in ("daily", "monthly") for e in ctx["sector_sensitivities"][f])
     assert o.company_context("278470")["company_sensitivities"] == {"daily": [], "monthly": []}  # 가설과 반대라 제외
 
+
+def test_company_sensitivity_chip_text_is_not_causal():
+    # 수경 #64 리뷰: 월별은 "주가가 다음 달 지표 변화를 먼저 반영"하는 관계라 원인처럼 쓰지 않는다
+    co = {(e["src"], e["dst"]): e for e in o.edges("sensitive_to") if e["src_type"] == "COMPANY"}
+    dram = co[("005930", "DRAM_EXPORT_PRICE")]["chip_text"]
+    assert "경향" in dram and "다음 달" in dram and "같은 방향" in dram
+    assert "약한 경향" in co[("003490", "KTB_3Y_KR")]["chip_text"]
+    assert all(not e["hypothesis_preregistered"] and e["hypothesis_fixed_on"] == "2026-11-23" for e in co.values())
+    assert all(e["rationale"].endswith("수 있음") for e in co.values())
+

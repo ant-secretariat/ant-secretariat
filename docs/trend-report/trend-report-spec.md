@@ -2,12 +2,13 @@
 
 | 항목 | 값 |
 | --- | --- |
-| 버전 | **v2.1** (2026-11-23) |
+| 버전 | **v2.2** (2026-11-24) |
 | 상태 | 검토 중 |
 | 담당 | 태은 |
 | 기능 ID | FN-TR-01 (카드 생성), FN-TR-02 (근거 연결) |
 | 계약 | [`openapi.yaml`](../api/openapi.yaml) `POST /orchestrate/trend-report`, `TrendReportResult` |
 | 관련 결정 | ADR 0005 (pgvector), ADR 0006 (DataTier), ADR 0010 (컨센서스 180일) |
+| 후속 이슈 | #81 근거 개수 실험, #82 목표주가 방향 경계값 |
 | 구현 계획 | [`specs/001-orchestrator-trend-insight/`](../../specs/001-orchestrator-trend-insight/plan.md) |
 
 ## 변경 이력
@@ -17,7 +18,8 @@
 | v1.0 | 2026-10-13 | Notion 아키텍처 초안 7.1 (절차형 단계 + 근거 부족 루프) |
 | v1.1 | 2026-11-05 | Notion 시그니처 계약 3장 (`select_evidence` 등 5단계, `TrendCards`) |
 | v2.0 | 2026-11-23 | 저장소로 이관. Pinecone·SQLite 경로 제거, `get_agent_context`·컨센서스(ADR 0010) 기준으로 수정, 목표주가 방향 계산 규칙·`BrokerView`·`verification` 정의, 근거 부족 루프를 S1~S3로 한정 |
-| **v2.1** | 2026-11-23 | 실행 조건(1.1) 추가 — 오케스트레이터 기획서 v2.1 5.3 경로별 실행 조건 표와 연결 (#68 리뷰) |
+| v2.1 | 2026-11-23 | 실행 조건(1.1) 추가 — 오케스트레이터 기획서 v2.1 5.3 경로별 실행 조건 표와 연결 (#68 리뷰) |
+| **v2.2** | 2026-11-24 | #69 리뷰 반영: `intent`를 단일 값으로, `as_of`를 각 함수에 직접 전달, 근거 개수는 초기값(#81), 매크로 문서 0건 → 정형 값만, 증권사 이름은 `broker_key`로 매칭, **목표주가 방향을 개정 비율 방식으로 교체**(#82), 변동성 표기 |
 
 ### v1.1 → v2.0 무엇이 바뀌었나
 
@@ -60,19 +62,20 @@ class TrendReportRequest:
     sector: str = ""
     tier: Tier = Tier.T1
     query: str | None = None             # 없으면 기본 질의 "{company} {sector} 실적 전망 …"
-    intent: list[AgendaId] | None = None # get_agent_context에 그대로 전달
+    intent: AgendaId | None = None       # 질문 주제(아젠다) 하나. 버튼 경로는 보통 None
     date_from: str | None = None
     date_to: str | None = None
     as_of_date: str | None = None        # 없으면 today_kst()
 ```
 
 - `as_of_date`는 모든 데이터 조회의 상한이다. `as_of` 이후에 발표된 문서·목표가는 쓰지 않는다(헌법 원칙 III, look-ahead 금지).
+- `intent`는 **AgendaId**(질문이 묻는 주제: `valuation`·`macro`·`risk`·`growth`·`shareholder_return`·`flow`)다. 에이전트 종류는 `get_agent_context`의 `agent_type="trend_report"`가 따로 맡는다. 데이터 함수(#53)와 계약이 값 하나만 받으므로 리스트로 두지 않는다.
 
 ## 3. 처리 단계
 
 ```text
-① 데이터 조회   get_agent_context(ticker, "trend_report", query, intent)   [수경 #53]
-                 → report/news/macro 문서, target_prices, price_data, macro_data, data_tier
+① 데이터 조회   get_agent_context(ticker, "trend_report", query, intent, as_of)   [수경 #53, as_of 추가 예정]
+                 → report/news 문서, target_prices, price_data, macro_data, data_tier
                  + get_disclosure_data(ticker, date_from, date_to, as_of)  (공시 카드 근거)
 ② 근거 선택     select_evidence()       코드: 중복 제거·관련도 컷·최신순·종류별 상한 → Evidence[S1..Sn]
 ③ 숫자 계산     compute_target_price_trend()  코드: consensus·방향 (4.2)
@@ -82,16 +85,21 @@ class TrendReportRequest:
 ⑦ 정리         실패한 주장 철회 → data_tier 카드 정책 적용 → status 결정 → 봉투
 ```
 
+- **`as_of` 전달:** `get_agent_context`에 `as_of`가 추가되기 전까지는(수경 작업 중) 검색·목표주가를 `search_documents(as_of=)`·`get_target_price_data(as_of=)`로 직접 부른다. 과거 날짜 리포트에 그 뒤 문서가 섞이지 않게 하기 위해서다.
+- **매크로:** `document_chunks`에 매크로 문서가 0건이다(11/23). 매크로 카드는 `get_macro_data` 정형 값만으로 만들고, 매크로 문서 검색은 하지 않는다.
+
 ### 3.1 근거 선택 `select_evidence`
 
 | 규칙 | 값 | 이유 |
 | --- | --- | --- |
-| 중복 제거 | 같은 `report_id`(문서)에서 최대 2청크 | 한 리포트가 근거를 독점하지 않게 |
+| 중복 제거 | 같은 `doc_id`(문서)에서 최대 2청크 | 한 리포트가 근거를 독점하지 않게. `doc_id`는 검색 결과에 추가 예정(수경) |
 | 관련도 | 하이브리드 점수 하위 청크 제외(RRF 순위 상위 N만) | 무관한 청크로 LLM이 지어내지 않게 |
-| 상한 | 리포트 5 · 뉴스 4 · 공시 3 · 매크로 2 | 현재 `ReportGenerator` 상한 유지 + 공시 추가 |
+| 후보 | 데이터 쪽에서 종류당 약 15개 (`top_k` 조정, 수경) | 줄이는 일은 이 함수가 함 |
+| 상한 | **초기값** 리포트 5 · 뉴스 4 · 공시 3 | 기존 `ReportGenerator` 상수를 옮긴 값. **#81 실험으로 확정** |
 | 정렬 | 종류별로 최신순 | 카드는 최근 흐름을 말함 |
 | 미리보기 | `content_preview` 240자 | 계약 Evidence |
 
+- 상한을 두는 이유: 10초 지연 목표, 토큰 비용, 그리고 근거가 많을수록 중간 근거를 덜 보고 근거와 무관한 문장을 쓸 여지가 커진다. 방식(넉넉히 받고 줄이기)은 확정이고 숫자만 #81에서 정한다.
 - 정형 데이터(목표주가·시세·매크로 지표)는 `document_type="structured"` 근거로 1개씩 넣는다. 목표주가 근거는 특정 리포트가 아니라 KIS 집계라 리포트 ID를 붙이지 않는다.
 
 ### 3.2 카드 생성 `generate_cards`
@@ -121,20 +129,28 @@ class Claim(BaseModel):              # 계약 Claim (토론과 공용)
     evidence_ids: list[str]           # 최소 1개. 비면 검증 실패
 ```
 
-### 4.2 목표주가 방향 `compute_target_price_trend` (코드)
+### 4.2 목표주가 수준과 방향 `compute_target_price_trend` (코드)
 
-`get_target_price_data(ticker, as_of=as_of_date)`의 `consensus`(ADR 0010: 최근 180일, 증권사별 최신 1건)와 `records`로 계산한다.
+수준과 방향을 나눠서 계산한다. LLM은 `comment`만 쓴다.
 
-| 방향 | 규칙 |
+| 구분 | 지표 | 계산 | 근거 |
+| --- | --- | --- | --- |
+| **수준** (지금 얼마인가) | 평균·최고·최저 목표가, 증권사 수 | `get_target_price_data(ticker, as_of)`의 `consensus` (증권사별 최신 1건, 최근 180일) | ADR 0010. 국내 컨센서스(에프앤가이드)도 증권사 목표가의 단순 평균 |
+| **방향** (올라가는 중인가) | 상향·하향·유지 개정 수, 상향 비율 r | 같은 증권사의 **직전 → 최신 목표가** 쌍을 최근 3개월 안에서 센다. r = 상향 ÷ (상향 + 하향) | LSEG Revision Ratio(상향 ÷ 전체 개정), BofA 3개월 이동 상향/하향 비율. 목표주가 개정은 시장에 정보가 있다(Asquith·Mikhail·Au 2005) |
+
+- **평균 차이로 방향을 정하지 않는다.** 90일 전 평균과 지금 평균은 포함된 증권사가 달라서(180일 창에서 빠지거나 새로 들어온 증권사), 차이가 의견 변화가 아니라 구성 변화일 수 있다(#69 리뷰). 평균 변화는 화면 표시용으로만 쓴다.
+- **분류는 한 규칙으로만 한다** (규칙이 겹쳐 상향·하향이 동시에 되는 문제 제거).
+
+| 방향 | 조건 (경계값은 #82에서 확정, 아래는 초기값) |
 | --- | --- |
-| `근거 부족` | `broker_count` < 2 |
-| `상향` | 최근 90일 안에 목표가를 바꾼 증권사 중 올린 곳이 2/3 이상, 또는 현재 평균이 90일 전 평균보다 +3% 이상 |
-| `하향` | 위와 반대 |
-| `혼조` | 최근 90일 변경이 있지만 올림·내림 어느 쪽도 2/3 미만 |
-| `유지` | 최근 90일 안에 목표가를 바꾼 증권사가 없음, 또는 평균 변화가 ±3% 안 |
+| `근거 부족` | 컨센서스 증권사 3곳 미만 (에프앤가이드도 3곳 이상일 때만 컨센서스 산출) |
+| `유지` | 최근 3개월 안에 개정한 증권사가 없음, 또는 개정이 모두 같은 가격 |
+| `상향` | r ≥ 2/3 |
+| `하향` | r ≤ 1/3 |
+| `혼조` | 그 사이 |
 
-- 90일 전 평균은 같은 함수를 `as_of = as_of_date - 90일`로 한 번 더 불러 구한다.
-- 임계값(2/3, 3%, 90일)은 운영 DB 분포를 보고 확정한다(research R5). `comment`만 LLM이 쓴다.
+- **화면에는 숫자를 같이 보인다:** "최근 3개월 목표가 상향 5곳 · 하향 1곳 · 평균 OO원". 라벨만 보여 줄 때보다 해석 논쟁이 적고 근거로 바로 이어진다.
+- **계산 위치 (제안):** 토론도 같은 규칙을 쓴다(#69 리뷰). 개정 집계(건수·증권사별 변화율)는 데이터 쪽 `get_target_price_data` 결과의 `revisions`로 두고, 라벨 경계값만 이 함수가 적용하는 안을 수경과 협의한다(#82). 정해지기 전까지는 `records`에서 직접 센다.
 
 ### 4.3 증권사 시각차 `BrokerView` (계약에 추가)
 
@@ -148,6 +164,10 @@ class BrokerView(BaseModel):
 ```
 
 - 목표가가 컨센서스 평균에서 가장 먼 증권사 위·아래 1곳씩(최대 2개)을 코드가 고르고, 그 증권사의 리포트 청크가 근거에 있을 때만 LLM이 `view`를 쓴다. 없으면 카드에서 뺀다.
+- **증권사 매칭은 `broker_key`로 한다.** KIS 목표가(`키움`, `NH투자`)와 리포트(`키움증권`)의 표기가 달라 그대로 맞으면 2곳뿐이다(11/23). 데이터 쪽이 목표가 `records`와 검색 결과에 같은 `broker_key`를 넣는다(수경).
+  - 만드는 방식: 공백·`(주)`·"증권"·"투자증권" 같은 접미어를 지우는 정규화 규칙 + 그래도 안 맞는 경우만 정적 예외 사전(기준 키 → 별칭, 적용 기간. 예: 이베스트투자증권 → LS증권).
+  - 실시간 LLM 매핑은 쓰지 않는다(정해진 30곳 안팎의 집합이라 비용·지연만 늘고 결과가 결정적이지 않음). 초안은 LLM으로 만들 수 있지만 사람이 검수해 파일로 커밋한다.
+  - DB의 모든 증권사 이름이 기준 키로 매핑되는지 테스트로 확인해 새 이름이 들어와도 놓치지 않는다.
 
 ### 4.4 결과
 
@@ -186,7 +206,7 @@ class TrendReportResult(BaseModel):
 | --- | --- | --- |
 | S1 기간 확대 | `date_from` 30 → 90 → 180일 | 없음 |
 | S2 유형 전환 | report → news → disclosure | 없음 |
-| S3 도구 전환 | `numeric`은 `get_financials`·`get_derived_snapshot`, `table`은 `chunk_type='table'` | 없음 |
+| S3 도구 전환 | `numeric`은 `get_financials`·`get_derived_snapshot`, `table`은 표 조각(`chunk_type='table'`, 12,714개. `search_documents`에 거르는 인자 추가 필요, 수경) | 없음 |
 
 - 새 청크가 0개면 다음 단계로, 연속 2회 0개면 종료. 이미 시도한 `(함수, 인자)`는 다시 부르지 않는다.
 - 예산: 카드당 2회, 리포트 전체 +3초. 먼저 소진되는 쪽에서 멈춘다.
@@ -215,6 +235,8 @@ class VerificationSummary(BaseModel):
 | `report` | 전체 | — |
 | `news_only`, `disclosure_only` | 요약·긍정·리스크·뉴스 이슈·목표주가(KIS 값이 있을 때) | 증권사 시각차 |
 | `derived_only` | 요약(정량)·리스크(변동성·밸류에이션 위치) + "심층 분석 준비 중" 고지 | 증권사 시각차·뉴스 이슈 |
+
+- 리스크 카드의 변동성은 `get_derived_snapshot`의 실현 변동성이다. 시뮬레이션(GARCH 추정)과 값이 달라 보일 수 있어 "최근 3개월 실현 변동성"처럼 이름을 붙인다(#69 리뷰).
 | `macro_only` | 없음 → `status=empty`, 봉투 `rejected` `no_data` | 전체 |
 
 ## 8. 제거하는 코드
@@ -241,8 +263,10 @@ class VerificationSummary(BaseModel):
 
 | # | 내용 | 상대 |
 | --- | --- | --- |
-| Q1 | #53 머지 시점 (`data_tier`, `intent`). 그 전에는 `data_tier_for()`로 계산 | 수경 |
-| Q2 | 목표주가 방향 임계값 (2/3, 3%, 90일) | 운영 DB 확인 |
-| Q3 | `macro` 문서가 `document_chunks`에 실제로 있는지, 없으면 매크로 카드는 `get_macro_data` 정형 값만 | 수경 |
+| ~~Q1~~ | #53 머지 시점 → **해결:** 11/23 머지, `data_tier`·`intent` 바로 사용 | 수경 |
+| Q2 | 목표주가 방향 경계값 → 개정 비율 방식으로 바꾸고 경계값은 #82 | 운영 DB |
+| ~~Q3~~ | 매크로 문서 → **해결:** 0건, 매크로 카드는 정형 값만 | 수경 |
 | Q4 | 데이터 함수 일부가 `date.today()` 기본값 → `as_of`를 항상 명시해서 호출 (#55) | 수경 |
 | Q5 | `BrokerView`·`VerificationSummary` 계약 추가 | 계약 PR |
+| Q6 | 근거 개수 상한 실험 | #81 |
+| Q7 | 데이터 쪽 추가: `get_agent_context(as_of=)`, 후보 `top_k`, 검색 결과 `doc_id`·`broker_key`, `search_documents` 표 조각 필터, `revisions` | 수경 |

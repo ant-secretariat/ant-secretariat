@@ -24,7 +24,7 @@ AI 에이전트도 [AGENTS.md](../../AGENTS.md)를 통해 이 폴더를 읽습�
 | --- | --- | --- | --- | --- |
 | [0001](0001-core-universe-top100.md) | 핵심 종목(T1)은 KOSPI+KOSDAQ 통합 시가총액 상위 100개 보통주, 지정 후 고정 | 채택 | 2026-10-22 | 수경, 유민 |
 | [0002](0002-sensitivity-factors.md) | 민감도 회귀 요인은 KOSPI·원달러 환율·국고채 3년, 국고채 10년은 단순회귀만 | 채택 | 2026-11 | 수경, 유민 |
-| [0003](0003-ontology-edge-weight.md) | 온톨로지 엣지 가중치는 `corr_daily`, 섹터 값은 소속 종목 중앙값 | 채택 | 2026-11 | 수경, 유민 |
+| [0003](0003-ontology-edge-weight.md) | 온톨로지 엣지 가중치는 `corr_daily`, 섹터 값은 소속 종목 중앙값 | 대체됨 (→ 0011) | 2026-11 | 수경, 유민 |
 | [0004](0004-macro-indicator-mapping.md) | 매크로 지표 이름·출처 매핑과 수집하지 않는 지표의 처리 | 채택 | 2026-11 | 수경, 유민 |
 | [0005](0005-vector-store-pgvector.md) | 벡터 저장소를 Pinecone에서 Supabase pgvector로 옮기고, 청크 ID는 내용 기준 | 채택 | 2026-11 | 수경 |
 | [0006](0006-shared-enums-data-tier.md) | `AgendaId`·`DataTier`·`Tier` 공용 열거형은 data-pipeline에 둔다 | 채택 | 2026-11 | 수경, 유민 |
@@ -32,6 +32,7 @@ AI 에이전트도 [AGENTS.md](../../AGENTS.md)를 통해 이 폴더를 읽습�
 | [0008](0008-ontology-flag-default-off.md) | 관계 사전 기능 플래그는 기본 꺼짐, 켬/끔 평가로 기본값을 정함 | 채택 | 2026-11-17 | 태은 |
 | [0009](0009-sse-event-delivery.md) | 진행 이벤트는 `job_events` 1초 조회로 SSE 전달, 단위는 단계와 주장 | 제안 | 2026-11-17 | 태은 |
 | [0010](0010-target-price-consensus-window.md) | 목표주가 컨센서스는 증권사별 최신 1건 중 최근 180일 안의 의견으로 계산 | 채택 | 2026-11-23 | 수경 |
+| [0011](0011-ontology-sensitivity-exposure.md) | 매크로 민감도는 시장 효과를 뺀 값으로 판정, 종목 → 매크로 엣지는 기준 4개(신뢰구간·크기·가설·BH q)를 모두 만족할 때만 노출, 한 번 탈락 시 보류·두 달 연속 기각 | 제안 | 2026-11-23 | 유민, 수경 |
 | [PR #46](https://github.com/ant-secretariat/ant-secretariat/pull/46) | 데이터가 없어 남는 아젠다가 없을 때의 거절 코드는 계약의 `no_data`(다음 행동 `choose_alternative_company`). 임시 이름 `insufficient_data`는 쓰지 않음 | 채택 | 2026-11-17 | 태은 |
 
 결정일이 `2026-11`로만 적힌 것은 카톡 대화 날짜를 확인해 고쳐 주세요.

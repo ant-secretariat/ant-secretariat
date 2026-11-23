@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 
 from crawling.analytics import ontology_inputs as oi
-from crawling.ontology_inputs import attach_seed, parse_args
+from crawling.ontology_inputs import attach_seed, parse_args, sector_grades, summarize
 
 
 def _series(values, start="2024-01-01", freq="D"):
@@ -163,3 +163,21 @@ def test_event_response_needs_clear_majority():
     target.iloc[36:] -= 4.0
     result = oi.event_response(events, target, before=1, after=2)
     assert (result["same"], result["opposite"], result["direction"]) == (2, 2, "unclear")
+
+
+def test_summarize_ticker_rows_keep_ci_and_sector_rows_aggregate():
+    from datetime import date
+    per_ticker = {("A", "USD_KRW"): oi.TickerSensitivity("A", "USD_KRW", "daily", 700, -0.1, -0.09, -0.16, -0.02),
+                  ("B", "USD_KRW"): oi.TickerSensitivity("B", "USD_KRW", "daily", 700, 0.0, 0.01, -0.06, 0.08)}
+    rows = summarize(per_ticker, {"A": ["A"], "B": ["B"]}, "ticker", date(2026, 11, 23))
+    assert rows[0] == {"level": "ticker", "group": "A", "factor": "USD_KRW", "frequency": "daily", "as_of": "2026-11-23",
+                       "n_obs": 700, "raw": -0.1, "adjusted": -0.09, "ci_low": -0.16, "ci_high": -0.02, "certain": True}
+    sector = summarize(per_ticker, {"IT": ["A", "B"]}, "l1", date(2026, 11, 23))
+    assert sector[0]["n_tickers"] == 2 and sector[0]["certain"] == 1
+    grades = sector_grades(sector, 0.10, 0.05, 0.05)
+    assert grades[0]["fx_sensitivity"] == "neutral" and grades[0]["rate_sensitivity"] == ""
+
+
+def test_cli_monthly_args():
+    args = parse_args(["monthly", "--out-dir", "out"])
+    assert args.command == "monthly" and str(args.out_dir) == "out" and args.seed is None

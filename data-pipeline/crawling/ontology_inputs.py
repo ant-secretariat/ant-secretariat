@@ -6,6 +6,7 @@
     python -m crawling.ontology_inputs impacts --as-of 2026-11-23 --out impacts.csv
     python -m crawling.ontology_inputs kind --out kind_t1.csv [--kind-file corplist.html]
     python -m crawling.ontology_inputs issue-evidence --seed ../ontology/seed/ontology_seed.json --out evidence.csv
+    python -m crawling.ontology_inputs monthly --out-dir ontology_inputs_out   # 매달 자동 계산 묶음
 
 - sensitivities: 섹터(l1·l2) 또는 종목 × 요인의 원래 상관, 시장 효과 뺀 상관, 같은 부호 비율, 방향 확실 수.
   --seed를 주면 시드 SENSITIVE_TO 엣지의 가설·상태와 sign_check를 붙인다
@@ -118,10 +119,18 @@ def _monthly_change(series: pd.Series, how: str = "log") -> pd.Series:
 
 # ───────────────────────── 명령 ─────────────────────────
 
+FACTOR_FREQUENCY = [*[(f, "daily") for f in DAILY_FACTORS], *[(f, "monthly") for f in MONTHLY_FACTORS]]
+
+
 def compute_sensitivities(connection, as_of: date, level: str) -> list[dict]:
+    end, per_ticker = ticker_sensitivities(connection, as_of)
+    return summarize(per_ticker, _members(connection, level), level, end)
+
+
+def ticker_sensitivities(connection, as_of: date) -> tuple[date, dict[tuple[str, str], oi.TickerSensitivity]]:
+    """핵심 종목 × 요인의 시장 효과 뺀 상관 (일별 3년, 월별 최대 120개월)."""
     end = _as_of(connection, as_of)
-    groups = _members(connection, level)
-    tickers = sorted({t for members in groups.values() for t in members})
+    tickers = sorted(t for members in _members(connection, "ticker").values() for t in members)
     returns, daily_changes, market = _daily_frame(connection, tickers, end - timedelta(days=365 * WINDOW_YEARS), end)
     m_returns, m_market = _monthly_frame(connection, end)
 
@@ -146,15 +155,45 @@ def compute_sensitivities(connection, as_of: date, level: str) -> list[dict]:
             if row:
                 per_ticker[(ticker, factor)] = row
 
+    return end, per_ticker
+
+
+def summarize(per_ticker: dict, groups: dict[str, list[str]], level: str, end: date) -> list[dict]:
+    """종목 값 → 섹터 요약(l1·l2) 또는 종목 행(ticker, 신뢰구간 포함)."""
     out = []
     for group, members in sorted(groups.items()):
-        for factor, frequency in [*[(f, "daily") for f in DAILY_FACTORS], *[(f, "monthly") for f in MONTHLY_FACTORS]]:
+        for factor, frequency in FACTOR_FREQUENCY:
             rows = [per_ticker[(t, factor)] for t in members if (t, factor) in per_ticker]
             if not rows:
                 continue
-            out.append({"level": level, "group": group, "factor": factor, "frequency": frequency,
-                        "as_of": end.isoformat(), **oi.sector_summary(rows)})
+            base = {"level": level, "group": group, "factor": factor, "frequency": frequency, "as_of": end.isoformat()}
+            if level == "ticker":
+                r = rows[0]
+                out.append({**base, "n_obs": r.n, "raw": round(r.raw, 4), "adjusted": round(r.adjusted, 4),
+                            "ci_low": round(r.ci_low, 4), "ci_high": round(r.ci_high, 4), "certain": r.certain})
+            else:
+                out.append({**base, **oi.sector_summary(rows)})
     return out
+
+
+def compute_monthly(connection, as_of: date, out_dir: Path, seed: Path | None) -> list[Path]:
+    """매달 자동 계산: 민감도(종목·l1·l2)·섹터 등급·매크로 방향·IMPACTS를 한 번에 out_dir/<기준일>/에 쓴다."""
+    end, per_ticker = ticker_sensitivities(connection, as_of)
+    folder = out_dir / end.isoformat()
+    folder.mkdir(parents=True, exist_ok=True)
+    results = {}
+    for level in ("ticker", "l1", "l2"):
+        rows = summarize(per_ticker, _members(connection, level), level, end)
+        results[f"sensitivities_{level}"] = attach_seed(rows, seed) if seed and level == "l1" else rows
+    results["sector_grades"] = sector_grades(results["sensitivities_l1"], 0.10, 0.05, 0.05)
+    results["macro_direction"] = compute_macro_direction(connection, end)
+    results["impacts"] = compute_impacts(connection, end)
+    paths = []
+    for name, rows in results.items():
+        path = folder / f"{name}.csv"
+        write_csv(rows, path)
+        paths.append(path)
+    return paths
 
 
 def attach_seed(rows: list[dict], seed_path: Path) -> list[dict]:
@@ -172,7 +211,11 @@ def attach_seed(rows: list[dict], seed_path: Path) -> list[dict]:
 
 
 def compute_sector_grades(connection, as_of: date, high: float, medium: float, neutral: float) -> list[dict]:
-    rows = {(r["group"], r["factor"]): r for r in compute_sensitivities(connection, as_of, "l1")}
+    return sector_grades(compute_sensitivities(connection, as_of, "l1"), high, medium, neutral)
+
+
+def sector_grades(l1_rows: list[dict], high: float, medium: float, neutral: float) -> list[dict]:
+    rows = {(r["group"], r["factor"]): r for r in l1_rows}
     out = []
     for group in sorted({g for g, _ in rows}):
         rate, fx = rows.get((group, "KTB_3Y_KR")), rows.get((group, "USD_KRW"))
@@ -326,7 +369,7 @@ def write_csv(rows: list[dict], path: Path | None) -> None:
 def parse_args(argv=None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="온톨로지 입력값 계산 (DB 읽기 전용, CSV 출력)")
     sub = parser.add_subparsers(dest="command", required=True)
-    for name in ("sensitivities", "sector-grades", "macro-direction", "impacts", "kind", "issue-evidence"):
+    for name in ("sensitivities", "sector-grades", "macro-direction", "impacts", "kind", "issue-evidence", "monthly"):
         p = sub.add_parser(name)
         p.add_argument("--out", type=Path, default=None, help="CSV 경로 (없으면 화면)")
         p.add_argument("--as-of", type=date.fromisoformat, default=None, help="기준일 (기본 오늘 KST)")
@@ -339,6 +382,9 @@ def parse_args(argv=None) -> argparse.Namespace:
             p.add_argument("--neutral", type=float, default=0.05)
         if name == "kind":
             p.add_argument("--kind-file", type=Path, default=None, help="미리 받은 KIND 목록 파일 (없으면 내려받음)")
+        if name == "monthly":
+            p.add_argument("--out-dir", type=Path, default=Path("ontology_inputs_out"), help="기준일 폴더를 만들 위치")
+            p.add_argument("--seed", type=Path, default=None, help="온톨로지 시드 JSON (섹터 민감도에 가설·상태 붙임)")
         if name == "issue-evidence":
             p.add_argument("--seed", type=Path, required=True)
             p.add_argument("--top-k", type=int, default=3, help="종목마다 검색할 조각 수")
@@ -357,6 +403,9 @@ def main(argv=None) -> None:
         return
     with connect() as connection:
         connection.execute("set session characteristics as transaction read only")
+        if args.command == "monthly":
+            compute_monthly(connection, as_of, args.out_dir, args.seed)
+            return
         if args.command == "sensitivities":
             rows = compute_sensitivities(connection, as_of, args.level)
             if args.seed:

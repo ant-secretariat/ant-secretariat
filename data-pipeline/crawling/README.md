@@ -372,6 +372,7 @@ python -m crawling.ontology_inputs issue-evidence --seed ../ontology/seed/ontolo
 | `impacts` | 기준금리 변경일 전후 국고채·환율 변화 방향, 월별 지표 간 1달 시차 상관 | IMPACTS `direction` |
 | `kind` | KIND 업종·주요제품으로 T1 세부 업종 후보(`SUB_INDUSTRY_RULES`)와 지주사 후보 | COMPANY `sub_industry`·`is_holding` |
 | `issue-evidence` | 시드 ISSUE마다 수혜·타격 종목 문서에서 이슈 이름으로 검색한 근거 후보 | ISSUE `evidence_chunk_ids` |
+| `monthly` | 매달 자동 계산 묶음: `<out-dir>/<기준일>/`에 `sensitivities_ticker`(종목 행, 95% 구간 포함)·`sensitivities_l1`·`sensitivities_l2`·`sector_grades`·`macro_direction`·`impacts` CSV | 위 칸 전부 (KIND·이슈 근거 제외) |
 
 - 일별은 최근 3년(민감도 적합과 같음), 시장은 코스피 일별 수익률입니다.
 - 월별은 최근 최대 120개월, t월 종목 수익률과 t+1월 지표 변화이고, 시장은 핵심 종목 동일가중 평균 수익률입니다(DB의 코스피 지수가 3년 치뿐이라서).

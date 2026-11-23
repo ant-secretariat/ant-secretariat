@@ -10,6 +10,7 @@ v0.7 변경 (수경 PR #29 검증 코멘트 2026-11-23, 유민 결정)
     status "needs_review", review_reason "market_unadjusted"
   - 섹터 → KOSPI(시장 동조) 엣지를 모든 섹터에 추가(수경 corr_daily 중앙값). 종목 3개 미만 섹터는 needs_review(low_n).
     노출되는 SENSITIVE_TO 는 KOSPI 엣지 8개
+  - (#56 반영) market_unadjusted 보류 10개도 시장 효과를 뺀 값이 기준 미달 → rejected (REJECTED_56). 기각 19개
   - 엣지에 market_adjusted 필드 (지금은 모두 False — 수경 값은 시장 효과를 빼지 않은 상관)
 
 v0.6 변경 (태은 PR #29 리뷰, ADR 0008 · 헌법 원칙 III·IV)
@@ -366,6 +367,24 @@ REJECTED = {
     ("SEC_HEALTH", "USD_KRW"): "같은 부호 5/7(71%)이나 방향 확실 1/7",
     ("SEC_INDUS", "USD_KRW"): "같은 부호 18/31(58%), 방향 확실 5/31",
 }
+# #56: 시장 효과 보류(market_unadjusted) 10개. 수경이 시장 효과를 양쪽에서 뺀 편상관을 계산(#56 2026-11-23),
+# 같은 기준으로 10개 모두 미달 → 기각. 유민 결정 2026-11-23. detail 앞의 값은 시장 효과 뺀 섹터 중앙값.
+_REJ56 = "수경 #56 2026-11-23 (종목·요인 양쪽에서 시장 효과를 뺀 편상관. 일별 최근 3년 ~2026-11-06, 월별 최대 120개월)"
+REJECTED_56 = {
+    ("SEC_IT", "KTB_3Y_KR"): "0.000, 같은 부호 10/19(53%), 방향 확실 0/19. 원래 값(−0.111)은 거의 시장 효과",
+    ("SEC_IT", "DRAM_EXPORT_PRICE"): "+0.037, 같은 부호 11/18(61%), 방향 확실 2/18. 종목 단위(삼성전자·SK하이닉스)는 뚜렷함",
+    ("SEC_COMM", "KTB_10Y_KR"): "−0.050, 같은 부호 5/7(71%)이나 방향 확실 2/7",
+    ("SEC_CONS_DISC", "KTB_3Y_KR"): "−0.010, 같은 부호 6/7(86%)이나 방향 확실 1/7",
+    ("SEC_HEALTH", "KTB_10Y_KR"): "−0.036, 같은 부호 7/7(100%)이나 방향 확실 2/7",
+    ("SEC_MATERIAL", "BRENT"): "−0.041(원래 +0.110에서 부호 바뀜), 같은 부호 4/5(80%), 방향 확실 0/5",
+    ("SEC_ENERGY", "BRENT"): "+0.139, 같은 부호 4/5(80%)이나 방향 확실 2/5",
+    ("SEC_ENERGY", "USD_KRW"): "−0.056, 같은 부호 5/5(100%)이나 방향 확실 0/5",
+    ("SEC_UTIL", "USD_KRW"): "−0.036, 종목 1개(한국전력)라 판단 불가",
+    ("SEC_UTIL", "KTB_10Y_KR"): "−0.101, 종목 1개(한국전력)라 판단 불가",
+}
+assert not set(REJECTED) & set(REJECTED_56)
+REJECTED_BASIS = {**{k: _REJ for k in REJECTED}, **{k: _REJ56 for k in REJECTED_56}}
+REJECTED.update(REJECTED_56)
 MARKET_FACTORS = {"KOSPI"}  # 시장 자체라 시장 효과를 뺄 대상이 아님
 
 
@@ -398,7 +417,7 @@ def _sens_edge(s, m, sign, why):
                 as_of=W_AS_OF[m] if w is not None else None,
                 inactive_reason="no_data_source" if inactive else None,
                 review_reason=reason,
-                rejection=dict(decided_by="유민", decided_on="2026-11-23", basis=_REJ, detail=REJECTED[(s, m)])
+                rejection=dict(decided_by="유민", decided_on="2026-11-23", basis=REJECTED_BASIS[(s, m)], detail=REJECTED[(s, m)])
                 if status == "rejected" else None,
                 market_adjusted=market_adjusted,
                 weight=w, weight_window=WSRC[freq]["window"] if w is not None else None, weight_n_tickers=n,

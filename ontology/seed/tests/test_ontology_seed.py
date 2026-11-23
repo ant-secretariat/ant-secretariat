@@ -47,17 +47,19 @@ def test_rejected_sensitivity_is_never_shown_and_keeps_its_basis():
     e = next(e for e in o.load()["edges"]["sensitive_to"] if (e["src"], e["dst"]) == ("SEC_FIN", "KTB_3Y_KR"))
     assert e["status"] == "rejected" and e["reviewed"] and e["rejection"]["decided_by"] == "유민"
     assert "시장 제거" in e["rejection"]["detail"]
-    assert sum(x["status"] == "rejected" for x in o.load()["edges"]["sensitive_to"]) == 9
+    assert sum(x["status"] == "rejected" for x in o.load()["edges"]["sensitive_to"]) == 19
 
 
-def test_market_unadjusted_sensitivity_waits_for_review():
-    # 시장 효과를 빼지 않은 상관은 KOSPI(시장 자체)만 노출한다 (v0.7)
+def test_market_adjusted_check_rejects_the_ten_pending_edges():
+    # #56: 시장 효과를 양쪽에서 뺀 값도 기준 미달 → 보류 10개 모두 rejected, 노출은 KOSPI 8개 그대로
     exposed = o.edges("sensitive_to")
     assert {e["dst"] for e in exposed} == {"KOSPI"} and len(exposed) == 8
-    pending = [e for e in o.load()["edges"]["sensitive_to"] if e["review_reason"] == "market_unadjusted"]
-    assert len(pending) == 10 and all(e["status"] == "needs_review" and not e["market_adjusted"] for e in pending)
-    ctx = o.company_context("005930", include_draft=True)  # 검수용으로는 보인다
-    assert any(e["review_reason"] == "market_unadjusted" for e in ctx["sector_sensitivities"]["daily"])
+    sens = o.load()["edges"]["sensitive_to"]
+    assert not any(e["review_reason"] == "market_unadjusted" for e in sens)
+    e = next(e for e in sens if (e["src"], e["dst"]) == ("SEC_IT", "KTB_3Y_KR"))
+    assert e["status"] == "rejected" and "#56" in e["rejection"]["basis"]
+    ctx = o.company_context("005930", include_draft=True)  # 검수용으로도 기각 엣지는 숨김
+    assert not any(e["dst"] == "KTB_3Y_KR" for e in ctx["sector_sensitivities"]["daily"])
 
 
 def test_include_draft_shows_drafts_but_never_inactive_or_rejected():

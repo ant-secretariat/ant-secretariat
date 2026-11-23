@@ -2,6 +2,13 @@
 name = "ant-secretariat-data-pipeline"
 version = "0.1.0"
 requires-python = ">=3.10"
+# backend가 editable install(-e ../data-pipeline)로 함께 받는 실행 의존성. 조회 함수(processing)가 쓰는 것만 둔다
+dependencies = [
+    "psycopg[binary]>=3.2",
+    "kiwipiepy>=0.20",
+    "openai>=1.0",
+    "python-dotenv>=1.0",
+]
 
 [tool.setuptools.packages.find]
 include = ["crawling*", "processing*"]

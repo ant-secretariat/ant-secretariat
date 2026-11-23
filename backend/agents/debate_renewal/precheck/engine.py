@@ -75,7 +75,11 @@ def precheck(
     data_status: DataStatusProvider,
     config: PrecheckConfig | None = None,
     today: date | None = None,
+    company_mentioned: bool | None = None,
 ) -> PrecheckResult:
+    """company_mentioned: 관문1(EntityResolution)이 질의에서 종목을 확인했는지. 별칭("하이닉스", "삼성")은
+    관문1만 알기 때문에 넘겨받은 값을 우선한다. None이면 공식 회사명·종목코드 문자열로 대신 확인한다.
+    """
     cfg = config or load_default_config()
     today = today or today_kst()
     mode: Literal["single", "compare"] = "compare" if len(companies) == 2 else "single"
@@ -88,11 +92,20 @@ def precheck(
     # ── 관문2: 주제 범위 ──────────────────────────────────────────
     q = normalize(query or "")
     matched = [a for a in AgendaId if cfg.keywords[a].active and _hit(q, cfg.keywords[a].keywords)]
-    is_advice = _hit(q, cfg.advice_keywords)
+    strong_advice = _hit(q, cfg.advice_keywords)
+    is_advice = strong_advice or _hit(q, cfg.weak_signal_keywords)
     is_generic = _hit(q, cfg.generic_keywords)
+    named = company_mentioned if company_mentioned is not None else any(
+        normalize(c.company) in q or c.ticker in q for c in companies
+    )
 
-    # 질의가 있는데 풀 키워드도, 일반 분석 표현도, 투자 권유 표현도 없으면 범위 밖.
-    if q and not (matched or is_generic or is_advice):
+    # 명백한 범위 밖 단어는 다른 키워드가 걸려도 거절한다.
+    if q and _hit(q, cfg.out_of_scope_keywords):
+        return result("reject", reject_reason=ReasonCode.OUT_OF_SCOPE_TOPIC, matched_intents=[])
+
+    # 질의가 있는데 근거가 없으면 범위 밖이다. 아젠다 키워드와 확실한 매매 표현은 그것만으로 통과하고,
+    # 일반 분석 표현·"추천" 같은 약한 신호는 질의에 종목명이 있어야 통과한다.
+    if q and not (matched or strong_advice or (named and (is_generic or is_advice))):
         return result("reject", reject_reason=ReasonCode.OUT_OF_SCOPE_TOPIC, matched_intents=[])
 
     selected, cap_dropped = _select_agendas(matched, cfg)

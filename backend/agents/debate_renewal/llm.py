@@ -40,6 +40,9 @@ class LLMUnavailableError(UpstreamUnavailableError):
 class LLMOutputInvalidError(UpstreamUnavailableError):
     """재요청 후에도 출력이 스키마와 맞지 않음. 코드는 임시로 upstream_unavailable(정책표 OQ-2 확정 전)."""
 
+    def __init__(self, message: str = _INVALID_MESSAGE):
+        super().__init__(message)
+
 
 @dataclass(frozen=True)
 class LLMResult(Generic[T]):

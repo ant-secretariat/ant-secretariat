@@ -271,3 +271,50 @@ def test_compute_kind_compares_with_seed(tmp_path):
     assert rows["000500"]["sub_industry_differs"] is False and rows["000500"]["holding_differs"] is False
     assert rows["402340"]["seed_sub_industry"] == "SK하이닉스 지분 투자회사" and rows["402340"]["sub_industry_differs"] is True
     assert rows["402340"]["seed_holding_type"] == "legal" and rows["402340"]["holding_differs"] is False
+
+
+def test_ticker_sensitivity_records_actual_window():
+    rng = np.random.default_rng(5)
+    m = _series(rng.normal(size=300))
+    f = _series(rng.normal(size=300))
+    row = oi.ticker_sensitivity("A", "F", "daily", m + f, f, m, min_obs=100, max_obs=200)
+    assert row.window_start == m.index[100] and row.window_end == m.index[-1]
+    summary = oi.sector_summary([row])
+    assert (summary["window_start"], summary["window_end"]) == (m.index[100].date().isoformat(), m.index[-1].date().isoformat())
+
+
+def test_table_rows_map_ticker_and_sector_rows_to_one_shape():
+    from datetime import date
+    from crawling.ontology_inputs import METHOD, TABLE_KEY, summarize, table_rows
+    start, end = pd.Timestamp("2023-11-24"), pd.Timestamp("2026-11-23")
+    per_ticker = {("A", "USD_KRW"): oi.TickerSensitivity("A", "USD_KRW", "daily", 700, -0.1, -0.09, -0.16, -0.02, start, end),
+                  ("B", "USD_KRW"): oi.TickerSensitivity("B", "USD_KRW", "daily", 700, 0.0, 0.01, -0.06, 0.08, start, end)}
+    rows = table_rows(summarize(per_ticker, {"A": ["A"], "B": ["B"]}, "ticker", date(2026, 11, 23))
+                      + summarize(per_ticker, {"IT": ["A", "B"]}, "l1", date(2026, 11, 23)))
+    assert len({tuple(r) for r in rows}) == 1  # 모든 행의 칸이 같음 (upsert는 첫 행 칸을 씀)
+    assert len({tuple(r[k] for k in TABLE_KEY) for r in rows}) == 3
+    ticker, sector = rows[0], rows[-1]
+    assert (ticker["group_id"], ticker["certain"], ticker["n_tickers"], ticker["method"]) == ("A", True, None, METHOD["daily"])
+    assert ticker["window_start"] == "2023-11-24" and ticker["window_end"] == "2026-11-23"
+    assert ticker["q_value"] is not None and ticker["n_obs"] == 700
+    assert (sector["level"], sector["group_id"], sector["n_tickers"], sector["n_certain"], sector["n_obs"], sector["certain"]) == (
+        "l1", "IT", 2, 1, None, None)
+
+
+def test_cli_monthly_save_flag():
+    assert parse_args(["monthly"]).save is False
+    assert parse_args(["monthly", "--save"]).save is True
+
+
+def test_migration_columns_match_table_rows():
+    import pathlib, re
+    from datetime import date
+    from crawling.ontology_inputs import summarize, table_rows
+    sql = next(pathlib.Path(__file__).resolve().parents[3].glob("supabase/migrations/*_ontology_sensitivity_inputs.sql")).read_text(encoding="utf-8")
+    body = sql[sql.index("create table"):sql.index("computed_at")]
+    columns = set(re.findall(r"^\s{4}(\w+)\s", body, re.M))
+    t = pd.Timestamp("2026-11-23")
+    per_ticker = {("A", "USD_KRW"): oi.TickerSensitivity("A", "USD_KRW", "daily", 700, 0.1, 0.1, 0.03, 0.17, t, t)}
+    import crawling.ontology_inputs as cli
+    cli_rows = table_rows(cli.summarize(per_ticker, {"A": ["A"]}, "ticker", date(2026, 11, 23)))
+    assert set(cli_rows[0]) == columns

@@ -6,7 +6,7 @@ include_router로 등록되는 것을 전제로 한다. 이 파일 자체는 앱
 """
 from typing import List
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from db import get_database
@@ -29,20 +29,13 @@ class OnboardingRequest(BaseModel):
 
 @router.post("/onboarding")
 def submit_onboarding(payload: OnboardingRequest) -> dict:
-    form_data = payload.model_dump(exclude={"user_id"})
-    try:
-        return save_onboarding(
-            user_id=payload.user_id,
-            form_data=form_data,
-            relational_db=get_database(),
-        )
-    except (ValueError, KeyError) as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return save_onboarding(
+        user_id=payload.user_id,
+        form_data=payload.model_dump(exclude={"user_id"}),
+        relational_db=get_database(),
+    )
 
 
 @router.get("/users/{user_id}/context")
 def read_user_context(user_id: str) -> dict:
-    try:
-        return get_user_context(user_id=user_id, relational_db=get_database())
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return get_user_context(user_id=user_id, relational_db=get_database())

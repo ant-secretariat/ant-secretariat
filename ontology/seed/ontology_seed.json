@@ -1,6 +1,6 @@
 {
   "meta": {
-    "version": "seed-v0.11",
+    "version": "seed-v0.12",
     "generated": "2026-11-23",
     "spec": "온톨로지 기획서 v1.2",
     "exposure_rule": "status == \"active\" and reviewed == True (ADR 0008). draft_fields 는 include_draft 일 때만",
@@ -959,18 +959,22 @@
         "labeled_by": "claude_draft"
       },
       {
-        "issue_id": "ISS_RATE_CUT_NIM",
-        "name": "금리 인하에 따른 은행 NIM 축소",
-        "type": "macro",
+        "issue_id": "ISS_BANK_NIM_SQUEEZE",
+        "name": "은행 NIM 하락(대출 경쟁·조달비용)",
+        "type": "industry",
         "polarity": "negative",
         "duration": "cyclical",
         "agenda_ids": [
           "valuation",
           "macro"
         ],
-        "notes": "예대마진 축소. 비이자이익·주주환원이 방어 논거.",
-        "evidence_chunk_ids": [],
-        "valid_from": null,
+        "notes": "기업대출 경쟁·조달비용 상승으로 스프레드 축소. 금리 상승기 대출금리 재산정에 따른 반등이 Bull 논거.",
+        "evidence_chunk_ids": [
+          "NAVER_086790_20261026_b72cc8e8:778db223755d",
+          "NAVER_105560_20261030_f1f84599:e1b87cc7c933",
+          "NAVER_105560_20261123_52fcef75:a0024c00d57d"
+        ],
+        "valid_from": "2026-10-26",
         "valid_to": null,
         "review_cycle_days": 90,
         "status": "draft",
@@ -996,18 +1000,22 @@
         "labeled_by": "claude_draft"
       },
       {
-        "issue_id": "ISS_TRADING_VOLUME_BOOM",
-        "name": "증시 거래대금 증가",
+        "issue_id": "ISS_TRADING_VOLUME_DROP",
+        "name": "증시 거래대금 감소",
         "type": "market",
-        "polarity": "positive",
+        "polarity": "negative",
         "duration": "cyclical",
         "agenda_ids": [
           "growth",
           "valuation"
         ],
-        "notes": "브로커리지 수수료·IB 실적 개선.",
-        "evidence_chunk_ids": [],
-        "valid_from": null,
+        "notes": "2분기 급증 뒤 거래대금 위축. 브로커리지·WM 수수료 둔화, 이익 체력·밸류에이션이 방어 논거.",
+        "evidence_chunk_ids": [
+          "NAVER_039490_20261102_67af6de9:a70847ad40df",
+          "NAVER_071050_20261109_476230c3:5aa460bae2e2",
+          "NEWS_8ab17252e495c646:b7e72744ac69"
+        ],
+        "valid_from": "2026-10-13",
         "valid_to": null,
         "review_cycle_days": 90,
         "status": "draft",
@@ -1038,18 +1046,22 @@
         "labeled_by": "claude_draft"
       },
       {
-        "issue_id": "ISS_GOVERNANCE_REFORM",
-        "name": "상법 개정·지배구조 개선",
-        "type": "policy",
+        "issue_id": "ISS_HOLDCO_DISCOUNT",
+        "name": "지주사 할인 축소(자사주 소각·사업 재편)",
+        "type": "market",
         "polarity": "positive",
         "duration": "persistent",
         "agenda_ids": [
           "shareholder_return",
           "valuation"
         ],
-        "notes": "이사 충실의무 확대 등. 지주사 할인 축소 논거.",
-        "evidence_chunk_ids": [],
-        "valid_from": null,
+        "notes": "자사주 소각·인적분할·자회사 밸류업으로 NAV 할인율 축소. 할인율이 구조적이라는 점이 Bear 논거.",
+        "evidence_chunk_ids": [
+          "NAVER_000880_20260916_691647f4:f9e8aa9605a8",
+          "NAVER_028260_20260923_bb9d5072:094a57a4bd8e",
+          "NEWS_596d8a892e63a795:3fc0b546c1b7"
+        ],
+        "valid_from": "2026-09-16",
         "valid_to": null,
         "review_cycle_days": 180,
         "status": "draft",
@@ -1187,20 +1199,24 @@
         "labeled_by": "claude_draft"
       },
       {
-        "issue_id": "ISS_FREIGHT_NORMALIZATION",
-        "name": "컨테이너 운임 하락",
+        "issue_id": "ISS_FREIGHT_SUPPLY_SHOCK",
+        "name": "중동 분쟁·운하 제약에 따른 컨테이너 운임 강세",
         "type": "industry",
-        "polarity": "negative",
-        "duration": "cyclical",
+        "polarity": "positive",
+        "duration": "event_driven",
         "agenda_ids": [
-          "risk",
+          "growth",
           "valuation"
         ],
-        "notes": "선복 공급 증가로 운임 정상화.",
-        "evidence_chunk_ids": [],
-        "valid_from": null,
+        "notes": "선복 공급 차질로 운임 급등. 신조선 인도가 늘면 운임 정상화가 Bear 논거.",
+        "evidence_chunk_ids": [
+          "NAVER_086280_20261102_e753237e:cf0562234e63",
+          "NEWS_0fb2206eba12884a:eb13933846f0",
+          "NEWS_b71868606b476d2e:d87119452849"
+        ],
+        "valid_from": "2026-10-11",
         "valid_to": null,
-        "review_cycle_days": 90,
+        "review_cycle_days": 30,
         "status": "draft",
         "reviewed": false,
         "labeled_by": "claude_draft"
@@ -7627,7 +7643,7 @@
       },
       {
         "relation": "HURTS",
-        "src": "ISS_RATE_CUT_NIM",
+        "src": "ISS_BANK_NIM_SQUEEZE",
         "src_type": "ISSUE",
         "dst": "SEC_FIN",
         "dst_type": "SECTOR",
@@ -7643,7 +7659,7 @@
       },
       {
         "relation": "HURTS",
-        "src": "ISS_RATE_CUT_NIM",
+        "src": "ISS_BANK_NIM_SQUEEZE",
         "src_type": "ISSUE",
         "dst": "105560",
         "dst_type": "COMPANY",
@@ -7659,7 +7675,7 @@
       },
       {
         "relation": "HURTS",
-        "src": "ISS_RATE_CUT_NIM",
+        "src": "ISS_BANK_NIM_SQUEEZE",
         "src_type": "ISSUE",
         "dst": "055550",
         "dst_type": "COMPANY",
@@ -7675,7 +7691,7 @@
       },
       {
         "relation": "HURTS",
-        "src": "ISS_RATE_CUT_NIM",
+        "src": "ISS_BANK_NIM_SQUEEZE",
         "src_type": "ISSUE",
         "dst": "086790",
         "dst_type": "COMPANY",
@@ -7691,7 +7707,7 @@
       },
       {
         "relation": "HURTS",
-        "src": "ISS_RATE_CUT_NIM",
+        "src": "ISS_BANK_NIM_SQUEEZE",
         "src_type": "ISSUE",
         "dst": "316140",
         "dst_type": "COMPANY",
@@ -7707,7 +7723,7 @@
       },
       {
         "relation": "HURTS",
-        "src": "ISS_RATE_CUT_NIM",
+        "src": "ISS_BANK_NIM_SQUEEZE",
         "src_type": "ISSUE",
         "dst": "024110",
         "dst_type": "COMPANY",
@@ -7786,8 +7802,8 @@
         "strength": "low"
       },
       {
-        "relation": "BENEFITS",
-        "src": "ISS_TRADING_VOLUME_BOOM",
+        "relation": "HURTS",
+        "src": "ISS_TRADING_VOLUME_DROP",
         "src_type": "ISSUE",
         "dst": "006800",
         "dst_type": "COMPANY",
@@ -7802,8 +7818,8 @@
         "strength": "high"
       },
       {
-        "relation": "BENEFITS",
-        "src": "ISS_TRADING_VOLUME_BOOM",
+        "relation": "HURTS",
+        "src": "ISS_TRADING_VOLUME_DROP",
         "src_type": "ISSUE",
         "dst": "039490",
         "dst_type": "COMPANY",
@@ -7818,8 +7834,8 @@
         "strength": "high"
       },
       {
-        "relation": "BENEFITS",
-        "src": "ISS_TRADING_VOLUME_BOOM",
+        "relation": "HURTS",
+        "src": "ISS_TRADING_VOLUME_DROP",
         "src_type": "ISSUE",
         "dst": "005940",
         "dst_type": "COMPANY",
@@ -7834,8 +7850,8 @@
         "strength": "mid"
       },
       {
-        "relation": "BENEFITS",
-        "src": "ISS_TRADING_VOLUME_BOOM",
+        "relation": "HURTS",
+        "src": "ISS_TRADING_VOLUME_DROP",
         "src_type": "ISSUE",
         "dst": "016360",
         "dst_type": "COMPANY",
@@ -7850,8 +7866,8 @@
         "strength": "mid"
       },
       {
-        "relation": "BENEFITS",
-        "src": "ISS_TRADING_VOLUME_BOOM",
+        "relation": "HURTS",
+        "src": "ISS_TRADING_VOLUME_DROP",
         "src_type": "ISSUE",
         "dst": "071050",
         "dst_type": "COMPANY",
@@ -7979,7 +7995,7 @@
       },
       {
         "relation": "BENEFITS",
-        "src": "ISS_GOVERNANCE_REFORM",
+        "src": "ISS_HOLDCO_DISCOUNT",
         "src_type": "ISSUE",
         "dst": "034730",
         "dst_type": "COMPANY",
@@ -7995,7 +8011,7 @@
       },
       {
         "relation": "BENEFITS",
-        "src": "ISS_GOVERNANCE_REFORM",
+        "src": "ISS_HOLDCO_DISCOUNT",
         "src_type": "ISSUE",
         "dst": "003550",
         "dst_type": "COMPANY",
@@ -8011,7 +8027,7 @@
       },
       {
         "relation": "BENEFITS",
-        "src": "ISS_GOVERNANCE_REFORM",
+        "src": "ISS_HOLDCO_DISCOUNT",
         "src_type": "ISSUE",
         "dst": "000880",
         "dst_type": "COMPANY",
@@ -8027,7 +8043,7 @@
       },
       {
         "relation": "BENEFITS",
-        "src": "ISS_GOVERNANCE_REFORM",
+        "src": "ISS_HOLDCO_DISCOUNT",
         "src_type": "ISSUE",
         "dst": "402340",
         "dst_type": "COMPANY",
@@ -8043,7 +8059,7 @@
       },
       {
         "relation": "BENEFITS",
-        "src": "ISS_GOVERNANCE_REFORM",
+        "src": "ISS_HOLDCO_DISCOUNT",
         "src_type": "ISSUE",
         "dst": "028260",
         "dst_type": "COMPANY",
@@ -8059,7 +8075,7 @@
       },
       {
         "relation": "BENEFITS",
-        "src": "ISS_GOVERNANCE_REFORM",
+        "src": "ISS_HOLDCO_DISCOUNT",
         "src_type": "ISSUE",
         "dst": "267250",
         "dst_type": "COMPANY",
@@ -8330,8 +8346,8 @@
         "strength": "low"
       },
       {
-        "relation": "HURTS",
-        "src": "ISS_FREIGHT_NORMALIZATION",
+        "relation": "BENEFITS",
+        "src": "ISS_FREIGHT_SUPPLY_SHOCK",
         "src_type": "ISSUE",
         "dst": "011200",
         "dst_type": "COMPANY",
@@ -8346,8 +8362,8 @@
         "strength": "high"
       },
       {
-        "relation": "HURTS",
-        "src": "ISS_FREIGHT_NORMALIZATION",
+        "relation": "BENEFITS",
+        "src": "ISS_FREIGHT_SUPPLY_SHOCK",
         "src_type": "ISSUE",
         "dst": "086280",
         "dst_type": "COMPANY",
@@ -9234,7 +9250,7 @@
         "relation": "EXPOSED_TO",
         "src": "105560",
         "src_type": "COMPANY",
-        "dst": "ISS_RATE_CUT_NIM",
+        "dst": "ISS_BANK_NIM_SQUEEZE",
         "dst_type": "ISSUE",
         "status": "draft",
         "reviewed": false,
@@ -9251,7 +9267,7 @@
         "relation": "EXPOSED_TO",
         "src": "055550",
         "src_type": "COMPANY",
-        "dst": "ISS_RATE_CUT_NIM",
+        "dst": "ISS_BANK_NIM_SQUEEZE",
         "dst_type": "ISSUE",
         "status": "draft",
         "reviewed": false,
@@ -9268,7 +9284,7 @@
         "relation": "EXPOSED_TO",
         "src": "086790",
         "src_type": "COMPANY",
-        "dst": "ISS_RATE_CUT_NIM",
+        "dst": "ISS_BANK_NIM_SQUEEZE",
         "dst_type": "ISSUE",
         "status": "draft",
         "reviewed": false,
@@ -9285,7 +9301,7 @@
         "relation": "EXPOSED_TO",
         "src": "316140",
         "src_type": "COMPANY",
-        "dst": "ISS_RATE_CUT_NIM",
+        "dst": "ISS_BANK_NIM_SQUEEZE",
         "dst_type": "ISSUE",
         "status": "draft",
         "reviewed": false,
@@ -9302,7 +9318,7 @@
         "relation": "EXPOSED_TO",
         "src": "024110",
         "src_type": "COMPANY",
-        "dst": "ISS_RATE_CUT_NIM",
+        "dst": "ISS_BANK_NIM_SQUEEZE",
         "dst_type": "ISSUE",
         "status": "draft",
         "reviewed": false,
@@ -9370,7 +9386,7 @@
         "relation": "EXPOSED_TO",
         "src": "006800",
         "src_type": "COMPANY",
-        "dst": "ISS_TRADING_VOLUME_BOOM",
+        "dst": "ISS_TRADING_VOLUME_DROP",
         "dst_type": "ISSUE",
         "status": "draft",
         "reviewed": false,
@@ -9387,7 +9403,7 @@
         "relation": "EXPOSED_TO",
         "src": "039490",
         "src_type": "COMPANY",
-        "dst": "ISS_TRADING_VOLUME_BOOM",
+        "dst": "ISS_TRADING_VOLUME_DROP",
         "dst_type": "ISSUE",
         "status": "draft",
         "reviewed": false,
@@ -9404,7 +9420,7 @@
         "relation": "EXPOSED_TO",
         "src": "005940",
         "src_type": "COMPANY",
-        "dst": "ISS_TRADING_VOLUME_BOOM",
+        "dst": "ISS_TRADING_VOLUME_DROP",
         "dst_type": "ISSUE",
         "status": "draft",
         "reviewed": false,
@@ -9421,7 +9437,7 @@
         "relation": "EXPOSED_TO",
         "src": "016360",
         "src_type": "COMPANY",
-        "dst": "ISS_TRADING_VOLUME_BOOM",
+        "dst": "ISS_TRADING_VOLUME_DROP",
         "dst_type": "ISSUE",
         "status": "draft",
         "reviewed": false,
@@ -9438,7 +9454,7 @@
         "relation": "EXPOSED_TO",
         "src": "071050",
         "src_type": "COMPANY",
-        "dst": "ISS_TRADING_VOLUME_BOOM",
+        "dst": "ISS_TRADING_VOLUME_DROP",
         "dst_type": "ISSUE",
         "status": "draft",
         "reviewed": false,
@@ -9557,7 +9573,7 @@
         "relation": "EXPOSED_TO",
         "src": "034730",
         "src_type": "COMPANY",
-        "dst": "ISS_GOVERNANCE_REFORM",
+        "dst": "ISS_HOLDCO_DISCOUNT",
         "dst_type": "ISSUE",
         "status": "draft",
         "reviewed": false,
@@ -9574,7 +9590,7 @@
         "relation": "EXPOSED_TO",
         "src": "003550",
         "src_type": "COMPANY",
-        "dst": "ISS_GOVERNANCE_REFORM",
+        "dst": "ISS_HOLDCO_DISCOUNT",
         "dst_type": "ISSUE",
         "status": "draft",
         "reviewed": false,
@@ -9591,7 +9607,7 @@
         "relation": "EXPOSED_TO",
         "src": "000880",
         "src_type": "COMPANY",
-        "dst": "ISS_GOVERNANCE_REFORM",
+        "dst": "ISS_HOLDCO_DISCOUNT",
         "dst_type": "ISSUE",
         "status": "draft",
         "reviewed": false,
@@ -9608,7 +9624,7 @@
         "relation": "EXPOSED_TO",
         "src": "402340",
         "src_type": "COMPANY",
-        "dst": "ISS_GOVERNANCE_REFORM",
+        "dst": "ISS_HOLDCO_DISCOUNT",
         "dst_type": "ISSUE",
         "status": "draft",
         "reviewed": false,
@@ -9625,7 +9641,7 @@
         "relation": "EXPOSED_TO",
         "src": "028260",
         "src_type": "COMPANY",
-        "dst": "ISS_GOVERNANCE_REFORM",
+        "dst": "ISS_HOLDCO_DISCOUNT",
         "dst_type": "ISSUE",
         "status": "draft",
         "reviewed": false,
@@ -9642,7 +9658,7 @@
         "relation": "EXPOSED_TO",
         "src": "267250",
         "src_type": "COMPANY",
-        "dst": "ISS_GOVERNANCE_REFORM",
+        "dst": "ISS_HOLDCO_DISCOUNT",
         "dst_type": "ISSUE",
         "status": "draft",
         "reviewed": false,
@@ -9914,7 +9930,7 @@
         "relation": "EXPOSED_TO",
         "src": "011200",
         "src_type": "COMPANY",
-        "dst": "ISS_FREIGHT_NORMALIZATION",
+        "dst": "ISS_FREIGHT_SUPPLY_SHOCK",
         "dst_type": "ISSUE",
         "status": "draft",
         "reviewed": false,
@@ -9931,7 +9947,7 @@
         "relation": "EXPOSED_TO",
         "src": "086280",
         "src_type": "COMPANY",
-        "dst": "ISS_FREIGHT_NORMALIZATION",
+        "dst": "ISS_FREIGHT_SUPPLY_SHOCK",
         "dst_type": "ISSUE",
         "status": "draft",
         "reviewed": false,

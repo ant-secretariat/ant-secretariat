@@ -35,7 +35,8 @@ API 스키마의 원본은 [`docs/api/openapi.yaml`](../../docs/api/openapi.yaml
 | `job_id` | text PK | `<job_type>_<uuid hex>` |
 | `user_id` | text not null | 세션 사용자 |
 | `job_type` | text not null | `debate` · `simulation` |
-| `parent_job_id` | text FK | 시뮬레이션 job → 원래 토론 job |
+| `debate_job_id` | text FK | 시뮬레이션 job → 원래 토론 job (ADR 0013) |
+| `data_as_of` | date | 토론 기준일. 시뮬레이션도 이 날짜로 실행 |
 | `mode` | text | 토론만: `single` · `compare` |
 | `tickers` | text[] not null | 1~2개, 6자리 문자열 |
 | `query` | text | 토론만. 재사용 판정 키에 포함 |
@@ -48,8 +49,9 @@ API 스키마의 원본은 [`docs/api/openapi.yaml`](../../docs/api/openapi.yaml
 | `error_code` · `failed_stage` | text | `worker_lost`·`timeout` 등 |
 | `created_at` · `updated_at` | timestamptz | |
 
-- 인덱스: `(status, created_at)` — 워커 꺼내기, `(user_id, job_type, status)` — 동시 한도·재사용.
-- 재사용 키: `user_id`, `job_type`, 정렬한 `tickers`, `query`(시뮬레이션은 `parent_job_id`), `status in ('queued','running')`.
+- 인덱스: `(created_at) where status='queued'` — 워커 꺼내기, `(user_id, created_at desc)` — 토론 내역, **부분 유니크 `(user_id) where status in ('queued','running')`** — 사용자당 진행 중 job 합쳐 1개(ADR 0014).
+- 꺼내기: `for update skip locked`(ADR 0012). 전체 SQL은 오케스트레이터 기획서 v2.3 6.1·6.2.
+- 재사용 키: `user_id`, `job_type`, 정렬한 `tickers`, `query`(시뮬레이션은 `debate_job_id`), `status in ('queued','running')`.
 
 ### `job_events`
 
@@ -85,7 +87,7 @@ RLS: 세 테이블 모두 서비스 키 전용(익명 접근 없음). `core_tabl
 토론 job       queued → running → completed (단일·비교 모두)  /  failed
                                      │ completed payload: simulation_ready
                                      ▼ 사용자 버튼 (simulation_ready=true)
-시뮬레이션 job  queued → running → completed / failed       (parent_job_id = 토론 job)
+시뮬레이션 job  queued → running → completed / failed       (debate_job_id = 토론 job)
 ```
 
 - 버튼: `POST /orchestrate/debate/{job_id}/simulate`(계약 #46)가 시뮬레이션 job을 만들어 `job_started`를 돌려준다. 비교 모드·토론 미완료면 409 `invalid_job_state`, `simulation_ready=false`면 200 rejected `no_data`, 진행 중 시뮬레이션 job이 있으면 `reused=true`.

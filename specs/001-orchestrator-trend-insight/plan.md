@@ -118,7 +118,7 @@ frontend/src/                   # types.ts · api/client.ts (봉투·Badge·Clai
 | PR-1 ★ | 공통 봉투 | `backend/contracts/envelope.py`·`entities.py`, `core/errors`가 `REASON_POLICY` 사용 | PR-0 | 전원 (응답 형식) |
 | PR-R ★ | 도구 레지스트리 | `backend/tools/registry.py`(`ToolSpec`·`register`·`get`·`list_for`·`invoke`), MVP 도구 14개 등록, `error` 필드 → `ToolResult.error` | PR-1 | 전원 (데이터 조회 경로) |
 | PR-L | Langfuse | `observability/langfuse.py`, 요청·job trace, `invoke`·LLM span, 설정 없으면 no-op | PR-R | — (비용 상한 실측) |
-| PR-2 ★ | job 저장소·워커 | 마이그레이션 `agent_jobs`(job_type·parent_job_id·하트비트 열)·`job_events`, `functions/agent_jobs.py` Supabase 교체, `append_event`(R15), **워커 루프**(SKIP LOCKED·하트비트·복구·타임아웃, R4), 이벤트 7일 보관 | PR-1 | 유민 (`emit` 연결) |
+| PR-2 ★ | job 저장소·워커 | 마이그레이션 `agent_jobs`(job_type·debate_job_id·data_as_of·하트비트 열·사용자 부분 유니크 인덱스)·`job_events`, `functions/agent_jobs.py` Supabase 교체, `append_event`(R15), **워커 루프**(SKIP LOCKED·하트비트·복구·타임아웃, R4), 이벤트 7일 보관 | PR-1 | 유민 (`emit` 연결) |
 | PR-3 ★ | 관문1 | `resolve_companies`, `mentioned_in_query`, `ROUTE_REQUIREMENTS`·`check_coverage`, 대안 3개(`suggest_alternatives`), `uncovered_query_log` 마이그레이션·`log_uncovered_query` | PR-1, 수경 `suggest_alternatives` | 유민 (precheck 입력) |
 | PR-4 ★ | 토론 경로 | precheck 호출(`data_status` provider, `DataStatusUnavailable`→503), 거절 payload 채우기, 재사용·동시 한도, `job_started`/`rejected` 봉투, `run_debate` 연결(`emit`·`fetch_evidence`=레지스트리·`profile`·`data_tier`, 순수 함수), `simulate` → 시뮬레이션 job 생성(409·`no_data`·재사용) | PR-2, PR-3, PR-R, 유민 provider·#76 | 유민·수경 (시뮬레이션 job) |
 | PR-5 ★ | SSE | `GET /jobs/{job_id}/events`, `Last-Event-ID`, ping, 종료 후 닫기, 연결 풀(R14) | PR-2 | FE |

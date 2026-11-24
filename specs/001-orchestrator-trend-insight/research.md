@@ -24,6 +24,8 @@ plan.md의 Technical Context에서 정해지지 않았던 항목을 정리한다
 
 ## R4. job 실행 방식 (v2.2에서 정정)
 
+- **ADR:** 0012(테이블 큐·워커), 0013(시뮬레이션 별도 job), 0014(사용자당 진행 중 job 합쳐 1개) — #93
+
 - **결정:** API와 분리된 **워커 프로세스**가 `agent_jobs`에서 `status='queued'`를 `FOR UPDATE SKIP LOCKED`로 1건씩 꺼낸다. 하트비트 15초, 하트비트가 2분 넘게 끊긴 `running` job은 `failed(worker_lost)`, 토론 전체 5분·LLM 1회 60초 타임아웃, 자동 재실행 없음. 토론과 시뮬레이션은 다른 `job_type`이다.
 - **이유:** 상위 문서인 Design Doc v1.5 4.1이 이렇게 정했다(헌법 문서 우선순위: Design Doc > 에이전트 기획서). API 재시작에도 작업과 진행 상태를 잃지 않고(Design Doc 2.1 목표), 시연 중 API를 재배포해도 토론이 계속된다.
 - **처음 결정(정정 전):** API 안 `asyncio` 백그라운드 작업. 상위 문서를 확인하지 않고 지금 코드를 기준으로 정했다.

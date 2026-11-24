@@ -708,7 +708,7 @@ for k, v in nodes.items():
     for n in v:
         assert isinstance(n["reviewed"], bool) and n["status"] in ("active", "draft", "inactive"), n
 assert set(REJECTED) <= {(e["src"], e["dst"]) for e in SENSITIVE}, "REJECTED에 없는 엣지가 있다"
-meta = dict(version="seed-v0.10", generated=GENERATED, spec="온톨로지 기획서 v1.2",
+meta = dict(version="seed-v0.11", generated=GENERATED, spec="온톨로지 기획서 v1.2",
             exposure_rule='status == "active" and reviewed == True (ADR 0008). draft_fields 는 include_draft 일 때만',
             merged_sensitive_edges=MERGED, inactive_macros=sorted(INACTIVE_MACROS),
             t1_definition="KOSPI+KOSDAQ 통합 시가총액 상위 100 보통주(우선주 제외). 수경 파이프라인 companies.is_core, 2026-10-22 지정 후 고정",

@@ -158,10 +158,10 @@
 | 항목 | 내용 | 근거 |
 | --- | --- | --- |
 | 부르는 방식 | 토론이 아젠다마다 1번씩, 아젠다끼리 병렬로 부름 | 토론 기획서 v3.0, #76 |
-| 검색어 | 사용자 질문 + 아젠다 키워드. 질문이 없으면(버튼 경로) 아젠다 키워드만. 키워드는 데이터 쪽이 `intent_data_sources.json`의 아젠다별 `search_terms`로 관리하고, 토론은 질문만 넘김 | #84 Q3 |
+| 검색어 | 키워드 검색(BM25)은 질문 + 아젠다 키워드, 의미 검색은 질문만(키워드를 섞으면 질문 의도가 흐려짐). 질문이 없으면(버튼 경로) 둘 다 아젠다 키워드. 키워드는 데이터 쪽 설정 파일(`processing/config/agenda_search_terms.json`)에 두고, precheck 판정표(`intent_data_sources.json`)는 지금 자리에 그대로. 토론은 질문만 넘김 | #84 Q3, 11/24 합의 |
 | 숫자 표시 | 주장 문장 속 숫자는 `{{metric_id}}`로 쓰고 토론 쪽이 묶음의 `metrics[].display`로 치환. 자리표시자 목록(`metric_ids`)은 `metrics` 중 `value`와 `display`가 둘 다 있는 지표만. 남은 자리표시자는 L1이 잡음 | 토론 기획서 v3.0, #84 Q1 |
 | 값이 없는 지표 | 자리표시자 목록에서 빼고, `reason`이 사실 자체인 경우만 문장 근거로 씀(예: `capital_impaired` → "자본잠식") | #84 Q1 |
-| 근거 ID | 지표: `metric:{종목}:{지표}:{기준일}`, 블록: `block:{종목}:{블록}:{as_of}`(예: `block:005930:target_price:2026-11-10`). `document_type="structured"`, `title`은 지표·블록 이름, `source`는 함수 이름, `date`는 `as_of`. 토론이 블록을 짧은 표 문장 하나로 바꿔 근거로 넣고, 기준선 기록에도 남김 | #84 Q2 |
+| 근거 ID | 지표: `metric:{종목}:{지표}:{기준일}`, 블록: `block:{종목}:{블록}:{as_of}`(예: `block:005930:target_price:2026-11-10`). `document_type="structured"`, `title`은 지표·블록 이름, `source`는 함수 이름, `date`는 `as_of`. 블록 ID의 `as_of`는 요청 기준일이 아니라 **블록 자신의 기준일**(예: `flow`가 11/21 값이면 `block:005930:flow:2026-11-21`). 토론이 블록을 짧은 표 문장 하나로 바꿔 근거로 넣고, 기준선 기록에도 남김 | #84 Q2 |
 | 비교 모드 | 종목마다 축 단위로 같은 방식(대칭 검색)으로 부름 | 토론 기획서 v3.0 |
 | 온톨로지 | 이 묶음에 넣지 않고 `get_ontology_context`로 따로(기능 플래그 뒤) | 토론 기획서 v3.0, ADR 0008 |
 
@@ -193,7 +193,7 @@
 | `shareholder_return` | `dividend_yield`, `dps`, `eps`, `close` | `disclosures`(주주환원 공시만) | 리포트, 공시 | 공시 → `disclosures`, 시세 → `close`·`dividend_yield`, 리포트 → `documents` |
 | `macro` | (없음) | `macro`, `index`, `sensitivities` | 리포트, 뉴스 | 민감도 → `sensitivities`, 뉴스·리포트 → `documents` |
 
-**아젠다 키워드 (`search_terms` 초기값, #84 Q3)**
+**아젠다 키워드 (초기값, `processing/config/agenda_search_terms.json`, #84 Q3)**
 
 | intent | 키워드 |
 | --- | --- |
@@ -257,7 +257,7 @@
 | --- | --- | --- |
 | ~~Q1~~ | 자리표시자 목록을 묶음 `metrics`에서 → **해결:** 네. `value`·`display`가 둘 다 있는 지표만, 치환은 토론 쪽 | 유민 |
 | ~~Q2~~ | 지표·재무 근거 ID → **해결:** `metric:{종목}:{지표}:{기준일}`, 블록은 `block:{종목}:{블록}:{as_of}` | 유민 |
-| ~~Q3~~ | 검색어 → **해결:** 질문 + 아젠다 키워드(`search_terms`, 데이터 쪽 소유) | 유민 |
+| ~~Q3~~ | 검색어 → **해결:** 키워드 검색은 질문 + 아젠다 키워드, 의미 검색은 질문만, 질문이 없으면 키워드. 키워드는 데이터 쪽 설정 파일 | 유민 |
 | ~~Q4~~ | 지표·블록 목록 → **해결:** 목록은 그대로, 민감도는 시장 효과 뺀 값만, 중복 숫자 없음, 문서 종류별 최소 1개, 목표주가 상승여력 추가 | 유민 |
 | Q5 | `metrics`와 블록 이름을 계약서 `GetAgentContextOutput`에 적을지(계약 draft.6과 함께) | 태은 |
 
@@ -411,7 +411,8 @@
 | 함수 계약 추가(`doc_id`, `broker_key`, `coverage_from`, `get_agent_context`의 `as_of`) 머지 | 수경 (리뷰: 태은, 유민) | 🟡 #75 리뷰 중 |
 | `suggest_alternatives` 머지 | 수경 (리뷰: 태은) | 🟡 #85 리뷰 중 |
 | 실패 표시(`resolve_company` 등, `extract_company_mentions`), 한국 날짜, `get_derived_snapshot` 묶음 문제 | 수경 | ❌ #55, 12/6까지 |
-| intent별 묶음 구현(`get_index_data`, `get_sensitivities`, 과거 시점 `data_tier`, 문서 검색 병렬화, 아젠다 키워드 `search_terms`, 근거 ID `metric:`·`block:`) | 수경 | ❌ 착수 가능(#84 답 받음) |
+| 아젠다 키워드 검색(기준선 #77이 기다림) | 수경 | 🟡 PR 준비 |
+| intent별 묶음 구현(`get_index_data`, `get_sensitivities`, 과거 시점 `data_tier`, 문서 검색 병렬화, 문서 종류별 최소 1개, 근거 ID `metric:`·`block:`, 목표가 `revisions`) | 수경 | ❌ 착수 가능(#84 답 받음) |
 | `broker_key` 보강(컨센서스를 `broker_key`로 묶기), `chunk_type` 인자, `revisions` | 수경 | ❌ #73 |
 | 남은 리포트 적재(11/9–11/17 117건) | 수경 | ✅ 11/24 완료. 7건은 PDF를 자르다 멈춤(PyMuPDF 오류), 따로 확인 필요 |
 | 뉴스 빈 기간(11/10–11/19) 채우기 | 수경 | ❌ DB 용량(Q1) 결정 뒤 |

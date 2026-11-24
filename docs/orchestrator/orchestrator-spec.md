@@ -2,7 +2,7 @@
 
 | 항목 | 값 |
 | --- | --- |
-| 버전 | **v2.5** (2026-11-24) |
+| 버전 | **v2.6** (2026-11-24) |
 | 상태 | 검토 중 |
 | 담당 | 태은 |
 | 상위 문서 | [헌법](../../.specify/memory/constitution.md) > [ADR](../decisions/) > PRD v1.6 > 기능 명세서 v0.8 > 이 문서 |
@@ -20,7 +20,8 @@
 | v2.2 | 2026-11-24 | **상위 문서(Design Doc v1.5·토론 기획서 v3.0)와 어긋난 세 곳 정정:** 도구 레지스트리·Langfuse를 MVP로(8·9장), 작업 실행을 API 안 `asyncio`에서 워커 프로세스(`FOR UPDATE SKIP LOCKED`·하트비트·복구)로(6.2). #68 리뷰 반영: 시뮬레이션을 별도 job으로 분리(6.3), `run_debate` 순수 함수화(6.5), 미커버 판정에서 `macro` 제외(5.3) |
 | v2.3 | 2026-11-24 | #68 리뷰 반영: 스키마 확정(`debate_job_id`·`data_as_of`·인덱스), 큐 동작(꺼내기 트랜잭션·잠금·하트비트·주기 작업) 구체화, 사용자 한도를 종류 합쳐 1개 + 부분 유니크 인덱스, `simulation_ready` 정의와 버튼 시 재판정, 시뮬레이션 가능 기간, 보관 기간은 #92 실측. 근거는 ADR 0012·0013·0014(#93) |
 | v2.4 | 2026-11-24 | 워커 내부 구조 확정: dispatcher 하나가 꺼내고 `Semaphore(3)`로 실행(6.2 "워커 내부"), 하트비트 일괄 갱신, 배포 시 종료 순서, 이벤트 루프 운용(LLM 대기는 코루틴, 계산은 `to_thread`). 워커 DB 접근 방식은 Q8 |
-| **v2.5** | 2026-11-24 | Q8 해결: 워커의 큐 SQL은 동기 psycopg + `to_thread` |
+| v2.5 | 2026-11-24 | Q8 해결: 워커의 큐 SQL은 동기 psycopg + `to_thread` |
+| **v2.6** | 2026-11-24 | 5.3 실행 조건: 인사이트보드 공시를 `requires_any: []`로 (공시 0건 종목도 거절하지 않고 빈 칸으로, 인사이트보드 기획서 v2.3) |
 
 ### v1.1 → v2.0 무엇이 바뀌었나
 
@@ -177,7 +178,7 @@ def resolve_companies(
 # backend/orchestrator/requirements.py
 ROUTE_REQUIREMENTS = {
     ("insight_board", "price"):      {"requires_any": ["price"]},
-    ("insight_board", "disclosure"): {"requires_any": ["disclosure"]},
+    ("insight_board", "disclosure"): {"requires_any": []},          # 0건도 거절 안 함, 빈 칸으로 (#70)
     ("insight_board", "macro"):      {"requires_any": []},          # 종목 데이터 불필요
     ("trend_report", None):          {"requires_any": ["report", "news", "disclosure", "derived"]},
     # 토론은 precheck가 아젠다별로 판정 (intent_data_sources.json)

@@ -35,6 +35,7 @@ AI 에이전트도 [AGENTS.md](../../AGENTS.md)를 통해 이 폴더를 읽습�
 | [0012](0012-postgres-table-job-queue.md) | 장시간 작업은 Postgres 테이블 큐(`FOR UPDATE SKIP LOCKED`)와 워커 프로세스로 실행, 하트비트·복구, 자동 재실행 없음 | 채택 | 2026-11-24 | 태은 |
 | [0013](0013-simulation-as-separate-job.md) | 시뮬레이션은 토론과 다른 job, job 상태는 4종, 기준일은 토론 job의 `data_as_of` | 채택 | 2026-11-24 | 태은 |
 | [0014](0014-one-active-job-per-user.md) | 사용자당 진행 중 job은 종류 합쳐 1개, DB 부분 유니크 인덱스로 강제 (QA 후 재검토 #92) | 채택 | 2026-11-24 | 태은 |
+| [0015](0015-orchestrator-without-routing-graph.md) | MVP 오케스트레이터는 라우팅 그래프(LangGraph) 없이 공통 관문과 응답 조립만, 라우팅·플래너는 자유 질의와 함께 | 채택 | 2026-11-24 | 태은 |
 | [PR #46](https://github.com/ant-secretariat/ant-secretariat/pull/46) | 데이터가 없어 남는 아젠다가 없을 때의 거절 코드는 계약의 `no_data`(다음 행동 `choose_alternative_company`). 임시 이름 `insufficient_data`는 쓰지 않음 | 채택 | 2026-11-17 | 태은 |
 
 결정일이 `2026-11`로만 적힌 것은 카톡 대화 날짜를 확인해 고쳐 주세요.

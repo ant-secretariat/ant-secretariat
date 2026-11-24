@@ -778,7 +778,7 @@ result = get_available_data_status(
 - 수급 지표: 그날까지 최근 20거래일 합계(순매수) 또는 평균(공매도 비중). 20일보다 적으면 `basis`에 실제 일수를 적음
 - 공매도 잔고 비중: KRX가 약 2거래일 늦게 공개하므로 그날 기준 2거래일 전까지의 값만 씀
 - 지분공시 지표: 그날까지 접수된 최근 90일 보고. 지분공시를 받는 종목에서 보고가 없으면 0, 받지 않는 종목은 `no_data`. 임원 보고에는 주식 보상 같은 소액 변동도 들어 있음
-- 값을 낼 수 없으면 `value`는 `null`이고 `reason`에 사유: `unknown_metric`, `no_data`, `no_value`, `not_applicable_financials`(금융 섹터 부채비율), `metric_unavailable`(조회 실패)
+- 값을 낼 수 없으면 `value`는 `null`이고 `reason`에 사유: `unknown_metric`, `no_data`, `no_value`, `not_applicable_financials`(금융 섹터 부채비율), `loss_making`(PER·EPS: 직전 사업연도 당기순이익 적자, `basis`에 금액), `metric_unavailable`(조회 실패)
 - 여러 지표는 `get_metrics(ticker, metric_ids, as_of)`로 DB 연결 하나에서 계산(결과는 `metric_ids` 순서, 항목은 `get_metric`과 같음). 지표마다 연결을 열면 연결에만 약 0.35초씩 듦. 한 지표의 조회가 실패해도 나머지는 계산
 - 사람이 읽는 지표 이름은 `METRIC_NAMES`(예: `per` → "PER(주가수익비율)")
 

@@ -7,12 +7,18 @@ from processing.interfaces import BaseRelationalDB, BaseEmbeddingModel, BaseVect
 
 logger = logging.getLogger(__name__)
 
-# 토론 아젠다별 문서 검색 키워드(#84). 데이터 쪽이 관리한다
+# 토론 아젠다별 문서 검색 설정(#84): 키워드와 찾을 문서 종류. 데이터 쪽이 관리한다
 SEARCH_TERMS_PATH = Path(__file__).resolve().parent.parent / "config" / "agenda_search_terms.json"
-AGENDA_SEARCH_TERMS = {
+AGENDA_SEARCH = {
     key: value for key, value in json.loads(SEARCH_TERMS_PATH.read_text(encoding="utf-8")).items()
     if not key.startswith("_")
 }
+AGENDA_SEARCH_TERMS = {key: value["terms"] for key, value in AGENDA_SEARCH.items()}
+# 토론 아젠다 하나에 주는 문서 조각 수와, 한 문서에서 가져오는 최대 조각 수(같은 리포트가 몫을 다 차지하지 않게)
+DEBATE_TOP_K = 5
+MAX_CHUNKS_PER_DOC = 2
+# 문서당 제한으로 빠지는 조각을 채우려고 종류마다 몫의 몇 배를 찾아 둔다
+OVERSAMPLE = 3
 
 # 트렌드 리포트 문서 후보 수(종류마다). 받는 쪽이 문서당 2조각·리포트 5·뉴스 4개로 줄이므로 넉넉히 준다(#69 리뷰)
 TREND_REPORT_TOP_K = 15
@@ -44,8 +50,9 @@ def get_agent_context(
     없으면 오늘(KST)이다. 과거 날짜로 만들어도 그 뒤 문서·목표가가 섞이지 않게 하려는 것이다(#69 리뷰).
     단, data_status(와 그것으로 정하는 data_tier)는 as_of와 상관없이 지금 기준이다(과거 시점 계산은 아직 없음, #84).
     trend_report 문서 검색은 종류마다 TREND_REPORT_TOP_K개를 돌려준다. 받는 쪽이 문서당 조각 수를 줄여 고르기 때문이다.
-    debate에 intent를 주면 문서 검색에 아젠다 키워드(processing/config/agenda_search_terms.json)를 쓴다(#84).
+    debate에 intent를 주면 문서 검색에 아젠다 설정(processing/config/agenda_search_terms.json)을 쓴다(#84).
     키워드 검색(BM25)은 질문 + 키워드, 의미 검색은 질문만이고, 질문이 없으면(버튼 경로) 둘 다 키워드로 검색한다.
+    아젠다의 문서 종류마다 따로 찾아 종류별로 몫을 나누고(예: 리포트 3 + 뉴스 2), 한 문서는 최대 2조각까지만 준다.
     매크로 문서는 document_chunks에 없어서(0건) 검색하지 않는다. 매크로는 macro_data(정형 값)를 쓴다.
     """
     from processing.enums import AgendaId
@@ -84,12 +91,7 @@ def get_agent_context(
             "macro_data":    get_macro_data(as_of=as_of, relational_db=relational_db),
         }
         if intent:
-            # 질문이 없어도 아젠다 키워드로 검색한다. 의미 검색에 키워드를 섞지 않는 건 질문 의도가 흐려지기 때문
-            terms = AGENDA_SEARCH_TERMS[intent]
-            result["documents"] = search_documents(
-                query=query or terms, keyword_query=f"{query} {terms}" if query else terms, ticker=ticker, top_k=5,
-                as_of=as_of, embedding_model=embedding_model, vector_db=vector_db,
-            )
+            result["documents"] = _agenda_documents(search_documents, ticker, intent, query, as_of)
         elif query:
             result["documents"] = documents(None, 5)
 
@@ -133,3 +135,72 @@ def _data_tier(ticker: str, data_status: Optional[dict]) -> dict:
         status["derived_snapshot_available"],
     )
     return {"data_tier": tier.value}
+
+
+def _agenda_documents(search_documents, ticker: str, intent: str, query: Optional[str], as_of: str) -> dict:
+    """토론 아젠다 하나의 문서 근거. 문서 종류별로 따로 찾아 몫을 나누고, 한 문서는 최대 2조각(#84).
+
+    질문이 없어도 아젠다 키워드로 찾는다. 의미 검색에 키워드를 섞지 않는 건 질문 의도가 흐려지기 때문이다.
+    한 종류의 검색이 실패해도 나머지는 주고, reason·failed_types로 알린다(실패를 "문서 없음"으로 보이지 않게).
+    """
+    setting = AGENDA_SEARCH[intent]
+    terms, types = setting["terms"], setting["document_types"]
+    semantic, keyword = (query, f"{query} {terms}") if query else (terms, terms)
+    quotas = _quotas(DEBATE_TOP_K, len(types))
+    found, modes, failed = {}, [], []
+    for document_type, quota in zip(types, quotas):
+        searched = search_documents(query=semantic, keyword_query=keyword, ticker=ticker, document_type=document_type,
+                                    top_k=quota * OVERSAMPLE, as_of=as_of)
+        if searched.get("reason"):
+            failed.append(document_type)
+        else:
+            modes.append(searched.get("mode"))
+        found[document_type] = searched.get("results", [])
+    documents = {
+        "query": semantic, "keyword_query": keyword, "ticker": ticker,
+        "document_types": types,
+        "results": pick_diverse(found, dict(zip(types, quotas)), DEBATE_TOP_K, MAX_CHUNKS_PER_DOC),
+        # 종류마다 방식이 다르면(임베딩 실패로 BM25 대체 등) 낮은 쪽을 적는다
+        "mode": "bm25" if "bm25" in modes else (modes[0] if modes else None),
+    }
+    if failed:
+        documents["reason"] = "search_unavailable"
+        documents["failed_types"] = failed
+    return documents
+
+
+def _quotas(total: int, kinds: int) -> list[int]:
+    """total을 종류 수로 나눈 몫. 나머지는 앞쪽 종류부터 1개씩(5를 둘로 나누면 3·2, 셋이면 2·2·1)."""
+    base, extra = divmod(total, kinds)
+    return [base + (1 if index < extra else 0) for index in range(kinds)]
+
+
+def pick_diverse(found: dict[str, list[dict]], quotas: dict[str, int], total: int, per_doc: int) -> list[dict]:
+    """종류별 몫만큼 고르고(한 문서 per_doc조각까지), 모자라면 남은 후보 중 점수 높은 순으로 채운다.
+
+    결과는 점수 내림차순이다. 한 종류에 문서가 모자라면 다른 종류가 그 자리를 채운다.
+    """
+    per_document: dict[str, int] = {}
+    picked, chosen = [], set()
+
+    def take(result) -> bool:
+        if result["chunk_id"] in chosen or per_document.get(result["doc_id"], 0) >= per_doc:
+            return False
+        chosen.add(result["chunk_id"])
+        per_document[result["doc_id"]] = per_document.get(result["doc_id"], 0) + 1
+        picked.append(result)
+        return True
+
+    for document_type, quota in quotas.items():
+        taken = 0
+        for result in found.get(document_type, []):
+            if taken == quota:
+                break
+            taken += take(result)
+    leftovers = sorted((r for results in found.values() for r in results), key=lambda r: r.get("score") or 0, reverse=True)
+    for result in leftovers:
+        if len(picked) >= total:
+            break
+        take(result)
+    return sorted(picked, key=lambda r: r.get("score") or 0, reverse=True)[:total]
+

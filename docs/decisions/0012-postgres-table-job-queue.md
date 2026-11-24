@@ -57,6 +57,21 @@ t4  D1 실행                             D2 실행
 - A가 이미 커밋한 뒤라면 D1은 `running`이라 조건(`status='queued'`)에서 빠집니다. `SKIP LOCKED`가 막는 건 "A가 골랐지만 아직 커밋하지 않은" 그 사이입니다.
 - 잠금이 없으면 두 쪽이 D1을 동시에 실행해 LLM 비용이 두 배가 되고 결과가 두 번 저장됩니다.
 
+### 워커 내부: dispatcher 하나 + `Semaphore(3)`
+
+워커는 job을 동시에 3개까지 실행합니다(Design Doc 4.5). 꺼내는 주체를 두 가지로 검토했습니다. 두 방식 모두 꺼내기 SQL은 같고(`SKIP LOCKED`), 차이는 **누가** 꺼내느냐입니다.
+
+| | 슬롯 3개가 각자 꺼내기 | **dispatcher 하나가 꺼내고 세마포어로 할당 (선택)** |
+| --- | --- | --- |
+| 같은 프로세스 안 꺼내기 겹침 | 있음 (`SKIP LOCKED`가 해결) | 없음 |
+| 큐가 비었을 때 DB 조회 | 1.5초마다 슬롯 수만큼 | 1.5초마다 1번 |
+| 하트비트·종료 처리·실행 수 파악 | 슬롯마다 따로 | 한 곳에서 (하트비트 일괄 갱신, 꺼내기 중단 후 실행 중 job 대기) |
+| 주의할 점 | 적음 | dispatcher가 예외로 멈추지 않게 반복마다 예외 처리, `finally`에서 자리 반납 |
+
+- 정확성은 두 방식 모두 같으므로 DB 조회 수와 운영 편의로 골랐습니다(무료 플랜 연결·부하가 빠듯함).
+- `SKIP LOCKED`는 남겨 둡니다. 배포 순간 옛 워커와 새 워커가 겹칠 수 있습니다.
+- 워커는 이벤트 루프(스레드 1개) 위에서 돕니다. 토론 job은 시간 대부분이 LLM 응답 대기라 job 3개가 스레드 하나를 `await` 지점마다 번갈아 씁니다. 계산이 많은 작업(시뮬레이션 모델)은 `to_thread`로 별도 스레드에서 실행합니다.
+
 ### Redis가 아닌 이유
 
 | 기준 | 테이블 큐 (D) | Redis 큐 (B) |
@@ -68,7 +83,18 @@ t4  D1 실행                             D2 실행
 | 재시작 | 기본으로 디스크 저장 | 영속 설정 필요 |
 | 처리량 | 우리 필요량(시간당 수십 건)에 충분 | 더 빠르지만 필요 없음 |
 
-Design Doc의 MVP 원칙("새 라이브러리·인프라 최소화")과 5장의 Celery+Redis 기각("인프라 추가")과 같습니다. 같은 원리(`FOR UPDATE SKIP LOCKED`)를 Rails 8 기본 큐(Solid Queue), Elixir Oban이 씁니다.
+Design Doc의 MVP 원칙("새 라이브러리·인프라 최소화")과 5장의 Celery+Redis 기각("인프라 추가")과 같습니다. 같은 원리(`FOR UPDATE SKIP LOCKED`)로 동작하는 큐 라이브러리가 실무에서 쓰입니다: pg-boss(Node.js), PgQueuer(Python, 선택지 C), River(Go).
+
+실무 글들이 강조하는 주의점과 이 결정의 대응입니다.
+
+| 주의점 | 대응 |
+| --- | --- |
+| `FOR UPDATE`만 쓰면 워커가 한 행에서 줄을 섬 | `SKIP LOCKED` |
+| 외부 호출 내내 잠금을 잡으면 다른 워커가 멈춤 | 꺼내기만 짧은 트랜잭션으로 커밋, LLM 호출은 그 뒤 |
+| 긴 job은 갱신하는 타임스탬프(임대)로 관리해 죽은 워커의 job 회수 | `heartbeat_at` 15초, 2분 끊기면 `worker_lost` |
+| 웹 요청과 job 처리의 연결 풀을 섞지 않기 | API(SSE)는 작은 풀, 워커는 세션 모드 연결 |
+| 행을 자주 바꾸고 지우면 테이블이 부풀고 vacuum 부담 | 우리 규모(시간당 수십 건)에서는 작음, 끝난 job 정리 규칙(#92) |
+| 폴링 대신 LISTEN/NOTIFY로 깨우기 | Supabase 트랜잭션 풀러에서 LISTEN 불가 → 큐가 비었을 때만 1.5초 폴링 (0009와 같은 이유) |
 
 ## 영향
 
@@ -85,3 +111,6 @@ Design Doc의 MVP 원칙("새 라이브러리·인프라 최소화")과 5장의 
 - 오케스트레이터 기획서 v2.3 6.1(스키마)·6.2(실행)
 - 0009 (SSE 전달), 0013 (시뮬레이션 별도 job), 0014 (사용자당 진행 중 job)
 - PostgreSQL `SELECT … FOR UPDATE SKIP LOCKED` (Locking Clause)
+- [pg-boss](https://github.com/timgit/pg-boss), [PgQueuer — SKIP LOCKED](https://janbjorge.github.io/pgqueuer/reference/skip-locked/)
+- [Encore — Postgres job queue with SKIP LOCKED](https://encore.dev/articles/postgres-job-queue-skip-locked), [Neon — queue system](https://neon.com/guides/queue-system)
+- [Microsoft — Potential consequences of using Postgres as a job queue](https://techcommunity.microsoft.com/blog/adforpostgresql/potential-consequences-of-using-postgres-as-a-job-queue/4514332)

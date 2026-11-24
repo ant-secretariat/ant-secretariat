@@ -5,7 +5,7 @@
 ## 가장 중요한 규칙
 
 1. **기존 `backend/agents/debate/`는 재활용도 수정도 하지 않는다.** 1차 프로토타입이고 오케스트레이터가 아직 호출하므로 당분간 그대로 병행한다. 교체는 새 버전 완성·연동 후 별도 PR로 한다.
-2. **기준 문서는 `docs/debate-renewal/debate-agent-rebuild-spec-v3.0.html`** (토론 에이전트 리빌드 기획서 v3.0). 구현이 기획서와 다르면 코드를 맞추거나, 기획서를 바꿔야 하는 이유를 유민에게 먼저 묻는다. 온톨로지는 `docs/debate-renewal/ontology-spec-v1.2.html` (이번 범위에서는 인터페이스 참조용).
+2. **기준 문서는 `docs/debate-renewal/debate-agent-rebuild-spec-v3.0.md`** (토론 에이전트 리빌드 기획서 v3.0, 2026-11-22 HTML에서 옮김 · PR #20). 구현이 기획서와 다르면 코드를 맞추거나, 기획서를 바꿔야 하는 이유를 유민에게 먼저 묻는다. 온톨로지는 `docs/debate-renewal/ontology-spec-v1.2.html` (이번 범위에서는 인터페이스 참조용).
 3. 내 담당이 아닌 부분은 만들지 않고 인터페이스(Protocol·스텁)만 둔다.
 
 | 소유 | 항목 |
@@ -38,7 +38,7 @@
 - **라벨·담당자**: 수경 PR처럼 유형(`작업`/`문서`)·상태(`리뷰중`) 라벨과 담당자를 붙이고, 우리 에이전트 라벨 `토론 에이전트`를 함께 단다. `03 에이전트`는 쓰지 않는다
 - **Draft**: 방향 확인이 필요하면 Draft로 먼저 연다
 - **쌓인 PR(스택)**: 앞 PR이 머지되기 전에 그 위에서 다음 작업을 해야 하면, 다음 PR의 대상(base)을 앞 PR 브랜치로 열고 본문 맨 위에 인용문(`>`)으로 "N개 중 몇 번째, 머지 순서, 앞 PR 먼저 머지할 것, 앞 PR 머지 후 대상 변경은 작성자가 함"을 적는다 (PR #17 형식). 가능하면 main 기준 독립 PR을 우선한다
-- **PR 크기**: 400줄 이하. 기획서 HTML(`docs/debate-renewal/`)은 줄 수가 커서 코드 PR에서 빼고 별도 `docs:` PR로 올린다
+- **PR 크기**: 400줄 이하. 기획서(`docs/debate-renewal/`)는 줄 수가 커서 코드 PR에서 빼고 별도 `docs:` PR로 올린다
 - **리뷰어**: @taeeunni 한 명만 지정한다 (멀티에이전트 담당. `.github/CODEOWNERS` 기본값으로 자동 지정됨). 수경은 리뷰어로 추가하지 않고, 데이터 계약 관련 확인이 필요하면 "리뷰 포인트"에 `@멘션`만 한다
 
 ## 다른 쪽과 맞춰야 할 때 읽을 곳 (같은 레포)
@@ -68,7 +68,7 @@
 | 1 | `precheck()` + 키워드 사전 + `intent_data_sources.json` 로더 | 완료 (24 tests). PR 2개로 나눠 병합: 계약·설정 로더 → 엔진·테스트 |
 | 2 | 거절셋 수집 (`ReasonCode` 라벨) | v0.3 완료 (dev 47 + holdout 22 + holdout2 22문항, 측정기 `eval/refusal.py`). 사전 kw-0.3.1(holdout2 오답변율 20%). 남은 실패는 규칙으로 한계 — 경량 모델 승격 여부는 확정 필요 |
 | 3 | Pydantic 스키마: Evidence·Claim·DebateResult(단일→비교), Bull·Bear·Judge 출력 | 완료 (`schemas.py`, 10 tests) |
-| 3b | Bull·Bear·Judge 프롬프트 v3 (D6 `agreed_points`, Bear의 Bull Claim 인용) | 예정 |
+| 3b | Bull·Bear·Judge 프롬프트 v3 (D6 `agreed_points`, Bear의 Bull Claim 인용) | 문구·메시지 조립·strict 출력 스키마 완료 (`prompts/`, pv-3.0.0, 13 tests). 2라운드(D5) 프롬프트와 실제 호출·기준선 수치는 run_debate 연동 후 |
 | 4 | 검증 레이어 L1 + 근거 부족 루프(1회 수정) | L1 완료 (`validation/l1.py`, 10 tests). 근거 부족 루프·1회 수정은 검색·LLM 연동 후 |
 | 5 | 기준선 비교 실험 루브릭 5~6항목 + 문항 30~50개 | 루브릭 6항목·문항 48개(6아젠다×8, qs-0.2.0)·블라인드 채점 집계(승률·항목별 일치율·재현 정보) 완료 (`eval/baseline/`, 13 tests). 실제 실험은 토론·단일 출력 생성 후 |
 | 6 | 온톨로지 ISSUE 시드 20~30개 | 예정 (온톨로지 기획서) |
@@ -76,6 +76,7 @@
 ## 확정 필요한 임시값 (코드 곳곳에 TODO)
 
 - 비교 모드 Judge 판정은 종목별로 하나씩(`judge.per_company_verdict`, ticker → 판정)이고 `overall_verdict`는 단일 모드만 쓴다(유민 결정 2026-11-22). 계약 반영은 #46에 요청
+- 프롬프트 v3(`prompts/templates.py`) 임시 규칙: 아젠다 하나에 Bull 2~4개·Bear 1~3개 주장, claim_id는 Bull `B1…`·Bear `R1…`, `confidence`는 high/mid/low, Judge score는 0~10 정수. 숫자는 `[지표 자리표시자]` 목록에 있으면 `{{metric_id}}`(비교 모드 `{{종목코드.metric_id}}`), 없으면 근거 문서 숫자를 그대로 인용. 성향별 강조점(`PROFILE_FOCUS`)은 caution·points_to_check에만. 기획서에 수치가 없어 기준선 실험 후 확정
 - ~~`ReasonCode.insufficient_data`~~ → 계약의 `no_data`로 확정(11/17, 계약 draft.5 PR #46). 다음 행동은 `choose_alternative_company`
 - 관문1 거절 코드(미커버 종목·3종목 이상·비교 한쪽 미커버)의 `envelope.py` 이름. 11/9 기준 회의에서 확정되지 않았다. precheck 밖이라 이 패키지는 정의하지 않고, 확정되면 `ReasonCode`에 추가한다
 - 거절셋 수치(rs-0.3.0, 사전 kw-0.3.0): dev 오답변율 5%·과잉거절 0%, holdout 20%·8.3%, **holdout2 20%**·0%(목표 ≤5%). holdout은 kw-0.2.0 실패를 본 뒤 규칙을 만들어 더는 깨끗하지 않고, holdout2가 확인용이다. 남은 실패는 아젠다 키워드(`금리`·`산업`)가 우연히 들어간 범위 밖 질의라 규칙으로는 한계가 있다. 기획서 D1대로 경량 모델 승격 여부 확정 필요. 질의에 종목명이 없을 때(`분석해줘`만 입력 등) 일반·약한 표현을 거절하는 규칙이 챗 UX에 맞는지도 확인 필요

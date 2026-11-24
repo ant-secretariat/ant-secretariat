@@ -643,7 +643,10 @@ result = get_chunks_by_ids(["NAVER_000660_20261104_1:3f2a…", "NEWS_1f2e…:9c1
 
 - 모두 Supabase에서 셉니다. 정형 데이터(시세·매크로·재무·목표주가·시뮬레이션 파라미터)는 최신 기준일, 리포트·뉴스·공시는 `document_chunks`에서 검색에 쓸 수 있는 문서(활성·면책 아닌 청크가 있는 문서) 수와 최신 게시일
 - `relational_db`, `vector_db` 인자는 기존 호출 호환용으로 받기만 함
-- `simulation_ready`: 가장 최근 `sim_params`가 `ok`인지. FE가 시뮬레이션 버튼을 미리 끄는 데 씀
+- `simulation_ready`: 판정 기준일 이전 가장 최근 `sim_params`가 `ok`인지(파라미터가 없으면 `false`). FE가 시뮬레이션 버튼을 미리 끄는 데 씀
+  - `as_of`(선택)를 주면 그날 이전 파라미터로 판정합니다. 시뮬레이션 버튼을 누를 때 토론 job의 `data_as_of`를 넘기면, 시뮬레이션이 실제로 쓸 파라미터와 같은 기준으로 판정됩니다(#68, #99). 나머지 건수·최신일은 `as_of`와 상관없이 지금 기준
+  - `simulation_params_as_of`: 판정에 쓴 파라미터 기준일(`sim_params.as_of`)
+  - `as_of` 형식이 틀리면 `"error": "invalid_date"`
 - `derived_snapshot_available`: 시세와 재무가 둘 다 있으면 `true` (`get_derived_snapshot`이 계산 근거를 낼 수 있음)
 - `collection_job_status`: T2 수집이 Post-MVP라 `null`
 - `sources`: 소스 11개의 `{"count", "latest"}`. 토론 precheck의 `intent_data_sources.json` `requires_any`와 같은 키라 어댑터 없이 씀. `count`의 단위는 아래 표
@@ -683,6 +686,7 @@ result = get_available_data_status(
   "derived_snapshot_available": true,
   "collection_job_status": null,
   "simulation_ready": true,
+  "simulation_params_as_of": "2026-11-23",
   "sources": {
     "report": {"count": 12, "latest": "2026-11-05"},
     "price": {"count": 741, "latest": "2026-11-06"},

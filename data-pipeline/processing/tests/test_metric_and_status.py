@@ -208,7 +208,7 @@ STRUCTURED_ROW = (
     700, date(2026, 11, 6),    # flow
     0, None,                   # insider
     4, date(2026, 11, 1),      # sensitivity (요인 수)
-    True,
+    True, date(2026, 11, 23),  # sim_params 정상 여부, 판정에 쓴 파라미터 기준일
 )
 NO_DOCUMENTS = (0, None, 0, None, 0, None)
 STATUS_KEYS = {"ticker", "report_count", "news_count", "disclosure_count", "derived_snapshot_available"}
@@ -227,6 +227,7 @@ def test_status_follows_contract_and_keeps_previous_shape(monkeypatch):
     assert result["derived_snapshot_available"] is True   # 시세·재무가 있으면 계산 근거를 낼 수 있다
     assert result["collection_job_status"] is None
     assert result["simulation_ready"] is True
+    assert result["simulation_params_as_of"] == "2026-11-23"
     assert result["company"] == "삼성전자"
     assert result["as_of_dates"]["price"] == "2026-11-06"
     assert result["as_of_dates"]["financials"] == "2026-08-14"
@@ -292,6 +293,7 @@ def test_status_failure_is_not_reported_as_no_data(monkeypatch, caplog):
     assert (result["report_count"], result["news_count"], result["disclosure_count"]) == (None, None, None)
     assert result["derived_snapshot_available"] is None
     assert result["simulation_ready"] is None
+    assert result["simulation_params_as_of"] is None
     assert result["company"] is None
     assert set(result["available"]) == {"reports", "news", "disclosures", "price_data", "macro_data",
                                         "target_price_data"}
@@ -312,3 +314,40 @@ def test_status_reads_each_document_type_once(monkeypatch):
     get_available_data_status("005930")
 
     assert connection.queries[0][0].count("from document_chunks") == 3
+
+
+def test_simulation_ready_uses_params_on_or_before_as_of(monkeypatch):
+    # 버튼을 누를 때 토론 기준일로 다시 판정한다: 그날 이전 가장 최근 sim_params (#68, #99)
+    row = list(STRUCTURED_ROW)
+    row[15], row[16] = False, date(2026, 10, 21)   # 10/21 적합은 수렴 실패
+    connection = _use(monkeypatch, FakeConnection(tuple(row) + NO_DOCUMENTS))
+
+    result = get_available_data_status("005930", as_of="2026-10-25")
+
+    assert connection.queries[0][1] == {"ticker": "005930", "sim_as_of": "2026-10-25"}
+    assert result["simulation_ready"] is False
+    assert result["simulation_params_as_of"] == "2026-10-21"
+
+
+def test_simulation_ready_without_params_is_false_not_unknown(monkeypatch):
+    # 그날 이전 파라미터가 없으면 "모름"(null)이 아니라 시뮬레이션할 수 없음(false)
+    row = list(STRUCTURED_ROW)
+    row[15], row[16] = None, None
+    connection = _use(monkeypatch, FakeConnection(tuple(row) + NO_DOCUMENTS))
+
+    result = get_available_data_status("005930")
+
+    assert connection.queries[0][1]["sim_as_of"] is None   # as_of가 없으면 가장 최근 파라미터
+    assert result["simulation_ready"] is False
+    assert result["simulation_params_as_of"] is None
+    assert "error" not in result
+
+
+def test_status_rejects_bad_as_of_without_query(monkeypatch):
+    connection = _use(monkeypatch, FakeConnection())
+
+    result = get_available_data_status("005930", as_of="2026-13-01")
+
+    assert result["error"] == "invalid_date"
+    assert result["simulation_ready"] is None
+    assert connection.queries == []

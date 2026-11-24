@@ -34,9 +34,6 @@ info:
   - id: OQ-3
     topic: FE용 종목 검색 경로
     detail: 자동완성 10개가 확정됐지만 search_companies의 HTTP 경로가 없어 GET /companies/search를 제안했습니다.
-  - id: OQ-4
-    topic: 시뮬레이션 버튼 활성화 정보
-    detail: FE가 sim_params 유무로 버튼을 비활성화해야 하지만 노출 필드가 없어 DataStatus.simulation_ready를 제안했습니다.
   - id: OQ-5
     topic: 시뮬레이션 결과 필드명
     detail: 수정안은 개념만 정의합니다. impact_pct·ci_low·ci_high·significant·seed·model_id·data_as_of 외 필드명은 제안입니다.
@@ -1068,7 +1065,7 @@ x-internal-functions:
 - name: get_available_data_status
   agent: 데이터 에이전트
   summary: 데이터 보유 상태 조회
-  signature: get_available_data_status(ticker) -> dict
+  signature: get_available_data_status(ticker, as_of=None) -> dict
   input: GetAvailableDataStatusInput
   output: DataStatus
   status: changed
@@ -1887,7 +1884,13 @@ components:
           type:
           - boolean
           - 'null'
-          description: sim_params 존재 여부. 제안 필드입니다(OQ-4).
+          description: 이 종목을 시뮬레이션할 수 있는지. 판정 기준일(입력 `as_of`, 없으면 오늘) 이전 가장 최근 `sim_params`의 `status`가 `ok`이면 true, 정상이 아니거나 파라미터가 없으면 false입니다. 조회 실패면 null입니다. 시뮬레이션 버튼은 토론 job의 `data_as_of`를 넘겨 다시 판정합니다(ADR 0013).
+        simulation_params_as_of:
+          type:
+          - string
+          - 'null'
+          format: date
+          description: '`simulation_ready` 판정에 쓴 `sim_params.as_of`(파라미터 기준일). 파라미터가 없거나 조회 실패면 null'
         sources:
           type: object
           description: 소스별 보유 상태(precheck 관문3 입력). 키는 report, news, disclosure, price, macro, target_price, financials,
@@ -3579,6 +3582,12 @@ components:
       properties:
         ticker:
           $ref: '#/components/schemas/TickerValue'
+        as_of:
+          type:
+          - string
+          - 'null'
+          format: date
+          description: '`simulation_ready` 판정 기준일. 나머지 건수·최신일은 지금 기준입니다. 형식이 틀리면 `error=invalid_date`'
     GetAgentContextInput:
       type: object
       required:

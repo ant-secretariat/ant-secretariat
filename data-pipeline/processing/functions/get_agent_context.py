@@ -19,6 +19,17 @@ DEBATE_TOP_K = 5
 MAX_CHUNKS_PER_DOC = 2
 # 문서당 제한으로 빠지는 조각을 채우려고 종류마다 몫의 몇 배를 찾아 둔다
 OVERSAMPLE = 3
+# 토론 아젠다별 지표(#84, 데이터 에이전트 기획서 4-2절). 토론은 이 중 값이 있는 지표만 {{metric_id}} 자리표시자로 쓴다
+AGENDA_METRICS = {
+    "valuation": ["per", "pbr", "eps", "bps", "roe_ttm", "operating_margin", "close", "market_cap"],
+    "growth": ["revenue_growth_yoy", "operating_margin", "roe_ttm"],
+    "risk": ["debt_ratio", "short_volume_ratio_20d", "short_balance_ratio", "insider_net_shares_90d",
+             "insider_sell_reports_90d", "major_holder_ratio_change_90d", "foreign_net_buy_20d"],
+    "flow": ["foreign_net_buy_20d", "inst_net_buy_20d", "individual_net_buy_20d", "short_volume_ratio_20d",
+             "short_balance_ratio"],
+    "shareholder_return": ["dividend_yield", "dps", "eps", "close"],
+    "macro": [],
+}
 
 # 트렌드 리포트 문서 후보 수(종류마다). 받는 쪽이 문서당 2조각·리포트 5·뉴스 4개로 줄이므로 넉넉히 준다(#69 리뷰)
 TREND_REPORT_TOP_K = 15
@@ -53,6 +64,9 @@ def get_agent_context(
     debate에 intent를 주면 문서 검색에 아젠다 설정(processing/config/agenda_search_terms.json)을 쓴다(#84).
     키워드 검색(BM25)은 질문 + 키워드, 의미 검색은 질문만이고, 질문이 없으면(버튼 경로) 둘 다 키워드로 검색한다.
     아젠다의 문서 종류마다 따로 찾아 종류별로 몫을 나누고(예: 리포트 3 + 뉴스 2), 한 문서는 최대 2조각까지만 준다.
+    debate에 intent를 주면 그 아젠다의 지표 목록(metrics, AGENDA_METRICS)도 준다. 항목은 get_metric 결과 그대로이고
+    값이 없는 지표도 빼지 않는다(value null + reason). 항목마다 근거 ID(evidence_id, metric:{종목}:{지표}:{지표 기준일})와
+    지표 이름(name)을 붙인다. 지표는 DB 연결 하나로 한 번에 계산한다(get_metrics).
     매크로 문서는 document_chunks에 없어서(0건) 검색하지 않는다. 매크로는 macro_data(정형 값)를 쓴다.
     """
     from processing.enums import AgendaId
@@ -91,6 +105,7 @@ def get_agent_context(
             "macro_data":    get_macro_data(as_of=as_of, relational_db=relational_db),
         }
         if intent:
+            result["metrics"] = _agenda_metrics(ticker, intent, as_of)
             result["documents"] = _agenda_documents(search_documents, ticker, intent, query, as_of)
         elif query:
             result["documents"] = documents(None, 5)
@@ -169,6 +184,23 @@ def _agenda_documents(search_documents, ticker: str, intent: str, query: Optiona
     return documents
 
 
+def _agenda_metrics(ticker: str, intent: str, as_of: str) -> list[dict]:
+    """아젠다의 지표 목록. get_metric 결과에 근거 ID와 이름을 붙인다(#84 Q1·Q2).
+
+    근거 ID의 기준일은 요청 기준일이 아니라 그 지표가 실제로 쓴 데이터의 날짜(as_of)다.
+    """
+    from processing.functions.get_metric import METRIC_NAMES, get_metrics
+
+    metric_ids = AGENDA_METRICS[intent]
+    if not metric_ids:
+        return []
+    return [
+        {**metric, "name": METRIC_NAMES.get(metric["metric_id"], metric["metric_id"]),
+         "evidence_id": f"metric:{ticker}:{metric['metric_id']}:{metric['as_of']}"}
+        for metric in get_metrics(ticker, metric_ids, as_of)
+    ]
+
+
 def _quotas(total: int, kinds: int) -> list[int]:
     """total을 종류 수로 나눈 몫. 나머지는 앞쪽 종류부터 1개씩(5를 둘로 나누면 3·2, 셋이면 2·2·1)."""
     base, extra = divmod(total, kinds)
@@ -179,6 +211,8 @@ def pick_diverse(found: dict[str, list[dict]], quotas: dict[str, int], total: in
     """종류별 몫만큼 고르고(한 문서 per_doc조각까지), 모자라면 남은 후보 중 점수 높은 순으로 채운다.
 
     결과는 점수 내림차순이다. 한 종류에 문서가 모자라면 다른 종류가 그 자리를 채운다.
+    종류마다 따로 검색해 각 종류의 1등은 점수가 같으므로(RRF 등수 점수), 동점이면 최신 문서를 앞에 둔다.
+    그러지 않으면 설정 파일 앞쪽 종류(리포트)가 늘 앞 번호(S1)를 받는다(#106 리뷰).
     """
     per_document: dict[str, int] = {}
     picked, chosen = [], set()
@@ -202,5 +236,5 @@ def pick_diverse(found: dict[str, list[dict]], quotas: dict[str, int], total: in
         if len(picked) >= total:
             break
         take(result)
-    return sorted(picked, key=lambda r: r.get("score") or 0, reverse=True)[:total]
+    return sorted(picked, key=lambda r: (r.get("score") or 0, r.get("date") or ""), reverse=True)[:total]
 

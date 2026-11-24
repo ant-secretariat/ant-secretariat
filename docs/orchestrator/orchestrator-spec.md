@@ -2,7 +2,7 @@
 
 | 항목 | 값 |
 | --- | --- |
-| 버전 | **v2.6** (2026-11-24) |
+| 버전 | **v2.7** (2026-11-24) |
 | 상태 | 검토 중 |
 | 담당 | 태은 |
 | 상위 문서 | [헌법](../../.specify/memory/constitution.md) > [ADR](../decisions/) > PRD v1.6 > 기능 명세서 v0.8 > 이 문서 |
@@ -21,7 +21,8 @@
 | v2.3 | 2026-11-24 | #68 리뷰 반영: 스키마 확정(`debate_job_id`·`data_as_of`·인덱스), 큐 동작(꺼내기 트랜잭션·잠금·하트비트·주기 작업) 구체화, 사용자 한도를 종류 합쳐 1개 + 부분 유니크 인덱스, `simulation_ready` 정의와 버튼 시 재판정, 시뮬레이션 가능 기간, 보관 기간은 #92 실측. 근거는 ADR 0012·0013·0014(#93) |
 | v2.4 | 2026-11-24 | 워커 내부 구조 확정: dispatcher 하나가 꺼내고 `Semaphore(3)`로 실행(6.2 "워커 내부"), 하트비트 일괄 갱신, 배포 시 종료 순서, 이벤트 루프 운용(LLM 대기는 코루틴, 계산은 `to_thread`). 워커 DB 접근 방식은 Q8 |
 | v2.5 | 2026-11-24 | Q8 해결: 워커의 큐 SQL은 동기 psycopg + `to_thread` |
-| **v2.6** | 2026-11-24 | 5.3 실행 조건: 인사이트보드 공시를 `requires_any: []`로 (공시 0건 종목도 거절하지 않고 빈 칸으로, 인사이트보드 기획서 v2.3) |
+| v2.6 | 2026-11-24 | 5.3 실행 조건: 인사이트보드 공시를 `requires_any: []`로 (공시 0건 종목도 거절하지 않고 빈 칸으로, 인사이트보드 기획서 v2.3) |
+| **v2.7** | 2026-11-24 | **MVP에서 라우팅 그래프 제거(ADR 0015, #94).** 오케스트레이터 역할을 "공통 관문 + 응답 조립"으로(1장), 엔드포인트가 관문과 에이전트를 직접 호출(3장), 토론 탭 "직접 물어보기"와 자유 질의 구분, 라우팅은 Post-MVP(11장) |
 
 ### v1.1 → v2.0 무엇이 바뀌었나
 
@@ -39,7 +40,21 @@
 
 ## 1. 역할과 범위
 
-오케스트레이터는 FE 요청을 받아 **종목을 확정하고(관문1), 필요한 사전 판정을 거쳐, 맞는 에이전트를 부르고, 결과를 공통 봉투로 돌려준다.** 분석 자체는 하지 않는다.
+오케스트레이터는 **세 탭이 공통으로 거치는 관문과 응답 조립을 맡는다.** 종목을 확정하고(관문1), 경로별 실행 조건과 (토론이면) 사전 판정을 거쳐, 그 엔드포인트의 에이전트를 부르고, 결과를 공통 봉투로 돌려준다. 분석 자체는 하지 않는다.
+
+**MVP에서는 라우팅을 하지 않는다 (ADR 0015).**
+
+- FE 탭이 기능별로 나뉘어 있고(`/insight`·`/trend-report`·`/debate`) 탭마다 다른 엔드포인트를 부르므로, 어떤 에이전트로 보낼지는 URL에서 이미 정해진다. 지금 코드의 `decide_route()`는 `request_type`을 그대로 돌려주는 한 줄이었다.
+- 라우팅이 실제로 판단을 해야 하는 곳은 **자유 질의**(문장만 보고 기능·종목을 정함)이고, 이는 Post-MVP다(11/5 결정). 라우팅과 플래너는 그때 다시 도입한다(11장).
+- 토론 탭의 **"직접 물어보기"는 자유 질의가 아니다.** 탭(토론)과 종목(칩)이 먼저 정해진 상태에서 질문을 덧붙이는 `query`이고, precheck가 범위 판정·아젠다 선택을 한다(3장 ③).
+
+| 하는 일 | 대상 |
+| --- | --- |
+| 관문1: 종목 확정 + 경로별 실행 조건 (5장) | 세 탭 공통 |
+| 거절 사유·다음 행동·대안 종목, 공통 봉투 (4장) | 세 탭 공통 |
+| 세션 사용자, 하루 한도, `trace_id` (9·10장) | 세 탭 공통 |
+| 미커버 질의 로그 (7장) | 세 탭 공통 |
+| precheck → job 생성·재사용·동시 한도 → 워커 (6장) | 토론 |
 
 **MVP 범위 (버튼 경로)**
 
@@ -53,7 +68,7 @@
 
 **공통 인프라 (MVP, 태은 소유):** 공통 봉투(4장), 도구 레지스트리(8장), Langfuse 추적(9장), 작업 큐 워커(6.2).
 
-**Post-MVP:** `POST /orchestrate/chat`, `.../clarify`, 플래너(`make_plan`·`validate_plan`·`execute_plan`), 레지스트리의 LLM 도구 정의(`to_llm_tools`), 근거 부족 루프의 S4~S5. 설계는 11장에 남겨 둔다.
+**Post-MVP:** `POST /orchestrate/chat`, `.../clarify`, 라우팅, 플래너(`make_plan`·`validate_plan`·`execute_plan`), 레지스트리의 LLM 도구 정의(`to_llm_tools`), 근거 부족 루프의 S4~S5. 설계는 11장에 남겨 둔다.
 
 ## 2. 설계 원칙: 제한된 자율성
 
@@ -61,7 +76,7 @@ v1.0의 원칙을 유지한다. "실행 경로는 정해진 코드가, 사실(�
 
 | 판단 지점 | 방식 | 이유 |
 | --- | --- | --- |
-| 라우팅 (버튼) | `request_type` 그대로 | 사용자의 버튼이 이미 의도를 정함 |
+| 무엇을 실행할지 | 판단 없음: 엔드포인트(탭)가 정함 | 사용자의 탭 선택이 이미 의도를 정함 (ADR 0015) |
 | 종목 해석 | 룰 (`resolve_company`·`extract_company_mentions`) | 틀리면 다른 종목을 분석함. 애매하면 사람에게 되묻기 |
 | 토론 사전 판정 | 룰 (`precheck`, 유민) | job 생성 전 100ms 안에 거절 |
 | 숫자·방향·배지 | 코드 | 숫자 환각 차단 (헌법 원칙 IV) |
@@ -70,11 +85,10 @@ v1.0의 원칙을 유지한다. "실행 경로는 정해진 코드가, 사실(�
 ## 3. 요청 흐름
 
 ```text
-FE ── 세션 쿠키 ──▶ API (api/orchestrator.py)        HTTP 입력 → OrchestratorRequest
-                     │  user_id는 세션에서 주입 (바디 필드 없음)
+FE 탭 ── 세션 쿠키 ──▶ 탭별 엔드포인트 (api/orchestrator.py)
+         /orchestrate/insight-board · /orchestrate/trend-report · /orchestrate/debate
+                     │  user_id는 세션에서 주입 (바디 필드 없음). 경로 = 엔드포인트
                      ▼
-              [C] run_orchestrator_request
-                     │
        ① 관문1  resolve_companies(inputs, query, max_companies)          종목 확정 (5.1·5.2)
                      │   not_found·ambiguous → rejected company_not_found
                      │   too_many / partial_covered → rejected (토론만)
@@ -83,9 +97,9 @@ FE ── 세션 쿠키 ──▶ API (api/orchestrator.py)        HTTP 입력 �
                      │   조회 실패(resolve_company·data_status) → 503 upstream_unavailable (Problem)
                      │   거절이면 log_uncovered_query(gate=1)
                      ▼
-       ② 라우팅  decide_route(request)  ── insight_board ──▶ [E] run_insight_board ──▶ Envelope
-                     │                   ── trend_report  ──▶ [D] run_trend_report  ──▶ Envelope
-                     │                   ── debate
+       ② 실행    인사이트보드 엔드포인트 ──▶ [E] run_insight_board ──▶ 봉투
+                     │   트렌드 리포트 엔드포인트 ──▶ [D] run_trend_report ──▶ 봉투
+                     │   토론 엔드포인트 ──▶ ③으로
                      ▼
        ③ 토론    precheck(query, companies,                              [F, 유민]
                      │            data_status=<관문1의 data_status로 만든 provider>,
@@ -104,6 +118,19 @@ FE ── 세션 쿠키 ──▶ API (api/orchestrator.py)        HTTP 입력 �
 - 인사이트보드·트렌드 리포트는 precheck를 거치지 않는다. 관문1의 실행 조건(5.3)만 통과하면 실행하고, 데이터가 적으면 범위를 줄인다(계약: "T0·T2는 거절하지 않고 축소 실행"). 티어는 노출 범위에만 쓰고 거절 기준으로 쓰지 않는다.
 - 종목 상태 조회(`get_available_data_status`, 종목당 약 0.3초)는 관문1의 `resolve_company`에서 한 번만 한다. precheck와 실행 조건 판정은 그 결과를 넘겨받는다.
 - 오케스트레이터는 하위 에이전트의 결과 내용을 해석하지 않는다. 봉투의 `status`만 정한다.
+- **그래프 프레임워크 없이 함수 호출로 잇는다.** 엔드포인트가 공통 관문 함수(`resolve_and_check`)와 에이전트를 차례로 부르고, 응답 조립 함수가 봉투를 만든다.
+
+```python
+@router.post("/orchestrate/trend-report")
+async def trend_report(body: TrendReportBody, user_id: str = Depends(current_user_id)):
+    gate = await resolve_and_check([body.company], route=("trend_report", None))   # 관문1 (공통)
+    if gate.rejected:
+        return gate.envelope                                                       # 거절 봉투 (공통)
+    result = await run_trend_report(gate.companies[0], body)                       # 에이전트 직접 호출
+    return ok_or_partial(result)                                                   # 응답 조립 (공통)
+```
+
+- **삭제하는 코드:** `orchestrator/graph.py`(LangGraph `StateGraph`), `router.py`(`decide_route`), `service.py`의 그래프 실행, `OrchestratorRequest.request_type` 기반 분기. `langgraph` 의존성은 다른 패키지(토론 등)의 사용 여부를 확인한 뒤 정한다(#94).
 
 ## 4. 공통 봉투와 사유 정책 (`backend/contracts/envelope.py`)
 
@@ -500,6 +527,7 @@ async def invoke(name: ToolName, args: dict, *, caller: AgentId) -> ToolResult
 아래는 MVP 이후 구현한다. 시그니처는 계약서에 있다.
 
 - **자유 질의 경로:** `resolve_entities` → precheck → `make_plan`(LLM 1회) → `validate_plan` → `execute_plan` → 검증 → 응답 조합. ReAct 대신 plan-then-execute(경로를 미리 검증·로깅).
+- **라우팅:** 자유 질의는 문장만 보고 무엇을 실행할지 정해야 하므로 이때 라우팅이 생긴다. 판단과 분기가 생기는 시점이라 그래프 프레임워크(LangGraph 등)가 필요한지 그때 정한다(ADR 0015). MVP의 공통 관문·봉투 함수는 그대로 재사용한다.
 - **되묻기:** `conversations` 테이블에 `pending_clarification` 저장, `clarify`로 재개.
 - **레지스트리 LLM 도구 정의:** `to_llm_tools(caller)` — `args_schema.model_json_schema()`로 플래너·후속 질문에 도구 목록 제공.
 - **근거 부족 루프 S4~S5**, **L2 함의 판정**.

@@ -18,7 +18,8 @@ def test_regenerated_seed_matches_committed_file(tmp_path):
 
 
 def test_default_exposure_hides_drafts_and_review_items():
-    assert o.edges("benefits_hurts") == [] and o.edges("exposed_to") == [] and o.edges("impacts") == []
+    assert o.edges("benefits_hurts") == [] and o.edges("exposed_to") == []
+    assert [(e["src"], e["dst"]) for e in o.edges("impacts")] == [("CPI_KR", "BASE_RATE_KR")]  # v0.8 데이터 확인분만
     assert o.nodes("issues") == {}
     for e in o.edges("sensitive_to"):
         assert e["status"] == "active" and e["reviewed"] and e["sign_check"] not in ("mismatch", "near_zero")
@@ -92,3 +93,30 @@ def test_every_sector_has_a_kospi_edge_and_low_n_ones_wait():
     assert all(e["weight"] is not None and e["source"] for e in kospi.values())
     for sec in ("SEC_CONS_STAP", "SEC_UTIL"):  # 종목 2개·1개
         assert kospi[sec]["status"] == "needs_review" and kospi[sec]["review_reason"] == "low_n"
+
+
+def test_macro_direction_is_exposed_only_with_matching_data():
+    # v0.8 (#61): 데이터 판정이 초안과 같은 4개만 direction 노출, 나머지는 초안이라 숨김
+    macros = o.nodes("macros")
+    shown = {k for k, m in macros.items() if "direction" in m}
+    assert shown == {"KTB_3Y_KR", "KTB_10Y_KR", "USD_KRW", "BRENT"}
+    ev = macros["KTB_3Y_KR"]["direction_evidence"]
+    assert macros["KTB_3Y_KR"]["direction"] == "up_negative" and ev["ci95"][1] < 0 and ev["as_of"] == "2026-11-23"
+    assert macros["BASE_RATE_KR"]["direction_evidence"] is None
+
+
+def test_confirmed_impacts_carries_evidence_and_others_stay_draft():
+    imp = o.load()["edges"]["impacts"]
+    active = [e for e in imp if e["status"] == "active"]
+    assert len(active) == 1 and active[0]["reviewed"] and active[0]["evidence"]["ci95"][0] > 0
+    assert all(e["evidence"] is None for e in imp if e["status"] != "active")
+
+
+def test_holdings_and_reviewed_sub_industry():
+    cs = o.nodes("companies_t1")
+    holdings = {t for t, c in cs.items() if c["is_holding"]}
+    assert len(holdings) == 19 and {"105560", "005490", "028260"} <= holdings  # 금융지주·법적 지주·사업형 지주
+    assert cs["105560"]["holding_type"] == "financial" and cs["005930"]["holding_type"] is None
+    assert cs["009830"]["sub_industry"] == "화학·태양광" and cs["277810"]["sub_industry"] == "로봇"  # KIND 후보 정정
+    assert "sub_industry" not in cs["278470"]  # KIND 후보가 없는 초안은 기본값에서 숨김
+    assert sum("sub_industry" in c for c in cs.values()) == 34

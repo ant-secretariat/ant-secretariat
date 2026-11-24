@@ -1004,7 +1004,7 @@ x-internal-functions:
   summary: 문서 벡터 검색
   signature: search_documents(query, ticker, date_from=None, date_to=None, document_type=None, report_type=None, source=None,
     top_k=5, embedding_model=None, vector_db=None, broker=None, section_type=None, include_disclaimer=False, as_of=None,
-    mode=None) -> dict
+    mode=None, keyword_query=None) -> dict
   input: SearchDocumentsInput
   output: DataRecord
   status: changed
@@ -1084,7 +1084,8 @@ x-internal-functions:
   release: mvp
   note: '`intent`는 아젠다 ID와 같습니다. `data_tier`는 항상 포함합니다. 시뮬레이션은 `intent` 없이 호출합니다. `as_of`(없으면 오늘 KST)는 묶음
     안의 모든 조회에 그대로 넘어가 그날까지 알 수 있던 값만 씁니다. `trend_report`의 문서 검색은 리포트·뉴스 각 15개 후보이고, 매크로 문서
-    검색(`macro_documents`)은 없습니다(문서가 없어 매크로는 `macro_data` 정형 값만).'
+    검색(`macro_documents`)은 없습니다(문서가 없어 매크로는 `macro_data` 정형 값만). `debate`에 `intent`를 주면 문서 검색에 아젠다
+    키워드를 씁니다: 키워드 검색은 질문 + 키워드, 의미 검색은 질문만, 질문이 없으면 둘 다 키워드라 질문이 없어도 `documents`가 있습니다(#84).'
 - name: get_financials
   agent: 데이터 에이전트
   summary: 재무제표 조회
@@ -3496,6 +3497,11 @@ components:
           - 'null'
         as_of:
           $ref: '#/components/schemas/NullableDate'
+        keyword_query:
+          type:
+          - string
+          - 'null'
+          description: 주면 키워드 검색(BM25)에는 이 값을, 의미 검색에는 `query`를 씁니다(#84). 결과에도 담습니다
     GetReportMetadataInput:
       type: object
       required:

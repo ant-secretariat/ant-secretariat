@@ -1,9 +1,18 @@
+import json
 import logging
 from datetime import date
+from pathlib import Path
 from typing import Optional
 from processing.interfaces import BaseRelationalDB, BaseEmbeddingModel, BaseVectorDB
 
 logger = logging.getLogger(__name__)
+
+# 토론 아젠다별 문서 검색 키워드(#84). 데이터 쪽이 관리한다
+SEARCH_TERMS_PATH = Path(__file__).resolve().parent.parent / "config" / "agenda_search_terms.json"
+AGENDA_SEARCH_TERMS = {
+    key: value for key, value in json.loads(SEARCH_TERMS_PATH.read_text(encoding="utf-8")).items()
+    if not key.startswith("_")
+}
 
 # 트렌드 리포트 문서 후보 수(종류마다). 받는 쪽이 문서당 2조각·리포트 5·뉴스 4개로 줄이므로 넉넉히 준다(#69 리뷰)
 TREND_REPORT_TOP_K = 15
@@ -35,6 +44,8 @@ def get_agent_context(
     없으면 오늘(KST)이다. 과거 날짜로 만들어도 그 뒤 문서·목표가가 섞이지 않게 하려는 것이다(#69 리뷰).
     단, data_status(와 그것으로 정하는 data_tier)는 as_of와 상관없이 지금 기준이다(과거 시점 계산은 아직 없음, #84).
     trend_report 문서 검색은 종류마다 TREND_REPORT_TOP_K개를 돌려준다. 받는 쪽이 문서당 조각 수를 줄여 고르기 때문이다.
+    debate에 intent를 주면 문서 검색에 아젠다 키워드(processing/config/agenda_search_terms.json)를 쓴다(#84).
+    키워드 검색(BM25)은 질문 + 키워드, 의미 검색은 질문만이고, 질문이 없으면(버튼 경로) 둘 다 키워드로 검색한다.
     매크로 문서는 document_chunks에 없어서(0건) 검색하지 않는다. 매크로는 macro_data(정형 값)를 쓴다.
     """
     from processing.enums import AgendaId
@@ -72,7 +83,14 @@ def get_agent_context(
             "target_prices": get_target_price_data(ticker=ticker, as_of=as_of, relational_db=relational_db),
             "macro_data":    get_macro_data(as_of=as_of, relational_db=relational_db),
         }
-        if query:
+        if intent:
+            # 질문이 없어도 아젠다 키워드로 검색한다. 의미 검색에 키워드를 섞지 않는 건 질문 의도가 흐려지기 때문
+            terms = AGENDA_SEARCH_TERMS[intent]
+            result["documents"] = search_documents(
+                query=query or terms, keyword_query=f"{query} {terms}" if query else terms, ticker=ticker, top_k=5,
+                as_of=as_of, embedding_model=embedding_model, vector_db=vector_db,
+            )
+        elif query:
             result["documents"] = documents(None, 5)
 
     elif agent_type == "simulation":

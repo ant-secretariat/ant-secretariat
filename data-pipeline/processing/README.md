@@ -238,6 +238,8 @@ result = resolve_company(company_input="삼성전자")
 
 문서 조각 검색. Supabase `document_chunks`(리포트·뉴스·공시)만 검색한다. `embedding_model`, `vector_db` 인자는 기존 호출 호환용으로 받기만 한다.
 
+- `keyword_query`(선택)를 주면 키워드 검색(BM25)에는 `keyword_query`를, 의미 검색에는 `query`를 쓴다. 질문에 키워드를 덧붙이면 BM25에는 도움이 되지만 임베딩에서는 질문 의도가 흐려지기 때문(#84). 결과에 `keyword_query`를 담는다
+
 ```python
 from processing.functions.search_documents import search_documents
 
@@ -773,7 +775,19 @@ result = get_metric(ticker="005930", metric_id="roe_ttm", as_of="2026-09-01")
 - 결과에 항상 `data_tier`(근거 종류: `report` → `news_only` → `disclosure_only` → `derived_only` → `macro_only` 순으로 있는 것)가 붙음. 계산은 `processing.enums.data_tier_for`
 - 데이터 상태 조회가 실패하면 `data_tier`는 `null`이고 `"error": "data_status_unavailable"`. 근거 종류를 모르는데 정하지 않음
 - `data_status`에 이미 가진 `get_available_data_status` 결과(또는 `resolve_company`의 `data_status`)를 넘기면 상태를 다시 조회하지 않음. 아젠다마다 부를 때 쓰면 종목당 0.3~1초씩 반복되는 조회가 없어짐. 다른 종목의 결과면 `ValueError`
-- `intent`(아젠다 ID, `AgendaId`)를 받아 결과에 그대로 담음. 없는 아젠다면 `ValueError`(호출 코드의 실수). 아직 묶음 내용은 바꾸지 않음
+- `intent`(아젠다 ID, `AgendaId`)를 받아 결과에 그대로 담음. 없는 아젠다면 `ValueError`(호출 코드의 실수)
+- `debate`에 `intent`를 주면 문서 검색에 아젠다 키워드(`processing/config/agenda_search_terms.json`, 데이터 쪽 관리)를 씀(#84)
+  - 키워드 검색(BM25): 질문 + 키워드 / 의미 검색: 질문만 / 질문이 없으면(버튼 경로) 둘 다 키워드
+  - 그래서 질문이 없어도 `documents`가 있음. `intent`가 없으면 지금처럼 `query`가 있을 때만 검색
+
+| intent | 키워드 |
+| --- | --- |
+| `valuation` | 실적 밸류에이션 목표주가 |
+| `macro` | 업황 금리 환율 |
+| `risk` | 리스크 우려 하락 |
+| `growth` | 성장 신사업 증설 수주 |
+| `shareholder_return` | 배당 자사주 주주환원 |
+| `flow` | 외국인 기관 수급 순매수 |
 - `as_of`(`YYYY-MM-DD`, 없으면 오늘 KST)를 묶음 안의 모든 조회(목표가·시세·매크로·문서 검색)에 그대로 넘김. 과거 날짜로 만들어도 그 뒤 문서·목표가가 섞이지 않음. 결과에 `as_of`를 담음. 형식이 틀리면 `ValueError`
 - `trend_report` 문서 검색은 리포트·뉴스 각 15개(`TREND_REPORT_TOP_K`). 받는 쪽이 문서당 조각 수를 줄여 고르기 때문. 매크로 문서는 `document_chunks`에 없어서 검색하지 않음(`macro_documents` 없음, 매크로는 `macro_data` 정형 값)
 

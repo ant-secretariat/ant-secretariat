@@ -110,3 +110,72 @@ def test_trend_report_bundle_returns_more_candidates_and_no_macro_documents(reco
     assert [s["document_type"] for s in searches] == ["report", "news"]
     assert all(s["top_k"] == TREND_REPORT_TOP_K == 15 for s in searches)
     assert "macro_documents" not in result and "macro_data" in result  # 매크로는 정형 값만
+
+
+# ── 토론 아젠다별 검색 키워드 (#84) ──
+
+def test_every_agenda_has_search_terms():
+    from processing.enums import AgendaId
+    from processing.functions.get_agent_context import AGENDA_SEARCH_TERMS
+
+    assert set(AGENDA_SEARCH_TERMS) == {agenda.value for agenda in AgendaId}
+    assert all(terms.strip() for terms in AGENDA_SEARCH_TERMS.values())
+
+
+def test_debate_intent_adds_terms_to_keyword_search_only(recorded):
+    from processing.functions.get_agent_context import get_agent_context
+
+    result = get_agent_context("005930", "debate", query="외국인 매도 이유", intent="flow", as_of="2026-11-10")
+
+    (_, kwargs), = [call for call in recorded if call[0] == "search_documents"]
+    # 의미 검색은 질문만, 키워드 검색은 질문 + 키워드
+    assert kwargs["query"] == "외국인 매도 이유"
+    assert kwargs["keyword_query"] == "외국인 매도 이유 외국인 기관 수급 순매수"
+    assert "documents" in result
+
+
+def test_debate_intent_without_question_still_searches_with_terms(recorded):
+    from processing.functions.get_agent_context import get_agent_context
+
+    result = get_agent_context("005930", "debate", intent="shareholder_return", as_of="2026-11-10")
+
+    # 버튼 경로(질문 없음)도 아젠다 키워드로 검색한다
+    (_, kwargs), = [call for call in recorded if call[0] == "search_documents"]
+    assert kwargs["query"] == kwargs["keyword_query"] == "배당 자사주 주주환원"
+    assert "documents" in result
+
+
+def test_debate_without_intent_keeps_previous_search(recorded):
+    from processing.functions.get_agent_context import get_agent_context
+
+    assert "documents" not in get_agent_context("005930", "debate", as_of="2026-11-10")
+    get_agent_context("005930", "debate", query="실적", as_of="2026-11-10")
+    (_, kwargs), = [call for call in recorded if call[0] == "search_documents"]
+    assert kwargs["query"] == "실적" and "keyword_query" not in kwargs
+
+
+def test_search_documents_reports_keyword_query(monkeypatch):
+    from processing.functions.search_documents import search_documents
+
+    seen = {}
+
+    def fake_search_chunks(connection, query, ticker, top_k, mode, **filters):
+        seen.update(query=query, **filters)
+        return [], "hybrid"
+
+    class Connection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    monkeypatch.setattr("processing.search.chunk_search.search_chunks", fake_search_chunks)
+    monkeypatch.setattr("crawling.db.postgres.connect", lambda: Connection())
+
+    result = search_documents(query="질문", ticker="005930", keyword_query="질문 키워드")
+
+    assert seen["query"] == "질문" and seen["keyword_query"] == "질문 키워드"
+    assert result["keyword_query"] == "질문 키워드"
+    assert "keyword_query" not in search_documents(query="질문", ticker="005930")
+

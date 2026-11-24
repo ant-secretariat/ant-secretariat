@@ -3,7 +3,7 @@
 - 상태: 채택
 - 결정일: 2026-11-24
 - 결정자: 태은
-- 출처: 오케스트레이터 기획서 v2.7 1·3장, FE 라우트(`frontend/src/App.tsx`), API 계약 draft.5(`/orchestrate/chat` Post-MVP), MVP Design Doc v1.5 2.2
+- 출처: 오케스트레이터 기획서 1·3장, FE 라우트(`frontend/src/App.tsx`), API 계약 draft.5(`/orchestrate/chat` Post-MVP), MVP Design Doc v1.5 2.2
 
 ## 배경
 
@@ -83,10 +83,11 @@ async def trend_report(body: TrendReportBody, user_id: str = Depends(current_use
 - **다시 볼 조건:** 자유 질의(`/orchestrate/chat`)를 MVP에 넣거나 구현을 시작할 때.
 - **바꿔야 하는 것:**
   - 삭제: `backend/orchestrator/graph.py`, `router.py`, `service.py`의 그래프 실행, `OrchestratorRequest.request_type` 기반 분기
-  - `langgraph` 의존성: 오케스트레이터에서는 쓰지 않는다. 다른 패키지(토론 등)가 쓰는지 확인한 뒤 `requirements.txt`에서 뺄지 정한다
+  - `langgraph` 의존성: `requirements.txt`에서 제거. LangGraph를 쓰는 곳은 `orchestrator/graph.py`뿐이고, 토론(`debate_renewal`·레거시 `agents/debate`)은 쓰지 않으며 쓸 계획도 없다(유민 확인, #94)
   - 구현 계획 PR-4(토론 경로)·PR-8·PR-10(엔드포인트)에서 직접 호출 구조로, PR-12에서 잔여 정리
 
 ## 참고
 
-- 오케스트레이터 기획서 v2.7 1·2·3·11장
+- 오케스트레이터 기획서 1·2·3·11장
 - 0012 (테이블 큐·워커), 0013 (시뮬레이션 별도 job)
+- 의견을 준 사람: 유민 (토론 패키지 LangGraph 미사용 확인, #94)

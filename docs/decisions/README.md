@@ -32,6 +32,9 @@ AI 에이전트도 [AGENTS.md](../../AGENTS.md)를 통해 이 폴더를 읽습�
 | [0008](0008-ontology-flag-default-off.md) | 관계 사전 기능 플래그는 기본 꺼짐, 켬/끔 평가로 기본값을 정함 | 채택 | 2026-11-17 | 태은 |
 | [0009](0009-sse-event-delivery.md) | 진행 이벤트는 `job_events` 1초 조회로 SSE 전달, 단위는 단계와 주장 | 제안 | 2026-11-17 | 태은 |
 | [0010](0010-target-price-consensus-window.md) | 목표주가 컨센서스는 증권사별 최신 1건 중 최근 180일 안의 의견으로 계산 | 채택 | 2026-11-23 | 수경 |
+| [0012](0012-postgres-table-job-queue.md) | 장시간 작업은 Postgres 테이블 큐(`FOR UPDATE SKIP LOCKED`)와 워커 프로세스로 실행, 하트비트·복구, 자동 재실행 없음 | 채택 | 2026-11-24 | 태은 |
+| [0013](0013-simulation-as-separate-job.md) | 시뮬레이션은 토론과 다른 job, job 상태는 4종, 기준일은 토론 job의 `data_as_of` | 채택 | 2026-11-24 | 태은 |
+| [0014](0014-one-active-job-per-user.md) | 사용자당 진행 중 job은 종류 합쳐 1개, DB 부분 유니크 인덱스로 강제 (QA 후 재검토 #92) | 채택 | 2026-11-24 | 태은 |
 | [0015](0015-orchestrator-without-routing-graph.md) | MVP 오케스트레이터는 라우팅 그래프(LangGraph) 없이 공통 관문과 응답 조립만, 라우팅·플래너는 자유 질의와 함께 | 채택 | 2026-11-24 | 태은 |
 | [PR #46](https://github.com/ant-secretariat/ant-secretariat/pull/46) | 데이터가 없어 남는 아젠다가 없을 때의 거절 코드는 계약의 `no_data`(다음 행동 `choose_alternative_company`). 임시 이름 `insufficient_data`는 쓰지 않음 | 채택 | 2026-11-17 | 태은 |
 

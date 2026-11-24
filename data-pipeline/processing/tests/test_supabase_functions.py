@@ -28,6 +28,9 @@ class FakeCursor:
     def fetchall(self):
         return self.owner.rows
 
+    def fetchone(self):  # get_disclosure_data의 공시 수집 시작일
+        return {"first": date(2026, 8, 11)}
+
 
 class FakeSupabase:
     def __init__(self, rows):
@@ -131,6 +134,7 @@ def test_disclosure_keeps_insight_board_shape(monkeypatch):
     assert {"disclosure_id", "date", "source", "title", "disclosure_type", "summary", "url"} <= set(item)
     assert (item["date"], item["disclosure_type"], item["source"]) == ("2026-10-29", "risk", "DART")
     assert len(item["summary"]) == 1000 and item["chunk_ids"] == ["DART_20261029800130:abc"]
+    assert result["coverage_from"] == "2026-08-11"  # 그 이전 기간은 "공시 없음"이 아니라 "수집 전"
 
 
 @pytest.mark.parametrize(

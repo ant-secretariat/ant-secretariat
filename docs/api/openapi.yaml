@@ -1937,7 +1937,7 @@ components:
                 description: 증권사
         consensus:
           type: object
-          description: 증권사별 최신 1건 기준입니다.
+          description: 증권사별 최신 1건 가운데 as_of로부터 최근 180일 안에 발표된 의견 기준입니다(ADR 0010). 최신 의견이 180일보다 오래된 증권사는 빼고, 180일 안에 의견이 없으면 값은 null입니다. 금액은 원 단위 정수입니다.
           properties:
             avg_target_price:
               type:

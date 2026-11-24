@@ -105,7 +105,7 @@ plan.md의 Technical Context에서 정해지지 않았던 항목을 정리한다
 - **결정:** dispatcher 하나가 꺼내고 `asyncio.Semaphore(3)`로 동시 실행 수를 관리한다. job마다 `create_task(run_in_slot(job))`, `finally`에서 자리 반납, dispatcher는 반복마다 예외를 잡는다. 하트비트는 실행 중 job을 모아 15초마다 한 번에 갱신하고, 종료 신호를 받으면 꺼내기를 멈추고 실행 중 job을 기다린다. 계산이 많은 작업은 `to_thread`.
 - **이유:** 정확성은 슬롯이 각자 꺼내는 방식과 같지만(둘 다 `SKIP LOCKED`), 큐가 비었을 때 DB 조회가 1번으로 줄고 하트비트·종료·실행 수 파악을 한 곳에서 한다. 무료 플랜 연결·부하가 빠듯하다.
 - **대안:** 슬롯 3개가 각자 꺼내기 — 코드는 짧지만 조회가 슬롯 수만큼, 관리가 흩어짐. 미리 띄운 슬롯 + 내부 `asyncio.Queue` — 결과는 같고 큐·종료 신호 관리가 더 필요.
-- **남은 결정:** 워커 큐 SQL을 동기 psycopg + `to_thread`로 할지, 비동기 psycopg로 할지(오케스트레이터 기획서 Q8). 비동기면 윈도우 개발 환경에서 `WindowsSelectorEventLoopPolicy` 필요.
+- **DB 접근:** 동기 psycopg + `to_thread`로 정함(2026-11-24): 데이터 함수와 같은 방식이라 DB 접근이 하나로 통일되고, 윈도우 이벤트 루프 설정이 필요 없으며, 워커의 DB 작업량(꺼내기·하트비트·이벤트 기록, 각 수 밀리초)에서는 비동기와 성능 차이가 없음. 연결은 `psycopg_pool.ConnectionPool`. 비동기는 API의 SSE 동시 연결이 수십 개를 넘어 스레드 풀이 붐빌 때 SSE 조회만 다시 검토.
 - **ADR:** 0012 "워커 내부" (#93)
 
 ## R13. `mentioned_in_query`

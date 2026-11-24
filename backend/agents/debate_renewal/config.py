@@ -17,6 +17,9 @@ DEFAULT_TEMPERATURE = 0.2
 DEFAULT_TIMEOUT_S = 60.0
 # SDK 자체 재시도(연결 오류·429·5xx). 출력 형식 재시도는 llm.py에서 따로 1회
 DEFAULT_MAX_RETRIES = 2
+# 워커 프로세스 전체에서 동시에 보내는 Solar 호출 수 상한(오케스트레이터 기획서 v2.8 6.2, #107).
+# 무료 한도 60 RPM(추정) × 평균 호출 약 3초 기준. 요금제가 정해지면 콘솔 한도로 조정
+DEFAULT_MAX_CONCURRENCY = 3
 
 
 def llm_model() -> str:
@@ -36,3 +39,11 @@ def llm_timeout_s() -> float:
 def llm_max_retries() -> int:
     raw = os.getenv("DEBATE_RENEWAL_LLM_MAX_RETRIES")
     return int(raw) if raw else DEFAULT_MAX_RETRIES
+
+
+def llm_max_concurrency() -> int:
+    raw = os.getenv("DEBATE_RENEWAL_LLM_MAX_CONCURRENCY")
+    value = int(raw) if raw else DEFAULT_MAX_CONCURRENCY
+    if value < 1:
+        raise ValueError("DEBATE_RENEWAL_LLM_MAX_CONCURRENCY는 1 이상")
+    return value

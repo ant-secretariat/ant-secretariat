@@ -1004,7 +1004,7 @@ x-internal-functions:
   summary: 문서 벡터 검색
   signature: search_documents(query, ticker, date_from=None, date_to=None, document_type=None, report_type=None, source=None,
     top_k=5, embedding_model=None, vector_db=None, broker=None, section_type=None, include_disclaimer=False, as_of=None,
-    mode=None, keyword_query=None) -> dict
+    mode=None, keyword_query=None, chunk_type=None) -> dict
   input: SearchDocumentsInput
   output: DataRecord
   status: changed
@@ -2015,7 +2015,7 @@ components:
                 type:
                 - string
                 - 'null'
-                description: 증권사 비교용 키. KIS 이름("키움", "NH투자")과 리포트 이름("키움증권")을 같은 값("키움")으로 맞춥니다.
+                description: 증권사 비교용 키. KIS 이름("키움", "NH투자")과 리포트 이름("키움증권")을 같은 값("키움")으로 맞춥니다. 회사 형태 표기("(주)")는 떼고, 이름이 바뀐 증권사는 지금 이름의 키입니다(예 하이투자증권 → "IM").
         consensus:
           type: object
           description: 증권사별 최신 1건 가운데 as_of로부터 최근 180일 안에 발표된 의견 기준입니다(ADR 0010). 최신 의견이 180일보다 오래된 증권사는 빼고, 180일 안에 의견이 없으면 값은 null입니다. 금액은 원 단위 정수입니다.
@@ -3600,6 +3600,15 @@ components:
           - string
           - 'null'
           description: 주면 키워드 검색(BM25)에는 이 값을, 의미 검색에는 `query`를 씁니다(#84). 결과에도 담습니다
+        chunk_type:
+          type:
+          - string
+          - 'null'
+          enum:
+          - text
+          - table
+          - null
+          description: '`table`이면 리포트 표 조각만, `text`면 본문만(트렌드 리포트 S3)'
     GetReportMetadataInput:
       type: object
       required:

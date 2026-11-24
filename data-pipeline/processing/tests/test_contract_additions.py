@@ -34,6 +34,8 @@ def test_broker_key_covers_every_securities_firm_in_reports():
 @pytest.mark.parametrize("name, key", [
     ("하나금융투자", "하나"), ("KTB투자증권", "다올"), ("이베스트투자증권", "LS"), ("하이투자증권", "IM"),
     (" 키움 증권 ", "키움"), ("한국IR협의회", "한국IR협의회"), ("", None), (None, None), ("증권", "증권"),
+    # 회사 형태 표기는 앞뒤 어디에 붙어도 뗀다 (#73)
+    ("(주)키움증권", "키움"), ("키움증권(주)", "키움"), ("㈜하나증권", "하나"), ("주식회사 다올투자증권", "다올"), ("(주)", None),
 ])
 def test_broker_key_edge_cases(name, key):
     assert broker_key(name) == key
@@ -299,4 +301,13 @@ def test_pick_diverse_breaks_score_ties_by_newer_document():
     picked = pick_diverse(found, {"report": 3, "news": 2}, total=5, per_doc=2)
 
     assert [p["chunk_id"] for p in picked] == ["n1", "r1"]
+
+
+def test_renamed_brokers_keep_one_key_and_record_year():
+    # 사명 변경 전후를 같은 증권사로 본다. 바뀐 해는 기록으로만 둔다 (#50, #73)
+    from processing.brokers import RENAMED_SINCE
+
+    for old, (new, since) in RENAMED_SINCE.items():
+        assert broker_key(old + "투자증권") == broker_key(new + "증권") == new
+        assert since.isdigit() and len(since) == 4
 

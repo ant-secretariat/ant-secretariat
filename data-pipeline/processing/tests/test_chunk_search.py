@@ -129,3 +129,40 @@ def test_bm25_fallback_uses_keyword_query(monkeypatch):
 
     assert (mode, seen["bm25"]) == ("bm25", "질문 키워드")
 
+
+def test_chunk_type_filter():
+    # 표 조각만 찾기(트렌드 리포트 S3, #69). 모르는 값은 호출 코드의 실수라 ValueError (#73)
+    import pytest
+
+    from processing.search.chunk_search import build_filters
+
+    where, params = build_filters(chunk_type="table")
+    assert "d.chunk_type = %s" in where and params[0] == "table"
+    assert "chunk_type" not in build_filters()[0]
+    with pytest.raises(ValueError):
+        build_filters(chunk_type="image")
+
+
+def test_search_documents_passes_chunk_type(monkeypatch):
+    from processing.functions.search_documents import search_documents
+
+    seen = {}
+
+    def fake_search_chunks(connection, query, ticker, top_k, mode, **filters):
+        seen.update(filters)
+        return [], "hybrid"
+
+    class Connection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    monkeypatch.setattr("processing.search.chunk_search.search_chunks", fake_search_chunks)
+    monkeypatch.setattr("crawling.db.postgres.connect", lambda: Connection())
+
+    search_documents(query="영업이익 추정", ticker="005930", document_type="report", chunk_type="table")
+
+    assert seen["chunk_type"] == "table"
+

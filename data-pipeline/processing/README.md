@@ -567,6 +567,38 @@ result = get_macro_data(
 
 ---
 
+### get_index_data()
+
+시장 지수 일별 종가. Supabase `index_daily`(pykrx)를 읽습니다. 토론 macro 아젠다의 지수 블록과 시뮬레이션 묶음이 씁니다(#84).
+
+- `indexes`: 지수 ID 목록(`KOSPI`·`KOSDAQ`·`KOSPI200`), 없으면 코스피·코스닥. 모르는 ID면 `ValueError`
+- `as_of`까지의 최근 `days`거래일(기본 60, 최대 800). 없으면 오늘(KST)
+- 지수마다 `rows`(오래된 날부터 `date`·`close`), `latest`, `change_pct`(기간 첫날 대비 %, 소수 둘째 자리). 값이 없으면 `rows: []`·`reason: "no_data"`
+- 조회 실패면 `indexes: null`·`"error": "index_unavailable"`
+
+```python
+from processing.functions.get_index_data import get_index_data
+
+get_index_data(as_of="2026-11-10")   # 코스피·코스닥 최근 60거래일
+```
+
+### get_sensitivities()
+
+종목의 **시장 효과를 뺀** 매크로 민감도. Supabase `ontology_sensitivity_inputs`(#67, 매달 `ontology_inputs monthly --save`)의 종목 행을 읽습니다. 토론 macro 아젠다의 민감도 블록이 씁니다(#84 Q4-1).
+
+- 원래 상관(`raw`)은 주지 않음. 시장 전체 움직임이 섞인 관계라 ADR 0011이 노출하지 않기로 함. 엣지 노출 여부는 온톨로지가 따로 판단
+- `as_of` 이전 가장 최근 계산 기준일의 값. 그날 이전에 계산된 값이 없으면 `factors: []`·`reason: "no_data"`(미래에 계산한 값을 과거 기준일에 쓰지 않음)
+- `factors`: 요인마다 `frequency`(daily·monthly), `adjusted`(편상관), `ci_low`·`ci_high`(Fisher 95%), `certain`, `q_value`(지표별 전체 종목 BH), `n_obs`, `window_start`·`window_end`. 일별(국고채 3·10년, 원/달러) 먼저, 월별(브렌트유, 소비자물가, D램 수출물가) 다음
+- 코스피는 없음: 시장 자체라 "시장 효과를 뺀 값"이 정의되지 않음. 시장 민감도(베타)는 `sensitivities` 표에 있고 시뮬레이션이 씀
+- `caution`: 해석 주의 문구(인과 아님, 월별은 1달 시차, `certain=false`면 방향 불확실)
+- 조회 실패면 `factors: null`·`"error": "sensitivities_unavailable"`
+
+```python
+from processing.functions.get_sensitivities import get_sensitivities
+
+get_sensitivities("005930", as_of="2026-11-24")
+```
+
 ### get_disclosure_data()
 
 공시 데이터 조회. Supabase `disclosure_metadata`(DART 수시공시·주요사항보고서)를 읽습니다(`SUPABASE_DB_URL` 필요).

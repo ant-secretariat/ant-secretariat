@@ -1055,6 +1055,26 @@ x-internal-functions:
   output: DataRecord
   status: changed
   release: mvp
+- name: get_index_data
+  agent: 데이터 에이전트
+  summary: 시장 지수 일별 종가
+  signature: 'get_index_data(indexes: list[str] | None = None, as_of: str | None = None, days: int = 60) -> dict'
+  input: GetIndexDataInput
+  output: DataRecord
+  status: new
+  release: mvp
+  note: '`index_daily`(pykrx). 지수 ID는 `KOSPI`·`KOSDAQ`·`KOSPI200`(없으면 코스피·코스닥). 지수마다 `rows`(오래된 날부터 `date`·`close`), `latest`, `change_pct`(%).
+    값이 없으면 `reason: no_data`, 조회 실패면 `indexes: null` + `error: index_unavailable`. 토론 macro 아젠다·시뮬레이션 묶음용(#84).'
+- name: get_sensitivities
+  agent: 데이터 에이전트
+  summary: 종목의 시장 효과를 뺀 매크로 민감도
+  signature: 'get_sensitivities(ticker: str, as_of: str | None = None) -> dict'
+  input: GetSensitivitiesInput
+  output: DataRecord
+  status: new
+  release: mvp
+  note: '`ontology_sensitivity_inputs` 종목 행. 시장 효과를 뺀 편상관(`adjusted`)·95% 구간·`certain`·`q_value`만 주고 원래 상관은 주지 않습니다(ADR 0011).
+    `as_of` 이전에 계산된 값이 없으면 `factors: []` + `reason: no_data`, 조회 실패면 `factors: null` + `error: sensitivities_unavailable`. 토론 macro 아젠다용(#84 Q4-1).'
 - name: get_disclosure_data
   agent: 데이터 에이전트
   summary: 공시 조회
@@ -3633,6 +3653,35 @@ components:
         date_from:
           $ref: '#/components/schemas/NullableDate'
         date_to:
+          $ref: '#/components/schemas/NullableDate'
+    GetIndexDataInput:
+      type: object
+      properties:
+        indexes:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+            enum:
+            - KOSPI
+            - KOSDAQ
+            - KOSPI200
+        as_of:
+          $ref: '#/components/schemas/NullableDate'
+        days:
+          type: integer
+          minimum: 1
+          maximum: 800
+          default: 60
+    GetSensitivitiesInput:
+      type: object
+      required:
+      - ticker
+      properties:
+        ticker:
+          $ref: '#/components/schemas/TickerValue'
+        as_of:
           $ref: '#/components/schemas/NullableDate'
     GetMacroDataInput:
       type: object

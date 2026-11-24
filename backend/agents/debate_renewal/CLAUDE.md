@@ -58,7 +58,7 @@
 - 사실 층(근거·verdict·stance)은 사용자 성향과 무관하게 동일. 성향은 Judge의 `points_to_check`·`caution`에만 반영. **적합/부적합 label 노출 금지**
 - 비교 모드는 최대 2종목: 종목별 Bull→Bear(종목끼리 병렬) + Judge 축별 비교, 제시 순서 무작위화, 한쪽 실패 시 단일 분석으로 전환
 - 2라운드(D5)·시뮬레이션 버튼은 단일 모드 전용
-- job 상태(계약 `RunDebateInput`, 오케스트레이터 기획서 v2.1 6.3): 단일 `queued → running → simulation_pending →(버튼) simulation_running → completed`, 비교 `queued → running → debate_completed`(종료), 실패는 `failed`. 버튼을 누르지 않으면 `simulation_pending`에 머문다. 상태 전환은 오케스트레이터 워커가 하고 `run_debate`는 결과만 돌려준다(#68 재리뷰에서 draft.6 반영 제안). `simulation_handoff` 필드는 없다(삭제됨)
+- job 상태(ADR 0013, 오케스트레이터 기획서 v2.3): 토론 job은 단일·비교 모두 `queued → running → completed`, 실패는 `failed`. 시뮬레이션은 버튼으로 만드는 **별도 job**(`debate_job_id`로 토론 결과를 읽음, 기준일은 토론 job의 `data_as_of`). 상태 전환·이벤트 저장은 워커가 하고 `run_debate`는 결과만 돌려준다(계약 draft.6 C11·C12). `simulation_handoff` 필드는 없다(삭제됨)
 - 진행 이벤트는 노드·주장 단위(`node_started`·`claim_completed`·`agenda_completed`·`node_completed`). 토큰 단위 금지 (D8) — 단, 태은 쪽 확정 전까지는 제안 상태
 
 ## 구현 순서

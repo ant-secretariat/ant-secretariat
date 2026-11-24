@@ -141,7 +141,7 @@
 | `shareholder_return` | 주주환원 | 공시, 시세, 리포트 | 배당수익률·DPS·EPS·종가, 주주환원 공시, 리포트·공시 |
 | `flow` | 수급 | 수급 | 기관·외국인·개인 순매수, 공매도 거래·잔고, 뉴스 |
 
-- **반환 모양(키 이름, 블록, 개수 상한)은 4-2절 초안으로 토론(유민)·오케스트레이터(태은)와 확정 중입니다.** 원칙은 네 가지입니다.
+- **반환 모양(키 이름, 블록, 개수 상한)은 4-2절입니다.** 토론(유민)과는 #84에서 합의했고, 계약서 반영(Q5)은 오케스트레이터(태은)와 확인 중입니다. 원칙은 네 가지입니다.
   - 숫자는 `get_metric` 결과 그대로
   - 문서는 토론 근거(`Evidence`)로 바로 옮길 수 있는 모양
   - precheck가 "있다"고 판정한 데이터는 묶음에 꼭 포함
@@ -149,17 +149,19 @@
 - 새로 필요한 것: 지수 조회(`get_index_data`), 민감도 조회(`get_sensitivities`), 과거 시점 기준 `data_tier`.
 - 시뮬레이션은 `intent` 없이 부르고, 묶음에 지수(`index_daily`)와 파라미터 기준일(`sim_params_as_of`)을 더할 예정입니다.
 
-### 4-2. intent별 반환 모양 (초안, 토론 `agent_type="debate"`)
+### 4-2. intent별 반환 모양 (토론 `agent_type="debate"`)
 
-설계 논의는 이슈 #84에서 합니다.
+설계 논의는 이슈 #84에서 했습니다. 토론 쪽 질문(Q1–Q4)은 유민 답(11/24)으로 정했고, 계약서 반영(Q5)만 남았습니다.
 
-**이미 정해진 것** (토론 쪽 결정)
+**정해진 것**
 
 | 항목 | 내용 | 근거 |
 | --- | --- | --- |
 | 부르는 방식 | 토론이 아젠다마다 1번씩, 아젠다끼리 병렬로 부름 | 토론 기획서 v3.0, #76 |
-| 검색어 | 모든 아젠다에 사용자 질문을 그대로 넘김 | #76 |
-| 숫자 표시 | 주장 문장 속 숫자는 `{{metric_id}}`로 쓰고 코드가 `get_metric` 값으로 치환 | 토론 기획서 v3.0 |
+| 검색어 | 사용자 질문 + 아젠다 키워드. 질문이 없으면(버튼 경로) 아젠다 키워드만. 키워드는 데이터 쪽이 `intent_data_sources.json`의 아젠다별 `search_terms`로 관리하고, 토론은 질문만 넘김 | #84 Q3 |
+| 숫자 표시 | 주장 문장 속 숫자는 `{{metric_id}}`로 쓰고 토론 쪽이 묶음의 `metrics[].display`로 치환. 자리표시자 목록(`metric_ids`)은 `metrics` 중 `value`와 `display`가 둘 다 있는 지표만. 남은 자리표시자는 L1이 잡음 | 토론 기획서 v3.0, #84 Q1 |
+| 값이 없는 지표 | 자리표시자 목록에서 빼고, `reason`이 사실 자체인 경우만 문장 근거로 씀(예: `capital_impaired` → "자본잠식") | #84 Q1 |
+| 근거 ID | 지표: `metric:{종목}:{지표}:{기준일}`, 블록: `block:{종목}:{블록}:{as_of}`(예: `block:005930:target_price:2026-11-10`). `document_type="structured"`, `title`은 지표·블록 이름, `source`는 함수 이름, `date`는 `as_of`. 토론이 블록을 짧은 표 문장 하나로 바꿔 근거로 넣고, 기준선 기록에도 남김 | #84 Q2 |
 | 비교 모드 | 종목마다 축 단위로 같은 방식(대칭 검색)으로 부름 | 토론 기획서 v3.0 |
 | 온톨로지 | 이 묶음에 넣지 않고 `get_ontology_context`로 따로(기능 플래그 뒤) | 토론 기획서 v3.0, ADR 0008 |
 
@@ -178,7 +180,7 @@
 | 키 | 내용 | 출처 |
 | --- | --- | --- |
 | `metrics` | 그 아젠다의 지표 **목록**. 항목마다 `get_metric` 결과 그대로(`value`, `unit`, `display`, `as_of`, `reason`). 값이 없는 지표도 빼지 않고 `value: null`과 사유를 둠 | `get_metric` |
-| `documents` | 문서 검색 결과(`query`, `mode`, `results[]`). `query`가 없으면 키를 넣지 않음. 결과가 0건이면 리포트 → 뉴스 → 공시 순으로 한 번 더 넓혀 찾고 `widened: true` 표시 | `search_documents` |
+| `documents` | 문서 검색 결과(`query`, `mode`, `results[]`). 질문이 없어도 아젠다 키워드로 항상 검색. 아젠다당 5개, 문서 종류가 여럿이면 종류별로 최소 1개씩 섞음(예: 리포트 3 + 뉴스 2). 결과가 0건이면 리포트 → 뉴스 → 공시 순으로 한 번 더 넓혀 찾고 `widened: true` 표시 | `search_documents` |
 
 **intent별 지표·블록**
 
@@ -191,6 +193,17 @@
 | `shareholder_return` | `dividend_yield`, `dps`, `eps`, `close` | `disclosures`(주주환원 공시만) | 리포트, 공시 | 공시 → `disclosures`, 시세 → `close`·`dividend_yield`, 리포트 → `documents` |
 | `macro` | (없음) | `macro`, `index`, `sensitivities` | 리포트, 뉴스 | 민감도 → `sensitivities`, 뉴스·리포트 → `documents` |
 
+**아젠다 키워드 (`search_terms` 초기값, #84 Q3)**
+
+| intent | 키워드 |
+| --- | --- |
+| `valuation` | 실적 밸류에이션 목표주가 |
+| `macro` | 업황 금리 환율 |
+| `risk` | 리스크 우려 하락 |
+| `growth` | 성장 신사업 증설 수주 |
+| `shareholder_return` | 배당 자사주 주주환원 |
+| `flow` | 외국인 기관 수급 순매수 |
+
 **블록 모양과 개수 상한**
 
 | 블록 | 모양 | 개수 상한 | 출처 |
@@ -198,16 +211,17 @@
 | `valuation` | PER·PBR 과거 백분위, 업종 중앙값 대비 | – | `get_derived_snapshot`의 `valuation` |
 | `fundamental_trend` | 분기 매출·영업이익·순이익 YoY·QoQ | – | `get_derived_snapshot`의 `fundamental_trend` |
 | `price_trend` | 수익률, 최근 1·3개월 실현 변동성, 52주 위치, 지수 대비 | – | `get_derived_snapshot`의 `price_trend` |
-| `flow` | 5·20일 순매수, 시가총액 대비, 공매도 | – | `get_derived_snapshot`의 `flow` |
-| `target_price` | 컨센서스(최근 180일) + 최근 의견 목록(`broker_key` 포함) | 의견 최근 10건 | `get_target_price_data` |
+| `flow` | 5일 순매수, 시가총액 대비 등 **`metrics`에 없는 값만**(20일 순매수·공매도는 `metrics`) | – | `get_derived_snapshot`의 `flow` |
+| `target_price` | 컨센서스(최근 180일), 목표주가 상승여력(컨센서스 ÷ 종가 − 1), 최근 의견 목록(`broker_key` 포함) | 의견 최근 10건 | `get_target_price_data` |
 | `financials` | 분기 재무(연결/별도 표시) | 최근 8분기 | `get_financials` |
 | `disclosures` | 공시 목록 + 수집 시작일(`coverage_from`) | 리스크: 최근 90일 10건, 주주환원: 최근 1년 10건 | `get_disclosure_data` |
 | `macro` | 지표별 시계열(지표마다 기준일 표시). 이 종목의 민감도 요인부터: 국고채 3·10년, 원/달러, 기준금리, 소비자물가, 브렌트유, D램 수출물가 | 일별 최근 60거래일, 월별 최근 13개월 | `get_macro_data` |
 | `index` | 코스피·코스닥 일별 종가 | 최근 60거래일 | `get_index_data` (새로 만듦) |
-| `sensitivities` | 일별 요인(상관, 베타, 신뢰구간), 월별 요인(상관, 신뢰구간, 시차), **시장 효과를 뺀 값**(`adjusted`, `certain`, `q_value`), 기준일 | 요인 전체(일별 4, 월별 3) | `get_sensitivities` (새로 만듦) |
+| `sensitivities` | **시장 효과를 뺀 값만**(`adjusted`, `certain`, `q_value`)과 기준일. 원래 상관(`raw`)은 넣지 않음(ADR 0011은 시장 효과를 빼지 않은 관계를 노출하지 않음) | 요인 전체(일별 4, 월별 3) | `get_sensitivities` (새로 만듦) |
 
 - `get_derived_snapshot`은 한 번만 부르고, 아젠다에 필요한 블록만 꺼냅니다(종목당 약 1초).
-- `sensitivities`에는 주의 문구를 같이 넣습니다: "월별 상관은 함께 움직인 정도이고 인과가 아님", "원래 상관에는 시장 전체 움직임이 섞여 있으니 시장 효과를 뺀 값과 함께 볼 것".
+- **같은 숫자를 두 군데 두지 않습니다.** 블록에는 `metrics`에 없는 값만 둡니다. 숫자 출처가 둘이면 치환 값과 근거 문장이 어긋날 수 있습니다(#84 Q4).
+- `sensitivities`에는 주의 문구를 같이 넣습니다: "월별 상관은 함께 움직인 정도이고 인과가 아님". 엣지 노출 여부는 온톨로지(`get_ontology_context`)가 따로 판단합니다.
 - 예상 시간: 아젠다 하나에 약 1.5–3초. 토론이 `data_status`를 넘기면 상태 조회(0.3–1초)는 빠집니다.
 
 **예시** (`intent="flow"`)
@@ -222,8 +236,8 @@
     {"metric_id": "short_balance_ratio", "value": null, "unit": "%", "display": null,
      "as_of": "2026-11-19", "reason": "partial_window"}
   ],
-  "flow": {"foreign_net_buy_5d": 0, "foreign_net_buy_20d": 0, "...": "...", "as_of": "2026-11-21"},
-  "documents": {"query": "외국인 매도 이유", "mode": "hybrid", "widened": false,
+  "flow": {"foreign_net_buy_5d": 0, "...": "...", "as_of": "2026-11-21"},   // metrics에 있는 값은 두지 않음
+  "documents": {"query": "외국인 매도 이유 외국인 기관 수급 순매수", "mode": "hybrid", "widened": false,
                 "results": [{"chunk_id": "…", "doc_id": "…", "document_type": "news", "title": "…",
                              "author_org": "…", "date": "2026-11-20", "url": "…", "content": "…"}]}
 }
@@ -233,7 +247,7 @@
 
 | 경우 | 반환 |
 | --- | --- |
-| 토론, `intent` 없음 | 지금과 같음: 목표가, 매크로, 문서(`query`가 있을 때) + 공통 키 |
+| 토론, `intent` 없음 | 지금과 같음: 목표가, 매크로, 문서(`query`가 있을 때) + 공통 키. 토론은 아젠다마다 `intent`를 넘기므로 이 경우는 쓰지 않음 |
 | 시뮬레이션 | 시세, 매크로, 목표가 + 지수(`index_daily`, 최근 3년)와 파라미터 기준일(`sim_params_as_of`) 추가 예정 |
 | 트렌드 리포트 | 목표가, 시세, 매크로, 리포트·뉴스 후보 각 15개. `intent`는 쓰지 않음 |
 
@@ -241,10 +255,10 @@
 
 | # | 질문 | 누구 |
 | --- | --- | --- |
-| Q1 | 프롬프트의 지표 자리표시자 목록(`metric_ids`)을 묶음의 `metrics`(위 표의 아젠다별 지표)에서 가져가면 되는지. 지금 토론 코드는 빈 목록이라 숫자를 근거 문서에서만 인용함 | 유민 |
-| Q2 | 지표·재무를 토론 근거(`Evidence`)로 쓸 때 ID를 무엇으로 할지. 제안: `metric:{종목}:{지표}:{기준일}` | 유민 |
-| Q3 | 지금처럼 모든 아젠다에 사용자 질문을 그대로 쓸지, 데이터 쪽이 아젠다별 키워드를 검색어에 덧붙일지 | 유민 |
-| Q4 | 위 지표·블록 목록이 토론 프롬프트에 맞는지, 빼거나 더할 것 | 유민 |
+| ~~Q1~~ | 자리표시자 목록을 묶음 `metrics`에서 → **해결:** 네. `value`·`display`가 둘 다 있는 지표만, 치환은 토론 쪽 | 유민 |
+| ~~Q2~~ | 지표·재무 근거 ID → **해결:** `metric:{종목}:{지표}:{기준일}`, 블록은 `block:{종목}:{블록}:{as_of}` | 유민 |
+| ~~Q3~~ | 검색어 → **해결:** 질문 + 아젠다 키워드(`search_terms`, 데이터 쪽 소유) | 유민 |
+| ~~Q4~~ | 지표·블록 목록 → **해결:** 목록은 그대로, 민감도는 시장 효과 뺀 값만, 중복 숫자 없음, 문서 종류별 최소 1개, 목표주가 상승여력 추가 | 유민 |
 | Q5 | `metrics`와 블록 이름을 계약서 `GetAgentContextOutput`에 적을지(계약 draft.6과 함께) | 태은 |
 
 ### 4-3. data_tier (근거 종류)
@@ -265,15 +279,17 @@
 
 | 명령 | 계산하는 것 | 결과 |
 | --- | --- | --- |
-| `sensitivities` | 종목·섹터 × 지표의 원래 상관과 **시장 효과를 뺀 상관**, 95% 구간, 방향 확실 여부, q값 | 섹터 → 매크로 엣지는 기준 통과 0개(19개 기각). 종목 → 매크로는 가설 있는 10개 노출(시드 v0.9) |
+| `sensitivities` | 종목·섹터 × 지표의 원래 상관과 **시장 효과를 뺀 상관**, 95% 구간, 방향 확실 여부, q값 | 섹터 → 매크로 엣지는 기준 통과 0개(19개 기각). 종목 → 매크로는 가설 있는 10개를 시드가 판정(시드 v0.10, #80) |
 | `sector-grades` | 섹터 금리·환율 등급 후보 | 노출하지 않기로 함 |
 | `macro-direction` | 지표가 오를 때 시장이 같이 움직였는지 | 4개 확정(시드 v0.8) |
 | `impacts` | 지표끼리의 방향(기준금리 사건 분석, 1달 시차 상관) | 1개 확정(소비자물가 → 기준금리) |
 | `kind` | KRX KIND 업종·주요제품으로 세부 업종·지주사 후보, 확정값과 차이 표시 | 세부 업종 34개·지주사 19개 확정 |
-| `issue-evidence` | 시드 이슈마다 근거 청크 후보 | 유민이 직접 고름 |
+| `issue-evidence` | 시드 이슈마다 근거 청크 후보 | 후보는 시드 스크립트(`ontology/seed/scripts/issue_evidence_candidates.py`, #83)로 옮김, 연결은 유민이 고름 |
 | `monthly --save` | 위 계산을 매달 한 번에. 민감도는 `ontology_sensitivity_inputs` 표에 기준일별로 쌓음 | 11/23 값 765행 저장 |
 
-- 계산 방법: 일별은 최근 3년, 종목 수익률과 지표 변화에서 각각 코스피 효과를 뺀 상관. 월별은 최근 최대 120개월, t월 주가와 t+1월 지표 변화, 시장은 핵심 종목 평균. 95% 신뢰구간(Fisher).
+- 계산 방법: 일별은 최근 3년, 종목 수익률과 지표 변화에서 각각 코스피 효과를 뺀 상관. 월별은 최근 최대 120개월, t월 주가와 t+1월 지표 변화, 시장은 핵심 종목 동일가중 평균(그 종목 자신 포함). 95% 신뢰구간(Fisher). q값은 두 가지: 가설 엣지끼리(시드가 계산), 지표별 전체 종목(이 표의 `q_value`). 모두 Benjamini-Hochberg.
+- 시드는 표를 직접 읽거나 다시 계산하지 않고, `ontology_sensitivity_inputs`에서 내보낸 기준일 스냅샷 CSV(`computed_at` 포함)를 읽어 노출 기준 4개를 판정합니다. 두 달 연속 탈락은 직전 기준일 CSV로 판정합니다(시드 v0.10, #80). 데이터 쪽은 매달 표에 값을 쌓는 것까지 합니다.
+- 노출 기준과 운영 규칙: [ADR 0011](../decisions/0011-ontology-sensitivity-exposure.md)(#79)
 
 ## 6. 저장소 (Supabase)
 
@@ -383,7 +399,7 @@
 | # | 내용 | 상대 |
 | --- | --- | --- |
 | Q1 | DB 용량: Supabase Pro로 갈지. 가면 T0 정형 데이터, 뉴스 빈 기간, 매일 리포트·뉴스 적재를 켬. 무료로 남으면 뉴스 90일 보관 + 리포트·뉴스는 손으로 적재 | 전원 |
-| Q2 | intent별 묶음 모양(4-2절, #84의 Q1–Q5) | 유민, 태은 |
+| Q2 | intent별 묶음 모양(4-2절): #84 Q1–Q4는 유민 답으로 정함. Q5(계약서 `GetAgentContextOutput`에 적을지)만 남음 | 태은 |
 | Q3 | 근거 조각 보존 규칙: 뉴스를 90일 뒤 지워도 온톨로지·토론·기준선 근거로 쓰인 조각은 남김 | 유민 |
 | Q4 | 변동성 공용 용어("최근 1개월 실현 변동성", "시뮬레이션 변동성(GARCH)") | 태은, 유민 |
 | Q5 | 월별 지표 공개 시차: 지금은 그 달 기준으로 자르고 실제 공개일은 반영하지 않음. 필요해지면 공개일 칸 추가 | 유민 |
@@ -395,7 +411,7 @@
 | 함수 계약 추가(`doc_id`, `broker_key`, `coverage_from`, `get_agent_context`의 `as_of`) 머지 | 수경 (리뷰: 태은, 유민) | 🟡 #75 리뷰 중 |
 | `suggest_alternatives` 머지 | 수경 (리뷰: 태은) | 🟡 #85 리뷰 중 |
 | 실패 표시(`resolve_company` 등, `extract_company_mentions`), 한국 날짜, `get_derived_snapshot` 묶음 문제 | 수경 | ❌ #55, 12/6까지 |
-| intent별 묶음 구현(`get_index_data`, `get_sensitivities`, 과거 시점 `data_tier`, 문서 검색 병렬화) | 수경 | ❌ #84 답 받은 뒤 |
+| intent별 묶음 구현(`get_index_data`, `get_sensitivities`, 과거 시점 `data_tier`, 문서 검색 병렬화, 아젠다 키워드 `search_terms`, 근거 ID `metric:`·`block:`) | 수경 | ❌ 착수 가능(#84 답 받음) |
 | `broker_key` 보강(컨센서스를 `broker_key`로 묶기), `chunk_type` 인자, `revisions` | 수경 | ❌ #73 |
 | 남은 리포트 적재(11/9–11/17 117건) | 수경 | ✅ 11/24 완료. 7건은 PDF를 자르다 멈춤(PyMuPDF 오류), 따로 확인 필요 |
 | 뉴스 빈 기간(11/10–11/19) 채우기 | 수경 | ❌ DB 용량(Q1) 결정 뒤 |

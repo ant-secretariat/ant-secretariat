@@ -1,6 +1,7 @@
 """토론 리빌드 Solar 호출(llm.py) 테스트. 실제 API는 부르지 않는다."""
 from __future__ import annotations
 
+import asyncio
 import json
 from types import SimpleNamespace
 
@@ -9,6 +10,7 @@ import openai
 import pytest
 
 from agents.debate_renewal import config
+from agents.debate_renewal import llm
 from agents.debate_renewal.llm import (
     LLMOutputInvalidError, LLMUnavailableError, complete_structured,
 )
@@ -120,3 +122,47 @@ def test_config_defaults(monkeypatch):
     assert config.llm_temperature() == 0.2
     assert config.llm_timeout_s() == 60.0
     assert config.llm_max_retries() == 2
+
+
+class SlowClient:
+    """동시에 몇 개가 들어와 있는지 센다."""
+    def __init__(self):
+        self.active = self.peak = 0
+        self.chat = SimpleNamespace(completions=SimpleNamespace(create=self._create))
+
+    async def _create(self, **kwargs):
+        self.active += 1
+        self.peak = max(self.peak, self.active)
+        await asyncio.sleep(0.01)
+        self.active -= 1
+        return _resp(VALID)
+
+
+async def test_concurrent_calls_are_capped(monkeypatch):
+    monkeypatch.setenv("DEBATE_RENEWAL_LLM_MAX_CONCURRENCY", "2")
+    client = SlowClient()
+    await asyncio.gather(*[complete_structured(MESSAGES, BullOutput, client=client, model="m") for _ in range(6)])
+    assert client.peak == 2
+
+
+def test_max_concurrency_default_and_invalid(monkeypatch):
+    monkeypatch.delenv("DEBATE_RENEWAL_LLM_MAX_CONCURRENCY", raising=False)
+    assert config.llm_max_concurrency() == 3
+    monkeypatch.setenv("DEBATE_RENEWAL_LLM_MAX_CONCURRENCY", "0")
+    with pytest.raises(ValueError):
+        config.llm_max_concurrency()
+
+
+async def test_default_client_is_reused_within_loop(monkeypatch):
+    made = []
+    monkeypatch.setattr(llm, "make_client", lambda: made.append(FakeClient(_resp(VALID), _resp(VALID))) or made[-1])
+    await complete_structured(MESSAGES, BullOutput, model="m")
+    await complete_structured(MESSAGES, BullOutput, model="m")
+    assert len(made) == 1
+
+
+async def test_usage_kept_when_retry_response_has_none():
+    no_usage = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=VALID))], usage=None)
+    client = FakeClient(_resp("{not json"), no_usage)
+    result = await complete_structured(MESSAGES, BullOutput, client=client, model="m")
+    assert (result.prompt_tokens, result.completion_tokens) == (10, 5)

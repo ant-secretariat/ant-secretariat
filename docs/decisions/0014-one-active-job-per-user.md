@@ -58,5 +58,5 @@ create unique index agent_jobs_one_active_per_user
 
 ## 참고
 
-- 오케스트레이터 기획서 v2.3 6.2
+- 오케스트레이터 기획서 6.2
 - 0012 (테이블 큐), 0013 (시뮬레이션 별도 job)

@@ -4,7 +4,7 @@
 - 결정일: 2026-11-24
 - 결정자: 태은
 - 의견을 준 사람: 유민, 수경 (PR #68 리뷰)
-- 출처: MVP Design Doc v1.5 4.1·5장, 오케스트레이터 기획서 v2.3 6장, PR #68
+- 출처: MVP Design Doc v1.5 4.1·5장, 오케스트레이터 기획서 6장, PR #68
 
 ## 배경
 
@@ -109,7 +109,7 @@ Design Doc의 MVP 원칙("새 라이브러리·인프라 최소화")과 5장의 
 
 ## 참고
 
-- 오케스트레이터 기획서 v2.3 6.1(스키마)·6.2(실행)
+- 오케스트레이터 기획서 6.1(스키마)·6.2(실행)
 - 0009 (SSE 전달), 0013 (시뮬레이션 별도 job), 0014 (사용자당 진행 중 job)
 - PostgreSQL `SELECT … FOR UPDATE SKIP LOCKED` (Locking Clause)
 - [pg-boss](https://github.com/timgit/pg-boss), [PgQueuer — SKIP LOCKED](https://janbjorge.github.io/pgqueuer/reference/skip-locked/)

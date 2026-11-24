@@ -2,7 +2,7 @@
 
 | 항목 | 값 |
 | --- | --- |
-| 버전 | **v2.3** (2026-11-24) |
+| 버전 | **v2.4** (2026-11-24) |
 | 상태 | 검토 중 |
 | 담당 | 태은 |
 | 상위 문서 | [헌법](../../.specify/memory/constitution.md) > [ADR](../decisions/) > PRD v1.6 > 기능 명세서 v0.8 > 이 문서 |
@@ -18,7 +18,8 @@
 | v2.0 | 2026-11-23 | 저장소로 이관. 레포 현황에 맞춰 수정: 자유 질의·플래너를 Post-MVP로, 2종목 비교(ADR 0007)·SSE(ADR 0009)·Problem 오류(#60) 반영, 작업 저장소를 Supabase로 |
 | v2.1 | 2026-11-23 | #68 리뷰 반영: 경로별 실행 조건(5.3, 선언형 표), 커버 판정을 `data_status.sources`로, precheck에 `data_status` 전달, 거절 payload는 오케스트레이터가 채움, `append_event` 직렬화, 시뮬레이션 시작 흐름(6.3), 보관 기간·연결 풀 |
 | v2.2 | 2026-11-24 | **상위 문서(Design Doc v1.5·토론 기획서 v3.0)와 어긋난 세 곳 정정:** 도구 레지스트리·Langfuse를 MVP로(8·9장), 작업 실행을 API 안 `asyncio`에서 워커 프로세스(`FOR UPDATE SKIP LOCKED`·하트비트·복구)로(6.2). #68 리뷰 반영: 시뮬레이션을 별도 job으로 분리(6.3), `run_debate` 순수 함수화(6.5), 미커버 판정에서 `macro` 제외(5.3) |
-| **v2.3** | 2026-11-24 | #68 리뷰 반영: 스키마 확정(`debate_job_id`·`data_as_of`·인덱스), 큐 동작(꺼내기 트랜잭션·잠금·하트비트·주기 작업) 구체화, 사용자 한도를 종류 합쳐 1개 + 부분 유니크 인덱스, `simulation_ready` 정의와 버튼 시 재판정, 시뮬레이션 가능 기간, 보관 기간은 #92 실측. 근거는 ADR 0012·0013·0014(#93) |
+| v2.3 | 2026-11-24 | #68 리뷰 반영: 스키마 확정(`debate_job_id`·`data_as_of`·인덱스), 큐 동작(꺼내기 트랜잭션·잠금·하트비트·주기 작업) 구체화, 사용자 한도를 종류 합쳐 1개 + 부분 유니크 인덱스, `simulation_ready` 정의와 버튼 시 재판정, 시뮬레이션 가능 기간, 보관 기간은 #92 실측. 근거는 ADR 0012·0013·0014(#93) |
+| **v2.4** | 2026-11-24 | 워커 내부 구조 확정: dispatcher 하나가 꺼내고 `Semaphore(3)`로 실행(6.2 "워커 내부"), 하트비트 일괄 갱신, 배포 시 종료 순서, 이벤트 루프 운용(LLM 대기는 코루틴, 계산은 `to_thread`). 워커 DB 접근 방식은 Q8 |
 
 ### v1.1 → v2.0 무엇이 바뀌었나
 
@@ -309,8 +310,53 @@ t4  D1 실행                             D2 실행
 | --- | --- |
 | 타임아웃 | 토론 전체 5분, LLM 호출 1회 60초 → `failed` + `error_code=timeout` |
 | 워커 동시 실행 | 3 (Design Doc 4.5, Langfuse 실측 후 조정) |
-| 실행 방식 | 시뮬레이션은 torch 계산이라 별도 스레드·프로세스에서 실행해 토론의 LLM 대기와 서로 막지 않게 함 |
 | 프로세스 | API와 같은 이미지, 진입점만 다름. 연결은 세션 모드(5432) |
+
+**워커 내부: dispatcher 하나 + `Semaphore(3)`**
+
+꺼내기는 dispatcher 한 곳에서만 하고, 세마포어로 동시 실행 수(슬롯)를 관리한다. 슬롯은 떠 있는 실체가 아니라 "남은 자리 수"이고, job마다 `create_task`로 작업이 새로 생겼다가 끝난다.
+
+```python
+slots = asyncio.Semaphore(3)
+
+async def dispatcher():
+    while not shutting_down:
+        try:
+            await slots.acquire()                 # 빈 자리가 생길 때까지 멈춤 (폴링 없음, release가 깨움)
+            job = await claim_one()               # 6.2 꺼내기 트랜잭션. 꺼내기는 여기서만
+            if job is None:                       # 큐가 비어 있으면
+                slots.release()
+                await asyncio.sleep(1.5)          # 폴링은 큐가 비었을 때만
+                continue
+            running[job.job_id] = asyncio.create_task(run_in_slot(job))   # job을 인자로 넘겨 새 작업 생성
+        except Exception:
+            logger.exception("dispatcher")        # 반복문이 죽으면 아무도 못 꺼내므로 반복마다 잡음
+
+async def run_in_slot(job):
+    try:
+        await run_job(job)                        # 토론: run_debate 연결(6.5) / 시뮬레이션: to_thread
+    finally:
+        running.pop(job.job_id, None)
+        slots.release()                           # 성공·실패와 상관없이 자리 반납 (빠뜨리면 자리가 영영 줄어듦)
+```
+
+| 고른 이유 (슬롯이 각자 꺼내는 방식과 비교) | |
+| --- | --- |
+| 같은 프로세스 안 꺼내기 겹침 | 없음. 꺼내기가 한 곳에서만 일어남 |
+| 큐가 비었을 때 DB 조회 | 1.5초마다 1번 (각자 꺼내면 슬롯 수만큼) |
+| 하트비트 | 15초마다 `running`에 있는 job을 한 번에 갱신: `update agent_jobs set heartbeat_at = now() where job_id = any(:ids)` |
+| 실행 중 job 수 | `running` 크기로 바로 앎 |
+| 정확성 | 두 방식 모두 `SKIP LOCKED`로 보장. 차이는 DB 조회 수와 운영 편의 |
+
+- **`SKIP LOCKED`는 그대로 둔다.** 같은 프로세스 안 겹침은 구조로 없앴지만, 배포 순간 옛 워커와 새 워커가 잠깐 같이 떠서 꺼내기가 겹칠 수 있다.
+- **배포 시 종료 순서:** 종료 신호(SIGTERM) → `shutting_down = True`로 꺼내기 중단 → `running`의 작업이 끝나길 기다림(최대 토론 타임아웃 5분, 플랫폼 종료 유예가 더 짧으면 남은 job은 복구 루틴이 `worker_lost`로 정리) → 종료.
+
+**이벤트 루프 운용**
+
+- 워커는 `asyncio.run(main())` 하나로 돈다. dispatcher·`run_in_slot`·`run_job`은 모두 코루틴이고, 이벤트 루프가 `await` 지점마다 번갈아 실행한다. **스레드 하나를 job 3개가 나눠 쓴다.**
+- 토론 job은 시간 대부분이 LLM 응답 대기라(그 동안은 네트워크·OS가 기다림) 스레드 하나로 충분하다.
+- **계산이 많은 작업은 `await asyncio.to_thread(...)`로 별도 스레드에 보낸다.** 시뮬레이션의 모델 계산이 `await` 없이 스레드를 오래 잡으면 다른 job과 하트비트까지 멈춘다.
+- 데이터 함수(동기 psycopg)도 레지스트리 `invoke`가 `to_thread`로 감싼다(8장).
 
 **생성 규칙 (API 쪽)**
 
@@ -478,3 +524,4 @@ async def invoke(name: ToolName, args: dict, *, caller: AgentId) -> ToolResult
 | Q5 | 사용자당 진행 중 job 합쳐 1개가 QA에서 불편하지 않은지, 보관 기간 실측 | #92 |
 | Q6 | 계약 draft.6: `JobStatus` 4종·시뮬레이션 별도 job(ADR 0013, 유민 동의 대기), `RunDebateInput` 순수 함수화 | 유민·수경 |
 | Q7 | Langfuse 호스팅 (Cloud 무료 vs 셀프호스트) | 팀 |
+| Q8 | 워커의 큐 SQL(꺼내기·하트비트·`append_event`)을 동기 psycopg + `to_thread`로 할지, 비동기 psycopg로 할지. 비동기면 윈도우 개발 환경에서 `WindowsSelectorEventLoopPolicy` 설정 필요(기본 `ProactorEventLoop`에서 비동기 psycopg가 동작하지 않음), 배포(리눅스)는 무관 | 태은 (PR-2) |

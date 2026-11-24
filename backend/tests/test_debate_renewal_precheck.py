@@ -117,10 +117,23 @@ def test_missing_source_excludes_agenda_as_no_data():
     s.sources["disclosure"] = SourceStatus(count=0)
     s.sources["report"] = SourceStatus(count=0)
     s.sources["news"] = SourceStatus(count=0)
+    s.sources["sensitivity"] = SourceStatus(count=4, latest=FRESH)  # 매크로는 종목 민감도로 남음
     r = run("", data_status=provider(**{"005930": s}))
     assert r.allowed_agendas == [A.VALUATION, A.MACRO]
     assert [(e.agenda_id, e.reason) for e in r.excluded] == [(A.RISK, "no_data")]
     assert r.verdict == "reduced"
+
+
+def test_market_macro_alone_does_not_enable_macro_agenda():
+    # ds-0.3.0: macro 건수는 시장 전체 지표 수라 회사 데이터 없는 T0 종목도 13으로 나온다(#72 리뷰)
+    zero = SourceStatus(count=0)
+    s = TickerDataStatus(tier=Tier.T0, sources={
+        "report": zero, "news": zero, "sensitivity": zero, "price": zero, "financials": zero,
+        "target_price": zero, "disclosure": zero, "macro": SourceStatus(count=13, latest=FRESH),
+    })
+    r = run("금리 영향 알려줘", data_status=provider(**{"005930": s}))
+    assert A.MACRO not in r.allowed_agendas
+    assert (A.MACRO, "no_data") in [(e.agenda_id, e.reason) for e in r.excluded]
 
 
 def test_no_usable_agenda_is_rejected():
@@ -146,6 +159,7 @@ def test_compare_mode_uses_intersection_of_available_agendas():
     s = full_status()
     for k in ("report", "news", "disclosure"):
         s.sources[k] = SourceStatus(count=0)
+    s.sources["sensitivity"] = SourceStatus(count=4, latest=FRESH)  # 매크로는 종목 민감도로 남음
     r = run("", companies=(SAMSUNG, HYNIX), data_status=provider(**{"000660": s}))
     assert r.mode == "compare"
     assert r.allowed_agendas == [A.VALUATION, A.MACRO]
@@ -163,7 +177,7 @@ def test_three_companies_raise():
 
 
 def test_result_carries_dictionary_version():
-    assert run("").dictionary_version == "kw-0.3.1+ds-0.2.0"
+    assert run("").dictionary_version == "kw-0.3.1+ds-0.3.0"
 
 
 def test_flow_net_buy_is_not_investment_advice():

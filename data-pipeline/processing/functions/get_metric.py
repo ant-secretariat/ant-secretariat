@@ -48,6 +48,31 @@ INSIDER_METRICS = {
 METRIC_IDS = sorted([
     *MARKET_METRICS, *PRICE_METRICS, *FINANCIAL_METRICS, *FLOW_METRICS, *INSIDER_METRICS, "short_balance_ratio",
 ])
+# 사람이 읽는 지표 이름. 토론 근거 제목 등에 쓴다
+METRIC_NAMES = {
+    "per": "PER(주가수익비율)",
+    "pbr": "PBR(주가순자산비율)",
+    "eps": "EPS(주당순이익)",
+    "bps": "BPS(주당순자산)",
+    "dividend_yield": "배당수익률",
+    "dps": "주당배당금",
+    "foreign_ratio": "외국인 지분율",
+    "shares_outstanding": "상장주식수",
+    "close": "종가",
+    "market_cap": "시가총액",
+    "debt_ratio": "부채비율",
+    "operating_margin": "영업이익률",
+    "revenue_growth_yoy": "매출 성장률(전년 대비)",
+    "roe_ttm": "ROE(최근 4분기)",
+    "foreign_net_buy_20d": "외국인 순매수(최근 20거래일)",
+    "inst_net_buy_20d": "기관 순매수(최근 20거래일)",
+    "individual_net_buy_20d": "개인 순매수(최근 20거래일)",
+    "short_volume_ratio_20d": "공매도 거래 비중(최근 20거래일 평균)",
+    "short_balance_ratio": "공매도 잔고 비율",
+    "insider_net_shares_90d": "임원·주요주주 주식수 증감(최근 90일)",
+    "insider_sell_reports_90d": "임원·주요주주 매도 보고 수(최근 90일)",
+    "major_holder_ratio_change_90d": "5% 이상 대량보유자 지분율 증감(최근 90일)",
+}
 
 # 은행·증권·보험은 예금·보험부채가 부채로 잡혀 부채비율이 의미 없다
 FINANCIALS_SECTOR = "금융"
@@ -113,31 +138,55 @@ def get_metric(ticker: str, metric_id: str, as_of: str) -> dict:
     display는 토론·트렌드 리포트가 문장에 그대로 넣을 표시용 문자열이다(format_display).
     형식 문서: processing/docs/get_metric.md
     """
+    return get_metrics(ticker, [metric_id], as_of)[0]
+
+
+def get_metrics(ticker: str, metric_ids: list[str], as_of: str) -> list[dict]:
+    """여러 지표를 DB 연결 하나로 계산한다. 결과는 metric_ids 순서이고 항목마다 get_metric과 같다.
+
+    지표마다 연결을 새로 열면 연결에만 약 0.35초씩 들어서(운영 DB), 토론 아젠다 하나(지표 최대 8개)에 3초가 걸렸다.
+    한 지표의 조회가 실패해도 나머지는 계산한다(연결이 autocommit이라 실패가 다음 조회로 번지지 않음).
+    """
     requested = date.fromisoformat(as_of).isoformat()
-    return _finish(_compute(ticker, metric_id, requested), requested)
+    known = [metric_id for metric_id in metric_ids if metric_id in METRIC_IDS]
+    results: dict[str, dict] = {}
+    if known:
+        # 조회 실패로 토론·온톨로지가 멈추지 않게 한다. 접속 주소가 메시지에 섞일 수 있어 종류만 남긴다
+        try:
+            from crawling.db.postgres import connect
+
+            with connect() as connection:
+                for metric_id in known:
+                    results[metric_id] = _compute(connection, ticker, metric_id, requested)
+        except Exception as exc:
+            logger.error("지표 조회 실패: %s(%s)", ticker, type(exc).__name__)
+            for metric_id in known:
+                results.setdefault(metric_id, _unavailable(ticker, metric_id, requested))
+    return [
+        _finish(results.get(metric_id) or _result(ticker, metric_id, None, "", "", requested, [], "unknown_metric"),
+                requested)
+        for metric_id in metric_ids
+    ]
 
 
-def _compute(ticker: str, metric_id: str, as_of: str) -> dict:
-    if metric_id not in METRIC_IDS:
-        return _result(ticker, metric_id, None, "", "", as_of, [], "unknown_metric")
-
-    # 조회 실패로 토론·온톨로지가 멈추지 않게 한다. 접속 주소가 메시지에 섞일 수 있어 종류만 남긴다
+def _compute(connection, ticker: str, metric_id: str, as_of: str) -> dict:
     try:
-        from crawling.db.postgres import connect
-
-        with connect() as connection:
-            if metric_id in FINANCIAL_METRICS:
-                return _financial_metric(connection, ticker, metric_id, as_of)
-            if metric_id in FLOW_METRICS:
-                return _flow_metric(connection, ticker, metric_id, as_of)
-            if metric_id == "short_balance_ratio":
-                return _short_balance_metric(connection, ticker, as_of)
-            if metric_id in INSIDER_METRICS:
-                return _insider_metric(connection, ticker, metric_id, as_of)
-            return _daily_metric(connection, ticker, metric_id, as_of)
+        if metric_id in FINANCIAL_METRICS:
+            return _financial_metric(connection, ticker, metric_id, as_of)
+        if metric_id in FLOW_METRICS:
+            return _flow_metric(connection, ticker, metric_id, as_of)
+        if metric_id == "short_balance_ratio":
+            return _short_balance_metric(connection, ticker, as_of)
+        if metric_id in INSIDER_METRICS:
+            return _insider_metric(connection, ticker, metric_id, as_of)
+        return _daily_metric(connection, ticker, metric_id, as_of)
     except Exception as exc:
         logger.error("지표 조회 실패: %s %s(%s)", ticker, metric_id, type(exc).__name__)
-        return _result(ticker, metric_id, None, _unit(metric_id), "", as_of, [], "metric_unavailable")
+        return _unavailable(ticker, metric_id, as_of)
+
+
+def _unavailable(ticker: str, metric_id: str, as_of: str) -> dict:
+    return _result(ticker, metric_id, None, _unit(metric_id), "", as_of, [], "metric_unavailable")
 
 
 def _finish(result: dict, requested: str) -> dict:

@@ -78,6 +78,13 @@ def recorded(monkeypatch):
     for module, name in [("get_target_price_data", "get_target_price_data"), ("get_price_data", "get_price_data"),
                          ("get_macro_data", "get_macro_data"), ("search_documents", "search_documents")]:
         monkeypatch.setattr(f"processing.functions.{module}.{name}", recorder(name))
+
+    def fake_metrics(ticker, metric_ids, as_of):
+        calls.append(("get_metrics", {"ticker": ticker, "metric_ids": metric_ids, "as_of": as_of}))
+        return [{"ticker": ticker, "metric_id": m, "value": 1.0, "unit": "배", "as_of": "2026-11-07",
+                 "display": "1배", "reason": None} for m in metric_ids]
+
+    monkeypatch.setattr("processing.functions.get_metric.get_metrics", fake_metrics)
     monkeypatch.setattr("processing.functions.get_available_data_status.get_available_data_status",
                         lambda ticker: {"ticker": ticker, "report_count": 1, "news_count": 0, "disclosure_count": 0,
                                         "derived_snapshot_available": True})
@@ -237,4 +244,59 @@ def test_agenda_documents_reports_failed_type_without_hiding_others(monkeypatch)
     # 뉴스 검색이 실패해도 리포트는 주고, 실패는 "문서 없음"이 아니라 reason으로 알린다
     assert [r["chunk_id"] for r in documents["results"]] == ["r1"]
     assert (documents["reason"], documents["failed_types"], documents["mode"]) == ("search_unavailable", ["news"], "hybrid")
+
+
+# ── 토론 아젠다별 지표 (#84 Q1·Q2) ──
+
+def test_every_agenda_has_known_metrics_with_names():
+    from processing.enums import AgendaId
+    from processing.functions.get_agent_context import AGENDA_METRICS
+    from processing.functions.get_metric import METRIC_IDS, METRIC_NAMES
+
+    assert set(AGENDA_METRICS) == {agenda.value for agenda in AgendaId}
+    assert {m for ids in AGENDA_METRICS.values() for m in ids} <= set(METRIC_IDS)
+    assert set(METRIC_NAMES) == set(METRIC_IDS)
+
+
+def test_debate_intent_gives_metrics_with_evidence_ids(recorded):
+    from processing.functions.get_agent_context import AGENDA_METRICS, get_agent_context
+
+    result = get_agent_context("005930", "debate", intent="valuation", as_of="2026-11-10")
+
+    (_, kwargs), = [call for call in recorded if call[0] == "get_metrics"]   # 지표는 한 번에
+    assert kwargs == {"ticker": "005930", "metric_ids": AGENDA_METRICS["valuation"], "as_of": "2026-11-10"}
+    first = result["metrics"][0]
+    assert first["metric_id"] == "per" and first["name"] == "PER(주가수익비율)"
+    # 근거 ID의 기준일은 요청일(11/10)이 아니라 지표가 실제로 쓴 데이터의 날짜
+    assert first["evidence_id"] == "metric:005930:per:2026-11-07"
+
+
+def test_macro_agenda_has_no_metrics_and_no_metric_query(recorded):
+    from processing.functions.get_agent_context import get_agent_context
+
+    result = get_agent_context("005930", "debate", intent="macro", as_of="2026-11-10")
+
+    assert result["metrics"] == []
+    assert not [call for call in recorded if call[0] == "get_metrics"]
+
+
+def test_metrics_only_for_debate_with_intent(recorded):
+    from processing.functions.get_agent_context import get_agent_context
+
+    assert "metrics" not in get_agent_context("005930", "debate", query="실적", as_of="2026-11-10")
+    assert "metrics" not in get_agent_context("005930", "simulation", as_of="2026-11-10")
+
+
+def test_pick_diverse_breaks_score_ties_by_newer_document():
+    from processing.functions.get_agent_context import pick_diverse
+
+    # 종류마다 따로 검색해 각 종류 1등은 점수가 같다. 동점이면 최신 문서가 앞(리포트가 늘 S1이 되지 않게)
+    found = {
+        "report": [{"chunk_id": "r1", "doc_id": "R1", "document_type": "report", "score": 0.5, "date": "2026-10-01"}],
+        "news": [{"chunk_id": "n1", "doc_id": "N1", "document_type": "news", "score": 0.5, "date": "2026-11-05"}],
+    }
+
+    picked = pick_diverse(found, {"report": 3, "news": 2}, total=5, per_doc=2)
+
+    assert [p["chunk_id"] for p in picked] == ["n1", "r1"]
 

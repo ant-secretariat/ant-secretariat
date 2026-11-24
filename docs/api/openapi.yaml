@@ -1086,7 +1086,8 @@ x-internal-functions:
     안의 모든 조회에 그대로 넘어가 그날까지 알 수 있던 값만 씁니다. `trend_report`의 문서 검색은 리포트·뉴스 각 15개 후보이고, 매크로 문서
     검색(`macro_documents`)은 없습니다(문서가 없어 매크로는 `macro_data` 정형 값만). `debate`에 `intent`를 주면 문서 검색에 아젠다
     키워드를 씁니다: 키워드 검색은 질문 + 키워드, 의미 검색은 질문만, 질문이 없으면 둘 다 키워드라 질문이 없어도 `documents`가 있습니다.
-    아젠다의 문서 종류마다 따로 찾아 5개를 나누고(예: 리포트 3 + 뉴스 2), 한 문서는 최대 2조각입니다(#84).'
+    아젠다의 문서 종류마다 따로 찾아 5개를 나누고(예: 리포트 3 + 뉴스 2), 한 문서는 최대 2조각입니다. 아젠다의 지표 목록 `metrics`도
+    줍니다: 항목은 `MetricValue` + `name` + `evidence_id`(`metric:{종목}:{지표}:{지표의 as_of}`)이고 값이 없는 지표도 사유와 함께 둡니다(#84).'
 - name: get_financials
   agent: 데이터 에이전트
   summary: 재무제표 조회
@@ -1132,6 +1133,15 @@ x-internal-functions:
   status: new
   release: mvp
   note: 최종 설계 6장의 계약입니다. PER·PBR·ROE처럼 매일 바뀌는 값은 노드에 저장하지 않고 이 함수로 조회합니다.
+- name: get_metrics
+  agent: 데이터 에이전트
+  summary: 여러 지표를 한 번에 조회
+  signature: 'get_metrics(ticker: str, metric_ids: list[str], as_of: str) -> list[MetricValue]'
+  input: null
+  output: MetricValue
+  status: new
+  release: mvp
+  note: '`get_metric`과 같은 계산을 DB 연결 하나로 합니다. 결과는 `metric_ids` 순서이고, 한 지표가 실패해도 나머지는 계산합니다(실패한 지표는 `metric_unavailable`).'
 - name: run_simulation
   agent: 시뮬레이션 에이전트
   summary: 시뮬레이션 실행 함수

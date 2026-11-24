@@ -312,3 +312,56 @@ def test_status_reads_each_document_type_once(monkeypatch):
     get_available_data_status("005930")
 
     assert connection.queries[0][0].count("from document_chunks") == 3
+
+
+def test_get_metrics_uses_one_connection_and_keeps_order(monkeypatch):
+    # 지표마다 연결을 열면 연결에만 약 0.35초씩 든다. 여러 지표는 연결 하나로 (#84)
+    from processing.functions.get_metric import get_metrics
+
+    opened = []
+
+    def connect():
+        connection = FakeConnection((70000, date(2026, 11, 7)), (1.2, date(2026, 11, 7)))
+        opened.append(connection)
+        return connection
+
+    monkeypatch.setattr("crawling.db.postgres.connect", connect)
+
+    results = get_metrics("005930", ["close", "nope", "pbr"], "2026-11-10")
+
+    assert len(opened) == 1
+    assert [r["metric_id"] for r in results] == ["close", "nope", "pbr"]
+    assert (results[0]["value"], results[1]["reason"], results[2]["value"]) == (70000, "unknown_metric", 1.2)
+    assert all(r["requested_as_of"] == "2026-11-10" for r in results)
+
+
+def test_get_metrics_isolates_one_failing_metric(monkeypatch):
+    from processing.functions.get_metric import get_metrics
+
+    class HalfBroken(FakeConnection):
+        def execute(self, query, params=None):
+            if "pbr" in str(query):
+                raise RuntimeError("postgresql://user:SECRET@host/db")
+            return super().execute(query, params)
+
+    monkeypatch.setattr("crawling.db.postgres.connect", lambda: HalfBroken((70000, date(2026, 11, 7))))
+
+    close, pbr = get_metrics("005930", ["close", "pbr"], "2026-11-10")
+
+    # 한 지표가 실패해도 나머지는 계산하고, 실패는 "값 없음"이 아니라 metric_unavailable
+    assert close["value"] == 70000 and close["reason"] is None
+    assert pbr["value"] is None and pbr["reason"] == "metric_unavailable"
+
+
+def test_get_metrics_connection_failure_marks_every_metric(monkeypatch):
+    from processing.functions.get_metric import get_metrics
+
+    def fail():
+        raise RuntimeError("down")
+
+    monkeypatch.setattr("crawling.db.postgres.connect", fail)
+
+    results = get_metrics("005930", ["close", "per", "nope"], "2026-11-10")
+
+    assert [r["reason"] for r in results] == ["metric_unavailable", "metric_unavailable", "unknown_metric"]
+

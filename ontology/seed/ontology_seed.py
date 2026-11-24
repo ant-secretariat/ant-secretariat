@@ -5,9 +5,10 @@
 노출 규칙 (ADR 0008 · 헌법 원칙 IV)
 - 노드·엣지는 status == "active" 이고 reviewed 가 True 일 때만 돌려준다.
   Claude 초안(ISSUE·BENEFITS/HURTS·EXPOSED_TO·IMPACTS, status "draft"), 가설과 부호가 어긋난 민감도
-  (status "needs_review"), 수집 계획 없는 매크로(status "inactive")는 기본값에서 빠진다.
+  (status "needs_review"), 시장 효과를 빼지 않은 민감도(needs_review, market_unadjusted),
+  수집 계획 없는 매크로(status "inactive"), 검증으로 기각한 관계(status "rejected")는 기본값에서 빠진다.
 - 노드의 draft_fields 에 적힌 속성(섹터 경기 성격, 종목 세부 산업 등)도 기본값에서 뺀다.
-- include_draft=True 는 검수용이다. inactive 를 뺀 전부와 draft_fields 를 그대로 돌려준다. 주입 경로에서는 쓰지 않는다.
+- include_draft=True 는 검수용이다. inactive·rejected 를 뺀 전부와 draft_fields 를 그대로 돌려준다. 주입 경로에서는 쓰지 않는다.
 """
 from __future__ import annotations
 
@@ -28,7 +29,7 @@ def load() -> dict[str, Any]:
 
 def is_exposed(record: dict, include_draft: bool = False) -> bool:
     if include_draft:
-        return record["status"] != "inactive"
+        return record["status"] not in ("inactive", "rejected")
     return record["status"] == "active" and record["reviewed"] is True
 
 
@@ -60,7 +61,9 @@ def company_context(ticker: str, include_draft: bool = False) -> dict:
     if company is None:
         return {}
     sec = company["sector_id"]
-    sens = [e for e in edges("sensitive_to", include_draft) if e["src"] == sec]
+    all_sens = edges("sensitive_to", include_draft)
+    sens = [e for e in all_sens if e["src"] == sec and e["src_type"] == "SECTOR"]
+    co_sens = [e for e in all_sens if e["src"] == ticker and e["src_type"] == "COMPANY"]
     issue_nodes = nodes("issues", include_draft)
     issues: dict[str, dict] = {}
     for via, target in (("SECTOR", sec), ("COMPANY", ticker)):  # 종목 엣지가 섹터 엣지를 덮어쓴다
@@ -71,5 +74,7 @@ def company_context(ticker: str, include_draft: bool = False) -> dict:
         "company": company,
         "sector": nodes("sectors", include_draft)[sec],
         "sector_sensitivities": {f: [e for e in sens if e["weight_frequency"] == f] for f in ("daily", "monthly")},
+        # v0.9: 종목 → 매크로. weight 는 시장 효과를 뺀 값이라 섹터 엣지(원래 상관)와 크기를 바로 비교하지 않는다
+        "company_sensitivities": {f: [e for e in co_sens if e["weight_frequency"] == f] for f in ("daily", "monthly")},
         "issues": list(issues.values()),
     }

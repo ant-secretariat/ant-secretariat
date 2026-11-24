@@ -20,7 +20,7 @@ API 스키마의 원본은 [`docs/api/openapi.yaml`](../../docs/api/openapi.yaml
 
 | 에이전트 | 타입 | 파일 |
 | --- | --- | --- |
-| 오케스트레이터 | `OrchestratorRequest`(`request_type`에 `trend_report` 추가), `UncoveredQueryEvent` | `orchestrator/schemas.py`, `orchestrator/uncovered.py` |
+| 오케스트레이터 | `GateResult`(확정 종목 · 거절 봉투), `UncoveredQueryEvent`. `OrchestratorRequest.request_type` 분기는 없앰(엔드포인트가 경로를 정함, ADR 0015) | `orchestrator/gate.py`, `orchestrator/uncovered.py` |
 | 트렌드 리포트 | `TrendReportRequest`, `Claim`, `Evidence`, `TrendCards`, `TrendCardsDraft`(LLM 출력), `BrokerView`, `TargetPriceTrend`, `VerificationSummary`, `TrendReportResult` | `agents/trend_report/schemas.py` |
 | 인사이트보드 | `CompanyData`, `Badge`, `Comment`, `FeatureSummary`, `InsightBoardResult` | `agents/insight_board/schemas.py` (신규) |
 

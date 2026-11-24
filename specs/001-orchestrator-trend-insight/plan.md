@@ -20,7 +20,7 @@
 
 **Language/Version**: Python 3.12 (backend), TypeScript (frontend, 타입 갱신만)
 
-**Primary Dependencies**: FastAPI, Pydantic v2, LangGraph(기존 라우팅 유지), openai SDK(Upstage 호환), psycopg(데이터 함수 경유), `psycopg_pool`(SSE 조회, R14), `langfuse` SDK(선택 설정, R17). 테스트 전용: `pyyaml`, `jsonschema` (research R9)
+**Primary Dependencies**: FastAPI, Pydantic v2 (오케스트레이터의 LangGraph 라우팅은 제거, ADR 0015), openai SDK(Upstage 호환), psycopg(데이터 함수 경유), `psycopg_pool`(SSE 조회, R14), `langfuse` SDK(선택 설정, R17). 테스트 전용: `pyyaml`, `jsonschema` (research R9)
 
 **Storage**: Supabase Postgres — 신규 `agent_jobs`·`job_events`·`uncovered_query_log` (R2). `users`는 SQLite 유지(범위 밖)
 
@@ -88,7 +88,8 @@ backend/
 │   ├── uncovered.py           # log_uncovered_query
 │   ├── jobs.py                # job 생성·재사용·한도(토론·시뮬레이션), append_event
 │   ├── worker.py              # 워커: dispatcher + Semaphore(3), SKIP LOCKED·하트비트·복구·타임아웃·종료, run_debate·run_simulation 연결
-│   ├── graph.py · router.py   # trend_report 경로 추가, 노드가 Envelope 반환
+│   ├── gate.py                # 공통 관문 resolve_and_check (관문1 + 실행 조건) · 응답 조립 ok_or_partial
+│   ├── (삭제) graph.py · router.py · service.py 그래프 실행   # ADR 0015
 │   ├── schemas.py · service.py
 ├── functions/agent_jobs.py    # Supabase 저장소로 교체 (SQL은 여기에만)
 ├── api/
@@ -128,7 +129,7 @@ frontend/src/                   # types.ts · api/client.ts (봉투·Badge·Clai
 | PR-9 | 트렌드 리포트 ① 데이터 | `get_agent_context` 경로(`as_of` 직접 전달), `select_evidence`(상한은 #81), `compute_target_price_trend`(개정 비율, 경계값 #82), 레거시 삭제 | PR-1, 수경 `doc_id`·`broker_key` | — |
 | PR-10 | 트렌드 리포트 ② 생성·검증 | `generate_cards`(구조화 출력), `verify_cards`, `fill_card_gaps` S1~S3, `data_tier` 정책, status, `/orchestrate/trend-report` (+기준선 수치) | PR-9, PR-7 | FE |
 | PR-11 | FE 전환 | 봉투 처리, `Badge`·`Claim` 렌더링, trend-report 경로 전환, SSE 구독 | PR-4·5·8·10 | — |
-| PR-12 | 정리 | `/agents/trend-report` 삭제, `resolve_company_context`·SQLite `agent_jobs` 잔여 제거 | PR-11 | — |
+| PR-12 | 정리 | `/agents/trend-report` 삭제, `resolve_company_context`·SQLite `agent_jobs` 잔여 제거, 오케스트레이터 라우팅 그래프(`graph.py`·`router.py`) 삭제·`langgraph` 의존성 정리(ADR 0015) | PR-11 | — |
 
 ### 에이전트별 귀속
 

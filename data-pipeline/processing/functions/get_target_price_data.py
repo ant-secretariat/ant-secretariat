@@ -12,6 +12,8 @@ logger = logging.getLogger(__name__)
 OPINION_LABELS = {"buy": "매수", "hold": "중립", "sell": "매도"}
 # ADR 0010: 증권사별 최신 1건 가운데 as_of로부터 180일 안에 발표된 의견만 컨센서스에 쓴다
 CONSENSUS_WINDOW_DAYS = 180
+# 목표가 개정을 세는 기본 기간(#82: 3개월이 개정 0·1건 종목이 적고 실적 시즌이 한 번만 들어감)
+REVISION_WINDOW_DAYS = 90
 
 
 def get_target_price_data(
@@ -20,6 +22,7 @@ def get_target_price_data(
     date_to: Optional[str] = None,
     as_of: Optional[str] = None,
     relational_db: BaseRelationalDB = None,
+    revision_window_days: int = REVISION_WINDOW_DAYS,
 ) -> dict:
     """Supabase broker_opinions_adjusted(KIS)를 읽어 API 계약서 TargetPriceData 형식으로 반환한다.
 
@@ -31,25 +34,33 @@ def get_target_price_data(
     최신 의견이 180일보다 오래된 증권사는 빼고, 그 증권사의 더 오래된 의견으로 채우지 않는다.
     금액은 원 단위 정수(반올림은 0.5 올림)다.
 
+    revisions는 같은 증권사의 직전 → 최신 목표가 개정을 최근 revision_window_days(기본 90일) 안에서 센 것이다(#82).
+    방향 라벨(상향·하향·혼조)의 경계값은 받는 쪽(트렌드 리포트·토론)이 적용한다.
+
     target_prices·summary는 트렌드 리포트가 계약서 형식으로 옮겨 갈 때까지 함께 주는
     이전 형식이다. relational_db 인자는 기존 호출을 깨지 않으려고 받기만 한다.
     """
     as_of_day = date.fromisoformat(as_of) if as_of else today_kst()  # 형식이 틀리면 ValueError
+    if not isinstance(revision_window_days, int) or revision_window_days <= 0:
+        raise ValueError("revision_window_days는 1 이상의 정수")
+    # 형식이 틀리면 ValueError. 예전처럼 date 객체로 넘겨도 된다
+    date_from = date.fromisoformat(str(date_from)).isoformat() if date_from else None
+    date_to = date.fromisoformat(str(date_to)).isoformat() if date_to else None
     # 조회 실패로 토론·시뮬레이션 전체가 멈추지 않게 한다. 접속 주소가 메시지에 섞일 수 있어 종류만 남긴다
     try:
-        rows = _fetch_rows(ticker, date_from, date_to, as_of_day.isoformat())
+        # 개정을 세려면 date_from 이전의 직전 의견도 있어야 해서, 기간은 조회 뒤에 거른다
+        rows = _fetch_rows(ticker, as_of_day.isoformat())
     except Exception as exc:
         logger.error("목표주가 조회 실패: %s(%s)", ticker, type(exc).__name__)
-        return {**_build_result(ticker, [], as_of_day), "error": "target_price_unavailable"}
-    return _build_result(ticker, rows, as_of_day)
+        # 개정 수를 모르는데 0으로 두면 "개정 없음"으로 읽히므로 null
+        return {**_build_result(ticker, [], as_of_day), "revisions": None, "error": "target_price_unavailable"}
+    in_range = [row for row in rows
+                if (not date_from or row[0].isoformat() >= date_from) and (not date_to or row[0].isoformat() <= date_to)]
+    return {**_build_result(ticker, in_range, as_of_day),
+            "revisions": _revisions(rows, as_of_day, revision_window_days)}
 
 
-def _fetch_rows(
-    ticker: str,
-    date_from: Optional[str],
-    date_to: Optional[str],
-    as_of: str,
-) -> list[tuple]:
+def _fetch_rows(ticker: str, as_of: str) -> list[tuple]:
     from crawling.db.postgres import connect
 
     query = """
@@ -63,14 +74,6 @@ def _fetch_rows(
           and b.opinion_date <= %s::date
     """
     params = [as_of, ticker, as_of]
-
-    if date_from:
-        query += " and b.opinion_date >= %s::date"
-        params.append(date_from)
-    if date_to:
-        query += " and b.opinion_date <= %s::date"
-        params.append(date_to)
-
     query += " order by b.opinion_date desc, b.broker"
 
     with connect() as connection:
@@ -163,3 +166,47 @@ def _consensus(records: list[dict], as_of: date) -> dict:
 def _won(value) -> int:
     """원 단위 정수. 0.5는 올린다(은행가 반올림을 쓰지 않음)."""
     return int(Decimal(str(value)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+
+def _revisions(rows: list[tuple], as_of: date, window_days: int) -> dict:
+    """같은 증권사의 직전 → 최신 환산 목표가 개정을 센다(#82).
+
+    - 기간(as_of로부터 window_days일 안)에 최신 의견을 낸 증권사만 본다
+    - 직전은 그 증권사의 바로 앞 의견 가운데 목표가가 있는 것. 없으면 new(기간 안 첫 의견)
+    - 최신 의견에 목표가가 없는 증권사는 세지 않는다
+    - 분할 환산 목표가로 비교한다(분할 전후 가격을 그대로 비교하지 않게)
+    """
+    history: dict[str, list[tuple]] = {}
+    for opinion_date, broker, *_, target_price_adjusted, _superseded, _company in rows:
+        history.setdefault(broker, []).append((opinion_date, target_price_adjusted))
+    cutoff = as_of - timedelta(days=window_days)
+    counts = {"up": 0, "down": 0, "unchanged": 0, "new": 0}
+    brokers = []
+    for broker, opinions in history.items():
+        opinions.sort(key=lambda item: item[0], reverse=True)
+        latest_date, latest = opinions[0]
+        if latest_date < cutoff or latest is None:
+            continue
+        prev = next(((d, p) for d, p in opinions[1:] if p is not None), None)
+        if prev is None:
+            kind, change_pct = "new", None
+        else:
+            kind = "up" if latest > prev[1] else "down" if latest < prev[1] else "unchanged"
+            change_pct = round((float(latest) / float(prev[1]) - 1) * 100, 2)
+        counts[kind] += 1
+        brokers.append({
+            "broker": broker,
+            "broker_key": broker_key(broker),
+            "prev_date": prev[0].isoformat() if prev else None,
+            "prev": _won(prev[1]) if prev else None,
+            "latest_date": latest_date.isoformat(),
+            "latest": _won(latest),
+            "change_pct": change_pct,
+        })
+    brokers.sort(key=lambda item: (item["latest_date"], item["broker"]), reverse=True)
+    return {
+        "window_days": window_days,
+        **counts,
+        "brokers": brokers,
+        "basis": f"같은 증권사 직전 → 최신 환산 목표가, 최근 {window_days}일 안에 최신 의견을 낸 증권사",
+    }

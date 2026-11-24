@@ -238,6 +238,8 @@ result = resolve_company(company_input="삼성전자")
 
 문서 조각 검색. Supabase `document_chunks`(리포트·뉴스·공시)만 검색한다. `embedding_model`, `vector_db` 인자는 기존 호출 호환용으로 받기만 한다.
 
+- `keyword_query`(선택)를 주면 키워드 검색(BM25)에는 `keyword_query`를, 의미 검색에는 `query`를 쓴다. 질문에 키워드를 덧붙이면 BM25에는 도움이 되지만 임베딩에서는 질문 의도가 흐려지기 때문(#84). 결과에 `keyword_query`를 담는다
+
 ```python
 from processing.functions.search_documents import search_documents
 
@@ -382,10 +384,18 @@ result = get_report_metadata(
 - `records`: 계약서 필드 `hts_goal_prc`(목표가), `invt_opnn`(투자의견), `rgbf_invt_opnn`(직전 투자의견), `mbcr_name`(증권사)은 KIS 원래 값 그대로
 - `records` 추가 필드: `broker_key`(증권사 비교용 키, 예: "키움"·"NH투자" → "키움"·"NH". 리포트 검색 결과의 `broker_key`와 같은 값), `published_at`(발표일), `target_price_adjusted`(액면분할 환산 목표가), `opinion_norm`(매수 / 중립 / 매도 또는 `null`), `valid_from`(발표일), `superseded_at`(같은 증권사의 다음 발표일, 아직 없으면 `null`)
 - `consensus`: 증권사마다 가장 최근 의견 1건의 환산 목표가로 계산한 평균·최고·최저(원 단위 정수, 0.5 올림). **`as_of`로부터 최근 180일 안에 발표된 의견만** 씀(ADR 0010). 최신 의견이 180일보다 오래되거나 목표가가 없는 증권사는 빼고, 그 증권사의 더 오래된 의견으로 채우지 않음. `broker_count`에 계산에 쓴 증권사 수, `basis`에 "증권사별 최신 1건, 최근 180일, 증권사 N곳". 180일 안에 의견이 없으면 평균·최고·최저는 `null`
-- `as_of`: 주면 그날까지 발표된 의견만 쓰고, 그 뒤에 나온 의견은 `superseded_at`에도 드러내지 않음. 기본값은 오늘(KST). 형식이 틀리면 `ValueError`
+- `revisions`: 같은 증권사의 **직전 → 최신 환산 목표가 개정** 수(#82). 최근 `revision_window_days`(기본 90일) 안에 최신 의견을 낸 증권사만 셈
+  - `up`·`down`·`unchanged`(같은 가격 재발행)·`new`(직전 목표가가 없는 첫 의견), `brokers`(증권사별 직전·최신 날짜와 목표가, `change_pct`는 %), `basis`
+  - 직전은 그 증권사의 바로 앞 의견 가운데 목표가가 있는(0이 아닌) 것. 최신 의견에 목표가가 없는 증권사는 세지 않음
+  - 증권사는 `broker_key`로 묶음. 이름이 바뀐 증권사(하이투자 → iM 등)의 옛 의견도 직전으로 봄. `consensus`도 같은 기준
+  - 기간은 경계일 포함(`as_of` − N일부터, 기본 90이면 실제 91일). `consensus`의 180일과 같은 규칙
+  - 분할 환산 목표가로 비교. 방향 라벨(상향·하향·혼조)의 경계값은 받는 쪽(트렌드 리포트·토론)이 적용
+  - `date_from`·`date_to`는 `records`·`consensus`에만 적용하고, 개정은 그 이전 의견까지 보고 셈
+  - 조회 실패면 `null`(0으로 두면 "개정 없음"으로 읽힘)
+- `as_of`: 주면 그날까지 발표된 의견만 쓰고, 그 뒤에 나온 의견은 `superseded_at`에도 드러내지 않음. 기본값은 오늘(KST). `as_of`·`date_from`·`date_to` 형식이 틀리거나 `revision_window_days`가 1 미만이면 `ValueError`
 - `target_prices`, `summary`: 트렌드 리포트가 계약서 형식으로 옮겨 갈 때까지 함께 주는 이전 형식(`summary`의 평균·최고·최저는 `consensus`와 같고, `count`는 기간 안 의견 수)
 - `relational_db` 인자: 기존 호출과의 호환을 위해 받기만 하고 쓰지 않음. `report_type` 인자는 계약서대로 삭제
-- 조회 실패 시 예외 대신 빈 결과와 `"error": "target_price_unavailable"`을 반환
+- 조회 실패 시 예외 대신 빈 결과와 `"error": "target_price_unavailable"`을 반환(`revisions`는 `null`)
 - 현재 T1/T2만 적재되어 있어 그 외 종목은 빈 결과
 
 ```python
@@ -423,6 +433,14 @@ result = get_target_price_data(
     "min_target_price": 95000,
     "broker_count": 1,
     "basis": "증권사별 최신 1건, 최근 180일, 증권사 1곳"
+  },
+  "revisions": {
+    "window_days": 90, "up": 0, "down": 0, "unchanged": 0, "new": 1,
+    "brokers": [
+      {"broker": "삼성", "broker_key": "삼성", "prev_date": null, "prev": null,
+       "latest_date": "2026-06-15", "latest": 95000, "change_pct": null}
+    ],
+    "basis": "같은 증권사 직전 → 최신 환산 목표가, 최근 90일 안에 최신 의견을 낸 증권사"
   },
   "target_prices": [
     {
@@ -733,6 +751,8 @@ result = get_available_data_status(
 - 공매도 잔고 비중: KRX가 약 2거래일 늦게 공개하므로 그날 기준 2거래일 전까지의 값만 씀
 - 지분공시 지표: 그날까지 접수된 최근 90일 보고. 지분공시를 받는 종목에서 보고가 없으면 0, 받지 않는 종목은 `no_data`. 임원 보고에는 주식 보상 같은 소액 변동도 들어 있음
 - 값을 낼 수 없으면 `value`는 `null`이고 `reason`에 사유: `unknown_metric`, `no_data`, `no_value`, `not_applicable_financials`(금융 섹터 부채비율), `metric_unavailable`(조회 실패)
+- 여러 지표는 `get_metrics(ticker, metric_ids, as_of)`로 DB 연결 하나에서 계산(결과는 `metric_ids` 순서, 항목은 `get_metric`과 같음). 지표마다 연결을 열면 연결에만 약 0.35초씩 듦. 한 지표의 조회가 실패해도 나머지는 계산
+- 사람이 읽는 지표 이름은 `METRIC_NAMES`(예: `per` → "PER(주가수익비율)")
 
 | metric_id | 단위 | 출처 |
 |---|---|---|
@@ -777,7 +797,35 @@ result = get_metric(ticker="005930", metric_id="roe_ttm", as_of="2026-09-01")
 - 결과에 항상 `data_tier`(근거 종류: `report` → `news_only` → `disclosure_only` → `derived_only` → `macro_only` 순으로 있는 것)가 붙음. 계산은 `processing.enums.data_tier_for`
 - 데이터 상태 조회가 실패하면 `data_tier`는 `null`이고 `"error": "data_status_unavailable"`. 근거 종류를 모르는데 정하지 않음
 - `data_status`에 이미 가진 `get_available_data_status` 결과(또는 `resolve_company`의 `data_status`)를 넘기면 상태를 다시 조회하지 않음. 아젠다마다 부를 때 쓰면 종목당 0.3~1초씩 반복되는 조회가 없어짐. 다른 종목의 결과면 `ValueError`
-- `intent`(아젠다 ID, `AgendaId`)를 받아 결과에 그대로 담음. 없는 아젠다면 `ValueError`(호출 코드의 실수). 아직 묶음 내용은 바꾸지 않음
+- `intent`(아젠다 ID, `AgendaId`)를 받아 결과에 그대로 담음. 없는 아젠다면 `ValueError`(호출 코드의 실수)
+- `debate`에 `intent`를 주면 문서 검색에 아젠다 설정(`processing/config/agenda_search_terms.json`, 데이터 쪽 관리)을 씀(#84)
+  - 키워드 검색(BM25): 질문 + 키워드 / 의미 검색: 질문만 / 질문이 없으면(버튼 경로) 둘 다 키워드
+  - 그래서 질문이 없어도 `documents`가 있음. `intent`가 없으면 지금처럼 `query`가 있을 때만 검색
+  - 아젠다의 문서 종류마다 따로 찾아 5개를 나눔(1종류 5, 2종류 3·2, 3종류 2·2·1). 한 종류가 모자라면 다른 종류로 채움
+  - 한 문서에서는 최대 2조각(같은 리포트가 몫을 다 차지하지 않게)
+  - `documents`에 `query`(의미 검색)·`keyword_query`(키워드 검색)·`document_types`·`mode`. 한 종류의 검색이 실패하면 나머지는 주고 `reason="search_unavailable"`·`failed_types`. 동점이면 최신 문서가 앞
+- `debate`에 `intent`를 주면 그 아젠다의 지표 목록 `metrics`도 줌(`AGENDA_METRICS`, #84)
+  - 항목은 `get_metric` 결과 그대로(`value`·`unit`·`display`·`as_of`·`reason` 등)이고 값이 없는 지표도 빼지 않음
+  - 항목마다 `name`(지표 이름)과 `evidence_id`(`metric:{종목}:{지표}:{지표의 as_of}`). 근거 ID의 날짜는 요청일이 아니라 그 지표가 실제로 쓴 데이터의 날짜
+  - 토론은 `value`와 `display`가 둘 다 있는 지표만 `{{metric_id}}` 자리표시자로 씀(#84 Q1)
+
+| intent | `metrics` |
+| --- | --- |
+| `valuation` | `per`, `pbr`, `eps`, `bps`, `roe_ttm`, `operating_margin`, `close`, `market_cap` |
+| `growth` | `revenue_growth_yoy`, `operating_margin`, `roe_ttm` |
+| `risk` | `debt_ratio`, `short_volume_ratio_20d`, `short_balance_ratio`, `insider_net_shares_90d`, `insider_sell_reports_90d`, `major_holder_ratio_change_90d`, `foreign_net_buy_20d` |
+| `flow` | `foreign_net_buy_20d`, `inst_net_buy_20d`, `individual_net_buy_20d`, `short_volume_ratio_20d`, `short_balance_ratio` |
+| `shareholder_return` | `dividend_yield`, `dps`, `eps`, `close` |
+| `macro` | (없음) |
+
+| intent | 키워드 | 문서 종류 |
+| --- | --- | --- |
+| `valuation` | 실적 밸류에이션 목표주가 | 리포트 |
+| `macro` | 업황 금리 환율 | 리포트, 뉴스 |
+| `risk` | 리스크 우려 하락 | 리포트, 뉴스, 공시 |
+| `growth` | 성장 신사업 증설 수주 | 리포트, 뉴스 |
+| `shareholder_return` | 배당 자사주 주주환원 | 리포트, 공시 |
+| `flow` | 외국인 기관 수급 순매수 | 뉴스 |
 - `as_of`(`YYYY-MM-DD`, 없으면 오늘 KST)를 묶음 안의 모든 조회(목표가·시세·매크로·문서 검색)에 그대로 넘김. 과거 날짜로 만들어도 그 뒤 문서·목표가가 섞이지 않음. 결과에 `as_of`를 담음. 형식이 틀리면 `ValueError`
 - `trend_report` 문서 검색은 리포트·뉴스 각 15개(`TREND_REPORT_TOP_K`). 받는 쪽이 문서당 조각 수를 줄여 고르기 때문. 매크로 문서는 `document_chunks`에 없어서 검색하지 않음(`macro_documents` 없음, 매크로는 `macro_data` 정형 값)
 

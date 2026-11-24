@@ -129,7 +129,7 @@ def test_get_target_price_data_adds_date_adjusted_price_and_validity(monkeypatch
 def test_consensus_uses_latest_adjusted_price_per_broker(monkeypatch):
     monkeypatch.setattr("crawling.db.postgres.connect", lambda: FakeSupabase(OPINION_ROWS))
 
-    consensus = get_target_price_data(ticker="005930")["consensus"]
+    consensus = get_target_price_data(ticker="005930", as_of="2026-06-20")["consensus"]
 
     # 테스트증권의 5/1 의견(8만)은 6/15 의견으로 대체됐고, 최신 의견에 목표가가 없는 증권사는 뺀다
     assert consensus == {
@@ -137,14 +137,71 @@ def test_consensus_uses_latest_adjusted_price_per_broker(monkeypatch):
         "max_target_price": 100000,
         "min_target_price": 90000,
         "broker_count": 2,
-        "basis": "증권사별 최신 1건",
+        "basis": "증권사별 최신 1건, 최근 180일, 증권사 2곳",
     }
+    assert all(isinstance(consensus[k], int) for k in ("avg_target_price", "max_target_price", "min_target_price"))
+
+
+# ADR 0010: 증권사별 최신 1건 가운데 as_of로부터 180일 안에 발표된 의견만 쓴다
+WINDOW_ROWS = [
+    (date(2026, 11, 20), "최근증권", "BUY", "buy", "BUY", 120000, 120000, None, "삼성전자"),
+    (date(2026, 5, 27), "경계증권", "BUY", "buy", "BUY", 100000, 100000, None, "삼성전자"),   # 정확히 180일 전
+    (date(2026, 5, 26), "오래된증권", "BUY", "buy", "BUY", 50000, 50000, None, "삼성전자"),   # 181일 전
+    (date(2026, 1, 10), "최근증권", "BUY", "buy", "BUY", 10000, 10000, date(2026, 11, 20), "삼성전자"),
+]
+
+
+def test_consensus_drops_brokers_whose_latest_opinion_is_older_than_180_days(monkeypatch):
+    monkeypatch.setattr("crawling.db.postgres.connect", lambda: FakeSupabase(WINDOW_ROWS))
+
+    consensus = get_target_price_data(ticker="005930", as_of="2026-11-23")["consensus"]
+
+    # 오래된증권(181일 전)은 빠지고, 정확히 180일 전 의견은 들어간다. 최근증권의 옛 의견(1만)은 쓰지 않는다
+    assert (consensus["broker_count"], consensus["min_target_price"], consensus["max_target_price"]) == (2, 100000, 120000)
+    assert consensus["avg_target_price"] == 110000
+    assert consensus["basis"] == "증권사별 최신 1건, 최근 180일, 증권사 2곳"
+
+
+def test_consensus_does_not_fall_back_to_older_opinion_of_same_broker(monkeypatch):
+    rows = [
+        (date(2026, 3, 1), "한증권", "BUY", "buy", "BUY", 90000, 90000, None, "삼성전자"),
+        (date(2026, 2, 1), "한증권", "BUY", "buy", "BUY", 80000, 80000, date(2026, 3, 1), "삼성전자"),
+    ]
+    monkeypatch.setattr("crawling.db.postgres.connect", lambda: FakeSupabase(rows))
+
+    result = get_target_price_data(ticker="005930", as_of="2026-11-23")
+
+    assert result["consensus"] == {
+        "avg_target_price": None, "max_target_price": None, "min_target_price": None,
+        "broker_count": 0, "basis": "증권사별 최신 1건, 최근 180일, 증권사 0곳",
+    }
+    assert result["summary"]["avg_target_price"] is None and result["summary"]["count"] == 2
+
+
+def test_consensus_rounds_half_up_to_won(monkeypatch):
+    rows = [
+        (date(2026, 11, 20), "가증권", "BUY", "buy", "BUY", 97500, 97500, None, "삼성전자"),
+        (date(2026, 11, 19), "나증권", "BUY", "buy", "BUY", 97501, 97501, None, "삼성전자"),
+    ]
+    monkeypatch.setattr("crawling.db.postgres.connect", lambda: FakeSupabase(rows))
+
+    assert get_target_price_data(ticker="005930", as_of="2026-11-23")["consensus"]["avg_target_price"] == 97501
+
+
+def test_default_as_of_is_today_in_kst(monkeypatch):
+    connection = FakeSupabase([])
+    monkeypatch.setattr("crawling.db.postgres.connect", lambda: connection)
+    monkeypatch.setattr("processing.functions.get_target_price_data.today_kst", lambda: date(2026, 11, 23))
+
+    get_target_price_data(ticker="005930")
+
+    assert connection.params[0] == "2026-11-23"
 
 
 def test_get_target_price_data_keeps_previous_shape_during_migration(monkeypatch):
     monkeypatch.setattr("crawling.db.postgres.connect", lambda: FakeSupabase(OPINION_ROWS))
 
-    result = get_target_price_data(ticker="005930")
+    result = get_target_price_data(ticker="005930", as_of="2026-06-20")
 
     assert result["company"] == "삼성전자"
     first = result["target_prices"][0]

@@ -351,6 +351,37 @@ python -m crawling.monthly_corr_loader --skip-fetch # 상관만 다시 계산
 python main.py --run-once --source naver --include-news-data --include-disclosure-data
 ```
 
+## 온톨로지 입력값 계산
+
+온톨로지 시드의 데이터 칸을 손으로 옮기지 않고 같은 방식으로 다시 계산합니다. **DB는 읽기만 하고 결과는 CSV로만 씁니다**(테이블·뷰를 만들지 않음). 노출 여부·가설·확정 이름은 온톨로지 쪽이 정합니다.
+
+```bash
+python -m crawling.ontology_inputs sensitivities --as-of 2026-11-23 --level l1 --seed ../ontology/seed/ontology_seed.json --out sens_l1.csv
+python -m crawling.ontology_inputs sector-grades --out grades.csv
+python -m crawling.ontology_inputs macro-direction --out macro_direction.csv
+python -m crawling.ontology_inputs impacts --out impacts.csv
+python -m crawling.ontology_inputs kind --out kind_t1.csv            # KRX KIND 상장법인목록을 내려받음 (--kind-file로 대신 가능)
+python -m crawling.ontology_inputs issue-evidence --seed ../ontology/seed/ontology_seed.json --out evidence.csv
+```
+
+| 명령 | 내용 | 채우는 시드 칸 |
+| --- | --- | --- |
+| `sensitivities` | 섹터(`l1`·`l2`) 또는 종목 × 요인의 원래 상관, **시장 효과를 뺀 상관**(편상관) 중앙값, 같은 부호 비율, 방향 확실(95% 구간이 0 미포함) 종목 수. `--seed`를 주면 시드 엣지의 가설·상태, 시장 효과 기준 `sign_check`, 임시 노출 기준 통과 여부 | SENSITIVE_TO `weight`·`market_adjusted`·`sign_check` |
+| `sector-grades` | 위 값의 섹터 중앙값으로 금리(`KTB_3Y_KR`) 등급 high/medium/low, 환율(`USD_KRW`) positive/negative/neutral. 기준값은 `--high`·`--medium`·`--neutral` | SECTOR `rate_sensitivity`·`fx_sensitivity` |
+| `macro-direction` | 지표 변화와 시장 수익률의 상관 부호(기준금리는 변경일 전후 사건 분석) | MACRO `direction` |
+| `impacts` | 기준금리 변경일 전후 국고채·환율 변화 방향, 월별 지표 간 1달 시차 상관 | IMPACTS `direction` |
+| `kind` | KIND 업종·주요제품으로 T1 세부 업종 후보(`SUB_INDUSTRY_RULES`)와 지주사 후보 | COMPANY `sub_industry`·`is_holding` |
+| `issue-evidence` | 시드 ISSUE마다 수혜·타격 종목 문서에서 이슈 이름으로 검색한 근거 후보 | ISSUE `evidence_chunk_ids` |
+| `monthly` | 매달 자동 계산 묶음: `<out-dir>/<기준일>/`에 `sensitivities_ticker`(종목 행, 95% 구간 포함)·`sensitivities_l1`·`sensitivities_l2`·`sector_grades`·`macro_direction`·`impacts` CSV | 위 칸 전부 (KIND·이슈 근거 제외) |
+
+- 일별은 최근 3년(민감도 적합과 같음), 시장은 코스피 일별 수익률입니다.
+- 월별은 최근 최대 120개월, t월 종목 수익률과 t+1월 지표 변화이고, 시장은 핵심 종목 동일가중 평균 수익률입니다(DB의 코스피 지수가 3년 치뿐이라서). 이 평균에는 계산하는 종목 자신도 들어갑니다(98종목 중 1개라 영향은 작음).
+- `--as-of`로 과거 기준일을 주면 지표 값도 그날까지만 읽습니다. 월별 지표는 그 달 날짜 기준으로 자르고, 실제 공개일(공개 시차)은 반영하지 않습니다.
+- 종목 행(`--level ticker`, `monthly`의 `sensitivities_ticker`)에는 `p_value`와 지표별 Benjamini-Hochberg 보정 `q_value`가 있습니다. 한 지표를 여러 종목에서 볼 때 우연히 "방향 확실"로 나오는 것을 거를 때 씁니다.
+- `monthly --save`를 주면 민감도(종목·l1·l2)를 `ontology_sensitivity_inputs` 표에도 저장합니다(기준일별로 쌓음, 키 `as_of`·`level`·`group_id`·`factor`. `as_of`는 요청한 날 이전 마지막 거래일. 같은 기준일을 다시 저장하면 그 기준일 행을 지우고 새로 넣고, `computed_at`이 저장 시각으로 바뀜). 이 옵션만 DB에 쓰고, 나머지 명령은 모두 읽기만 합니다. 종목 행은 `n_obs`·`raw`·`adjusted`·`ci_low`·`ci_high`·`certain`·`p_value`·`q_value`, 섹터 행은 `n_tickers`·`raw_median`·`adjusted_median`·`same_sign`·`same_sign_ratio`·`n_certain`(+/−)·`n_obs_min`·`n_obs_max`를 채우고, 모든 행에 `method`(계산 방식·시장 대용)와 `window_start`·`window_end`(실제로 쓴 기간)가 있습니다.
+- `kind --seed`를 주면 시드 확정값(`seed_sub_industry`, `seed_is_holding`)과 차이(`sub_industry_differs`, `holding_differs`)를 같이 냅니다. 다음 달부터는 차이만 보면 됩니다.
+- 방향 판정(`direction`)은 신뢰구간이 0을 포함하지 않을 때만 붙고, 사건 분석은 같은 방향이 65% 이상일 때만 붙습니다.
+
 ## 로그
 
 콘솔과 `logs/crawler.log`에 다음을 기록합니다.

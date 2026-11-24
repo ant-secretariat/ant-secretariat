@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 
 from agents.trend_report.schemas import TrendReportRequest
 from agents.trend_report.service import TrendReportAgent
-from orchestrator.schemas import CompanyContext
+from orchestrator.companies import resolve_company_context
 
 router = APIRouter(prefix="/agents", tags=["trend-report"])
 
@@ -20,22 +20,9 @@ class TrendReportApiRequest(BaseModel):
     date_to: Optional[str] = None
 
 
-def _resolve_company(company_input: str) -> CompanyContext:
-    from processing.functions.resolve_company import resolve_company
-
-    resolved = resolve_company(company_input)
-    if not resolved["matched"]:
-        raise HTTPException(status_code=400, detail=f"지원하지 않는 기업입니다: {company_input}")
-    return CompanyContext(
-        ticker=resolved["ticker"],
-        company=resolved["company"],
-        sector=resolved["sector"] or "",
-    )
-
-
 @router.post("/trend-report")
 async def run_trend_report(payload: TrendReportApiRequest) -> dict:
-    company = _resolve_company(payload.company)
+    company = resolve_company_context(payload.company)
     request = TrendReportRequest(
         ticker=company.ticker,
         company=company.company,
@@ -44,10 +31,6 @@ async def run_trend_report(payload: TrendReportApiRequest) -> dict:
         date_from=payload.date_from,
         date_to=payload.date_to,
     )
-
-    try:
-        result = await run_in_threadpool(TrendReportAgent().run_trend_report, request)
-    except RuntimeError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
-
+    # 실패(키 누락 등)는 main.py가 500 internal_error로 바꾸고, 내부 메시지는 로그에만 남긴다
+    result = await run_in_threadpool(TrendReportAgent().run_trend_report, request)
     return {"report": result.to_dict()}

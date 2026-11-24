@@ -2,7 +2,7 @@
 
 | 항목 | 값 |
 | --- | --- |
-| 버전 | **v2.4** (2026-11-24) |
+| 버전 | **v2.5** (2026-11-24) |
 | 상태 | 검토 중 |
 | 담당 | 태은 |
 | 상위 문서 | [헌법](../../.specify/memory/constitution.md) > [ADR](../decisions/) > PRD v1.6 > 기능 명세서 v0.8 > 이 문서 |
@@ -19,7 +19,8 @@
 | v2.1 | 2026-11-23 | #68 리뷰 반영: 경로별 실행 조건(5.3, 선언형 표), 커버 판정을 `data_status.sources`로, precheck에 `data_status` 전달, 거절 payload는 오케스트레이터가 채움, `append_event` 직렬화, 시뮬레이션 시작 흐름(6.3), 보관 기간·연결 풀 |
 | v2.2 | 2026-11-24 | **상위 문서(Design Doc v1.5·토론 기획서 v3.0)와 어긋난 세 곳 정정:** 도구 레지스트리·Langfuse를 MVP로(8·9장), 작업 실행을 API 안 `asyncio`에서 워커 프로세스(`FOR UPDATE SKIP LOCKED`·하트비트·복구)로(6.2). #68 리뷰 반영: 시뮬레이션을 별도 job으로 분리(6.3), `run_debate` 순수 함수화(6.5), 미커버 판정에서 `macro` 제외(5.3) |
 | v2.3 | 2026-11-24 | #68 리뷰 반영: 스키마 확정(`debate_job_id`·`data_as_of`·인덱스), 큐 동작(꺼내기 트랜잭션·잠금·하트비트·주기 작업) 구체화, 사용자 한도를 종류 합쳐 1개 + 부분 유니크 인덱스, `simulation_ready` 정의와 버튼 시 재판정, 시뮬레이션 가능 기간, 보관 기간은 #92 실측. 근거는 ADR 0012·0013·0014(#93) |
-| **v2.4** | 2026-11-24 | 워커 내부 구조 확정: dispatcher 하나가 꺼내고 `Semaphore(3)`로 실행(6.2 "워커 내부"), 하트비트 일괄 갱신, 배포 시 종료 순서, 이벤트 루프 운용(LLM 대기는 코루틴, 계산은 `to_thread`). 워커 DB 접근 방식은 Q8 |
+| v2.4 | 2026-11-24 | 워커 내부 구조 확정: dispatcher 하나가 꺼내고 `Semaphore(3)`로 실행(6.2 "워커 내부"), 하트비트 일괄 갱신, 배포 시 종료 순서, 이벤트 루프 운용(LLM 대기는 코루틴, 계산은 `to_thread`). 워커 DB 접근 방식은 Q8 |
+| **v2.5** | 2026-11-24 | Q8 해결: 워커의 큐 SQL은 동기 psycopg + `to_thread` |
 
 ### v1.1 → v2.0 무엇이 바뀌었나
 
@@ -357,6 +358,7 @@ async def run_in_slot(job):
 - 토론 job은 시간 대부분이 LLM 응답 대기라(그 동안은 네트워크·OS가 기다림) 스레드 하나로 충분하다.
 - **계산이 많은 작업은 `await asyncio.to_thread(...)`로 별도 스레드에 보낸다.** 시뮬레이션의 모델 계산이 `await` 없이 스레드를 오래 잡으면 다른 job과 하트비트까지 멈춘다.
 - 데이터 함수(동기 psycopg)도 레지스트리 `invoke`가 `to_thread`로 감싼다(8장).
+- **워커의 큐 SQL**(꺼내기·하트비트·`append_event`·완료 기록)도 같은 방식으로, 동기 psycopg를 `to_thread`로 실행한다. 연결은 `psycopg_pool.ConnectionPool`. 비동기 psycopg를 쓰지 않으므로 윈도우 개발 환경에서 이벤트 루프 설정이 필요 없다.
 
 **생성 규칙 (API 쪽)**
 
@@ -524,4 +526,4 @@ async def invoke(name: ToolName, args: dict, *, caller: AgentId) -> ToolResult
 | Q5 | 사용자당 진행 중 job 합쳐 1개가 QA에서 불편하지 않은지, 보관 기간 실측 | #92 |
 | Q6 | 계약 draft.6: `JobStatus` 4종·시뮬레이션 별도 job(ADR 0013, 유민 동의 대기), `RunDebateInput` 순수 함수화 | 유민·수경 |
 | Q7 | Langfuse 호스팅 (Cloud 무료 vs 셀프호스트) | 팀 |
-| Q8 | 워커의 큐 SQL(꺼내기·하트비트·`append_event`)을 동기 psycopg + `to_thread`로 할지, 비동기 psycopg로 할지. 비동기면 윈도우 개발 환경에서 `WindowsSelectorEventLoopPolicy` 설정 필요(기본 `ProactorEventLoop`에서 비동기 psycopg가 동작하지 않음), 배포(리눅스)는 무관 | 태은 (PR-2) |
+| ~~Q8~~ | 워커 큐 SQL 방식 → **해결:** 동기 psycopg + `to_thread`로 정함(2026-11-24): 데이터 함수와 같은 방식이라 DB 접근이 하나로 통일되고, 윈도우 이벤트 루프 설정이 필요 없으며, 워커의 DB 작업량(꺼내기·하트비트·이벤트 기록, 각 수 밀리초)에서는 비동기와 성능 차이가 없음. 연결은 `psycopg_pool.ConnectionPool`. 비동기는 API의 SSE 동시 연결이 수십 개를 넘어 스레드 풀이 붐빌 때 SSE 조회만 다시 검토 | 태은 |

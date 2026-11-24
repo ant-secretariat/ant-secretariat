@@ -411,7 +411,7 @@
 | 함수 계약 추가(`doc_id`, `broker_key`, `coverage_from`, `get_agent_context`의 `as_of`) 머지 | 수경 (리뷰: 태은, 유민) | 🟡 #75 리뷰 중 |
 | `suggest_alternatives` 머지 | 수경 (리뷰: 태은) | 🟡 #85 리뷰 중 |
 | 실패 표시(`resolve_company` 등, `extract_company_mentions`), 한국 날짜, `get_derived_snapshot` 묶음 문제 | 수경 | ❌ #55, 12/6까지 |
-| 아젠다 키워드 검색(기준선 #77이 기다림) | 수경 | 🟡 PR 준비 |
+| 아젠다 키워드 검색(기준선 #77이 기다림) | 수경 | 🟡 #106 |
 | intent별 묶음 구현(`get_index_data`, `get_sensitivities`, 과거 시점 `data_tier`, 문서 검색 병렬화, 문서 종류별 최소 1개, 근거 ID `metric:`·`block:`, 목표가 `revisions`) | 수경 | ❌ 착수 가능(#84 답 받음) |
 | `broker_key` 보강(컨센서스를 `broker_key`로 묶기), `chunk_type` 인자, `revisions` | 수경 | ❌ #73 |
 | 남은 리포트 적재(11/9–11/17 117건) | 수경 | ✅ 11/24 완료. 7건은 PDF를 자르다 멈춤(PyMuPDF 오류), 따로 확인 필요 |

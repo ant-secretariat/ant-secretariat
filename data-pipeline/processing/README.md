@@ -834,7 +834,7 @@ result = get_metric(ticker="005930", metric_id="roe_ttm", as_of="2026-09-01")
   - `documents`에 `query`(의미 검색)·`keyword_query`(키워드 검색)·`document_types`·`mode`. 한 종류의 검색이 실패하면 나머지는 주고 `reason="search_unavailable"`·`failed_types`. 동점이면 최신 문서가 앞
 - `debate`에 `intent`를 주면 그 아젠다의 지표 목록 `metrics`도 줌(`AGENDA_METRICS`, #84)
   - 항목은 `get_metric` 결과 그대로(`value`·`unit`·`display`·`as_of`·`reason` 등)이고 값이 없는 지표도 빼지 않음
-  - 항목마다 `name`(지표 이름)과 `evidence_id`(`metric:{종목}:{지표}:{지표의 as_of}`). 근거 ID의 날짜는 요청일이 아니라 그 지표가 실제로 쓴 데이터의 날짜
+  - 항목마다 `name`(지표 이름)과 `chunk_id`(`metric:{종목}:{지표}:{지표의 as_of}`, 문서 결과와 같은 이름). 근거 ID의 날짜는 요청일이 아니라 그 지표가 실제로 쓴 데이터의 날짜
   - 토론은 `value`와 `display`가 둘 다 있는 지표만 `{{metric_id}}` 자리표시자로 씀(#84 Q1)
 
 | intent | `metrics` |
@@ -845,6 +845,20 @@ result = get_metric(ticker="005930", metric_id="roe_ttm", as_of="2026-09-01")
 | `flow` | `foreign_net_buy_20d`, `inst_net_buy_20d`, `individual_net_buy_20d`, `short_volume_ratio_20d`, `short_balance_ratio` |
 | `shareholder_return` | `dividend_yield`, `dps`, `eps`, `close` |
 | `macro` | (없음) |
+
+- `debate`에 `intent`를 주면 아젠다 블록도 최상위 키로 줌(#84 ②). 이때는 매크로 전체 이력(`macro_data`, 약 180만 자)을 넣지 않음
+  - 블록마다 `source`(함수), `as_of`(블록이 실제로 쓴 데이터의 날짜), `chunk_id`(`block:{종목}:{블록}:{as_of}`), `reason`. 조회 실패면 `chunk_id: null` + `error`, 값이 없으면 `reason: "no_data"`
+  - 블록 하나가 실패해도 나머지는 줌
+
+| intent | 블록 |
+| --- | --- |
+| `valuation`, `growth` | `financials`(최근 8분기, 연결/별도 표시) |
+| `risk` | `disclosures`(최근 90일, 10건까지, `total`은 전체 건수) |
+| `shareholder_return` | `disclosures`(최근 1년 주주환원 공시만, 10건까지) |
+| `macro` | `macro`(국고채 3·10년·원/달러·기준금리는 최근 60개, 소비자물가·브렌트유·D램 수출물가는 최근 13개월, 최신 먼저. 이 종목에 방향이 확실한 민감도 요인을 앞에), `index`(코스피·코스닥 60거래일), `sensitivities`(시장 효과를 뺀 값, `get_sensitivities`) |
+| `flow` | (아직 없음) |
+
+  - `valuation`(밸류에이션 위치)·`fundamental_trend`·`price_trend`·`flow`·`target_price`(상승여력·`revisions`) 블록은 `get_derived_snapshot` 실패 처리(#88)와 `revisions`(#105)가 들어간 뒤 더함
 
 | intent | 키워드 | 문서 종류 |
 | --- | --- | --- |

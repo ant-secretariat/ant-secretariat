@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Optional
 from processing.interfaces import BaseRelationalDB, BaseEmbeddingModel, BaseVectorDB
@@ -30,6 +30,25 @@ AGENDA_METRICS = {
     "shareholder_return": ["dividend_yield", "dps", "eps", "close"],
     "macro": [],
 }
+# 토론 아젠다별 블록(#84, 데이터 에이전트 기획서 4-2절). valuation·fundamental_trend·price_trend·flow·target_price
+# 블록은 get_derived_snapshot(#88)·revisions(#105)가 들어간 뒤 더한다
+AGENDA_BLOCKS = {
+    "valuation": ["financials"],
+    "growth": ["financials"],
+    "risk": ["disclosures"],
+    "flow": [],
+    "shareholder_return": ["disclosures"],
+    "macro": ["macro", "index", "sensitivities"],
+}
+FINANCIAL_QUARTERS = 8
+DISCLOSURE_LIMIT = 10
+# 공시 블록: 리스크는 최근 90일 전체, 주주환원은 최근 1년 주주환원 공시만
+DISCLOSURE_RULES = {"risk": (90, None), "shareholder_return": (365, "shareholder_return")}
+# 매크로 블록 지표(기획서 4-2절). 이 종목에 방향이 확실한 민감도 요인을 앞에 둔다
+MACRO_INDICATORS = ["KTB_3Y_KR", "KTB_10Y_KR", "USD_KRW", "BASE_RATE_KR", "CPI_KR", "BRENT", "DRAM_EXPORT_PRICE"]
+MACRO_DAILY_POINTS = 60      # 일별 지표는 최근 60개(거래일)
+MACRO_MONTHLY_POINTS = 13    # 월별 지표는 최근 13개월
+MACRO_LOOKBACK_DAYS = 430    # 13개월을 덮도록 넉넉히 읽고 지표마다 자른다
 
 # 트렌드 리포트 문서 후보 수(종류마다). 받는 쪽이 문서당 2조각·리포트 5·뉴스 4개로 줄이므로 넉넉히 준다(#69 리뷰)
 TREND_REPORT_TOP_K = 15
@@ -65,8 +84,12 @@ def get_agent_context(
     키워드 검색(BM25)은 질문 + 키워드, 의미 검색은 질문만이고, 질문이 없으면(버튼 경로) 둘 다 키워드로 검색한다.
     아젠다의 문서 종류마다 따로 찾아 종류별로 몫을 나누고(예: 리포트 3 + 뉴스 2), 한 문서는 최대 2조각까지만 준다.
     debate에 intent를 주면 그 아젠다의 지표 목록(metrics, AGENDA_METRICS)도 준다. 항목은 get_metric 결과 그대로이고
-    값이 없는 지표도 빼지 않는다(value null + reason). 항목마다 근거 ID(evidence_id, metric:{종목}:{지표}:{지표 기준일})와
+    값이 없는 지표도 빼지 않는다(value null + reason). 항목마다 근거 ID(chunk_id, metric:{종목}:{지표}:{지표 기준일})와
     지표 이름(name)을 붙인다. 지표는 DB 연결 하나로 한 번에 계산한다(get_metrics).
+    debate에 intent를 주면 아젠다 블록(AGENDA_BLOCKS)도 최상위 키로 준다: financials(최근 8분기), disclosures(리스크 90일,
+    주주환원 1년 주주환원 공시만, 각 10건), macro(지표별 일별 60개·월별 13개월), index(코스피·코스닥 60거래일),
+    sensitivities(시장 효과를 뺀 값). 블록마다 근거 ID(chunk_id, block:{종목}:{블록}:{블록 기준일})와 as_of·source가 있고,
+    조회 실패는 error, 값 없음은 reason="no_data"다. 이때는 매크로 전체 이력(macro_data)을 넣지 않는다(약 180만 자).
     매크로 문서는 document_chunks에 없어서(0건) 검색하지 않는다. 매크로는 macro_data(정형 값)를 쓴다.
     """
     from processing.enums import AgendaId
@@ -102,12 +125,15 @@ def get_agent_context(
             "ticker":        ticker,
             "agent_type":    agent_type,
             "target_prices": get_target_price_data(ticker=ticker, as_of=as_of, relational_db=relational_db),
-            "macro_data":    get_macro_data(as_of=as_of, relational_db=relational_db),
         }
         if intent:
+            # 아젠다 묶음에는 매크로 전체 이력 대신 macro 블록(필요한 지표·기간만)을 준다
             result["metrics"] = _agenda_metrics(ticker, intent, as_of)
+            result.update(_agenda_blocks(ticker, intent, as_of))
             result["documents"] = _agenda_documents(search_documents, ticker, intent, query, as_of)
-        elif query:
+        else:
+            result["macro_data"] = get_macro_data(as_of=as_of, relational_db=relational_db)
+        if not intent and query:
             result["documents"] = documents(None, 5)
 
     elif agent_type == "simulation":
@@ -196,7 +222,7 @@ def _agenda_metrics(ticker: str, intent: str, as_of: str) -> list[dict]:
         return []
     return [
         {**metric, "name": METRIC_NAMES.get(metric["metric_id"], metric["metric_id"]),
-         "evidence_id": f"metric:{ticker}:{metric['metric_id']}:{metric['as_of']}"}
+         "chunk_id": f"metric:{ticker}:{metric['metric_id']}:{metric['as_of']}"}
         for metric in get_metrics(ticker, metric_ids, as_of)
     ]
 
@@ -238,3 +264,96 @@ def pick_diverse(found: dict[str, list[dict]], quotas: dict[str, int], total: in
         take(result)
     return sorted(picked, key=lambda r: (r.get("score") or 0, r.get("date") or ""), reverse=True)[:total]
 
+
+# ---------------------------------------------------------------------------
+# 아젠다 블록 (#84 ②)
+
+def _agenda_blocks(ticker: str, intent: str, as_of: str) -> dict:
+    """아젠다 블록들. 블록 하나가 실패해도 나머지는 준다."""
+    names = AGENDA_BLOCKS[intent]
+    if not names:
+        return {}
+    sensitivities = _sensitivities_block(ticker, as_of) if "sensitivities" in names or "macro" in names else None
+    builders = {
+        "financials": lambda: _financials_block(ticker, as_of),
+        "disclosures": lambda: _disclosures_block(ticker, intent, as_of),
+        "macro": lambda: _macro_block(ticker, as_of, sensitivities),
+        "index": lambda: _index_block(ticker, as_of),
+        "sensitivities": lambda: sensitivities,
+    }
+    return {name: builders[name]() for name in names}
+
+
+def _block(ticker: str, name: str, source: str, block_as_of, content: dict, error=None) -> dict:
+    """블록 공통 모양. 근거 ID는 블록이 실제로 쓴 데이터의 날짜(block_as_of)로 만든다(#84)."""
+    block = {"source": source, "as_of": block_as_of, **content}
+    if error:
+        return {**block, "chunk_id": None, "error": error}
+    if block_as_of is None:
+        return {**block, "chunk_id": None, "reason": "no_data"}
+    return {**block, "chunk_id": f"block:{ticker}:{name}:{block_as_of}", "reason": None}
+
+
+def _financials_block(ticker: str, as_of: str) -> dict:
+    from processing.functions.get_financials import get_financials
+
+    result = get_financials(ticker, "quarter", as_of=as_of)
+    records = result.get("records", [])[:FINANCIAL_QUARTERS]
+    latest = max((r["disclosed_at"] for r in records if r.get("disclosed_at")), default=None)
+    content = {"unit": result.get("unit"), "basis": result.get("basis"), "records": records}
+    return _block(ticker, "financials", "get_financials", latest, content, result.get("error"))
+
+
+def _disclosures_block(ticker: str, intent: str, as_of: str) -> dict:
+    from processing.functions.get_disclosure_data import get_disclosure_data
+
+    days, disclosure_type = DISCLOSURE_RULES[intent]
+    date_from = (date.fromisoformat(as_of) - timedelta(days=days)).isoformat()
+    result = get_disclosure_data(ticker, date_from=date_from, disclosure_type=disclosure_type, as_of=as_of)
+    disclosures = result.get("disclosures", [])
+    content = {
+        "window_days": days, "disclosure_type": disclosure_type, "total": len(disclosures),
+        "disclosures": disclosures[:DISCLOSURE_LIMIT], "coverage_from": result.get("coverage_from"),
+    }
+    latest = disclosures[0]["date"] if disclosures else None
+    return _block(ticker, "disclosures", "get_disclosure_data", latest, content, result.get("error"))
+
+
+def _macro_block(ticker: str, as_of: str, sensitivities: Optional[dict]) -> dict:
+    from processing.functions.get_macro_data import get_macro_data
+
+    date_from = (date.fromisoformat(as_of) - timedelta(days=MACRO_LOOKBACK_DAYS)).isoformat()
+    result = get_macro_data(indicators=MACRO_INDICATORS, date_from=date_from, as_of=as_of)
+    certain = [f["factor"] for f in (sensitivities or {}).get("factors") or [] if f.get("certain")]
+    order = {indicator: index for index, indicator in enumerate(dict.fromkeys(certain + MACRO_INDICATORS))}
+    indicators = []
+    for indicator in sorted(result.get("indicators", []), key=lambda i: order.get(i["indicator_id"], len(order))):
+        points = MACRO_DAILY_POINTS if indicator["frequency"] == "daily" else MACRO_MONTHLY_POINTS
+        records = indicator["records"][:points]   # 최신 먼저
+        indicators.append({
+            "indicator_id": indicator["indicator_id"], "indicator_name": indicator["indicator_name"],
+            "unit": indicator["unit"], "frequency": indicator["frequency"],
+            "latest": records[0] if records else None, "records": records,
+        })
+    latest = max((i["latest"]["date"] for i in indicators if i["latest"]), default=None)
+    content = {"indicators": indicators,
+               "basis": f"일별 최근 {MACRO_DAILY_POINTS}개, 월별 최근 {MACRO_MONTHLY_POINTS}개월(최신 먼저)"}
+    return _block(ticker, "macro", "get_macro_data", latest, content, result.get("error"))
+
+
+def _index_block(ticker: str, as_of: str) -> dict:
+    from processing.functions.get_index_data import get_index_data
+
+    result = get_index_data(as_of=as_of)
+    indexes = result.get("indexes") or []
+    latest = max((i["latest"]["date"] for i in indexes if i.get("latest")), default=None)
+    return _block(ticker, "index", "get_index_data", latest, {"days": result.get("days"), "indexes": indexes},
+                  result.get("error"))
+
+
+def _sensitivities_block(ticker: str, as_of: str) -> dict:
+    from processing.functions.get_sensitivities import get_sensitivities
+
+    result = get_sensitivities(ticker, as_of=as_of)
+    content = {"factors": result.get("factors"), "caution": result.get("caution")}
+    return _block(ticker, "sensitivities", "get_sensitivities", result.get("as_of"), content, result.get("error"))

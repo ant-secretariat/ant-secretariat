@@ -1107,7 +1107,9 @@ x-internal-functions:
     검색(`macro_documents`)은 없습니다(문서가 없어 매크로는 `macro_data` 정형 값만). `debate`에 `intent`를 주면 문서 검색에 아젠다
     키워드를 씁니다: 키워드 검색은 질문 + 키워드, 의미 검색은 질문만, 질문이 없으면 둘 다 키워드라 질문이 없어도 `documents`가 있습니다.
     아젠다의 문서 종류마다 따로 찾아 5개를 나누고(예: 리포트 3 + 뉴스 2), 한 문서는 최대 2조각입니다. 아젠다의 지표 목록 `metrics`도
-    줍니다: 항목은 `MetricValue` + `name` + `evidence_id`(`metric:{종목}:{지표}:{지표의 as_of}`)이고 값이 없는 지표도 사유와 함께 둡니다(#84).'
+    줍니다: 항목은 `MetricValue` + `name` + `chunk_id`(`metric:{종목}:{지표}:{지표의 as_of}`)이고 값이 없는 지표도 사유와 함께 둡니다. 아젠다 블록
+    (valuation·growth `financials`, risk·shareholder_return `disclosures`, macro `macro`·`index`·`sensitivities`)도 최상위 키로 주고, 블록마다
+    `chunk_id`(`block:{종목}:{블록}:{블록 기준일}`)·`as_of`·`source`가 있습니다. 이때는 매크로 전체 이력(`macro_data`)을 넣지 않습니다(#84).'
 - name: get_financials
   agent: 데이터 에이전트
   summary: 재무제표 조회

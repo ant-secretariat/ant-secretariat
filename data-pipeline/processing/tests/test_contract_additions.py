@@ -85,6 +85,26 @@ def recorded(monkeypatch):
                  "display": "1배", "reason": None} for m in metric_ids]
 
     monkeypatch.setattr("processing.functions.get_metric.get_metrics", fake_metrics)
+
+    # 아젠다 블록이 부르는 함수 (#84 ②)
+    def fake_block(name, value):
+        def call(*args, **kwargs):
+            calls.append((name, kwargs))
+            return value
+        return call
+
+    blocks = {
+        ("get_financials", "get_financials"): {"unit": "원", "basis": "공시 접수일 기준", "records": [
+            {"period": "2026Q3", "disclosed_at": "2026-11-14"}, {"period": "2026Q2", "disclosed_at": "2026-08-14"}]},
+        ("get_disclosure_data", "get_disclosure_data"): {"disclosures": [
+            {"date": "2026-11-05", "title": "현금ㆍ현물배당결정"}], "coverage_from": "2026-08-11"},
+        ("get_index_data", "get_index_data"): {"days": 60, "indexes": [
+            {"index": "KOSPI", "latest": {"date": "2026-11-10", "close": 5239.13}}]},
+        ("get_sensitivities", "get_sensitivities"): {"as_of": "2026-11-23", "caution": ["인과 아님"], "factors": [
+            {"factor": "USD_KRW", "certain": False}, {"factor": "DRAM_EXPORT_PRICE", "certain": True}]},
+    }
+    for (module, name), value in blocks.items():
+        monkeypatch.setattr(f"processing.functions.{module}.{name}", fake_block(name, value))
     monkeypatch.setattr("processing.functions.get_available_data_status.get_available_data_status",
                         lambda ticker: {"ticker": ticker, "report_count": 1, "news_count": 0, "disclosure_count": 0,
                                         "derived_snapshot_available": True})
@@ -258,7 +278,7 @@ def test_every_agenda_has_known_metrics_with_names():
     assert set(METRIC_NAMES) == set(METRIC_IDS)
 
 
-def test_debate_intent_gives_metrics_with_evidence_ids(recorded):
+def test_debate_intent_gives_metrics_with_chunk_ids(recorded):
     from processing.functions.get_agent_context import AGENDA_METRICS, get_agent_context
 
     result = get_agent_context("005930", "debate", intent="valuation", as_of="2026-11-10")
@@ -268,7 +288,8 @@ def test_debate_intent_gives_metrics_with_evidence_ids(recorded):
     first = result["metrics"][0]
     assert first["metric_id"] == "per" and first["name"] == "PER(주가수익비율)"
     # 근거 ID의 기준일은 요청일(11/10)이 아니라 지표가 실제로 쓴 데이터의 날짜
-    assert first["evidence_id"] == "metric:005930:per:2026-11-07"
+    assert first["chunk_id"] == "metric:005930:per:2026-11-07"   # 문서 결과와 같은 이름(#108 리뷰)
+    assert "evidence_id" not in first
 
 
 def test_macro_agenda_has_no_metrics_and_no_metric_query(recorded):
@@ -299,4 +320,86 @@ def test_pick_diverse_breaks_score_ties_by_newer_document():
     picked = pick_diverse(found, {"report": 3, "news": 2}, total=5, per_doc=2)
 
     assert [p["chunk_id"] for p in picked] == ["n1", "r1"]
+
+
+# ── 토론 아젠다 블록 (#84 ②) ──
+
+def test_every_agenda_has_block_list():
+    from processing.enums import AgendaId
+    from processing.functions.get_agent_context import AGENDA_BLOCKS
+
+    assert set(AGENDA_BLOCKS) == {agenda.value for agenda in AgendaId}
+
+
+def test_agenda_bundle_drops_full_macro_history(recorded):
+    from processing.functions.get_agent_context import get_agent_context
+
+    result = get_agent_context("005930", "debate", intent="valuation", as_of="2026-11-10")
+
+    # 아젠다 묶음에는 매크로 전체 이력(약 180만 자)을 넣지 않는다. intent가 없으면 지금처럼 넣는다
+    assert "macro_data" not in result
+    assert "macro_data" in get_agent_context("005930", "debate", as_of="2026-11-10")
+
+
+def test_financials_block_has_block_id_from_latest_disclosure(recorded):
+    from processing.functions.get_agent_context import get_agent_context
+
+    block = get_agent_context("005930", "debate", intent="valuation", as_of="2026-11-20")["financials"]
+
+    # 근거 ID 날짜는 요청일이 아니라 블록이 실제로 쓴 데이터(가장 최근 공시 접수일)
+    assert block["chunk_id"] == "block:005930:financials:2026-11-14"
+    assert (block["as_of"], block["source"], block["reason"]) == ("2026-11-14", "get_financials", None)
+    assert [r["period"] for r in block["records"]] == ["2026Q3", "2026Q2"]
+
+
+def test_disclosure_block_rules_by_agenda(recorded):
+    from processing.functions.get_agent_context import get_agent_context
+
+    get_agent_context("005930", "debate", intent="risk", as_of="2026-11-10")
+    get_agent_context("005930", "debate", intent="shareholder_return", as_of="2026-11-10")
+
+    risk, shareholder = [kwargs for name, kwargs in recorded if name == "get_disclosure_data"]
+    assert (risk["date_from"], risk["disclosure_type"]) == ("2026-08-12", None)           # 90일, 전체
+    assert (shareholder["date_from"], shareholder["disclosure_type"]) == ("2025-11-10", "shareholder_return")
+
+
+def test_macro_agenda_blocks(recorded, monkeypatch):
+    from processing.functions.get_agent_context import get_agent_context
+
+    def fake_macro(**kwargs):
+        recorded.append(("get_macro_data", kwargs))
+        daily = [{"date": f"2026-11-{day:02d}", "value": 3.0, "source": "ECOS"} for day in range(10, 0, -1)] * 7
+        monthly = [{"date": f"2026-{month:02d}-01", "value": 1.0, "source": "ECOS"} for month in range(10, 0, -1)] * 2
+        return {"indicators": [
+            {"indicator_id": "USD_KRW", "indicator_name": "원/달러 환율", "unit": "KRW", "frequency": "daily",
+             "records": daily},
+            {"indicator_id": "DRAM_EXPORT_PRICE", "indicator_name": "D램 수출물가지수", "unit": "2020=100",
+             "frequency": "monthly", "records": monthly},
+        ]}
+
+    monkeypatch.setattr("processing.functions.get_macro_data.get_macro_data", fake_macro)
+
+    result = get_agent_context("005930", "debate", intent="macro", as_of="2026-11-10")
+
+    (_, kwargs), = [call for call in recorded if call[0] == "get_macro_data"]
+    assert kwargs["as_of"] == "2026-11-10" and "KTB_3Y_KR" in kwargs["indicators"]
+    macro = result["macro"]
+    # 방향이 확실한 민감도 요인(D램 수출물가)이 앞, 일별은 60개·월별은 13개까지
+    assert [i["indicator_id"] for i in macro["indicators"]] == ["DRAM_EXPORT_PRICE", "USD_KRW"]
+    assert [len(i["records"]) for i in macro["indicators"]] == [13, 60]
+    assert macro["chunk_id"] == "block:005930:macro:2026-11-10"
+    assert result["index"]["chunk_id"] == "block:005930:index:2026-11-10"
+    # 민감도 블록의 날짜는 계산 기준일
+    assert result["sensitivities"]["chunk_id"] == "block:005930:sensitivities:2026-11-23"
+    assert result["sensitivities"]["caution"] == ["인과 아님"]
+
+
+def test_block_failure_and_no_data_are_different():
+    from processing.functions.get_agent_context import _block
+
+    failed = _block("005930", "financials", "get_financials", None, {"records": []}, "financials_unavailable")
+    empty = _block("005930", "financials", "get_financials", None, {"records": []})
+
+    assert (failed["chunk_id"], failed["error"]) == (None, "financials_unavailable")
+    assert (empty["chunk_id"], empty["reason"]) == (None, "no_data") and "error" not in empty
 

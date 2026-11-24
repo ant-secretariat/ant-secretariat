@@ -9,6 +9,8 @@
 - 출력 폴더는 git에 올리지 않는다. outputs.jsonl에는 근거 본문 일부가 들어간 채점용 텍스트가 있다.
 - 이어서 돌리기: 두 시스템 출력이 이미 있는 문항은 건너뛴다. 한 문항 실패는 failures.jsonl에 남기고 다음으로 간다.
 - 데이터 함수는 기본 로더 안에서만 import한다(테스트는 가짜 로더를 넣는다).
+- 알고 쓸 것(수경 #77 리뷰): `data_tier`는 오늘 기준 건수로 계산된다(과거 시점 계산은 #84 이후). 뉴스는 11/10 하루치가 비어 있다.
+  리포트는 11/10까지 적재 완료(11/24), 11/9 LIG디펜스앤에어로스페이스 1건은 PDF 처리 실패로 빠진 채 고정.
 """
 from __future__ import annotations
 
@@ -127,7 +129,8 @@ async def default_loader(case: dict, as_of: Optional[str]) -> CaseContext:
     from processing.functions.get_agent_context import get_agent_context
     from processing.functions.resolve_company import resolve_company
 
-    resolved = await asyncio.to_thread(resolve_company, case["company"])
+    # 종목코드 정확 일치로 찾는다. 회사 이름이 다른 종목으로 잡히면 data_status가 어긋나 ValueError(#77 리뷰)
+    resolved = await asyncio.to_thread(resolve_company, case["ticker"])
     kwargs = {"as_of": as_of} if as_of else {}
     ctx = await asyncio.to_thread(get_agent_context, ticker=case["ticker"], agent_type="debate", query=case["query"],
                                   intent=case["agenda_id"], data_status=resolved.get("data_status"), **kwargs)

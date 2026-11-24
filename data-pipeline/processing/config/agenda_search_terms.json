@@ -1,0 +1,44 @@
+{
+  "_note": "토론 아젠다별 문서 검색 설정(#84). terms: 키워드 검색(BM25)에는 질문 + terms, 의미 검색에는 질문만(질문이 없으면 둘 다 terms). document_types: 찾을 문서 종류(앞쪽이 몫을 더 받음). 데이터 쪽이 관리한다.",
+  "valuation": {
+    "terms": "실적 밸류에이션 목표주가",
+    "document_types": [
+      "report"
+    ]
+  },
+  "macro": {
+    "terms": "업황 금리 환율",
+    "document_types": [
+      "report",
+      "news"
+    ]
+  },
+  "risk": {
+    "terms": "리스크 우려 하락",
+    "document_types": [
+      "report",
+      "news",
+      "disclosure"
+    ]
+  },
+  "growth": {
+    "terms": "성장 신사업 증설 수주",
+    "document_types": [
+      "report",
+      "news"
+    ]
+  },
+  "shareholder_return": {
+    "terms": "배당 자사주 주주환원",
+    "document_types": [
+      "report",
+      "disclosure"
+    ]
+  },
+  "flow": {
+    "terms": "외국인 기관 수급 순매수",
+    "document_types": [
+      "news"
+    ]
+  }
+}

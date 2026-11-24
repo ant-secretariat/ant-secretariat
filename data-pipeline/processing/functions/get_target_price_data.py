@@ -146,9 +146,11 @@ def _consensus(records: list[dict], as_of: date) -> dict:
     """
     latest: dict[str, dict] = {}
     for record in records:
-        current = latest.get(record["mbcr_name"])
+        # 이름이 바뀐 증권사(하이투자 → iM 등)도 같은 증권사로 본다(broker_key, 개정 집계와 같은 기준)
+        key = record["broker_key"] or record["mbcr_name"]
+        current = latest.get(key)
         if current is None or record["published_at"] > current["published_at"]:
-            latest[record["mbcr_name"]] = record
+            latest[key] = record
     cutoff = (as_of - timedelta(days=CONSENSUS_WINDOW_DAYS)).isoformat()
     prices = [
         r["target_price_adjusted"] for r in latest.values()
@@ -175,19 +177,22 @@ def _revisions(rows: list[tuple], as_of: date, window_days: int) -> dict:
     - 직전은 그 증권사의 바로 앞 의견 가운데 목표가가 있는 것. 없으면 new(기간 안 첫 의견)
     - 최신 의견에 목표가가 없는 증권사는 세지 않는다
     - 분할 환산 목표가로 비교한다(분할 전후 가격을 그대로 비교하지 않게)
+    - 증권사는 broker_key로 묶는다. 이름이 바뀐 증권사(하이투자 → iM 등)의 옛 의견도 직전으로 본다
+    - 기간은 경계일 포함이다(as_of − window_days일부터, 컨센서스와 같은 규칙)
     """
     history: dict[str, list[tuple]] = {}
     for opinion_date, broker, *_, target_price_adjusted, _superseded, _company in rows:
-        history.setdefault(broker, []).append((opinion_date, target_price_adjusted))
+        history.setdefault(broker_key(broker) or broker, []).append((opinion_date, target_price_adjusted, broker))
     cutoff = as_of - timedelta(days=window_days)
     counts = {"up": 0, "down": 0, "unchanged": 0, "new": 0}
     brokers = []
-    for broker, opinions in history.items():
+    for key, opinions in history.items():
         opinions.sort(key=lambda item: item[0], reverse=True)
-        latest_date, latest = opinions[0]
+        latest_date, latest, broker = opinions[0]
         if latest_date < cutoff or latest is None:
             continue
-        prev = next(((d, p) for d, p in opinions[1:] if p is not None), None)
+        # 목표가가 없거나 0인 의견은 직전으로 쓰지 않는다(0이면 변화율을 계산할 수 없음)
+        prev = next(((d, p) for d, p, _ in opinions[1:] if p), None)
         if prev is None:
             kind, change_pct = "new", None
         else:
@@ -195,8 +200,8 @@ def _revisions(rows: list[tuple], as_of: date, window_days: int) -> dict:
             change_pct = round((float(latest) / float(prev[1]) - 1) * 100, 2)
         counts[kind] += 1
         brokers.append({
-            "broker": broker,
-            "broker_key": broker_key(broker),
+            "broker": broker,   # 최신 의견의 이름
+            "broker_key": key,
             "prev_date": prev[0].isoformat() if prev else None,
             "prev": _won(prev[1]) if prev else None,
             "latest_date": latest_date.isoformat(),

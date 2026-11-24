@@ -321,3 +321,33 @@ def test_revisions_unknown_on_failure(monkeypatch):
 
     # 모르는 개정 수를 0으로 두면 "개정 없음"으로 읽힌다
     assert result["error"] == "target_price_unavailable" and result["revisions"] is None
+
+
+def test_renamed_broker_is_one_broker_for_revisions_and_consensus(monkeypatch):
+    # 하이투자증권 → iM증권(2024): 옛 이름의 의견도 같은 증권사의 직전 의견이다(#105 리뷰)
+    rows = [
+        (date(2026, 11, 10), "iM증권", "BUY", "buy", "BUY", 120000, 120000, None, "삼성전자"),
+        (date(2026, 9, 1), "하이투자증권", "BUY", "buy", "BUY", 100000, 100000, None, "삼성전자"),
+    ]
+    monkeypatch.setattr("crawling.db.postgres.connect", lambda: FakeSupabase(rows))
+
+    result = get_target_price_data(ticker="005930", as_of="2026-11-23")
+
+    assert (result["revisions"]["up"], result["revisions"]["new"]) == (1, 0)
+    (broker,) = result["revisions"]["brokers"]
+    assert (broker["broker"], broker["broker_key"], broker["prev"]) == ("iM증권", "IM", 100000)
+    # 컨센서스도 같은 증권사의 최신 1건만 쓴다
+    assert result["consensus"]["broker_count"] == 1 and result["consensus"]["avg_target_price"] == 120000
+
+
+def test_zero_previous_target_is_not_used(monkeypatch):
+    rows = [
+        (date(2026, 11, 10), "한증권", "BUY", "buy", "BUY", 120000, 120000, None, "삼성전자"),
+        (date(2026, 9, 1), "한증권", "BUY", "buy", "BUY", 0, 0, date(2026, 11, 10), "삼성전자"),
+    ]
+    monkeypatch.setattr("crawling.db.postgres.connect", lambda: FakeSupabase(rows))
+
+    revisions = get_target_price_data(ticker="005930", as_of="2026-11-23")["revisions"]
+
+    # 0으로 나누지 않고, 쓸 수 있는 직전 목표가가 없으니 첫 의견으로 센다
+    assert (revisions["new"], revisions["brokers"][0]["change_pct"]) == (1, None)

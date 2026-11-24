@@ -1,6 +1,7 @@
 """단일 모드 run_debate 테스트. LLM·데이터는 가짜로 주입한다."""
 from __future__ import annotations
 
+import asyncio
 import json
 from types import SimpleNamespace
 
@@ -106,13 +107,19 @@ async def test_scope_and_flags_come_from_precheck():
     assert run.result.flags == ["stale_data"]
 
 
-async def test_events_are_node_and_claim_level():
+async def test_events_follow_contract_names_and_payloads():
+    # ADR 0009·계약 JobEvent: data_collected → claim_completed·bull_completed·bear_completed → judge_completed → verifying
     events = []
-    run, _ = await _run([A.VALUATION], emit=lambda e, p: events.append((e, p.get("node"))))
+    await _run([A.VALUATION], emit=lambda e, p: events.append((e, p)))
     names = [e for e, _ in events]
-    assert names[0] == "node_started" and names[-1] == "node_completed"
-    assert names.count("claim_completed") == 3  # Bull 2 + Bear 1
-    assert ("agenda_completed", None) in events and ("node_started", "judge") in events
+    assert names == ["data_collected", "claim_completed", "claim_completed", "bull_completed",
+                     "claim_completed", "bear_completed", "judge_completed", "verifying"]
+    assert set(events[0][1]) == {"report_count", "news_count", "disclosure_count"}
+    bull_claim = events[1][1]
+    assert bull_claim["role"] == "bull" and bull_claim["agenda_id"] == "valuation"
+    assert bull_claim["claim"]["claim_id"].startswith("valuation-") and bull_claim["claim"]["text"]  # 카드에 쓸 주장 내용
+    assert events[4][1]["role"] == "bear" and events[4][1]["claim"]["claim_id"].startswith("valuation-")
+    assert events[3][1] == {"agenda_id": "valuation", "claim_count": 2}
 
 
 async def test_async_emit_is_awaited():
@@ -121,7 +128,24 @@ async def test_async_emit_is_awaited():
     async def emit(e, p):
         seen.append(e)
     await _run([A.VALUATION], emit=emit)
-    assert "agenda_completed" in seen
+    assert "judge_completed" in seen and "verifying" in seen
+
+
+async def test_one_agenda_failure_cancels_the_others():
+    cancelled = []
+
+    async def fetch(company, agenda, query):
+        if agenda == A.VALUATION:
+            raise RuntimeError("검색 실패")
+        try:
+            await asyncio.sleep(1)
+        except asyncio.CancelledError:
+            cancelled.append(agenda)
+            raise
+        return []
+    with pytest.raises(RuntimeError, match="검색 실패"):  # ExceptionGroup이 아니라 원래 오류 그대로(워커 error_code용)
+        await _run([A.VALUATION, A.MACRO], fetch=fetch)
+    assert cancelled == [A.MACRO]
 
 
 async def test_judge_missing_agenda_raises():

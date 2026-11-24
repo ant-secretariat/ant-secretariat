@@ -68,7 +68,7 @@ backend/agents/debate_renewal/
 - 환경변수 이름은 기존 `agents/debate`의 `DEBATE_LLM_MODEL`과 겹치지 않게 `DEBATE_RENEWAL_LLM_*`
 - `run_debate` claim_id: 프롬프트는 아젠다마다 `B1`·`R1`부터 매기고, 코드가 아젠다 ID를 앞에 붙인다(`valuation-B1`). L1이 결과 전체에서 유일한 id를 요구해서
 - 근거 본문 길이 `PREVIEW_CHARS` 600자, `data_richness`는 `data_tier == report`면 rich 그 외 limited (임시값)
-- 아젠다 하나의 Bull·Bear가 실패하면 토론 전체가 실패한다. 남은 아젠다로 계속할지(부분 결과)는 기획서에 없음
+- 진행 이벤트는 계약 `JobEvent`(ADR 0009) 이름·payload: `data_collected`(문서 종류별 건수) → 아젠다마다 `claim_completed`(`role`·`agenda_id`·`claim`)·`bull_completed`·`bear_completed`(`agenda_id`·`claim_count`) → `judge_completed` → `verifying`. `job_started`·`completed`·`failed`는 워커
 - Judge가 아젠다 판정을 빠뜨리면 채우지 않고 `LLMOutputInvalidError`
 - 기준선 단일 LLM 프롬프트(`eval/baseline/single.py`, single-1.0.0): 토론과 같은 `COMMON_RULES`, 긍정 2~4·부정 1~3·엇갈리는 점·요약. 토론에 불리하거나 유리하지 않은지 채점 전에 한 번 더 확인 필요
 - 블라인드 텍스트(`render.py`): 두 시스템을 긍정·부정·엇갈리는 점·종합·근거 목록으로 맞추고 Bull·Bear 이름을 긍정론·부정론으로 바꾼다. 토론의 엇갈리는 점에는 Judge 판정 이유와 Bear `agreed_points`를 넣는다. 반박 문체("~라고 보지만")로 짐작될 수 있는 한계는 남음

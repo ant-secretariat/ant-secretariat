@@ -187,12 +187,15 @@ def test_issue_candidates_search_top_exposed_tickers_and_dedupe():
                                      for t, x in [("000001", .3), ("000002", .9), ("000003", .6), ("000004", .6)]]}}
     calls = []
 
-    def search(query, ticker, top_k, as_of):
-        calls.append((query, ticker, top_k))
+    def search(query, ticker, top_k, as_of, doc_type):
+        calls.append((query, ticker, top_k, doc_type))
+        if doc_type != "news":
+            return []
         return [{"chunk_id": "c-same", "content": "본문 " * 200, "title": "t"}, {"chunk_id": f"c-{ticker}"}]
     found = candidates(seed, search, 2, None)
-    assert [c[1] for c in calls] == ["000002", "000004", "000003"]  # 노출도 높은 3종목
-    assert calls[0][0] == "이슈 메모" and calls[0][2] == 2
+    assert [c[1] for c in calls] == ["000002", "000002", "000004", "000004", "000003", "000003"]  # 노출도 높은 3종목
+    assert [c[3] for c in calls[:2]] == ["news", "report"]  # 뉴스·리포트 따로
+    assert calls[0][0] == "이슈" and calls[0][2] == 2  # 메모 전체는 붙이지 않음
     assert [r["chunk_id"] for r in found["ISS_A"]] == ["c-same", "c-000002", "c-000004", "c-000003"]
     md = to_markdown(seed, found)
     assert "- [ ] `c-same` 000002" in md and len(md.split("> ")[1].splitlines()[0]) <= 220
@@ -210,3 +213,14 @@ def test_issue_evidence_csv_has_header_only_until_reviewed():
 ])
 def test_two_consecutive_failures_reject(now, prev, status):
     assert co_status(now, prev) == status
+
+
+def test_issue_evidence_verify_reports_missing_and_date_mismatch():
+    from issue_evidence_candidates import verify
+    rows = [{"chunk_id": "a", "published_at": "2026-11-01"}, {"chunk_id": "b", "published_at": "2026-11-02"},
+            {"chunk_id": "c", "published_at": "2026-11-03"}]
+
+    def db(ids):
+        return {"chunks": [{"chunk_id": "a", "published_at": "2026-11-01T09:00:00+09:00"},
+                           {"chunk_id": "b", "published_at": "2026-11-05"}], "missing": ["c"]}
+    assert verify(rows, db) == ["c: DB에 없음", "b: published_at 2026-11-02 ≠ DB 2026-11-05"]

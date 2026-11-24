@@ -1,0 +1,149 @@
+# 데이터 파이프라인 정기 적재 (data-pipeline/crawling)
+# - 평일 19:30 KST: 정형 데이터(시세·지수·수급·목표가·지분공시·매크로)와 공시. 재무제표는 월요일만
+# - 매달 1일 20:00 KST: 민감도·시뮬레이션 파라미터, 월말 종가와 월별 상관 재계산, 온톨로지 입력값 계산(민감도는 ontology_sensitivity_inputs 표에 저장, 전체 CSV는 실행 결과 파일로 90일 보관)
+# - 리포트·뉴스는 Supabase 무료 한도(500MB) 때문에 기본은 끔. 레포 변수 LOAD_REPORTS / LOAD_NEWS = true 로 켬
+# - 비밀값은 레포 Settings → Secrets and variables → Actions 에 등록 (코드가 읽는 환경변수 이름 그대로)
+name: 데이터 적재
+
+on:
+  schedule:
+    - cron: "30 10 * * 1-5"   # 평일 19:30 KST (장 마감 뒤)
+    - cron: "0 11 1 * *"      # 매달 1일 20:00 KST (월간 재계산)
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "기준일 YYYY-MM-DD (비우면 오늘)"
+        required: false
+      run_daily:
+        description: "일일 적재"
+        type: boolean
+        default: true
+      run_monthly:
+        description: "월간 재계산 (민감도·시뮬레이션·월별 상관·온톨로지 입력값)"
+        type: boolean
+        default: false
+      include_reports:
+        description: "리포트 적재 (DB 용량 주의)"
+        type: boolean
+        default: false
+      include_news:
+        description: "뉴스 적재 (DB 용량 주의)"
+        type: boolean
+        default: false
+
+# 같은 DB에 두 적재가 동시에 쓰지 않게 한다
+concurrency:
+  group: data-load
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  TZ: Asia/Seoul
+  PYTHONPATH: .
+  SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+  DART_API_KEY: ${{ secrets.DART_API_KEY }}
+  KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
+  KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
+  ECOS_API_KEY: ${{ secrets.ECOS_API_KEY }}
+  NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
+  NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
+  UPSTAGE_API_KEY: ${{ secrets.UPSTAGE_API_KEY }}
+  KRX_ID: ${{ secrets.KRX_ID }}
+  KRX_PW: ${{ secrets.KRX_PW }}
+
+jobs:
+  daily:
+    if: >-
+      (github.event_name == 'schedule' && github.event.schedule == '30 10 * * 1-5') ||
+      (github.event_name == 'workflow_dispatch' && inputs.run_daily)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: data-pipeline
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: data-pipeline/requirements.txt
+      - name: 의존성 설치
+        run: pip install -r requirements.txt
+
+      # 한 단계가 실패해도 다음 단계는 돌고(!cancelled), 작업 전체는 실패로 표시된다
+      - name: 시세·PER·지수
+        if: ${{ !cancelled() }}
+        run: python -m crawling.market_loader --daily ${{ inputs.date && format('--date {0}', inputs.date) || '' }}
+      - name: 투자자 수급·공매도 (최근 14일)
+        if: ${{ !cancelled() }}
+        run: python -m crawling.investor_flow_loader --recent
+      - name: 목표주가 (최근 14일)
+        if: ${{ !cancelled() }}
+        run: python -m crawling.opinions_loader --recent
+      - name: 지분공시
+        if: ${{ !cancelled() }}
+        run: python -m crawling.insider_holdings_loader
+      - name: 매크로
+        if: ${{ !cancelled() }}
+        run: python -m crawling.macro_loader --daily
+      - name: 공시 (최근 3일, 임베딩 포함)
+        if: ${{ !cancelled() }}
+        run: python -m crawling.disclosure_chunks_loader --days 3 --embed
+      - name: 재무제표 (월요일 또는 손으로 실행할 때)
+        if: ${{ !cancelled() }}
+        run: |
+          if [ "$(date +%u)" = "1" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            python -m crawling.financials_loader --recent
+          else
+            echo "월요일이 아니라 건너뜀"
+          fi
+
+      - name: 리포트 (최근 14일) + 임베딩
+        if: ${{ !cancelled() && (vars.LOAD_REPORTS == 'true' || inputs.include_reports) }}
+        run: |
+          python -m crawling.report_chunks_loader --recent
+          python -m crawling.chunk_embedder
+      - name: 뉴스 (최근 3일, 임베딩 포함)
+        if: ${{ !cancelled() && (vars.LOAD_NEWS == 'true' || inputs.include_news) }}
+        run: python -m crawling.news_chunks_loader --days 3 --embed
+
+  monthly:
+    if: >-
+      (github.event_name == 'schedule' && github.event.schedule == '0 11 1 * *') ||
+      (github.event_name == 'workflow_dispatch' && inputs.run_monthly)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: data-pipeline
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: data-pipeline/requirements.txt
+      - name: 의존성 설치
+        run: pip install -r requirements.txt
+      - name: 민감도·시뮬레이션 파라미터
+        if: ${{ !cancelled() }}
+        run: python -m crawling.sim_loader ${{ inputs.date && format('--date {0}', inputs.date) || '' }}
+      - name: 월말 종가와 월별 상관
+        if: ${{ !cancelled() }}
+        run: python -m crawling.monthly_corr_loader
+      # 온톨로지 입력값. 민감도(종목·l1·l2)는 ontology_sensitivity_inputs 표에 기준일별로 쌓고(#67),
+      # 전체 결과 CSV(섹터 등급·매크로 방향·IMPACTS 포함)는 실행 결과 파일로 남긴다 (#56)
+      - name: 온톨로지 입력값 계산·저장
+        if: ${{ !cancelled() }}
+        run: python -m crawling.ontology_inputs monthly --save --out-dir ontology_inputs_out ${{ inputs.date && format('--as-of {0}', inputs.date) || '' }}
+      - name: 온톨로지 입력값 CSV 보관 (90일)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ontology-inputs-${{ github.run_id }}
+          path: data-pipeline/ontology_inputs_out/
+          if-no-files-found: warn
+          retention-days: 90

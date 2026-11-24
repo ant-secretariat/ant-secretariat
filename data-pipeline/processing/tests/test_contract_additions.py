@@ -110,3 +110,131 @@ def test_trend_report_bundle_returns_more_candidates_and_no_macro_documents(reco
     assert [s["document_type"] for s in searches] == ["report", "news"]
     assert all(s["top_k"] == TREND_REPORT_TOP_K == 15 for s in searches)
     assert "macro_documents" not in result and "macro_data" in result  # 매크로는 정형 값만
+
+
+# ── 토론 아젠다별 검색 키워드 (#84) ──
+
+def test_every_agenda_has_search_terms_and_document_types():
+    from processing.enums import AgendaId
+    from processing.functions.get_agent_context import AGENDA_SEARCH
+
+    assert set(AGENDA_SEARCH) == {agenda.value for agenda in AgendaId}
+    for setting in AGENDA_SEARCH.values():
+        assert setting["terms"].strip()
+        assert setting["document_types"] and set(setting["document_types"]) <= {"report", "news", "disclosure"}
+
+
+def test_debate_intent_adds_terms_to_keyword_search_only(recorded):
+    from processing.functions.get_agent_context import get_agent_context
+
+    result = get_agent_context("005930", "debate", query="외국인 매도 이유", intent="flow", as_of="2026-11-10")
+
+    (_, kwargs), = [call for call in recorded if call[0] == "search_documents"]   # flow는 뉴스만
+    # 의미 검색은 질문만, 키워드 검색은 질문 + 키워드
+    assert kwargs["query"] == "외국인 매도 이유"
+    assert kwargs["keyword_query"] == "외국인 매도 이유 외국인 기관 수급 순매수"
+    assert kwargs["document_type"] == "news"
+    assert result["documents"]["keyword_query"] == kwargs["keyword_query"]
+
+
+def test_debate_intent_without_question_still_searches_with_terms(recorded):
+    from processing.functions.get_agent_context import get_agent_context
+
+    result = get_agent_context("005930", "debate", intent="shareholder_return", as_of="2026-11-10")
+
+    # 버튼 경로(질문 없음)도 아젠다 키워드로 검색한다. 주주환원은 리포트·공시를 따로 찾는다
+    calls = [kwargs for name, kwargs in recorded if name == "search_documents"]
+    assert [c["document_type"] for c in calls] == ["report", "disclosure"]
+    assert all(c["query"] == c["keyword_query"] == "배당 자사주 주주환원" for c in calls)
+    assert "documents" in result
+
+
+def test_debate_without_intent_keeps_previous_search(recorded):
+    from processing.functions.get_agent_context import get_agent_context
+
+    assert "documents" not in get_agent_context("005930", "debate", as_of="2026-11-10")
+    get_agent_context("005930", "debate", query="실적", as_of="2026-11-10")
+    (_, kwargs), = [call for call in recorded if call[0] == "search_documents"]
+    assert kwargs["query"] == "실적" and "keyword_query" not in kwargs
+
+
+def test_search_documents_reports_keyword_query(monkeypatch):
+    from processing.functions.search_documents import search_documents
+
+    seen = {}
+
+    def fake_search_chunks(connection, query, ticker, top_k, mode, **filters):
+        seen.update(query=query, **filters)
+        return [], "hybrid"
+
+    class Connection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    monkeypatch.setattr("processing.search.chunk_search.search_chunks", fake_search_chunks)
+    monkeypatch.setattr("crawling.db.postgres.connect", lambda: Connection())
+
+    result = search_documents(query="질문", ticker="005930", keyword_query="질문 키워드")
+
+    assert seen["query"] == "질문" and seen["keyword_query"] == "질문 키워드"
+    assert result["keyword_query"] == "질문 키워드"
+    assert "keyword_query" not in search_documents(query="질문", ticker="005930")
+
+
+def _hit(chunk, doc, kind, score):
+    return {"chunk_id": chunk, "doc_id": doc, "document_type": kind, "score": score}
+
+
+def test_pick_diverse_limits_chunks_per_document_and_keeps_type_quotas():
+    from processing.functions.get_agent_context import pick_diverse
+
+    found = {
+        "report": [_hit("r1a", "R1", "report", 0.9), _hit("r1b", "R1", "report", 0.8), _hit("r1c", "R1", "report", 0.7),
+                   _hit("r1d", "R1", "report", 0.6), _hit("r2a", "R2", "report", 0.5)],
+        "news": [_hit("n1", "N1", "news", 0.4), _hit("n2", "N2", "news", 0.3), _hit("n3", "N3", "news", 0.2)],
+    }
+
+    picked = pick_diverse(found, {"report": 3, "news": 2}, total=5, per_doc=2)
+
+    # 같은 리포트(R1)는 2조각까지, 리포트 3 + 뉴스 2
+    assert [p["chunk_id"] for p in picked] == ["r1a", "r1b", "r2a", "n1", "n2"]
+
+
+def test_pick_diverse_fills_shortfall_from_other_types():
+    from processing.functions.get_agent_context import pick_diverse
+
+    found = {
+        "report": [_hit("r1", "R1", "report", 0.9), _hit("r2", "R2", "report", 0.8), _hit("r3", "R3", "report", 0.7),
+                   _hit("r4", "R4", "report", 0.6)],
+        "disclosure": [],   # 공시가 없으면 리포트가 그 자리를 채운다
+    }
+
+    picked = pick_diverse(found, {"report": 3, "disclosure": 2}, total=5, per_doc=2)
+
+    assert [p["chunk_id"] for p in picked] == ["r1", "r2", "r3", "r4"]
+
+
+@pytest.mark.parametrize(("total", "kinds", "quotas"), [(5, 1, [5]), (5, 2, [3, 2]), (5, 3, [2, 2, 1])])
+def test_quotas_split_total_front_first(total, kinds, quotas):
+    from processing.functions.get_agent_context import _quotas
+
+    assert _quotas(total, kinds) == quotas
+
+
+def test_agenda_documents_reports_failed_type_without_hiding_others(monkeypatch):
+    from processing.functions.get_agent_context import _agenda_documents
+
+    def fake_search(query, keyword_query, ticker, document_type, top_k, as_of):
+        if document_type == "news":
+            return {"results": [], "mode": None, "reason": "search_unavailable"}
+        return {"results": [_hit("r1", "R1", "report", 0.9)], "mode": "hybrid"}
+
+    documents = _agenda_documents(fake_search, "005930", "macro", None, "2026-11-10")
+
+    # 뉴스 검색이 실패해도 리포트는 주고, 실패는 "문서 없음"이 아니라 reason으로 알린다
+    assert [r["chunk_id"] for r in documents["results"]] == ["r1"]
+    assert (documents["reason"], documents["failed_types"], documents["mode"]) == ("search_unavailable", ["news"], "hybrid")
+

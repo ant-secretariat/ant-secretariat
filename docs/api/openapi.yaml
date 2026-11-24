@@ -2,7 +2,7 @@
 openapi: 3.1.0
 info:
   title: 개미비서단 에이전트 계약 명세
-  version: 1.0.0-draft.5
+  version: 1.0.0-draft.6
   description: |
     MVP 목표 구조(TO-BE) 기준의 API·에이전트 계약입니다. 현재 코드가 아니라 구현해야 할 계약을 설명합니다.
 
@@ -22,6 +22,7 @@ info:
 
     11/4 결정(관계 사전 MVP 포함)과 11/5 결정(자유 질의는 MVP 이후)을 반영했습니다.
     draft.5(11/17)는 ADR 0007(2종목 비교 MVP 포함), 0008(관계 사전 플래그 기본 꺼짐), 0009(SSE 전달 방식·`claim_completed`)를 반영했습니다. 문서와 다르면 `docs/decisions/`의 ADR이 우선합니다.
+    draft.6(11/24)는 ADR 0013(시뮬레이션은 토론과 다른 job, job 상태 4종)을 반영했습니다.
 
     **출처:** 토론 수정안 v2.3, 데이터 수정안, 시뮬레이션 수정안, 오케스트레이터 설계 초안, 시그니처 계약.
   x-open-questions:
@@ -475,9 +476,19 @@ paths:
       description: |-
         **상태:** 신규 · **릴리스:** MVP · **전송:** HTTP
 
-        `debate_completed`·`simulation_pending` 상태의 본인 job만 실행합니다. 이미 실행 중이면 기존 상태를 반환합니다(멱등).
-        비교 모드(`meta.mode=compare`) job은 409 `invalid_job_state`로 거절합니다(ADR 0007, 비교 모드는 시뮬레이션 없음).
-        이력 부족은 즉시 거절하지 않고 `job_started` 후 `failed` + `error_code=insufficient_history`로 끝납니다.
+        경로의 `job_id`는 **토론 job**입니다. 이 요청은 **시뮬레이션 job을 새로 만들고**(`job_type=simulation`, `debate_job_id`=경로의 job_id) 그 job의 `job_started`를 돌려줍니다(ADR 0013). 진행 이벤트는 새 시뮬레이션 job의 `GET /jobs/{job_id}/events`로 받습니다.
+        시뮬레이션은 버튼을 누른 날이 아니라 토론 job의 `data_as_of` 기준으로 실행합니다.
+
+        | 상황 | 응답 |
+        | --- | --- |
+        | 토론 job이 비교 모드(`meta.mode=compare`)이거나 아직 `completed`가 아님 | 409 `invalid_job_state` |
+        | 시뮬레이션 가능 기간이 지난 토론 | 409 `invalid_job_state` |
+        | 지금 시뮬레이션할 수 없는 종목 (버튼을 누를 때 다시 판정) | 200 `rejected` `no_data` (토론 job은 그대로) |
+        | 같은 토론의 시뮬레이션 job이 진행 중이거나 끝남 | 200 `job_started` + `reused=true` (그 job) |
+        | 사용자의 다른 job이 진행 중 (사용자당 1개, ADR 0014) | 409 `concurrent_job_limit` |
+        | 그 외 | 200 `job_started` (새 시뮬레이션 job) |
+
+        이력 부족은 즉시 거절하지 않고 시뮬레이션 job이 `failed` + `error_code=insufficient_history`로 끝납니다. 토론 job은 영향받지 않습니다.
       x-transport: http
       x-release: mvp
       x-status: new
@@ -485,11 +496,11 @@ paths:
       - $ref: '#/components/parameters/JobId'
       responses:
         '200':
-          description: 작업 시작
+          description: 시뮬레이션 job 시작 또는 거절
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/JobStartedResponse'
+                $ref: '#/components/schemas/SimulationStartEnvelope'
         '401':
           $ref: '#/components/responses/Unauthenticated'
         '404':
@@ -504,6 +515,7 @@ paths:
       - 시뮬레이션 에이전트
       operationId: readSimulationResult
       summary: 시뮬레이션 결과 조회
+      x-note: 경로의 `job_id`는 토론 job입니다. 그 토론의 가장 최근 시뮬레이션 job 상태와 결과를 돌려주고, 아직 없으면 `simulation_job_id`·`status`가 null입니다(ADR 0013).
       x-transport: http
       x-release: mvp
       x-status: changed
@@ -518,12 +530,22 @@ paths:
                 type: object
                 required:
                 - job_id
+                - simulation_job_id
                 - status
                 properties:
                   job_id:
                     type: string
+                    description: 토론 job
+                  simulation_job_id:
+                    type:
+                    - string
+                    - 'null'
+                    description: 가장 최근 시뮬레이션 job. 아직 없으면 null
                   status:
-                    $ref: '#/components/schemas/JobStatus'
+                    oneOf:
+                    - $ref: '#/components/schemas/JobStatus'
+                    - type: 'null'
+                    description: 시뮬레이션 job의 상태. 아직 없으면 null
                   simulation_result:
                     oneOf:
                     - $ref: '#/components/schemas/SimulationResult'
@@ -1199,7 +1221,7 @@ x-internal-functions:
   output: DebateResult
   status: changed
   release: mvp
-  note: 작업 큐 워커가 실행합니다. 단계마다 `job_events`를 기록하고 완료 시 상태를 `simulation_pending`으로 바꿉니다.
+  note: 작업 큐 워커가 실행합니다. 단계마다 `job_events`를 기록합니다. 토론 job은 단일·비교 모두 `completed`로 끝나고 완료 시점의 `simulation_ready`를 저장합니다. 시뮬레이션은 별도 job입니다(ADR 0013).
 - name: get_ontology_context
   agent: 관계 사전
   summary: 아젠다별 관계 컨텍스트 조회
@@ -1334,13 +1356,12 @@ components:
       - disclosure
     JobStatus:
       type: string
-      description: 비교 모드 job은 시뮬레이션이 없어 `debate_completed`에서 끝납니다(ADR 0007).
+      description: |-
+        job마다 같은 4종입니다(ADR 0013). 토론 job은 단일·비교 모두 `completed`로 끝나고, 시뮬레이션은 사용자 버튼으로 만들어지는 별도 job(`job_type=simulation`)이라 상태가 섞이지 않습니다.
+        draft.5의 `debate_completed`·`simulation_pending`·`simulation_running`은 없앴습니다.
       enum:
       - queued
       - running
-      - debate_completed
-      - simulation_pending
-      - simulation_running
       - completed
       - failed
     ResponseMeta:
@@ -1675,6 +1696,16 @@ components:
           $ref: '#/components/schemas/JobRef'
         meta:
           $ref: '#/components/schemas/ResponseMeta'
+    SimulationStartEnvelope:
+      description: 시뮬레이션 버튼 응답. 새(또는 재사용) 시뮬레이션 job의 `job_started`, 또는 지금 시뮬레이션할 수 없는 종목의 `rejected no_data`
+      oneOf:
+      - $ref: '#/components/schemas/JobStartedResponse'
+      - $ref: '#/components/schemas/RejectedResponse'
+      discriminator:
+        propertyName: status
+        mapping:
+          job_started: '#/components/schemas/JobStartedResponse'
+          rejected: '#/components/schemas/RejectedResponse'
     OkInsightBoard:
       type: object
       required:
@@ -3184,6 +3215,22 @@ components:
           type: string
         status:
           $ref: '#/components/schemas/JobStatus'
+        debate_job_id:
+          type:
+          - string
+          - 'null'
+          description: 시뮬레이션 job만. 어떤 토론 job의 시뮬레이션인지 (ADR 0013)
+        data_as_of:
+          oneOf:
+          - type: string
+            format: date
+          - type: 'null'
+          description: 토론 기준일. 시뮬레이션 job도 이 날짜로 실행합니다
+        simulation_ready:
+          type:
+          - boolean
+          - 'null'
+          description: 토론 job만. 완료 시점에 이 종목을 시뮬레이션할 수 있었는지(`DataStatus.simulation_ready`). 버튼 표시·지표용이고, 버튼을 누를 때 다시 판정합니다
         error_code:
           type:
           - string
@@ -3233,6 +3280,7 @@ components:
           description: |-
             단계 이벤트 이름은 PRD 6.4 문구와 1:1입니다. `claim_completed`는 주장 1개가 완성될 때마다 보내며 FE가 주장 카드를 하나씩 채웁니다(ADR 0009).
             토큰 단위 이벤트와 LangGraph `stream_mode="messages"` 중계는 쓰지 않습니다. simulation_* 세부 이름은 Design Doc의 와일드카드를 구체화한 제안입니다.
+            `simulation_*` 이벤트는 토론 job이 아니라 시뮬레이션 job의 이벤트로 기록합니다(ADR 0013). 토론 job의 `completed` payload에는 `simulation_ready`를 넣습니다.
         payload:
           type: object
           additionalProperties: true

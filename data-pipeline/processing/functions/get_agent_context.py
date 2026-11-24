@@ -33,6 +33,7 @@ def get_agent_context(
     relational_db·embedding_model·vector_db 인자는 기존 호출을 깨지 않으려고 받기만 한다(없어도 된다).
     as_of(YYYY-MM-DD)를 주면 묶음 안의 모든 조회(목표가·시세·매크로·문서 검색)가 그날까지 알 수 있던 값만 쓴다.
     없으면 오늘(KST)이다. 과거 날짜로 만들어도 그 뒤 문서·목표가가 섞이지 않게 하려는 것이다(#69 리뷰).
+    단, data_status(와 그것으로 정하는 data_tier)는 as_of와 상관없이 지금 기준이다(과거 시점 계산은 아직 없음, #84).
     trend_report 문서 검색은 종류마다 TREND_REPORT_TOP_K개를 돌려준다. 받는 쪽이 문서당 조각 수를 줄여 고르기 때문이다.
     매크로 문서는 document_chunks에 없어서(0건) 검색하지 않는다. 매크로는 macro_data(정형 값)를 쓴다.
     """

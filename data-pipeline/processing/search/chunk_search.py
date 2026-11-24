@@ -110,8 +110,9 @@ def build_filters(
     clauses = ["d.is_active"]
     params: list = []
     if ticker:
-        # 그 종목이 대상인 문서와, 그 종목을 다루는 다른 문서(mentioned_tickers)를 함께 찾는다
-        clauses.append("(d.ticker = %s or %s = any(d.mentioned_tickers))")
+        # 그 종목이 대상인 문서와, 그 종목을 다루는 다른 문서(mentioned_tickers)를 함께 찾는다.
+        # @>로 써야 GIN 색인(document_chunks_mentioned_idx)을 탄다. = any(...)는 전체를 읽어 5초가 걸렸다(#35 리뷰)
+        clauses.append("(d.ticker = %s or d.mentioned_tickers @> array[%s]::text[])")
         params += [ticker, ticker]
     if document_type:
         clauses.append("d.document_type = %s")

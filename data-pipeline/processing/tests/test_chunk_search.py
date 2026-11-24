@@ -129,3 +129,14 @@ def test_bm25_fallback_uses_keyword_query(monkeypatch):
 
     assert (mode, seen["bm25"]) == ("bm25", "질문 키워드")
 
+
+def test_ticker_filter_uses_gin_operator():
+    # = any(mentioned_tickers)는 GIN 색인을 못 타 전체를 읽었다(운영 DB 5초 → @> 0.02초, #35 리뷰)
+    from processing.search.chunk_search import build_filters
+
+    where, params = build_filters(ticker="005930")
+
+    assert "d.mentioned_tickers @> array[%s]::text[]" in where
+    assert "any(" not in where
+    assert params[:2] == ["005930", "005930"]
+

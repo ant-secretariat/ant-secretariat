@@ -16,7 +16,7 @@ sys.path.insert(0, str(HERE))
 from co_hypotheses import CO_HYPOTHESES  # noqa: E402
 
 COLUMNS = ["as_of", "group_id", "factor", "frequency", "method", "window_start", "window_end",
-           "n_obs", "raw", "adjusted", "ci_low", "ci_high", "certain", "p_value", "q_value"]
+           "n_obs", "raw", "adjusted", "ci_low", "ci_high", "certain", "p_value", "q_value", "computed_at"]
 
 
 def _db_url() -> str:
@@ -38,6 +38,7 @@ def main(as_of: str) -> Path:
 
     keys = sorted({f"{tk}:{m}" for tk, m, *_ in CO_HYPOTHESES})
     with psycopg.connect(_db_url()) as conn:
+        conn.read_only = True  # 읽기만 한다(실수로 쓰지 않게)
         rows = conn.execute(
             f"select {', '.join(COLUMNS)} from ontology_sensitivity_inputs "
             "where as_of = %s and level = 'ticker' and group_id || ':' || factor = any(%s) order by group_id, factor",
@@ -46,7 +47,9 @@ def main(as_of: str) -> Path:
     with out.open("w", encoding="utf-8", newline="") as f:
         w = csv.writer(f, lineterminator="\n")
         w.writerow(COLUMNS)
-        w.writerows(rows)
+        # computed_at(timestamptz)은 ISO 8601로 (같은 기준일을 다시 계산했는지 알 수 있게, 수경 #80 리뷰)
+        w.writerows([[v.isoformat(timespec="seconds") if hasattr(v, "isoformat") and k == "computed_at" else v
+                      for k, v in zip(COLUMNS, r)] for r in rows])
     print(f"{out.name}: {len(rows)}/{len(keys)}행")
     return out
 

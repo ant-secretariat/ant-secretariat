@@ -8,6 +8,7 @@ user_id로 그대로 받아쓴다(프론트가 최초 실행 시 UUID를 만들�
 """
 import logging
 
+from core.errors import InvalidRequestError
 from db import Database, utc_now
 
 logger = logging.getLogger(__name__)
@@ -23,7 +24,7 @@ def create_user(user_id: str, relational_db: Database = None) -> dict:
     if relational_db is None:
         raise ValueError("relational_db는 필수입니다.")
     if not user_id or not user_id.strip():
-        raise ValueError("user_id는 필수입니다.")
+        raise InvalidRequestError("user_id는 필수입니다.")
 
     now = utc_now()
     with relational_db.connect() as connection:

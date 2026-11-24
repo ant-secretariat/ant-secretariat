@@ -150,7 +150,7 @@ def test_company_sensitivity_chip_text_is_not_causal():
 
 # ── v0.10: 종목 → 매크로 엣지를 #67 표 스냅샷 CSV에서 읽고 ADR 0011 기준으로 판정 ──
 sys.path.insert(0, str(SEED / "scripts"))
-from co_hypotheses import CO_HYPOTHESES, co_failed_criteria  # noqa: E402
+from co_hypotheses import CO_HYPOTHESES, co_failed_criteria, co_status  # noqa: E402
 
 
 def test_company_edges_read_from_inputs_snapshot():
@@ -203,3 +203,10 @@ def test_issue_evidence_csv_has_header_only_until_reviewed():
     assert lines[0] == "issue_id,chunk_id,ticker,published_at,decided_by,decided_on"
     linked = {i["issue_id"] for i in o.load()["nodes"]["issues"] if i["evidence_chunk_ids"]}
     assert len(linked) == len({l.split(",")[0] for l in lines[1:]})
+
+@pytest.mark.parametrize("now,prev,status", [
+    ([], [], "active"), ([], ["below_min_size"], "active"),
+    (["below_min_size"], [], "needs_review"), (["below_min_size"], ["no_input"], "rejected"),
+])
+def test_two_consecutive_failures_reject(now, prev, status):
+    assert co_status(now, prev) == status

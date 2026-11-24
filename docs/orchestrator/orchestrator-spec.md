@@ -2,7 +2,7 @@
 
 | 항목 | 값 |
 | --- | --- |
-| 버전 | **v2.2** (2026-11-24) |
+| 버전 | **v2.3** (2026-11-24) |
 | 상태 | 검토 중 |
 | 담당 | 태은 |
 | 상위 문서 | [헌법](../../.specify/memory/constitution.md) > [ADR](../decisions/) > PRD v1.6 > 기능 명세서 v0.8 > 이 문서 |
@@ -17,7 +17,8 @@
 | v1.1 | 2026-11-05 | Notion "시그니처 계약" (봉투·`resolve_entities`·플래너 시그니처) |
 | v2.0 | 2026-11-23 | 저장소로 이관. 레포 현황에 맞춰 수정: 자유 질의·플래너를 Post-MVP로, 2종목 비교(ADR 0007)·SSE(ADR 0009)·Problem 오류(#60) 반영, 작업 저장소를 Supabase로 |
 | v2.1 | 2026-11-23 | #68 리뷰 반영: 경로별 실행 조건(5.3, 선언형 표), 커버 판정을 `data_status.sources`로, precheck에 `data_status` 전달, 거절 payload는 오케스트레이터가 채움, `append_event` 직렬화, 시뮬레이션 시작 흐름(6.3), 보관 기간·연결 풀 |
-| **v2.2** | 2026-11-24 | **상위 문서(Design Doc v1.5·토론 기획서 v3.0)와 어긋난 세 곳 정정:** 도구 레지스트리·Langfuse를 MVP로(8·9장), 작업 실행을 API 안 `asyncio`에서 워커 프로세스(`FOR UPDATE SKIP LOCKED`·하트비트·복구)로(6.2). #68 리뷰 반영: 시뮬레이션을 별도 job으로 분리(6.3), `run_debate` 순수 함수화(6.5), 미커버 판정에서 `macro` 제외(5.3) |
+| v2.2 | 2026-11-24 | **상위 문서(Design Doc v1.5·토론 기획서 v3.0)와 어긋난 세 곳 정정:** 도구 레지스트리·Langfuse를 MVP로(8·9장), 작업 실행을 API 안 `asyncio`에서 워커 프로세스(`FOR UPDATE SKIP LOCKED`·하트비트·복구)로(6.2). #68 리뷰 반영: 시뮬레이션을 별도 job으로 분리(6.3), `run_debate` 순수 함수화(6.5), 미커버 판정에서 `macro` 제외(5.3) |
+| **v2.3** | 2026-11-24 | #68 리뷰 반영: 스키마 확정(`debate_job_id`·`data_as_of`·인덱스), 큐 동작(꺼내기 트랜잭션·잠금·하트비트·주기 작업) 구체화, 사용자 한도를 종류 합쳐 1개 + 부분 유니크 인덱스, `simulation_ready` 정의와 버튼 시 재판정, 시뮬레이션 가능 기간, 보관 기간은 #92 실측. 근거는 ADR 0012·0013·0014(#93) |
 
 ### v1.1 → v2.0 무엇이 바뀌었나
 
@@ -197,79 +198,171 @@ def check_coverage(data_status: dict | None, requirement: dict) -> Coverage: ...
 
 ## 6. 작업(job): 토론과 시뮬레이션
 
-Design Doc v1.5 4.1을 따른다. **토론과 시뮬레이션은 서로 다른 job**(`job_type`)이고, API 프로세스와 워커 프로세스는 DB로만 소통한다.
+Design Doc v1.5 4.1을 따른다. **토론과 시뮬레이션은 서로 다른 job**(`job_type`)이고, API 프로세스와 워커 프로세스는 DB로만 소통한다. 결정과 검토한 대안은 ADR 0012(테이블 큐)·0013(시뮬레이션 별도 job)·0014(사용자당 진행 중 job)에 있다.
 
 ### 6.1 저장소 (Supabase, 신규 마이그레이션)
 
 ```sql
-agent_jobs (
-  job_id text primary key, user_id text not null,
-  job_type text not null,                   -- 'debate' | 'simulation'
-  parent_job_id text references agent_jobs, -- 시뮬레이션 job → 원래 토론 job
-  mode text,                                -- 토론만: single | compare
-  tickers text[] not null, query text,
-  status text not null,                     -- queued | running | completed | failed
-  precheck jsonb, result jsonb,             -- 토론: DebateResult, 시뮬레이션: 요약만
-  simulation_ready boolean,                 -- 토론 완료 시점 값 (Design Doc 4.10 분모)
-  locked_by text, heartbeat_at timestamptz, attempts int default 0,
-  error_code text, failed_stage text,
-  created_at timestamptz, updated_at timestamptz
-)
-job_events (job_id text, seq int, type text, payload jsonb, created_at timestamptz,
-            primary key (job_id, seq))
+create table agent_jobs (
+  job_id         text primary key,                 -- 'debate_<uuid>' / 'simulation_<uuid>'
+  user_id        text not null,
+  job_type       text not null check (job_type in ('debate', 'simulation')),
+  debate_job_id  text references agent_jobs(job_id),  -- 시뮬레이션만: 어떤 토론의 시뮬레이션인지
+  mode           text check (mode in ('single', 'compare')),  -- 토론만
+  tickers        text[] not null,
+  query          text,                             -- 토론만
+  status         text not null default 'queued'
+                 check (status in ('queued', 'running', 'completed', 'failed')),
+  data_as_of     date,                             -- 토론 기준일. 시뮬레이션도 이 날짜로 실행
+  precheck       jsonb,                            -- 토론만
+  result         jsonb,                            -- 토론: DebateResult / 시뮬레이션: 요약만
+  simulation_ready boolean,                        -- 토론 완료 시점 값 (표시·지표용, Design Doc 4.10 분모)
+  trace_id       text,                             -- Langfuse (9장)
+  locked_by      text,                             -- 실행 중인 워커 이름
+  heartbeat_at   timestamptz,                      -- 워커가 15초마다 갱신
+  attempts       int not null default 0,
+  error_code     text,                             -- worker_lost · timeout · …
+  failed_stage   text,
+  created_at     timestamptz not null default now(),
+  updated_at     timestamptz not null default now()
+);
+
+create index agent_jobs_queue_idx on agent_jobs (created_at) where status = 'queued';   -- 워커 꺼내기
+create index agent_jobs_user_idx  on agent_jobs (user_id, created_at desc);            -- 토론 내역
+create unique index agent_jobs_one_active_per_user                                       -- 사용자 한도 (ADR 0014)
+  on agent_jobs (user_id) where status in ('queued', 'running');
+
+create table job_events (
+  job_id text not null references agent_jobs(job_id) on delete cascade,
+  seq int not null, type text not null, payload jsonb not null default '{}',
+  created_at timestamptz not null default now(),
+  primary key (job_id, seq)
+);
 ```
 
-- **상태는 job마다 4종**(`queued`·`running`·`completed`·`failed`)이다. 토론이 끝났는지와 시뮬레이션을 했는지가 한 칸에 섞이지 않는다. 계약 `JobStatus` 7종을 이렇게 줄이는 변경은 draft.6에서 한다(아래 6.3 이유).
+- **PK는 `job_id`다.** 한 사용자가 여러 job(지난 토론, 시뮬레이션)을 가지므로 `user_id`는 PK가 될 수 없다. `user_id`는 조회 인덱스와 사용자 한도에만 쓴다.
+- **상태는 job마다 4종**(`queued`·`running`·`completed`·`failed`)이다. 계약 `JobStatus` 7종을 이렇게 줄이는 변경은 draft.6에서 한다(ADR 0013).
+- `agent_jobs`는 job의 **현재 상태**, `job_events`는 **진행 기록**이다. SSE(6.4)는 `job_events`만 읽는다.
 - `seq`는 그 job을 실행하는 워커 한 곳에서만 매긴다(ADR 0009). `append_event(job_id, type, payload)`가 같은 트랜잭션에서 `pg_advisory_xact_lock(hashtext(job_id))`로 잠근 뒤 `max(seq)+1`을 넣는다.
   - 비교 모드는 종목별 Bull·Bear가 병렬이라 같은 job에 이벤트가 동시에 들어온다. 잠금이 없으면 PK 충돌로 이벤트가 실패한다.
   - 전역 자동 증가 번호는 잠금이 필요 없지만, 커밋 순서가 뒤바뀌면 SSE 클라이언트가 앞 번호를 영영 놓칠 수 있어 쓰지 않는다.
-- **보관 기간:** 끝난 job의 `job_events`는 7일 뒤 지운다. `agent_jobs` 행과 결과는 남긴다(DB 무료 한도 500MB 중 약 440MB 사용, 11/23).
+- **보관 기간 (초기값, #92에서 토론 QA 실측으로 확정)**
+
+| 대상 | 초기값 |
+| --- | --- |
+| 토론 결과 (사용자의 토론 내역) | 삭제 안 함 |
+| 시뮬레이션 가능 기간 (토론 후) | 3~4일 (`sim_params` 과거값 보관에 따라, 수경 확인) |
+| `job_events` | 끝난 job 7일 |
+
 - 시뮬레이션 `result`에는 요약(분위수·시나리오별 결과)만 저장한다. 경로 전체는 넣지 않는다.
 
-### 6.2 실행: 워커 프로세스 (Design Doc 4.1)
+### 6.2 실행: 테이블 큐와 워커 (ADR 0012)
 
-| 항목 | 규칙 |
+별도 큐 서버 없이 `status`가 큐 역할을 한다. `queued`인 행이 대기 중인 job이다. 큐는 **모든 사용자의 job이 함께 들어가는 하나의 대기열**이고, 사용자별 제한은 job을 만드는 시점(아래 "생성 규칙")에 건다.
+
+**누가 무엇을 바꾸나** — API와 워커는 HTTP로 통신하지 않고, 둘 다 DB에 SQL로 쓴다.
+
+| 상태 변화 | 누가 | 언제 |
+| --- | --- | --- |
+| → `queued` | API (`insert`) | 사용자가 토론·시뮬레이션 요청 |
+| `queued` → `running` | 워커 | job을 꺼낼 때 |
+| `running` → `completed`·`failed` | 워커 | 실행이 끝나거나 실패·타임아웃 |
+| `running` → `failed(worker_lost)` | 워커의 복구 루틴 | 하트비트가 2분 넘게 멈춘 job |
+
+**꺼내기 트랜잭션**
+
+```sql
+update agent_jobs
+   set status = 'running', locked_by = :worker, heartbeat_at = now(), attempts = attempts + 1
+ where job_id = (
+   select job_id from agent_jobs
+    where status = 'queued'
+    order by created_at                 -- 먼저 들어온 job부터 (사용자 구분 없이)
+    for update skip locked              -- 다른 쪽이 고른 행은 기다리지 않고 건너뜀
+    limit 1)
+returning *;
+```
+
+- **워커는 LLM이 아니라 우리 Python 프로세스**(`python -m orchestrator.worker`)다. LLM은 워커가 job을 실행하는 도중에 부르는 외부 API다.
+- **잠금은 Postgres 행 잠금**이고 꺼내는 트랜잭션(수 밀리초)에만 걸린다. 실행 중(수 분)의 소유권은 `status='running'`·`locked_by`로 표시한다. 실행 내내 잠금을 잡으면 연결·트랜잭션을 수 분 열어 둬야 하고 워커가 죽었을 때 언제 풀릴지 불분명하다.
+- **`SKIP LOCKED`가 필요한 경우:** 한 사용자의 동시 클릭이 아니라(그건 사용자 한도가 막음) 꺼내는 쪽이 여럿일 때다. MVP는 워커 프로세스 1개지만 ① 워커 안 슬롯 3개가 동시에 꺼내거나 ② 배포 순간 옛 워커와 새 워커가 겹칠 때 생긴다. 잠금이 없으면 두 쪽이 같은 job을 실행해 LLM 비용이 두 배가 된다.
+
+```text
+queued: D1(u1, 10:00:01), D2(u2, 10:00:02)
+        슬롯 A                              슬롯 B
+t1  D1 잠금
+t2                                     D1은 잠김 → 건너뜀, D2 잠금 (지금 실행할 job으로 가져감)
+t3  D1 → running, 커밋                  D2 → running, 커밋
+t4  D1 실행                             D2 실행
+```
+
+**주기적으로 도는 것**
+
+| 주기 | 누가 | 하는 일 |
+| --- | --- | --- |
+| 1~2초 (일이 없을 때) | 워커 | 꺼내기 트랜잭션 실행, 없으면 쉼 |
+| 15초 | 워커 | 실행 중인 job의 `heartbeat_at` = 지금 (**상태 확인이 아니라 생존 신호**, `status`는 안 바꿈) |
+| 1분 (+ 워커 시작 시) | 워커 복구 루틴 | `running`인데 `heartbeat_at`이 2분 넘게 멈춘 job → `failed` + `error_code=worker_lost`. **자동 재실행 안 함**(LLM 비용 중복 방지), FE가 "다시 시도" |
+| 1초 (SSE 연결마다) | API | `job_events`의 새 이벤트를 FE로 (6.4) |
+
+| 그 밖의 규칙 | 값 |
 | --- | --- |
-| 꺼내기 | 워커가 `status='queued'` 행을 `FOR UPDATE SKIP LOCKED`로 1건씩 가져가 `running`, `locked_by` 기록. 워커가 여럿이어도 중복 실행 없음 |
-| 하트비트 | 실행 중 15초마다 `heartbeat_at` 갱신 |
-| 복구 | 워커 시작 시와 1분마다, `running`인데 하트비트가 2분 넘게 끊긴 job → `failed` + `error_code=worker_lost`. 자동 재실행 안 함(LLM 비용 중복 방지), FE가 "다시 시도" 제공 |
 | 타임아웃 | 토론 전체 5분, LLM 호출 1회 60초 → `failed` + `error_code=timeout` |
-| 동시 실행 | 워커 동시 job 3 (Design Doc 4.5, Langfuse 실측 후 조정) |
-| 프로세스 | API와 같은 이미지, 진입점만 다름(`python -m orchestrator.worker`). 연결은 세션 모드(5432) |
+| 워커 동시 실행 | 3 (Design Doc 4.5, Langfuse 실측 후 조정) |
+| 실행 방식 | 시뮬레이션은 torch 계산이라 별도 스레드·프로세스에서 실행해 토론의 LLM 대기와 서로 막지 않게 함 |
+| 프로세스 | API와 같은 이미지, 진입점만 다름. 연결은 세션 모드(5432) |
 
 **생성 규칙 (API 쪽)**
 
-- **재사용:** 같은 사용자·`job_type`·정렬한 종목·질문으로 `queued`·`running` job이 있으면 새로 만들지 않고 `job_started` + `reused=true`(FN-DBT-01).
-- **동시 한도:** 사용자당 `queued`·`running`인 토론 job 1개, 시뮬레이션 job 1개. 넘으면 409 `concurrent_job_limit` + `view_existing_job`. 끝난 job(`completed`)은 세지 않으므로, 토론이 끝난 뒤 시뮬레이션 버튼을 누르지 않아도 새 토론을 시작할 수 있다.
+- **사용자 한도 (ADR 0014):** 사용자당 `queued`·`running` job은 **토론·시뮬레이션 합쳐 1개**다. `agent_jobs_one_active_per_user` 부분 유니크 인덱스가 insert 순간에 강제하고, API는 insert 실패를 409 `concurrent_job_limit` + `view_existing_job`으로 바꾼다.
+  - `job_id`가 아니라 `user_id`에 거는 이유: `job_id`는 PK라 이미 행마다 달라서 사용자별 개수를 제한하지 못한다.
+  - 조건(`where status in ('queued','running')`)을 붙이는 이유: 끝난 job은 검사에서 빠져 토론 내역이 남고, job이 끝나는 순간 다음 job을 만들 수 있다.
+  - "개수를 세고 0이면 insert"를 애플리케이션에서 하면 동시 요청 두 개가 둘 다 통과할 수 있다. 인덱스는 그런 경쟁이 없다.
+  - 그래서 한 사용자에게 D1·D2·S1이 동시에 대기하는 일은 없다. 진행 중 job이 있으면 두 번째 요청부터 409이고 FE가 진행 중인 job으로 안내한다.
+  - QA에서 불편하면 종류별 1개(`(user_id, job_type)`)로 바꾼다(#92).
+- **재사용:** 같은 사용자·`job_type`·정렬한 종목·질문(시뮬레이션은 `debate_job_id`)으로 `queued`·`running` job이 있으면 새로 만들지 않고 `job_started` + `reused=true`(FN-DBT-01). 사용자 한도보다 먼저 확인한다(같은 요청을 다시 보낸 건 409가 아니라 재사용).
 - **사용자당 하루 토론 수** 10 (Design Doc 4.5) → 넘으면 429 `rate_limited`.
 
-### 6.3 시뮬레이션 시작 (사용자 버튼 → 별도 job)
+| 막는 수단 | 막는 것 | 시점 |
+| --- | --- | --- |
+| 부분 유니크 인덱스 (`user_id`) | 한 사용자가 job을 여러 개 동시에 만드는 것 | API가 job을 만들 때 |
+| `FOR UPDATE SKIP LOCKED` | 워커·슬롯 여럿이 같은 job을 동시에 꺼내는 것 | 워커가 꺼낼 때 |
+
+### 6.3 시뮬레이션 시작 (사용자 버튼 → 별도 job, ADR 0013)
 
 ```text
-토론 job      queued → running → completed (단일·비교 모두 여기서 끝)
-                                   │ completed 이벤트 payload: simulation_ready
-                                   ▼ 사용자 버튼 (simulation_ready=true일 때만 켜짐)
-시뮬레이션 job queued → running → completed / failed      parent_job_id = 토론 job
+시각  사용자/API                                       agent_jobs                                  워커
+t0    POST /debate → 관문1·precheck·한도(0건)          D1 debate queued
+t1                                                     D1 running                                  run_debate, 15초마다 하트비트
+t2                                                     D1 completed, result, simulation_ready, data_as_of
+      ── 진행 중 0건 → 새 토론도, 시뮬레이션도 가능 ──
+t3    POST /debate/D1/simulate → 다시 판정(가능 종목? 기간 안? 한도 0건?)
+                                                       S1 simulation queued (debate_job_id=D1)
+t4                                                     S1 running                                  D1의 result·data_as_of로 run_simulation
+t5                                                     S1 completed
 ```
 
-계약의 `POST /orchestrate/debate/{job_id}/simulate`(#46)를 그대로 쓴다. 이 요청이 **시뮬레이션 job을 새로 만들고** `job_started {job_id: <시뮬레이션 job>}`를 돌려준다. FE는 그 job의 이벤트를 구독한다.
+계약의 `POST /orchestrate/debate/{job_id}/simulate`(#46)를 그대로 쓴다. URL의 토론 job_id가 시뮬레이션 job의 `debate_job_id`로 기록되고, 응답은 **시뮬레이션 job**의 `job_started`다. FE는 그 job의 이벤트를 구독한다. 시뮬레이션 job 조회 응답에는 `debate_job_id`도 담는다.
+
+- **기준일:** 시뮬레이션은 버튼을 누른 날이 아니라 토론 job의 `data_as_of`로 실행한다(수경). 다음 날 눌러도 토론 근거와 시뮬레이션 숫자가 같은 날 기준이다. 봉투 `data_as_of`는 그 기준일의 `sim_params.as_of`다.
+- **`simulation_ready`는 "버튼을 눌렀는가"가 아니라 "이 종목을 시뮬레이션할 수 있는가"**(`sim_params` 정상 여부, 11/23 T1 100종목 중 95)다. 누르지 않아도 바뀌지 않으므로, 기간 안이면 나중에 토론 내역에서 눌러도 된다. 버튼이 꺼지는 경우는 불가 종목과 비교 모드뿐이고, 꺼진 버튼에는 이유를 적는다.
+- **버튼을 누를 때 다시 판정한다.** 토론 완료 때 저장한 값은 표시·지표용이다. `sim_params`가 매달 1일 다시 계산돼 값이 바뀔 수 있다.
 
 | 버튼 요청 상황 | 응답 |
 | --- | --- |
 | 토론 job이 비교 모드이거나 아직 `completed`가 아님 | 409 `invalid_job_state` |
-| `simulation_ready=false` (파라미터 없는 종목: 정상 95종목 밖) | 200 rejected `no_data` (토론 job은 그대로) |
-| 같은 토론의 시뮬레이션 job이 `queued`·`running` | `job_started` + `reused=true` |
+| 시뮬레이션 가능 기간이 지남 (초기값 3~4일, #92) | 409 `invalid_job_state` ("새로 토론해 주세요") |
+| 지금 시뮬레이션할 수 없는 종목 (다시 판정) | 200 rejected `no_data` (토론 job은 그대로) |
+| 같은 토론의 시뮬레이션 job이 진행 중이거나 끝남 | 그 job으로 `job_started` + `reused=true` |
+| 사용자의 다른 job이 진행 중 | 409 `concurrent_job_limit` (6.2) |
 | 그 외 | 시뮬레이션 job 생성 → `job_started` |
 
-**왜 별도 job인가 (계약의 `simulation_pending` 대신)**
+**왜 별도 job인가 (계약의 `simulation_pending` 대신)** — 자세한 선택지는 ADR 0013.
 
-- 계약 흐름(`running → simulation_pending → simulation_running`)은 토론과 시뮬레이션이 상태 한 칸을 같이 써서, 버튼을 누르지 않은 job이 `simulation_pending`에 계속 남는다. 그 결과 동시 한도·재사용에서 무엇을 "진행 중"으로 셀지, 시뮬레이션 불가 종목은 어디서 끝낼지를 따로 정해야 했다(#68 수경 리뷰 2·3번).
+- 계약 흐름은 토론과 시뮬레이션이 상태 한 칸을 같이 써서, 버튼을 누르지 않은 job이 `simulation_pending`에 계속 남는다. 동시 한도·재사용에서 무엇을 셀지, 불가 종목은 어디서 끝낼지 규칙을 따로 붙여야 했다(#68 수경 리뷰 2·3번).
 - 시뮬레이션이 실패하면 job 전체가 `failed`가 되어 끝난 토론까지 실패처럼 보인다.
-- Design Doc 4.1이 이미 큐 종류를 `debate`·`simulation` 두 가지(`job_type`)로 정해 두었다.
-- 별도 job으로 두면 위 문제가 규칙 추가 없이 사라지고, 토론의 종료 상태가 단일·비교 모두 `completed` 하나가 된다.
-- 비용: 계약 변경(`JobStatus` 4종, `simulate` 응답 설명, 이벤트 `simulation_*`는 시뮬레이션 job에 기록). draft.6에서 유민·수경 리뷰.
-
-- 시뮬레이션 봉투의 `data_as_of`는 `sim_params.as_of`다(수경).
+- Design Doc 4.1이 이미 큐 종류를 `debate`·`simulation`(`job_type`)으로 정해 두었다.
+- 비용: 계약 변경(`JobStatus` 4종, `simulate` 응답 설명, `simulation_*` 이벤트는 시뮬레이션 job에 기록). draft.6(C11).
 
 ### 6.4 진행 상황 SSE (ADR 0009)
 
@@ -382,6 +475,6 @@ async def invoke(name: ToolName, args: dict, *, caller: AgentId) -> ToolResult
 | Q2 | 인증 방식 확정 (OQ-8) | 팀 |
 | Q3 | `EntityResolution.companies` maxItems 3으로 계약 변경 | 유민·수경 (계약 리뷰) |
 | ~~Q4~~ | 대안 종목 규칙 → **해결:** 중분류 → 대분류 → 전체 시총순 3개, `suggest_alternatives`(수경) (#68 리뷰) | 수경 |
-| Q5 | 사용자당 동시 job 한도(토론 1·시뮬레이션 1)가 데모에 충분한지 | 팀 |
-| Q6 | 계약 draft.6: `JobStatus` 4종·시뮬레이션 별도 job, `RunDebateInput` 순수 함수화 | 유민·수경 |
+| Q5 | 사용자당 진행 중 job 합쳐 1개가 QA에서 불편하지 않은지, 보관 기간 실측 | #92 |
+| Q6 | 계약 draft.6: `JobStatus` 4종·시뮬레이션 별도 job(ADR 0013, 유민 동의 대기), `RunDebateInput` 순수 함수화 | 유민·수경 |
 | Q7 | Langfuse 호스팅 (Cloud 무료 vs 셀프호스트) | 팀 |

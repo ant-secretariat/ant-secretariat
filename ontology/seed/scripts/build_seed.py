@@ -511,10 +511,11 @@ CO_HYPOTHESIS_FIXED_ON = "2026-11-23"
 # 값은 ontology_sensitivity_inputs(#67) 스냅샷을 내보낸 CSV에서 읽는다(ADR 0011 6번, 손으로 옮기지 않음).
 # 다시 만들기: python ontology/seed/scripts/export_sensitivity_inputs.py <as_of>  → 아래 날짜를 바꾼다
 CO_INPUTS_AS_OF = "2026-11-23"
-CO_INPUTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", f"sensitivity_inputs_{CO_INPUTS_AS_OF}.csv")
+# 직전 기준일. 다음 달 CSV를 넣을 때 이전 CSV는 지우지 않고 여기에 그 날짜를 적는다(두 달 연속 탈락 → rejected, ADR 0011 4번)
+CO_PREV_INPUTS_AS_OF = None
 CO_Q_MAX = 0.05
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from co_hypotheses import CO_HYPOTHESES, co_failed_criteria  # noqa: E402
+from co_hypotheses import CO_HYPOTHESES, co_failed_criteria, co_status  # noqa: E402
 
 
 def bh_q_values(ps):
@@ -529,12 +530,33 @@ def bh_q_values(ps):
     return q
 
 
-with open(CO_INPUTS, encoding="utf-8") as f:
-    CO_ROWS = {(r["group_id"], r["factor"]): r for r in csv.DictReader(f)}
-assert all(r["as_of"] == CO_INPUTS_AS_OF for r in CO_ROWS.values()), "CSV 기준일이 CO_INPUTS_AS_OF와 다름"
-# 가설 엣지끼리 BH 보정(ADR 0011 2-4). 표에 행이 없는 가설은 보정 개수에서 빠진다
-_HAS = [(tk, m) for tk, m, *_ in CO_HYPOTHESES if (tk, m) in CO_ROWS]
-CO_Q_HYP = dict(zip(_HAS, bh_q_values([float(CO_ROWS[k]["p_value"]) for k in _HAS])))
+def _load_inputs(as_of):
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", f"sensitivity_inputs_{as_of}.csv")
+    with open(path, encoding="utf-8") as f:
+        rows = {(r["group_id"], r["factor"]): r for r in csv.DictReader(f)}
+    assert all(r["as_of"] == as_of for r in rows.values()), f"CSV 기준일이 {as_of}와 다름"
+    return rows
+
+
+def _q_hyp(rows):
+    """가설 엣지끼리 BH 보정(ADR 0011 2-4). 값이 없는 가설도 개수에 넣고 p=1로 둔다(덜 낙관적, 수경 #80 리뷰)."""
+    keys = [(tk, m) for tk, m, *_ in CO_HYPOTHESES]
+    qs = bh_q_values([float(rows[k]["p_value"]) if k in rows else 1.0 for k in keys])
+    return {k: q for k, q in zip(keys, qs) if k in rows}
+
+
+def _failed(rows, q_hyp, tk, m, sign):
+    """그 기준일 판정에서 못 넘은 기준. 값이 없으면 no_input."""
+    row = rows.get((tk, m))
+    return ["no_input"] if row is None else co_failed_criteria(row, sign, round(q_hyp[(tk, m)], 6), CO_SENS_MIN, CO_Q_MAX)
+
+
+CO_ROWS = _load_inputs(CO_INPUTS_AS_OF)
+CO_Q_HYP = _q_hyp(CO_ROWS)
+CO_PREV = None  # (직전 기준일 rows, q값)
+if CO_PREV_INPUTS_AS_OF:
+    _prev_rows = _load_inputs(CO_PREV_INPUTS_AS_OF)
+    CO_PREV = (_prev_rows, _q_hyp(_prev_rows))
 
 
 _MACRO_NAME = {mm["indicator_id"]: mm["name"] + (" 금리" if mm["category"] == "rate" and "금리" not in mm["name"] else "")
@@ -557,23 +579,26 @@ def _chip_text(m, adj, freq):
 def _co_sens_edge(tk, m, sign, why, prereg, fixed_on):
     freq = WEIGHT_FREQ[m]
     row = CO_ROWS.get((tk, m))
-    if row is None:  # 이번 기준일 표에 값이 없음 → 판정 못 함, 노출 멈춤
-        status, review, adj, failed = "needs_review", "no_input", None, None
-    else:
-        adj = round(float(row["adjusted"]), 3)
-        q_hyp = round(CO_Q_HYP[(tk, m)], 6)
-        failed = co_failed_criteria(row, sign, q_hyp, CO_SENS_MIN, CO_Q_MAX)
-        # 한 번 떨어지면 needs_review(노출 멈춤). 두 달 연속 rejected는 이전 판정이 필요해 월간 재판정 단계에서(ADR 0011 4번)
-        status, review = ("needs_review", ",".join(failed)) if failed else ("active", None)
+    adj = round(float(row["adjusted"]), 3) if row else None
+    q_hyp = round(CO_Q_HYP[(tk, m)], 6) if row else None
+    failed = _failed(CO_ROWS, CO_Q_HYP, tk, m, sign)
+    prev_failed = _failed(*CO_PREV, tk, m, sign) if CO_PREV else []
+    # 한 번 떨어지면 needs_review(노출 멈춤), 직전 기준일에도 떨어졌으면 rejected (ADR 0011 4번)
+    status = co_status(failed, prev_failed)
+    review = ",".join(failed) or None
+    rejection = None if status != "rejected" else dict(
+        decided_by="규칙(ADR 0011 4번)", decided_on=CO_INPUTS_AS_OF,
+        reason=f"두 기준일 연속 기준 미달: {CO_PREV_INPUTS_AS_OF} {','.join(prev_failed)} / {CO_INPUTS_AS_OF} {review}")
     f = (lambda k: float(row[k])) if row else (lambda k: None)
     r3 = (lambda k: round(float(row[k]), 3)) if row else (lambda k: None)
     # 칸 순서는 v0.9와 같게 둔다(시드 JSON diff를 줄이려고)
     return edge("SENSITIVE_TO", tk, "COMPANY", m, "MACRO", status=status, reviewed=True,
                 source=f"ontology_sensitivity_inputs as_of {CO_INPUTS_AS_OF} (수경 #67, 계산 #62)",
                 method=row["method"] if row else "partial_corr_market_adjusted", as_of=CO_INPUTS_AS_OF,
-                inactive_reason=None, review_reason=review, rejection=None, market_adjusted=True,
+                inactive_reason=None, review_reason=review, rejection=rejection, market_adjusted=True,
                 weight=adj, weight_raw=r3("raw"), weight_ci95=[r3("ci_low"), r3("ci_high")] if row else None,
                 weight_n_obs=int(row["n_obs"]) if row else None, weight_p_value=f("p_value"),
+                weight_computed_at=row.get("computed_at") if row else None,
                 weight_q_value_hypothesis=q_hyp if row else None, weight_q_value_all=f("q_value"),
                 weight_window=(f"{row['window_start']}~{row['window_end']}" + (" 일별" if freq == "daily" else " 월별, t+1월 지표 변화")) if row else None,
                 weight_n_tickers=None, expected_sign=sign, sign_check=_sign_check(sign, adj) if row else None, weight_low_n=False,

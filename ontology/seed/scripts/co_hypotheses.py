@@ -31,3 +31,10 @@ def co_failed_criteria(row, sign, q_hyp, min_size=0.10, q_max=0.05):
     if q_hyp is None or q_hyp >= q_max:
         failed.append("q_not_significant")
     return failed
+
+
+def co_status(failed, prev_failed):
+    """ADR 0011 4번: 통과 → active, 이번에만 탈락 → needs_review, 직전 기준일에도 탈락 → rejected."""
+    if not failed:
+        return "active"
+    return "rejected" if prev_failed else "needs_review"

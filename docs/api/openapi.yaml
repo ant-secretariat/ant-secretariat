@@ -22,16 +22,10 @@ info:
 
     11/4 결정(관계 사전 MVP 포함)과 11/5 결정(자유 질의는 MVP 이후)을 반영했습니다.
     draft.5(11/17)는 ADR 0007(2종목 비교 MVP 포함), 0008(관계 사전 플래그 기본 꺼짐), 0009(SSE 전달 방식·`claim_completed`)를 반영했습니다. 문서와 다르면 `docs/decisions/`의 ADR이 우선합니다.
-    draft.6(11/24)는 ADR 0013(시뮬레이션은 토론과 다른 job, job 상태 4종)을 반영했습니다.
+    draft.6(11/24)는 ADR 0013(시뮬레이션은 토론과 다른 job, job 상태 4종), 0015(MVP 오케스트레이터는 라우팅 없이 공통 관문·응답 조립)와 사유 정책표를 반영했습니다.
 
     **출처:** 토론 수정안 v2.3, 데이터 수정안, 시뮬레이션 수정안, 오케스트레이터 설계 초안, 시그니처 계약.
   x-open-questions:
-  - id: OQ-1
-    topic: envelope.py 대조
-    detail: 시그니처 계약은 backend/orchestrator/envelope.py 구현 완료로 적혀 있으나 저장소 어느 브랜치에도 없습니다. NextAction의 payload 구조를 파일과 대조해야 합니다.
-  - id: OQ-2
-    topic: 오류 코드 누락
-    detail: 정책표에 404와 잘못된 job 상태용 코드가 없어 job_not_found, invalid_job_state를 제안했습니다.
   - id: OQ-3
     topic: FE용 종목 검색 경로
     detail: 자동완성 10개가 확정됐지만 search_companies의 HTTP 경로가 없어 GET /companies/search를 제안했습니다.
@@ -119,15 +113,16 @@ tags:
     url: https://app.notion.com/p/3eb1fad9262e8113bc12f6803670476a
 - name: 오케스트레이터
   description: |-
-    **역할:** 모든 요청의 진입점입니다. 종목 확정(관문1), 사전 판정 호출, 라우팅, job 생성, 공통 봉투 조합을 담당합니다.
-    **패턴:** MVP는 버튼 경로의 결정적 라우팅입니다. 자유 질의는 MVP 이후 범위입니다. **담당:** 태은.
+    **역할:** 세 탭(인사이트보드·트렌드 리포트·토론)이 공통으로 거치는 관문과 응답 조립입니다. 종목 확정·경로별 실행 조건(관문1), 토론 사전 판정 호출, job 생성, 공통 봉투 조합을 담당합니다.
+    **패턴:** MVP는 **라우팅하지 않습니다**(ADR 0015). 탭마다 엔드포인트가 따로 있어 실행할 에이전트는 경로가 정하고, 엔드포인트가 공통 관문 함수와 에이전트를 직접 호출합니다. 라우팅·플래너는 자유 질의(Post-MVP)와 함께 도입합니다. 토론 탭의 "직접 물어보기"는 자유 질의가 아니라 `POST /orchestrate/debate`의 `query`입니다. **담당:** 태은.
 
     **내부 함수** (HTTP로 노출하지 않음, 입출력은 Schemas 참고)
 
     | 함수 | 역할 | 입력 | 출력 | 상태 |
     |---|---|---|---|---|
-    | `resolve_entities` | 관문1 종목 확정 | `ResolveEntitiesInput` | `EntityResolution` | 신규 · MVP |
-    | `run_orchestrator_request` | 버튼 경로 실행 | `OrchestratorRequest` | `AnyEnvelope` | 변경 · MVP |
+    | `resolve_companies` | 관문1: 탭에서 고른 종목 확정 + 실행 조건 | 회사 이름 목록 | `EntityResolution` | 신규 · MVP |
+    | `resolve_entities` | 자유 질의 문장에서 종목 추출·확정 | `ResolveEntitiesInput` | `EntityResolution` | 신규 · Post-MVP |
+    | `run_orchestrator_request` | 요청 종류로 라우팅 | `OrchestratorRequest` | `AnyEnvelope` | Post-MVP (ADR 0015) |
     | `log_uncovered_query` | 미커버 질의 적재 | `UncoveredQueryEvent` | `-` | 신규 · MVP |
     | `make_plan` | 계획 1회 생성 | `MakePlanInput` | `Plan` | 신규 · Post-MVP |
   externalDocs:
@@ -1160,23 +1155,32 @@ x-internal-functions:
   status: changed
   release: mvp
   note: '내부 단계: select_evidence, compute_target_price_trend, generate_cards, verify_cards, fill_card_gaps.'
+- name: resolve_companies
+  agent: 오케스트레이터
+  summary: 관문1 종목 확정 (버튼 경로)
+  signature: 'def resolve_companies(inputs: list[str], query: str | None = None, max_companies: int = 2) -> EntityResolution'
+  input: null
+  output: EntityResolution
+  status: new
+  release: mvp
+  note: 탭에서 고른 회사 이름을 하나씩 resolve_company로 확정하고 경로별 실행 조건(ROUTE_REQUIREMENTS)을 판정합니다. 인사이트보드는 max_companies=3, 토론 2, 트렌드 리포트 1.
 - name: resolve_entities
   agent: 오케스트레이터
-  summary: 관문1 종목 확정
+  summary: 자유 질의 문장에서 종목 확정
   signature: 'def resolve_entities(text: str, max_companies: int = 2) -> EntityResolution'
   input: ResolveEntitiesInput
   output: EntityResolution
   status: new
-  release: mvp
+  release: post-mvp
 - name: run_orchestrator_request
   agent: 오케스트레이터
-  summary: 버튼 경로 실행
+  summary: 요청 종류로 라우팅 (자유 질의)
   signature: 'async def run_orchestrator_request(request: OrchestratorRequest) -> Envelope'
   input: OrchestratorRequest
   output: AnyEnvelope
   status: changed
-  release: mvp
-  note: '`decide_route`로 라우팅하고 공통 봉투를 반환합니다. 토론은 job 생성 전에 `precheck`를 동기 호출합니다.'
+  release: post-mvp
+  note: 'MVP는 라우팅하지 않습니다(ADR 0015). 탭별 엔드포인트가 resolve_companies와 에이전트를 직접 호출하고, 토론은 job 생성 전에 precheck를 동기 호출합니다. decide_route·request_type 분기는 자유 질의와 함께 도입합니다.'
 - name: log_uncovered_query
   agent: 오케스트레이터
   summary: 미커버 질의 적재
@@ -1206,22 +1210,22 @@ x-internal-functions:
 - name: precheck
   agent: 토론 에이전트
   summary: 사전 판정(관문2·3)
-  signature: 'def precheck(query: str, companies: list[CompanyContext]) -> PrecheckResult'
+  signature: 'def precheck(query: str, companies: list[CompanyContext], *, data_status: DataStatusProvider, company_mentioned: bool | None = None) -> PrecheckResult'
   input: PrecheckInput
   output: PrecheckResult
   status: new
   release: mvp
-  note: LLM 없는 룰 기반 순수 함수이며 목표는 100ms 미만입니다. job 생성 전에 동기 호출합니다.
+  note: LLM 없는 룰 기반 순수 함수이며 목표는 100ms 미만입니다. job 생성 전에 동기 호출합니다. data_status는 관문1의 resolve_company 결과로 만든 provider(ticker → 상태)이고, 상태를 믿을 수 없으면 DataStatusUnavailable을 던져 오케스트레이터가 503 upstream_unavailable로 바꿉니다(조회 실패 ≠ 데이터 없음).
 - name: run_debate
   agent: 토론 에이전트
   summary: 토론 실행 함수
-  signature: 'async def run_debate(companies: list[CompanyContext], user_id: str, query: str, precheck: PrecheckResult, job_id:
-    str) -> DebateResult'
+  signature: 'async def run_debate(*, query: str, company: CompanyMeta, precheck: PrecheckResult, fetch_evidence, trace_id: str,
+    data_as_of: str, profile: UserProfile | None = None, emit=None) -> DebateRun'
   input: RunDebateInput
   output: DebateResult
   status: changed
   release: mvp
-  note: 작업 큐 워커가 실행합니다. 단계마다 `job_events`를 기록합니다. 토론 job은 단일·비교 모두 `completed`로 끝나고 완료 시점의 `simulation_ready`를 저장합니다. 시뮬레이션은 별도 job입니다(ADR 0013).
+  note: '결과만 돌려주는 함수입니다. job 상태와 `job_events`는 건드리지 않고, 작업 큐 워커가 저장·상태 전환을 맡습니다. 워커가 주입하는 것: `emit`(→ `append_event`, 진행 이벤트 기록), `fetch_evidence`(→ 도구 레지스트리 `get_agent_context`), `profile`(user_id로 조회한 투자 성향), `company.data_tier`(관문1 data_status로 계산). 진행 이벤트 저장 실패는 로그만 남기고 계속, 결과 저장 실패는 job `failed`. 토론 job은 단일·비교 모두 `completed`로 끝나고 완료 시점의 `simulation_ready`를 저장합니다. 시뮬레이션은 별도 job입니다(ADR 0013). 비교 모드도 같은 모양입니다.'
 - name: get_ontology_context
   agent: 관계 사전
   summary: 아젠다별 관계 컨텍스트 조회
@@ -1409,7 +1413,28 @@ components:
       - job_not_found
       - invalid_job_state
       description: |-
-        마지막 두 값은 제안입니다(OQ-2). 사용자 문구는 reason.message를 사용합니다.
+        사용자 문구는 reason.message를 사용합니다. 사유는 반드시 정책표(REASON_POLICY)로 만들어 채널·HTTP·다음 행동이 어긋나지 않게 합니다.
+
+        | 사유 코드 | 채널 | HTTP | next_action.type | payload |
+        | --- | --- | --- | --- | --- |
+        | `uncovered_company` | rejected | 200 | `choose_alternative_company` | `alternatives` 3개 (`suggest_alternatives`) |
+        | `no_data` | rejected | 200 | `choose_alternative_company` | `alternatives` 3개 |
+        | `company_not_found` | rejected | 200 | `rephrase_company` | 없음 |
+        | `too_many_companies` | rejected | 200 | `select_companies` | `candidates` ≥3, `max_select=2` |
+        | `partial_coverage` | rejected | 200 | `run_single_analysis` | `company` |
+        | `out_of_scope_topic` | rejected | 200 | `choose_supported_topic` | `topics` ≥1 |
+        | `data_collecting` | rejected | 200 | `check_back_later` | `ready_at` (선택) |
+        | `partial_result` | partial | 200 | `retry_failed_parts` | `failed_parts` ≥1 |
+        | `unauthenticated` | Problem | 401 | `login` | 없음 |
+        | `invalid_request` | Problem | 422 | `fix_input` | `fields` (선택) |
+        | `concurrent_job_limit` | Problem | 409 | `view_existing_job` | `job_id` |
+        | `invalid_job_state` | Problem | 409 | `view_existing_job` | `job_id` |
+        | `job_not_found` | Problem | 404 | `fix_input` | 없음 |
+        | `rate_limited` | Problem | 429 | `retry_later` | `retry_after_seconds` + `Retry-After` 헤더 |
+        | `upstream_unavailable` | Problem | 503 | `retry` | 없음 |
+        | `internal_error` | Problem | 500 | `retry` | 없음 |
+
+        precheck는 사유 코드만 돌려주고 payload(대안 종목·지원 주제)는 오케스트레이터가 채웁니다.
         `no_data`: 종목은 커버되지만 고를 수 있는 아젠다에 쓸 데이터가 하나도 없을 때입니다. precheck 관문3이 범위를 줄이다가 남는 아젠다가 없으면 이 코드로 거절하고, 다음 행동은 `choose_alternative_company`입니다. 토론 기획서의 임시 이름 `insufficient_data`는 쓰지 않습니다(11/17 결정).
     NextAction:
       description: 사유 코드와 1:1로 대응합니다(REASON_POLICY).
@@ -2183,7 +2208,8 @@ components:
           - partial_covered
         companies:
           type: array
-          maxItems: 2
+          maxItems: 3
+          description: 확정·커버 확인된 종목. 인사이트보드는 최대 3개, 토론은 `max_companies=2`(3개 이상은 `too_many`), 트렌드 리포트는 1개입니다.
           items:
             $ref: '#/components/schemas/CompanyContext'
         ambiguous:
@@ -2206,6 +2232,7 @@ components:
           description: 질의 문장에서 `companies`의 종목을 하나 이상 찾았으면 true입니다(별칭·조사 포함, `extract_company_mentions` 결과). 종목을 UI로 고르고 질의에 이름이 없으면 false입니다. 오케스트레이터가 precheck에 그대로 넘깁니다.
     OrchestratorRequest:
       type: object
+      description: 자유 질의(Post-MVP)용 라우팅 입력입니다. MVP는 탭별 엔드포인트가 경로를 정하므로 쓰지 않습니다(ADR 0015).
       required:
       - request_type
       - user_id
@@ -3753,27 +3780,43 @@ components:
           description: EntityResolution.mentioned_in_query 값입니다. null이면 precheck가 공식 회사명·종목코드로 직접 확인합니다.
     RunDebateInput:
       type: object
+      description: run_debate에 넘기는 데이터 인자입니다. 함수 인자 `emit`·`fetch_evidence`는 워커가 주입하는 콜백이라 여기 적지 않습니다(run_debate note 참고). job_id·user_id는 워커만 알고 run_debate에는 넘기지 않습니다.
       required:
-      - companies
-      - user_id
       - query
+      - companies
       - precheck
-      - job_id
+      - trace_id
+      - data_as_of
       properties:
+        query:
+          type: string
         companies:
           type: array
           minItems: 1
           maxItems: 2
+          description: 단일 모드 1개, 비교 모드 2개. 각 종목에 워커가 관문1 data_status로 계산한 `data_tier`를 붙입니다.
           items:
-            $ref: '#/components/schemas/CompanyContext'
-        user_id:
-          type: string
-        query:
-          type: string
+            allOf:
+            - $ref: '#/components/schemas/CompanyContext'
+            - type: object
+              required:
+              - data_tier
+              properties:
+                data_tier:
+                  $ref: '#/components/schemas/DataTier'
         precheck:
           $ref: '#/components/schemas/PrecheckResult'
-        job_id:
+        trace_id:
           type: string
+        data_as_of:
+          type: string
+          format: date
+        profile:
+          type:
+          - object
+          - 'null'
+          additionalProperties: true
+          description: user_id로 조회한 투자 성향. 없으면 null
     GetOntologyContextInput:
       type: object
       required:

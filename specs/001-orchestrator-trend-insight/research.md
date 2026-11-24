@@ -100,6 +100,14 @@ plan.md의 Technical Context에서 정해지지 않았던 항목을 정리한다
 - **이유:** Design Doc 4.5가 토론 1건 토큰 상한·워커 동시 수를 Langfuse 실측으로 정하게 했고, 피드백 API가 `trace_id`로 연결된다(4.10).
 - **남은 결정:** Cloud 무료 vs 셀프호스트(오케스트레이터 기획서 Q7).
 
+## R18. 워커 내부 구조
+
+- **결정:** dispatcher 하나가 꺼내고 `asyncio.Semaphore(3)`로 동시 실행 수를 관리한다. job마다 `create_task(run_in_slot(job))`, `finally`에서 자리 반납, dispatcher는 반복마다 예외를 잡는다. 하트비트는 실행 중 job을 모아 15초마다 한 번에 갱신하고, 종료 신호를 받으면 꺼내기를 멈추고 실행 중 job을 기다린다. 계산이 많은 작업은 `to_thread`.
+- **이유:** 정확성은 슬롯이 각자 꺼내는 방식과 같지만(둘 다 `SKIP LOCKED`), 큐가 비었을 때 DB 조회가 1번으로 줄고 하트비트·종료·실행 수 파악을 한 곳에서 한다. 무료 플랜 연결·부하가 빠듯하다.
+- **대안:** 슬롯 3개가 각자 꺼내기 — 코드는 짧지만 조회가 슬롯 수만큼, 관리가 흩어짐. 미리 띄운 슬롯 + 내부 `asyncio.Queue` — 결과는 같고 큐·종료 신호 관리가 더 필요.
+- **남은 결정:** 워커 큐 SQL을 동기 psycopg + `to_thread`로 할지, 비동기 psycopg로 할지(오케스트레이터 기획서 Q8). 비동기면 윈도우 개발 환경에서 `WindowsSelectorEventLoopPolicy` 필요.
+- **ADR:** 0012 "워커 내부" (#93)
+
 ## R13. `mentioned_in_query`
 
 - **결정:** `extract_company_mentions(query)`가 종목을 하나 이상 돌려주면, 그 `ticker` 집합과 확정 종목이 겹칠 때 true, 아니면 false. **빈 목록이면 `None`**을 넘겨 precheck가 공식명·종목코드로 직접 확인하게 한다.

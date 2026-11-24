@@ -30,10 +30,10 @@ AGENDA_METRICS = {
     "shareholder_return": ["dividend_yield", "dps", "eps", "close"],
     "macro": [],
 }
-# 토론 아젠다별 블록(#84, 데이터 에이전트 기획서 4-2절). valuation·fundamental_trend·price_trend·flow·target_price
-# 블록은 get_derived_snapshot(#88)·revisions(#105)가 들어간 뒤 더한다
+# 토론 아젠다별 블록(#84, 데이터 에이전트 기획서 4-2절). valuation·fundamental_trend·price_trend·flow 블록은
+# get_derived_snapshot 실패 처리(#88)가 들어간 뒤 더한다
 AGENDA_BLOCKS = {
-    "valuation": ["financials"],
+    "valuation": ["target_price", "financials"],
     "growth": ["financials"],
     "risk": ["disclosures"],
     "flow": [],
@@ -41,6 +41,9 @@ AGENDA_BLOCKS = {
     "macro": ["macro", "index", "sensitivities"],
 }
 FINANCIAL_QUARTERS = 8
+OPINION_LIMIT = 10           # 목표가 블록의 최근 의견 수
+# 문서 검색 결과가 0건이면 이 순서로 다른 종류를 한 번 더 찾는다
+WIDEN_ORDER = ["report", "news", "disclosure"]
 DISCLOSURE_LIMIT = 10
 # 공시 블록: 리스크는 최근 90일 전체, 주주환원은 최근 1년 주주환원 공시만
 DISCLOSURE_RULES = {"risk": (90, None), "shareholder_return": (365, "shareholder_return")}
@@ -89,7 +92,9 @@ def get_agent_context(
     debate에 intent를 주면 아젠다 블록(AGENDA_BLOCKS)도 최상위 키로 준다: financials(최근 8분기), disclosures(리스크 90일,
     주주환원 1년 주주환원 공시만, 각 10건), macro(지표별 일별 60개·월별 13개월), index(코스피·코스닥 60거래일),
     sensitivities(시장 효과를 뺀 값). 블록마다 근거 ID(chunk_id, block:{종목}:{블록}:{블록 기준일})와 as_of·source가 있고,
-    조회 실패는 error, 값 없음은 reason="no_data"다. 이때는 매크로 전체 이력(macro_data)을 넣지 않는다(약 180만 자).
+    조회 실패는 error, 값 없음은 reason="no_data"다. valuation은 target_price(컨센서스·상승여력·개정 수·최근 의견 10건)도 준다.
+    이때는 목표가 전체 이력(target_prices)과 매크로 전체 이력(macro_data, 약 180만 자)을 넣지 않는다.
+    아젠다 문서 검색이 0건이면 다른 문서 종류(리포트 → 뉴스 → 공시)로 한 번 더 찾고 widened=true로 표시한다.
     매크로 문서는 document_chunks에 없어서(0건) 검색하지 않는다. 매크로는 macro_data(정형 값)를 쓴다.
     """
     from processing.enums import AgendaId
@@ -121,17 +126,14 @@ def get_agent_context(
             result["news_documents"] = documents("news", TREND_REPORT_TOP_K)
 
     elif agent_type == "debate":
-        result = {
-            "ticker":        ticker,
-            "agent_type":    agent_type,
-            "target_prices": get_target_price_data(ticker=ticker, as_of=as_of, relational_db=relational_db),
-        }
+        result = {"ticker": ticker, "agent_type": agent_type}
         if intent:
-            # 아젠다 묶음에는 매크로 전체 이력 대신 macro 블록(필요한 지표·기간만)을 준다
+            # 아젠다 묶음에는 목표가 전체 이력·매크로 전체 이력 대신 그 아젠다의 블록만 준다
             result["metrics"] = _agenda_metrics(ticker, intent, as_of)
-            result.update(_agenda_blocks(ticker, intent, as_of))
+            result.update(_agenda_blocks(ticker, intent, as_of, result["metrics"]))
             result["documents"] = _agenda_documents(search_documents, ticker, intent, query, as_of)
         else:
+            result["target_prices"] = get_target_price_data(ticker=ticker, as_of=as_of, relational_db=relational_db)
             result["macro_data"] = get_macro_data(as_of=as_of, relational_db=relational_db)
         if not intent and query:
             result["documents"] = documents(None, 5)
@@ -197,10 +199,28 @@ def _agenda_documents(search_documents, ticker: str, intent: str, query: Optiona
         else:
             modes.append(searched.get("mode"))
         found[document_type] = searched.get("results", [])
+    results = pick_diverse(found, dict(zip(types, quotas)), DEBATE_TOP_K, MAX_CHUNKS_PER_DOC)
+    widened = []
+    if not results:
+        # 아젠다의 문서 종류에 하나도 없으면 다른 종류로 한 번 더 찾는다(데이터 에이전트 기획서 4-2절)
+        for document_type in (t for t in WIDEN_ORDER if t not in types):
+            searched = search_documents(query=semantic, keyword_query=keyword, ticker=ticker,
+                                        document_type=document_type, top_k=DEBATE_TOP_K * OVERSAMPLE, as_of=as_of)
+            widened.append(document_type)
+            if searched.get("reason"):
+                failed.append(document_type)
+                continue
+            modes.append(searched.get("mode"))
+            results = pick_diverse({document_type: searched.get("results", [])}, {document_type: DEBATE_TOP_K},
+                                   DEBATE_TOP_K, MAX_CHUNKS_PER_DOC)
+            if results:
+                break
     documents = {
         "query": semantic, "keyword_query": keyword, "ticker": ticker,
         "document_types": types,
-        "results": pick_diverse(found, dict(zip(types, quotas)), DEBATE_TOP_K, MAX_CHUNKS_PER_DOC),
+        "results": results,
+        "widened": bool(widened),
+        "widened_types": widened,
         # 종류마다 방식이 다르면(임베딩 실패로 BM25 대체 등) 낮은 쪽을 적는다
         "mode": "bm25" if "bm25" in modes else (modes[0] if modes else None),
     }
@@ -268,13 +288,14 @@ def pick_diverse(found: dict[str, list[dict]], quotas: dict[str, int], total: in
 # ---------------------------------------------------------------------------
 # 아젠다 블록 (#84 ②)
 
-def _agenda_blocks(ticker: str, intent: str, as_of: str) -> dict:
-    """아젠다 블록들. 블록 하나가 실패해도 나머지는 준다."""
+def _agenda_blocks(ticker: str, intent: str, as_of: str, metrics: Optional[list] = None) -> dict:
+    """아젠다 블록들. 블록 하나가 실패해도 나머지는 준다. metrics는 같은 묶음의 지표(목표가 상승여력의 종가)."""
     names = AGENDA_BLOCKS[intent]
     if not names:
         return {}
     sensitivities = _sensitivities_block(ticker, as_of) if "sensitivities" in names or "macro" in names else None
     builders = {
+        "target_price": lambda: _target_price_block(ticker, as_of, metrics or []),
         "financials": lambda: _financials_block(ticker, as_of),
         "disclosures": lambda: _disclosures_block(ticker, intent, as_of),
         "macro": lambda: _macro_block(ticker, as_of, sensitivities),
@@ -292,6 +313,35 @@ def _block(ticker: str, name: str, source: str, block_as_of, content: dict, erro
     if block_as_of is None:
         return {**block, "chunk_id": None, "reason": "no_data"}
     return {**block, "chunk_id": f"block:{ticker}:{name}:{block_as_of}", "reason": None}
+
+
+def _target_price_block(ticker: str, as_of: str, metrics: list) -> dict:
+    """목표가 블록: 컨센서스(ADR 0010), 상승여력, 개정 수(#105), 최근 의견.
+
+    상승여력은 컨센서스 평균 ÷ 종가 − 1(%)이다. 종가는 같은 묶음의 close 지표(get_metric)를 써서, 근거 문장의 종가와
+    숫자가 어긋나지 않게 한다. 목표가는 분할 환산값이다. 방향 라벨(상향·하향·혼조)은 받는 쪽이 정한다(#82).
+    """
+    from processing.functions.get_target_price_data import get_target_price_data
+
+    result = get_target_price_data(ticker=ticker, as_of=as_of)
+    consensus = result.get("consensus") or {}
+    close = next((m for m in metrics if m.get("metric_id") == "close" and m.get("value")), None)
+    average = consensus.get("avg_target_price")
+    upside = round((average / close["value"] - 1) * 100, 2) if average and close else None
+    opinions = [
+        {"broker": r["mbcr_name"], "broker_key": r["broker_key"], "opinion": r["opinion_norm"],
+         "target_price": r["target_price_adjusted"], "published_at": r["published_at"]}
+        for r in result.get("records", [])[:OPINION_LIMIT]
+    ]
+    content = {
+        "consensus": consensus,
+        "upside_pct": upside,
+        "upside_basis": (f"컨센서스 평균 ÷ 종가({close['as_of']}, {close['display']}) − 1" if close else None),
+        "revisions": result.get("revisions"),
+        "opinions": opinions,
+    }
+    latest = opinions[0]["published_at"] if opinions else None
+    return _block(ticker, "target_price", "get_target_price_data", latest, content, result.get("error"))
 
 
 def _financials_block(ticker: str, as_of: str) -> dict:

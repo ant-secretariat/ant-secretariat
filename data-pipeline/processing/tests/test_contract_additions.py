@@ -72,7 +72,16 @@ def recorded(monkeypatch):
     def recorder(name):
         def call(**kwargs):
             calls.append((name, kwargs))
-            return {"results": []} if name == "search_documents" else {}
+            if name == "search_documents":   # 아젠다 검색이 0건이면 넓혀 찾으므로 한 건은 돌려준다
+                hit = {"chunk_id": f"c-{kwargs.get('document_type')}", "doc_id": "D1", "score": 0.5,
+                       "document_type": kwargs.get("document_type"), "date": "2026-11-01"}
+                return {"results": [hit], "mode": "hybrid"}
+            if name == "get_target_price_data":
+                return {"consensus": {"avg_target_price": 250000, "broker_count": 12, "basis": "증권사별 최신 1건"},
+                        "revisions": {"window_days": 90, "up": 3, "down": 6, "unchanged": 0, "new": 0, "brokers": []},
+                        "records": [{"mbcr_name": "키움", "broker_key": "키움", "opinion_norm": "매수",
+                                     "target_price_adjusted": 290000, "published_at": "2026-11-06"}] * 12}
+            return {}
         return call
 
     for module, name in [("get_target_price_data", "get_target_price_data"), ("get_price_data", "get_price_data"),
@@ -81,8 +90,10 @@ def recorded(monkeypatch):
 
     def fake_metrics(ticker, metric_ids, as_of):
         calls.append(("get_metrics", {"ticker": ticker, "metric_ids": metric_ids, "as_of": as_of}))
-        return [{"ticker": ticker, "metric_id": m, "value": 1.0, "unit": "배", "as_of": "2026-11-07",
-                 "display": "1배", "reason": None} for m in metric_ids]
+        values = {"close": (200000, "원", "200,000원")}
+        return [{"ticker": ticker, "metric_id": m, "value": values.get(m, (1.0,))[0],
+                 "unit": values.get(m, (1.0, "배"))[1], "as_of": "2026-11-07",
+                 "display": values.get(m, (1.0, "배", "1배"))[2], "reason": None} for m in metric_ids]
 
     monkeypatch.setattr("processing.functions.get_metric.get_metrics", fake_metrics)
 
@@ -402,4 +413,64 @@ def test_block_failure_and_no_data_are_different():
 
     assert (failed["chunk_id"], failed["error"]) == (None, "financials_unavailable")
     assert (empty["chunk_id"], empty["reason"]) == (None, "no_data") and "error" not in empty
+
+
+def test_valuation_target_price_block_replaces_full_history(recorded):
+    from processing.functions.get_agent_context import get_agent_context
+
+    result = get_agent_context("005930", "debate", intent="valuation", as_of="2026-11-10")
+    block = result["target_price"]
+
+    # 목표가 전체 이력(target_prices) 대신 블록. intent가 없으면 예전처럼 전체 이력
+    assert "target_prices" not in result
+    assert "target_prices" in get_agent_context("005930", "debate", as_of="2026-11-10")
+    # 상승여력 = 컨센서스 평균 ÷ 같은 묶음의 종가 − 1
+    assert block["upside_pct"] == 25.0
+    assert block["upside_basis"] == "컨센서스 평균 ÷ 종가(2026-11-07, 200,000원) − 1"
+    assert block["revisions"]["down"] == 6
+    assert len(block["opinions"]) == 10 and block["opinions"][0]["broker_key"] == "키움"
+    assert block["chunk_id"] == "block:005930:target_price:2026-11-06"
+
+
+def test_target_price_block_without_close_has_no_upside(monkeypatch):
+    from processing.functions.get_agent_context import _target_price_block
+
+    monkeypatch.setattr("processing.functions.get_target_price_data.get_target_price_data",
+                        lambda **kwargs: {"consensus": {"avg_target_price": 250000}, "revisions": None, "records": [],
+                                          "error": "target_price_unavailable"})
+
+    block = _target_price_block("005930", "2026-11-10", [{"metric_id": "close", "value": None}])
+
+    assert (block["upside_pct"], block["upside_basis"]) == (None, None)
+    assert (block["chunk_id"], block["error"]) == (None, "target_price_unavailable")
+
+
+def test_documents_widen_to_other_types_when_agenda_types_are_empty():
+    from processing.functions.get_agent_context import _agenda_documents
+
+    calls = []
+
+    def fake_search(query, keyword_query, ticker, document_type, top_k, as_of):
+        calls.append(document_type)
+        if document_type == "report":   # flow 아젠다(뉴스만)에 뉴스가 없으면 리포트로 넓힌다
+            return {"results": [{"chunk_id": "r1", "doc_id": "R1", "score": 0.5, "date": "2026-11-01"}],
+                    "mode": "hybrid"}
+        return {"results": [], "mode": "hybrid"}
+
+    documents = _agenda_documents(fake_search, "005930", "flow", None, "2026-11-10")
+
+    assert calls == ["news", "report"]   # 찾으면 거기서 멈춘다(공시는 찾지 않음)
+    assert (documents["widened"], documents["widened_types"]) == (True, ["report"])
+    assert [r["chunk_id"] for r in documents["results"]] == ["r1"]
+
+
+def test_documents_not_widened_when_found():
+    from processing.functions.get_agent_context import _agenda_documents
+
+    def fake_search(query, keyword_query, ticker, document_type, top_k, as_of):
+        return {"results": [{"chunk_id": "n1", "doc_id": "N1", "score": 0.5, "date": "2026-11-01"}], "mode": "hybrid"}
+
+    documents = _agenda_documents(fake_search, "005930", "flow", None, "2026-11-10")
+
+    assert (documents["widened"], documents["widened_types"]) == (False, [])
 

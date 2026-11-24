@@ -846,19 +846,22 @@ result = get_metric(ticker="005930", metric_id="roe_ttm", as_of="2026-09-01")
 | `shareholder_return` | `dividend_yield`, `dps`, `eps`, `close` |
 | `macro` | (없음) |
 
-- `debate`에 `intent`를 주면 아젠다 블록도 최상위 키로 줌(#84 ②). 이때는 매크로 전체 이력(`macro_data`, 약 180만 자)을 넣지 않음
+- `debate`에 `intent`를 주면 아젠다 블록도 최상위 키로 줌(#84 ②). 이때는 목표가 전체 이력(`target_prices`)과 매크로 전체 이력(`macro_data`, 약 180만 자)을 넣지 않음
+- 아젠다 문서 검색이 0건이면 다른 문서 종류(리포트 → 뉴스 → 공시 순, 아젠다 종류 제외)로 한 번 더 찾고 `documents.widened: true`, `widened_types`에 찾아본 종류. 찾으면 거기서 멈춤
   - 블록마다 `source`(함수), `as_of`(블록이 실제로 쓴 데이터의 날짜), `chunk_id`(`block:{종목}:{블록}:{as_of}`), `reason`. 조회 실패면 `chunk_id: null` + `error`, 값이 없으면 `reason: "no_data"`
   - 블록 하나가 실패해도 나머지는 줌
 
 | intent | 블록 |
 | --- | --- |
-| `valuation`, `growth` | `financials`(최근 8분기, 연결/별도 표시) |
+| `valuation` | `target_price`(컨센서스, `upside_pct` = 컨센서스 평균 ÷ 같은 묶음의 종가 − 1, `revisions`(#105), 최근 의견 10건), `financials`(최근 8분기, 연결/별도 표시) |
+| `growth` | `financials` |
 | `risk` | `disclosures`(최근 90일, 10건까지, `total`은 전체 건수) |
 | `shareholder_return` | `disclosures`(최근 1년 주주환원 공시만, 10건까지) |
 | `macro` | `macro`(국고채 3·10년·원/달러·기준금리는 최근 60개, 소비자물가·브렌트유·D램 수출물가는 최근 13개월, 최신 먼저. 이 종목에 방향이 확실한 민감도 요인을 앞에), `index`(코스피·코스닥 60거래일), `sensitivities`(시장 효과를 뺀 값, `get_sensitivities`) |
 | `flow` | (아직 없음) |
 
-  - `valuation`(밸류에이션 위치)·`fundamental_trend`·`price_trend`·`flow`·`target_price`(상승여력·`revisions`) 블록은 `get_derived_snapshot` 실패 처리(#88)와 `revisions`(#105)가 들어간 뒤 더함
+  - `valuation`(밸류에이션 위치)·`fundamental_trend`·`price_trend`·`flow` 블록은 `get_derived_snapshot` 실패 처리(#88)가 들어간 뒤 더함
+  - 목표가 방향 라벨(상향·하향·혼조)은 받는 쪽이 `revisions`로 정함(#82)
 
 | intent | 키워드 | 문서 종류 |
 | --- | --- | --- |

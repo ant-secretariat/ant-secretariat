@@ -238,6 +238,8 @@ result = resolve_company(company_input="삼성전자")
 
 문서 조각 검색. Supabase `document_chunks`(리포트·뉴스·공시)만 검색한다. `embedding_model`, `vector_db` 인자는 기존 호출 호환용으로 받기만 한다.
 
+- `keyword_query`(선택)를 주면 키워드 검색(BM25)에는 `keyword_query`를, 의미 검색에는 `query`를 쓴다. 질문에 키워드를 덧붙이면 BM25에는 도움이 되지만 임베딩에서는 질문 의도가 흐려지기 때문(#84). 결과에 `keyword_query`를 담는다
+
 ```python
 from processing.functions.search_documents import search_documents
 
@@ -252,10 +254,13 @@ result = search_documents(
     top_k=5,
     mode="hybrid",               # hybrid(기본) / bm25 / vector
 )
-# → {"query", "ticker", "mode", "results": [{chunk_id, report_id, ticker, company, date, source,
-#    author_org, document_type, title, page_start, page_end, content, score, url,
+# → {"query", "ticker", "mode", "results": [{chunk_id, doc_id, report_id, ticker, company, date, source,
+#    author_org, broker_key, document_type, title, page_start, page_end, content, score, url,
 #    section_title, section_type, chunk_type, table_structure}]}
 ```
+
+- `doc_id`: 문서 ID(리포트·뉴스·공시 공통). `report_id`와 같은 값이고, `report_id`는 예전 이름이라 남겨 둠. 한 문서에서 조각을 몇 개까지 쓸지 정할 때 씀
+- `broker_key`: 리포트일 때만 증권사 이름을 비교용 키로 맞춘 값(`processing/brokers.py`, 예: "키움증권" → "키움"). `get_target_price_data`의 `records[].broker_key`와 같은 값이라 KIS 목표가와 증권사 리포트를 이을 수 있음. 뉴스·공시는 `null`
 
 - **필터 먼저**: 활성 청크(`is_active`)만, 종목·기간·`as_of`·면책 제외를 먼저 걸고 그 안에서 점수를 낸다
 - **bm25**: 질문과 청크를 같은 Kiwi 규칙(`processing/search/korean_tokens.py`)으로 잘라 BM25(k1=1.2, b=0.75)로 점수. 외부 API 없음. 청크 색인은 `search_tokens`(적재기가 채움, 처음 한 번은 `python -m crawling.chunk_indexer`)
@@ -377,7 +382,7 @@ result = get_report_metadata(
 목표주가 및 투자의견 조회. Supabase `broker_opinions_adjusted`(KIS 종목투자의견)를 읽으며 `SUPABASE_DB_URL`이 필요합니다. 반환 형식은 API 계약서(`docs/api/openapi.yaml`)의 `TargetPriceData`를 따릅니다.
 
 - `records`: 계약서 필드 `hts_goal_prc`(목표가), `invt_opnn`(투자의견), `rgbf_invt_opnn`(직전 투자의견), `mbcr_name`(증권사)은 KIS 원래 값 그대로
-- `records` 추가 필드: `published_at`(발표일), `target_price_adjusted`(액면분할 환산 목표가), `opinion_norm`(매수 / 중립 / 매도 또는 `null`), `valid_from`(발표일), `superseded_at`(같은 증권사의 다음 발표일, 아직 없으면 `null`)
+- `records` 추가 필드: `broker_key`(증권사 비교용 키, 예: "키움"·"NH투자" → "키움"·"NH". 리포트 검색 결과의 `broker_key`와 같은 값), `published_at`(발표일), `target_price_adjusted`(액면분할 환산 목표가), `opinion_norm`(매수 / 중립 / 매도 또는 `null`), `valid_from`(발표일), `superseded_at`(같은 증권사의 다음 발표일, 아직 없으면 `null`)
 - `consensus`: 증권사마다 가장 최근 의견 1건의 환산 목표가로 계산한 평균·최고·최저(원 단위 정수, 0.5 올림). **`as_of`로부터 최근 180일 안에 발표된 의견만** 씀(ADR 0010). 최신 의견이 180일보다 오래되거나 목표가가 없는 증권사는 빼고, 그 증권사의 더 오래된 의견으로 채우지 않음. `broker_count`에 계산에 쓴 증권사 수, `basis`에 "증권사별 최신 1건, 최근 180일, 증권사 N곳". 180일 안에 의견이 없으면 평균·최고·최저는 `null`
 - `as_of`: 주면 그날까지 발표된 의견만 쓰고, 그 뒤에 나온 의견은 `superseded_at`에도 드러내지 않음. 기본값은 오늘(KST). 형식이 틀리면 `ValueError`
 - `target_prices`, `summary`: 트렌드 리포트가 계약서 형식으로 옮겨 갈 때까지 함께 주는 이전 형식(`summary`의 평균·최고·최저는 `consensus`와 같고, `count`는 기간 안 의견 수)
@@ -406,6 +411,7 @@ result = get_target_price_data(
       "invt_opnn": "BUY",
       "rgbf_invt_opnn": "BUY",
       "mbcr_name": "삼성",
+      "broker_key": "삼성",
       "published_at": "2026-06-15",
       "target_price_adjusted": 95000,
       "opinion_norm": "매수",
@@ -554,6 +560,7 @@ result = get_macro_data(
 - `summary`는 원문 첫 조각(최대 1,000자). 본문 검색은 `search_documents(document_type="disclosure")`
 - 추가 필드 `rcept_no`(접수번호), `is_correction`(정정 공시), `filer`(제출인), `chunk_ids`(본문 청크 ID)
 - `as_of`를 주면 그날까지 접수된 공시만. `relational_db` 인자는 기존 호출 호환용으로 받기만 함. 조회 실패 시 빈 결과와 `"error": "disclosure_unavailable"`
+- `coverage_from`: 공시를 모으기 시작한 날(전체 공시 중 가장 이른 접수일, 지금 2026-08-11). `date_from`이 그보다 이르면 그 앞 기간은 "공시 없음"이 아니라 "수집 전"이다. 공시가 하나도 없으면 `null`
 
 ```python
 from processing.functions.get_disclosure_data import get_disclosure_data
@@ -584,7 +591,8 @@ result = get_disclosure_data(
       "filer": "삼성전자",
       "chunk_ids": ["DART_20260615800123:3f2a9c1b7d0e"]
     }
-  ]
+  ],
+  "coverage_from": "2026-08-11"
 }
 ```
 
@@ -767,7 +775,24 @@ result = get_metric(ticker="005930", metric_id="roe_ttm", as_of="2026-09-01")
 - 결과에 항상 `data_tier`(근거 종류: `report` → `news_only` → `disclosure_only` → `derived_only` → `macro_only` 순으로 있는 것)가 붙음. 계산은 `processing.enums.data_tier_for`
 - 데이터 상태 조회가 실패하면 `data_tier`는 `null`이고 `"error": "data_status_unavailable"`. 근거 종류를 모르는데 정하지 않음
 - `data_status`에 이미 가진 `get_available_data_status` 결과(또는 `resolve_company`의 `data_status`)를 넘기면 상태를 다시 조회하지 않음. 아젠다마다 부를 때 쓰면 종목당 0.3~1초씩 반복되는 조회가 없어짐. 다른 종목의 결과면 `ValueError`
-- `intent`(아젠다 ID, `AgendaId`)를 받아 결과에 그대로 담음. 없는 아젠다면 `ValueError`(호출 코드의 실수). 아직 묶음 내용은 바꾸지 않음
+- `intent`(아젠다 ID, `AgendaId`)를 받아 결과에 그대로 담음. 없는 아젠다면 `ValueError`(호출 코드의 실수)
+- `debate`에 `intent`를 주면 문서 검색에 아젠다 설정(`processing/config/agenda_search_terms.json`, 데이터 쪽 관리)을 씀(#84)
+  - 키워드 검색(BM25): 질문 + 키워드 / 의미 검색: 질문만 / 질문이 없으면(버튼 경로) 둘 다 키워드
+  - 그래서 질문이 없어도 `documents`가 있음. `intent`가 없으면 지금처럼 `query`가 있을 때만 검색
+  - 아젠다의 문서 종류마다 따로 찾아 5개를 나눔(1종류 5, 2종류 3·2, 3종류 2·2·1). 한 종류가 모자라면 다른 종류로 채움
+  - 한 문서에서는 최대 2조각(같은 리포트가 몫을 다 차지하지 않게)
+  - `documents`에 `query`(의미 검색)·`keyword_query`(키워드 검색)·`document_types`·`mode`. 한 종류의 검색이 실패하면 나머지는 주고 `reason="search_unavailable"`·`failed_types`
+
+| intent | 키워드 | 문서 종류 |
+| --- | --- | --- |
+| `valuation` | 실적 밸류에이션 목표주가 | 리포트 |
+| `macro` | 업황 금리 환율 | 리포트, 뉴스 |
+| `risk` | 리스크 우려 하락 | 리포트, 뉴스, 공시 |
+| `growth` | 성장 신사업 증설 수주 | 리포트, 뉴스 |
+| `shareholder_return` | 배당 자사주 주주환원 | 리포트, 공시 |
+| `flow` | 외국인 기관 수급 순매수 | 뉴스 |
+- `as_of`(`YYYY-MM-DD`, 없으면 오늘 KST)를 묶음 안의 모든 조회(목표가·시세·매크로·문서 검색)에 그대로 넘김. 과거 날짜로 만들어도 그 뒤 문서·목표가가 섞이지 않음. 결과에 `as_of`를 담음. 형식이 틀리면 `ValueError`
+- `trend_report` 문서 검색은 리포트·뉴스 각 15개(`TREND_REPORT_TOP_K`). 받는 쪽이 문서당 조각 수를 줄여 고르기 때문. 매크로 문서는 `document_chunks`에 없어서 검색하지 않음(`macro_documents` 없음, 매크로는 `macro_data` 정형 값)
 
 ```python
 from processing.functions.get_agent_context import get_agent_context
@@ -778,6 +803,7 @@ result = get_agent_context(
     query="HBM 수요 전망",
     intent="valuation",         # 선택
     data_status=status,         # 선택: 이미 가진 get_available_data_status 결과
+    as_of="2026-11-23",         # 선택: 없으면 오늘(KST)
     relational_db=db,
     embedding_model=embedding_model,
     vector_db=vector_db,
@@ -789,11 +815,13 @@ result = get_agent_context(
   "ticker": "005930",
   "agent_type": "trend_report",
   "intent": "valuation",
+  "as_of": "2026-11-23",
   "data_tier": "report",
   "target_prices": { "...": "..." },
   "price_data": { "...": "..." },
   "macro_data": { "...": "..." },
-  "documents": { "...": "..." }
+  "report_documents": { "...": "..." },
+  "news_documents": { "...": "..." }
 }
 ```
 

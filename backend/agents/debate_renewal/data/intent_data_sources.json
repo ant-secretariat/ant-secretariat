@@ -1,9 +1,9 @@
 {
-  "version": "ds-0.2.0",
-  "note": "아젠다별 필요 데이터·신선도·T0 가능 여부. 값은 수경(데이터 에이전트) 제안 반영(PR #21 리뷰, 2026-11-10). sources 이름은 get_available_data_status의 키이고 report, news, disclosure, price, macro, target_price 6개에 financials, flow, insider, sensitivity, derived 5개가 추가될 예정이다(#35 병합 후). 추가 전에는 새 키가 provider에 없어서 requires_any 중 기존 키로만 판정된다. insider는 보고가 없는 기간이 흔해 단독 필수 소스로 쓰지 않는다.",
+  "version": "ds-0.3.0",
+  "note": "아젠다별 필요 데이터·신선도·T0 가능 여부. 값은 수경(데이터 에이전트) 제안 반영(PR #21 리뷰, 2026-11-10). sources 이름은 get_available_data_status의 키이고 report, news, disclosure, price, macro, target_price 6개에 financials, flow, insider, sensitivity, derived 5개가 추가될 예정이다(#35 병합 후). 추가 전에는 새 키가 provider에 없어서 requires_any 중 기존 키로만 판정된다. insider는 보고가 없는 기간이 흔해 단독 필수 소스로 쓰지 않는다. ds-0.3.0(#72 수경 리뷰): macro 소스 건수는 종목과 무관한 시장 지표 수라 매크로 아젠다 requires_any에서 뺐다. 종목 데이터(sensitivity·news·report)가 하나도 없는 T0 종목은 매크로 토론을 하지 않는다.",
   "agendas": {
     "valuation": {"requires_any": ["financials", "price", "target_price", "report"], "stale_after_days": 7, "t0_available": true},
-    "macro": {"requires_any": ["macro", "sensitivity", "news", "report"], "stale_after_days": 7, "t0_available": true},
+    "macro": {"requires_any": ["sensitivity", "news", "report"], "stale_after_days": 7, "t0_available": true},
     "risk": {"requires_any": ["flow", "insider", "disclosure", "news", "report"], "stale_after_days": 7, "t0_available": false},
     "growth": {"requires_any": ["financials", "derived", "report", "news"], "stale_after_days": 150, "t0_available": true},
     "shareholder_return": {"requires_any": ["disclosure", "price", "report"], "stale_after_days": 90, "t0_available": true},

@@ -146,7 +146,7 @@
   - 문서는 토론 근거(`Evidence`)로 바로 옮길 수 있는 모양
   - precheck가 "있다"고 판정한 데이터는 묶음에 꼭 포함
   - 한 블록이 실패해도 나머지는 줌
-- 새로 필요한 것: 지수 조회(`get_index_data`), 민감도 조회(`get_sensitivities`), 과거 시점 기준 `data_tier`.
+- 지수 조회(`get_index_data`)·민감도 조회(`get_sensitivities`)는 만들었고(#109), 과거 시점 기준 `data_tier`는 아직 없습니다.
 - 시뮬레이션은 `intent` 없이 부르고, 묶음에 지수(`index_daily`)와 파라미터 기준일(`sim_params_as_of`)을 더할 예정입니다.
 
 ### 4-2. intent별 반환 모양 (토론 `agent_type="debate"`)
@@ -216,8 +216,8 @@
 | `financials` | 분기 재무(연결/별도 표시) | 최근 8분기 | `get_financials` |
 | `disclosures` | 공시 목록 + 수집 시작일(`coverage_from`) | 리스크: 최근 90일 10건, 주주환원: 최근 1년 10건 | `get_disclosure_data` |
 | `macro` | 지표별 시계열(지표마다 기준일 표시). 이 종목의 민감도 요인부터: 국고채 3·10년, 원/달러, 기준금리, 소비자물가, 브렌트유, D램 수출물가 | 일별 최근 60거래일, 월별 최근 13개월 | `get_macro_data` |
-| `index` | 코스피·코스닥 일별 종가 | 최근 60거래일 | `get_index_data` (새로 만듦) |
-| `sensitivities` | **시장 효과를 뺀 값만**(`adjusted`, `certain`, `q_value`)과 기준일. 원래 상관(`raw`)은 넣지 않음(ADR 0011은 시장 효과를 빼지 않은 관계를 노출하지 않음) | 요인 전체(일별 4, 월별 3) | `get_sensitivities` (새로 만듦) |
+| `index` | 코스피·코스닥 일별 종가 | 최근 60거래일 | `get_index_data` |
+| `sensitivities` | **시장 효과를 뺀 값만**(`adjusted`, `certain`, `q_value`)과 기준일. 원래 상관(`raw`)은 넣지 않음(ADR 0011은 시장 효과를 빼지 않은 관계를 노출하지 않음). 코스피는 시장 자체라 시장 효과를 뺀 값이 없어 빼고, 시장 베타는 시뮬레이션이 `sensitivities` 표에서 씀 | 일별 3(국고채 3·10년, 원/달러), 월별 3(브렌트유, 소비자물가, D램 수출물가) | `get_sensitivities` |
 
 - `get_derived_snapshot`은 한 번만 부르고, 아젠다에 필요한 블록만 꺼냅니다(종목당 약 1초).
 - **같은 숫자를 두 군데 두지 않습니다.** 블록에는 `metrics`에 없는 값만 둡니다. 숫자 출처가 둘이면 치환 값과 근거 문장이 어긋날 수 있습니다(#84 Q4).
@@ -411,8 +411,10 @@
 | 함수 계약 추가(`doc_id`, `broker_key`, `coverage_from`, `get_agent_context`의 `as_of`) 머지 | 수경 (리뷰: 태은, 유민) | 🟡 #75 리뷰 중 |
 | `suggest_alternatives` 머지 | 수경 (리뷰: 태은) | 🟡 #85 리뷰 중 |
 | 실패 표시(`resolve_company` 등, `extract_company_mentions`), 한국 날짜, `get_derived_snapshot` 묶음 문제 | 수경 | ❌ #55, 12/6까지 |
-| 아젠다 키워드 검색(기준선 #77이 기다림) | 수경 | 🟡 #106 |
-| intent별 묶음 구현(`get_index_data`, `get_sensitivities`, 과거 시점 `data_tier`, 문서 검색 병렬화, 문서 종류별 최소 1개, 근거 ID `metric:`·`block:`, 목표가 `revisions`) | 수경 | ❌ 착수 가능(#84 답 받음) |
+| 아젠다 키워드 검색, 문서 종류별 몫·한 문서 2조각 | 수경 | ✅ #106 |
+| 아젠다별 지표 목록(`metrics`)과 지표 근거 ID | 수경 | ✅ #108 |
+| 지수·민감도 조회 함수(`get_index_data`, `get_sensitivities`) | 수경 | ✅ #109 |
+| 묶음 블록(`valuation`·`target_price`(상승여력·`revisions`)·`financials`·`flow`(중복 제거)·`disclosures`·`macro`(기간 축소)·`index`·`sensitivities`), 블록 근거 ID, `evidence_id` → `chunk_id`, 과거 시점 `data_tier` | 수경 | ❌ #105·#88 머지 뒤 |
 | `broker_key` 보강(컨센서스를 `broker_key`로 묶기), `chunk_type` 인자, `revisions` | 수경 | ❌ #73 |
 | 남은 리포트 적재(11/9–11/17 117건) | 수경 | ✅ 11/24 완료. 7건은 PDF를 자르다 멈춤(PyMuPDF 오류), 따로 확인 필요 |
 | 뉴스 빈 기간(11/10–11/19) 채우기 | 수경 | ❌ DB 용량(Q1) 결정 뒤 |

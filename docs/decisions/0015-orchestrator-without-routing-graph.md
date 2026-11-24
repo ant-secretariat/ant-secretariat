@@ -3,6 +3,7 @@
 - 상태: 채택
 - 결정일: 2026-11-24
 - 결정자: 태은
+- 의견을 준 사람: 유민 (토론 패키지 LangGraph 미사용 확인, #94)
 - 출처: 오케스트레이터 기획서 1·3장, FE 라우트(`frontend/src/App.tsx`), API 계약 draft.5(`/orchestrate/chat` Post-MVP), MVP Design Doc v1.5 2.2
 
 ## 배경
@@ -90,4 +91,3 @@ async def trend_report(body: TrendReportBody, user_id: str = Depends(current_use
 
 - 오케스트레이터 기획서 1·2·3·11장
 - 0012 (테이블 큐·워커), 0013 (시뮬레이션 별도 job)
-- 의견을 준 사람: 유민 (토론 패키지 LangGraph 미사용 확인, #94)

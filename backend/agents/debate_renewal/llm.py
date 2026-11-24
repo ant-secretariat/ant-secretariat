@@ -5,13 +5,18 @@
 - JSON·검증 오류면 오류 내용을 붙여 1회 다시 요청한다. 그래도 틀리면 `LLMOutputInvalidError`.
 - 연결 오류·타임아웃·429·5xx는 SDK가 재시도한 뒤 `LLMUnavailableError`(503)로 바꾼다.
   그 밖의 4xx(요청 형식·인증)는 코드 문제라 그대로 올린다.
+- 동시 호출은 워커 전체에서 `config.llm_max_concurrency()`개(기본 3)로 막는다(#74 리뷰, #107).
+  job 세마포어는 job 수만 막고 job 안의 Bull·Bear 병렬 호출 수는 못 막기 때문이다.
+- `client`를 넘기지 않으면 이벤트 루프마다 하나 만든 클라이언트를 다시 쓴다(연결 재사용).
 - 테스트는 `client`에 가짜 객체를 넣는다(`client.chat.completions.create`만 쓴다).
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import time
+import weakref
 from dataclasses import dataclass
 from typing import Any, Generic, Optional, Sequence, TypeVar
 
@@ -64,6 +69,28 @@ def make_client() -> openai.AsyncOpenAI:
     )
 
 
+# 세마포어와 클라이언트(httpx 연결)는 이벤트 루프에 묶여서 루프마다 따로 둔다.
+# 워커는 루프 하나라 사실상 프로세스 전체에서 하나다. 테스트처럼 루프가 바뀌어도 깨지지 않는다
+_semaphores: "weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.Semaphore]" = weakref.WeakKeyDictionary()
+_clients: "weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, openai.AsyncOpenAI]" = weakref.WeakKeyDictionary()
+
+
+def _semaphore() -> asyncio.Semaphore:
+    loop = asyncio.get_running_loop()
+    sem = _semaphores.get(loop)
+    if sem is None:
+        sem = _semaphores[loop] = asyncio.Semaphore(config.llm_max_concurrency())
+    return sem
+
+
+def default_client() -> openai.AsyncOpenAI:
+    loop = asyncio.get_running_loop()
+    client = _clients.get(loop)
+    if client is None:
+        client = _clients[loop] = make_client()
+    return client
+
+
 def _is_unavailable(exc: openai.APIError) -> bool:
     if isinstance(exc, (openai.APIConnectionError, openai.RateLimitError)):  # APITimeoutError 포함
         return True
@@ -78,21 +105,23 @@ async def complete_structured(
     model: Optional[str] = None,
     temperature: Optional[float] = None,
 ) -> LLMResult[T]:
-    client = client if client is not None else make_client()
+    client = client if client is not None else default_client()
     model = model or config.llm_model()
     temperature = config.llm_temperature() if temperature is None else temperature
     convo = list(messages)
     prompt_tokens = completion_tokens = 0
+    usage_seen = False  # 응답 중 하나라도 usage가 있으면 합계를 돌려준다
     started = time.perf_counter()
 
     for attempt in range(1, FORMAT_RETRIES + 2):
         try:
-            resp = await client.chat.completions.create(
-                model=model,
-                messages=convo,
-                response_format=response_format(output_model),
-                temperature=temperature,
-            )
+            async with _semaphore():  # 형식 재요청도 상한 안에서 보낸다
+                resp = await client.chat.completions.create(
+                    model=model,
+                    messages=convo,
+                    response_format=response_format(output_model),
+                    temperature=temperature,
+                )
         except openai.APIError as exc:
             if _is_unavailable(exc):
                 logger.warning("debate llm unavailable model=%s err=%s", model, type(exc).__name__)
@@ -101,6 +130,7 @@ async def complete_structured(
 
         usage = getattr(resp, "usage", None)
         if usage is not None:
+            usage_seen = True
             prompt_tokens += usage.prompt_tokens or 0
             completion_tokens += usage.completion_tokens or 0
         content = resp.choices[0].message.content or ""
@@ -120,8 +150,8 @@ async def complete_structured(
         return LLMResult(
             output=output,
             model=model,
-            prompt_tokens=prompt_tokens if usage is not None else None,
-            completion_tokens=completion_tokens if usage is not None else None,
+            prompt_tokens=prompt_tokens if usage_seen else None,
+            completion_tokens=completion_tokens if usage_seen else None,
             latency_ms=round((time.perf_counter() - started) * 1000),
             attempts=attempt,
         )

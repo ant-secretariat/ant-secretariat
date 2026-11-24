@@ -61,7 +61,9 @@ def company_context(ticker: str, include_draft: bool = False) -> dict:
     if company is None:
         return {}
     sec = company["sector_id"]
-    sens = [e for e in edges("sensitive_to", include_draft) if e["src"] == sec]
+    all_sens = edges("sensitive_to", include_draft)
+    sens = [e for e in all_sens if e["src"] == sec and e["src_type"] == "SECTOR"]
+    co_sens = [e for e in all_sens if e["src"] == ticker and e["src_type"] == "COMPANY"]
     issue_nodes = nodes("issues", include_draft)
     issues: dict[str, dict] = {}
     for via, target in (("SECTOR", sec), ("COMPANY", ticker)):  # 종목 엣지가 섹터 엣지를 덮어쓴다
@@ -72,5 +74,7 @@ def company_context(ticker: str, include_draft: bool = False) -> dict:
         "company": company,
         "sector": nodes("sectors", include_draft)[sec],
         "sector_sensitivities": {f: [e for e in sens if e["weight_frequency"] == f] for f in ("daily", "monthly")},
+        # v0.9: 종목 → 매크로. weight 는 시장 효과를 뺀 값이라 섹터 엣지(원래 상관)와 크기를 바로 비교하지 않는다
+        "company_sensitivities": {f: [e for e in co_sens if e["weight_frequency"] == f] for f in ("daily", "monthly")},
         "issues": list(issues.values()),
     }

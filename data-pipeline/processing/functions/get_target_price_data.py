@@ -5,6 +5,7 @@ from typing import Optional
 
 from crawling.config.clock import today_kst
 from processing.interfaces import BaseRelationalDB
+from processing.brokers import broker_key
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +90,7 @@ def _build_result(ticker: str, rows: list[tuple], as_of: date) -> dict:
             "invt_opnn": opinion,
             "rgbf_invt_opnn": prev_opinion,
             "mbcr_name": broker,
+            "broker_key": broker_key(broker),
             "published_at": published_at,
             "target_price_adjusted": target_price_adjusted,
             "opinion_norm": OPINION_LABELS.get(opinion_norm),

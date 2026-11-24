@@ -17,6 +17,7 @@ from functools import lru_cache
 
 from psycopg.rows import dict_row
 
+from processing.brokers import broker_key
 from processing.processors.report_chunker import NUMBERS_TITLE
 from processing.search.korean_tokens import terms
 
@@ -300,15 +301,21 @@ def _quote_lexeme(term: str) -> str:
 
 
 def _result(row: dict, score: float) -> dict:
-    """트렌드 리포트·토론이 쓰던 결과 형식(키 이름)을 그대로 지킨다."""
+    """트렌드 리포트·토론이 쓰던 결과 형식(키 이름)을 그대로 지킨다.
+
+    doc_id는 report_id와 같은 값이다(리포트·뉴스·공시 모두 문서 ID). report_id는 예전 이름이라 남겨 둔다.
+    broker_key는 리포트일 때만 증권사 이름을 KIS 목표가와 같은 키로 맞춘 값이다(processing.brokers).
+    """
     return {
         "chunk_id": row["chunk_id"],
+        "doc_id": row["doc_id"],
         "report_id": row["doc_id"],
         "ticker": row["ticker"] or "",
         "company": row["company"] or "",
         "date": row["published_at"].isoformat() if row["published_at"] else "",
         "source": row["source"] or "",
         "author_org": row["broker"] or "",
+        "broker_key": broker_key(row["broker"]) if row["document_type"] == "report" else None,
         "document_type": row["document_type"],
         "report_type": None,
         "title": row["title"] or "",

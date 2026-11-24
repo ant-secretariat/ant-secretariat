@@ -1003,11 +1003,15 @@ x-internal-functions:
   agent: 데이터 에이전트
   summary: 문서 벡터 검색
   signature: search_documents(query, ticker, date_from=None, date_to=None, document_type=None, report_type=None, source=None,
-    top_k=5, embedding_model=None, vector_db=None) -> dict
+    top_k=5, embedding_model=None, vector_db=None, broker=None, section_type=None, include_disclaimer=False, as_of=None,
+    mode=None) -> dict
   input: SearchDocumentsInput
   output: DataRecord
-  status: existing
+  status: changed
   release: mvp
+  note: '`results[]`의 `doc_id`는 문서 ID입니다(리포트·뉴스·공시 공통, 예전 이름 `report_id`와 같은 값). `broker_key`는 리포트일
+    때만 증권사 이름을 `get_target_price_data`의 `records[].broker_key`와 같은 키로 맞춘 값이고, 그 외 문서는 null입니다. `as_of`를
+    주면 그날까지 게시된 문서만 찾습니다.'
 - name: get_report_metadata
   agent: 데이터 에이전트
   summary: 리포트 메타데이터 조회
@@ -1027,12 +1031,13 @@ x-internal-functions:
 - name: get_target_price_data
   agent: 데이터 에이전트
   summary: 목표주가와 컨센서스 조회
-  signature: get_target_price_data(ticker, date_from=None, date_to=None) -> dict
+  signature: get_target_price_data(ticker, date_from=None, date_to=None, as_of=None) -> dict
   input: GetTargetPriceDataInput
   output: TargetPriceData
   status: changed
   release: mvp
-  note: KIS 종목투자의견 API 기준입니다. 리포트 ID 연결과 `report_type`은 삭제됐습니다.
+  note: KIS 종목투자의견 API 기준입니다. 리포트 ID 연결과 `report_type`은 삭제됐습니다. `records[].broker_key`로 증권사 리포트(`search_documents`
+    결과의 `broker_key`)와 증권사를 이을 수 있습니다.
 - name: get_price_data
   agent: 데이터 에이전트
   summary: 시세 이력 조회
@@ -1053,11 +1058,13 @@ x-internal-functions:
 - name: get_disclosure_data
   agent: 데이터 에이전트
   summary: 공시 조회
-  signature: get_disclosure_data(ticker, date_from=None, date_to=None, disclosure_type=None) -> dict
+  signature: get_disclosure_data(ticker, date_from=None, date_to=None, disclosure_type=None, as_of=None) -> dict
   input: GetDisclosureDataInput
   output: DataRecord
-  status: existing
+  status: changed
   release: mvp
+  note: '`coverage_from`은 공시를 모으기 시작한 날(전체 공시 중 가장 이른 접수일, 지금 2026-08-11)입니다. `date_from`이 그보다 이르면 그
+    앞 기간은 "공시 없음"이 아니라 "수집 전"입니다. 공시가 하나도 없으면 null입니다.'
 - name: get_available_data_status
   agent: 데이터 에이전트
   summary: 데이터 보유 상태 조회
@@ -1069,12 +1076,15 @@ x-internal-functions:
 - name: get_agent_context
   agent: 데이터 에이전트
   summary: 에이전트별 근거 묶음 조회
-  signature: 'get_agent_context(ticker: str, agent_type: str, query: str | None = None, intent: str | None = None) -> dict'
+  signature: 'get_agent_context(ticker: str, agent_type: str, query: str | None = None, intent: str | None = None, data_status:
+    dict | None = None, as_of: str | None = None) -> dict'
   input: GetAgentContextInput
   output: GetAgentContextOutput
   status: changed
   release: mvp
-  note: '`intent`는 아젠다 ID와 같습니다. `data_tier`는 항상 포함합니다. 시뮬레이션은 `intent` 없이 호출합니다.'
+  note: '`intent`는 아젠다 ID와 같습니다. `data_tier`는 항상 포함합니다. 시뮬레이션은 `intent` 없이 호출합니다. `as_of`(없으면 오늘 KST)는 묶음
+    안의 모든 조회에 그대로 넘어가 그날까지 알 수 있던 값만 씁니다. `trend_report`의 문서 검색은 리포트·뉴스 각 15개 후보이고, 매크로 문서
+    검색(`macro_documents`)은 없습니다(문서가 없어 매크로는 `macro_data` 정형 값만).'
 - name: get_financials
   agent: 데이터 에이전트
   summary: 재무제표 조회
@@ -1850,24 +1860,58 @@ components:
         ticker:
           $ref: '#/components/schemas/TickerValue'
         report_count:
-          type: integer
+          type:
+          - integer
+          - 'null'
           minimum: 0
         news_count:
-          type: integer
+          type:
+          - integer
+          - 'null'
           minimum: 0
         disclosure_count:
-          type: integer
+          type:
+          - integer
+          - 'null'
           minimum: 0
         derived_snapshot_available:
-          type: boolean
+          type:
+          - boolean
+          - 'null'
         collection_job_status:
           type:
           - string
           - 'null'
           description: 진행 중인 수집 작업 상태
         simulation_ready:
-          type: boolean
+          type:
+          - boolean
+          - 'null'
           description: sim_params 존재 여부. 제안 필드입니다(OQ-4).
+        sources:
+          type: object
+          description: 소스별 보유 상태(precheck 관문3 입력). 키는 report, news, disclosure, price, macro, target_price, financials,
+            flow, insider, sensitivity, derived 11개이고 성공하면 늘 다 있습니다. 조회에 실패하면 빈 객체입니다.
+          additionalProperties:
+            type: object
+            required:
+            - count
+            - latest
+            properties:
+              count:
+                type: integer
+                minimum: 0
+                description: 건수. 단위는 소스마다 다릅니다(macro는 종목과 무관한 지표 수, sensitivity는 요인 수, derived는 계산
+                  가능하면 1).
+              latest:
+                $ref: '#/components/schemas/NullableDate'
+                description: 가장 최근 날짜. 한국 날짜(KST) `YYYY-MM-DD`입니다. 0건이면 null입니다.
+        error:
+          type:
+          - string
+          - 'null'
+          description: 조회 실패면 "data_status_unavailable". 이때 건수·available·latest는 0·false가 아니라 null입니다(데이터 없음과
+            구분).
     ResolvedCompany:
       type: object
       required:
@@ -1935,6 +1979,11 @@ components:
                 - string
                 - 'null'
                 description: 증권사
+              broker_key:
+                type:
+                - string
+                - 'null'
+                description: 증권사 비교용 키. KIS 이름("키움", "NH투자")과 리포트 이름("키움증권")을 같은 값("키움")으로 맞춥니다.
         consensus:
           type: object
           description: 증권사별 최신 1건 가운데 as_of로부터 최근 180일 안에 발표된 의견 기준입니다(ADR 0010). 최신 의견이 180일보다 오래된 증권사는 빼고, 180일 안에 의견이 없으면 값은 null입니다. 금액은 원 단위 정수입니다.
@@ -3441,6 +3490,12 @@ components:
         top_k:
           type: integer
           default: 5
+        broker:
+          type:
+          - string
+          - 'null'
+        as_of:
+          $ref: '#/components/schemas/NullableDate'
     GetReportMetadataInput:
       type: object
       required:
@@ -3475,6 +3530,8 @@ components:
         date_from:
           $ref: '#/components/schemas/NullableDate'
         date_to:
+          $ref: '#/components/schemas/NullableDate'
+        as_of:
           $ref: '#/components/schemas/NullableDate'
     GetPriceDataInput:
       type: object
@@ -3513,6 +3570,8 @@ components:
           $ref: '#/components/schemas/NullableDate'
         date_to:
           $ref: '#/components/schemas/NullableDate'
+        as_of:
+          $ref: '#/components/schemas/NullableDate'
     GetAvailableDataStatusInput:
       type: object
       required:
@@ -3543,6 +3602,9 @@ components:
           oneOf:
           - $ref: '#/components/schemas/AgendaId'
           - type: 'null'
+        as_of:
+          $ref: '#/components/schemas/NullableDate'
+          description: 이 날까지 알 수 있던 값만 씁니다. 없으면 오늘(KST)입니다.
     GetAgentContextOutput:
       type: object
       required:

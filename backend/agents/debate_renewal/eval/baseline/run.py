@@ -9,6 +9,9 @@
 - 출력 폴더는 git에 올리지 않는다. outputs.jsonl에는 근거 본문 일부가 들어간 채점용 텍스트가 있다.
 - 이어서 돌리기: 두 시스템 출력이 이미 있는 문항은 건너뛴다. 한 문항 실패는 failures.jsonl에 남기고 다음으로 간다.
 - 데이터 함수는 기본 로더 안에서만 import한다(테스트는 가짜 로더를 넣는다).
+- 검색 방식(#106): 키워드 검색은 질문 + 아젠다 키워드, 의미 검색은 질문만, 문서 종류별 몫·한 문서 2조각.
+  기록의 search에 keyword_query·document_types를 남겨 검색 방식이 바뀌어도 구분한다.
+  문서 종류 일부가 검색 실패(reason)면 그 문항은 실패로 남기고 다시 돌린다(근거 조건이 달라지므로).
 - 알고 쓸 것(수경 #77 리뷰): `data_tier`는 오늘 기준 건수로 계산된다(과거 시점 계산은 #84 이후). 뉴스는 11/10 하루치가 비어 있다.
   리포트는 11/10까지 적재 완료(11/24), 11/9 LIG디펜스앤에어로스페이스 1건은 PDF 처리 실패로 빠진 채 고정.
 """
@@ -38,6 +41,7 @@ from agents.debate_renewal.service import run_debate
 logger = logging.getLogger(__name__)
 
 TOP_K = 5  # get_agent_context(agent_type="debate")의 문서 검색 개수
+SEARCH_KEYS = ("query", "keyword_query", "document_types", "mode", "top_k")
 MAX_FAILURE_RATE = 0.1
 
 
@@ -45,7 +49,7 @@ MAX_FAILURE_RATE = 0.1
 class CaseContext:
     company: CompanyMeta
     rows: list[dict]
-    search: dict  # query·mode·top_k
+    search: dict  # query·keyword_query·document_types·mode·top_k·as_of
 
 
 ContextLoader = Callable[[dict, Optional[str]], Awaitable[CaseContext]]
@@ -60,7 +64,7 @@ async def run_case(case: dict, ctx: CaseContext, snapshot_tag: str, *, llm_clien
     query = case["query"]
     evidence = EvidencePool().add(ctx.rows)
     record = {"question_id": case["id"], "snapshot_tag": snapshot_tag, "ticker": case["ticker"],
-              "as_of": ctx.search.get("as_of"), "search": {k: ctx.search.get(k) for k in ("query", "mode", "top_k")},
+              "as_of": ctx.search.get("as_of"), "search": {k: ctx.search.get(k) for k in SEARCH_KEYS},
               "evidence_chunk_ids": [e.chunk_id for e in evidence]}
 
     async def same_rows(*_):
@@ -134,11 +138,20 @@ async def default_loader(case: dict, as_of: Optional[str]) -> CaseContext:
     kwargs = {"as_of": as_of} if as_of else {}
     ctx = await asyncio.to_thread(get_agent_context, ticker=case["ticker"], agent_type="debate", query=case["query"],
                                   intent=case["agenda_id"], data_status=resolved.get("data_status"), **kwargs)
+    return case_context(case, ctx, resolved.get("sector"), as_of)
+
+
+def case_context(case: dict, ctx: dict, sector: Optional[str], as_of: Optional[str]) -> CaseContext:
+    """get_agent_context 결과 → CaseContext. 문서 종류 일부가 검색 실패면 문항 실패로 올린다."""
     docs = ctx.get("documents") or {}
-    company = CompanyMeta(ticker=case["ticker"], company=case["company"], sector=resolved.get("sector") or "알 수 없음",
+    if docs.get("reason"):  # "문서 없음"으로 돌리지 않는다(근거 조건이 달라지므로 다시 돌림)
+        raise RuntimeError(f"문서 검색 실패: {docs.get('reason')} {docs.get('failed_types')}")
+    company = CompanyMeta(ticker=case["ticker"], company=case["company"], sector=sector or "알 수 없음",
                           data_tier=ctx["data_tier"])
     return CaseContext(company=company, rows=list(docs.get("results") or []),
-                       search={"query": case["query"], "mode": docs.get("mode"), "top_k": TOP_K, "as_of": ctx.get("as_of", as_of)})
+                       search={"query": case["query"], "keyword_query": docs.get("keyword_query"),
+                               "document_types": docs.get("document_types"), "mode": docs.get("mode"),
+                               "top_k": TOP_K, "as_of": ctx.get("as_of", as_of)})
 
 
 def _as_of_supported() -> bool:

@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+
+import pytest
 from types import SimpleNamespace
 
 from agents.debate_renewal.contracts import AgendaId, DataTier
@@ -57,7 +59,8 @@ def _loader(seen):
         seen.append((case["id"], as_of))
         rows = [{"chunk_id": f"{case['id']}-c1", "document_type": "report", "title": "t", "source": "s",
                  "date": "2026-11-01", "content": "본문"}]
-        return CaseContext(company=CO, rows=rows, search={"query": case["query"], "mode": "hybrid", "top_k": 5, "as_of": as_of})
+        return CaseContext(company=CO, rows=rows, search={"query": case["query"], "keyword_query": f"{case['query']} 키워드",
+                                                       "document_types": ["report"], "mode": "hybrid", "top_k": 5, "as_of": as_of})
     return load
 
 
@@ -76,7 +79,8 @@ async def test_run_all_writes_both_systems_with_same_evidence(tmp_path):
     assert outputs[0]["tokens"] == 360 and outputs[1]["tokens"] == 120  # 토론 3회 vs 단일 1회
     rec = _jsonl(tmp_path / "evidence_records.jsonl")[0]
     assert rec["snapshot_tag"] == "tag-v1" and rec["evidence_chunk_ids"] == ["q-val-01-c1"]
-    assert rec["search"] == {"query": "비싸?", "mode": "hybrid", "top_k": 5}
+    assert rec["search"] == {"query": "비싸?", "keyword_query": "비싸? 키워드", "document_types": ["report"],
+                             "mode": "hybrid", "top_k": 5}  # 검색 방식(#106)이 기록에 남는다
     pack, key = make_blind_pack(outputs, seed=1)  # 채점 pack까지 이어진다
     assert len(pack) == 4
 
@@ -120,3 +124,16 @@ def test_render_single_marks_empty_sections():
     out = SingleOutput(positives=[], negatives=[], conflicts=[], summary="", confidence="low")
     text = render_single("q", out, [])
     assert text.count("(없음)") == 5
+
+
+def test_case_context_keeps_search_mode_and_rejects_partial_search_failure():
+    from agents.debate_renewal.eval.baseline.run import case_context
+    case = CASES[0]
+    docs = {"keyword_query": "비싸? 실적 밸류에이션 목표주가", "document_types": ["report"], "mode": "hybrid",
+            "results": [{"chunk_id": "c1"}]}
+    ctx = case_context(case, {"data_tier": "report", "as_of": "2026-11-10", "documents": docs}, "반도체", "2026-11-10")
+    assert ctx.search["keyword_query"] == docs["keyword_query"] and ctx.search["document_types"] == ["report"]
+    assert ctx.company.sector == "반도체" and ctx.rows == [{"chunk_id": "c1"}]
+    failed = {**docs, "reason": "search_unavailable", "failed_types": ["news"]}
+    with pytest.raises(RuntimeError, match="문서 검색 실패"):
+        case_context(case, {"data_tier": "report", "documents": failed}, None, "2026-11-10")

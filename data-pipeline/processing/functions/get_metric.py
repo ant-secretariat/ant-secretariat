@@ -48,6 +48,31 @@ INSIDER_METRICS = {
 METRIC_IDS = sorted([
     *MARKET_METRICS, *PRICE_METRICS, *FINANCIAL_METRICS, *FLOW_METRICS, *INSIDER_METRICS, "short_balance_ratio",
 ])
+# 사람이 읽는 지표 이름. 토론 근거 제목 등에 쓴다
+METRIC_NAMES = {
+    "per": "PER(주가수익비율)",
+    "pbr": "PBR(주가순자산비율)",
+    "eps": "EPS(주당순이익)",
+    "bps": "BPS(주당순자산)",
+    "dividend_yield": "배당수익률",
+    "dps": "주당배당금",
+    "foreign_ratio": "외국인 지분율",
+    "shares_outstanding": "상장주식수",
+    "close": "종가",
+    "market_cap": "시가총액",
+    "debt_ratio": "부채비율",
+    "operating_margin": "영업이익률",
+    "revenue_growth_yoy": "매출 성장률(전년 대비)",
+    "roe_ttm": "ROE(최근 4분기)",
+    "foreign_net_buy_20d": "외국인 순매수(최근 20거래일)",
+    "inst_net_buy_20d": "기관 순매수(최근 20거래일)",
+    "individual_net_buy_20d": "개인 순매수(최근 20거래일)",
+    "short_volume_ratio_20d": "공매도 거래 비중(최근 20거래일 평균)",
+    "short_balance_ratio": "공매도 잔고 비율",
+    "insider_net_shares_90d": "임원·주요주주 주식수 증감(최근 90일)",
+    "insider_sell_reports_90d": "임원·주요주주 매도 보고 수(최근 90일)",
+    "major_holder_ratio_change_90d": "5% 이상 대량보유자 지분율 증감(최근 90일)",
+}
 
 # 은행·증권·보험은 예금·보험부채가 부채로 잡혀 부채비율이 의미 없다
 FINANCIALS_SECTOR = "금융"
@@ -79,7 +104,9 @@ FINANCIAL_QUERY = """
         select
             fiscal_year, quarter, fs_div, seq,
             max(rcept_dt) over (order by seq rows between 4 preceding and current row) as rcept_dt,
-            round(100.0 * total_liabilities / nullif(total_equity, 0), 2) as debt_ratio,
+            -- 자본잠식(자본 0 이하)이면 부채비율은 의미가 없어 null (get_financials와 같은 규칙)
+            case when total_equity > 0 then round(100.0 * total_liabilities / total_equity, 2) end as debt_ratio,
+            total_equity <= 0 as capital_impaired,
             round(100.0 * operating_income / nullif(revenue, 0), 2)        as operating_margin,
             -- 전년 동기와 연결·별도 기준이 같을 때만 비교한다
             case when lag(seq, 4) over w = seq - 4 and lag(fs_div, 4) over w = fs_div
@@ -97,12 +124,34 @@ FINANCIAL_QUERY = """
         from chosen
         window w as (order by seq)
     )
-    select fiscal_year, quarter, fs_div, rcept_dt, debt_ratio, operating_margin, revenue_growth_yoy, roe_ttm
+    select fiscal_year, quarter, fs_div, rcept_dt, debt_ratio, operating_margin, revenue_growth_yoy, roe_ttm,
+           capital_impaired
     from calc
     order by seq desc
     limit 1
 """
 FINANCIAL_COLUMNS = ("debt_ratio", "operating_margin", "revenue_growth_yoy", "roe_ttm")
+
+# KRX(pykrx)는 직전 사업연도 순이익이 적자면 PER·EPS를 비워 준다. 비어 있을 때 그 이유가 적자인지 재무로 확인한다
+LOSS_CHECKED_METRICS = {"per", "eps"}
+# 그날까지 접수된 재무에서, 네 분기가 모두 같은 기준(연결/별도)으로 있는 가장 최근 사업연도의 순이익 합계
+ANNUAL_NET_INCOME_QUERY = """
+    with f as (select * from financials_as_of(%s::date) where ticker = %s),
+    pivoted as (
+        select fiscal_year, quarter, fs_div, max(amount) filter (where account = 'net_income') as net_income
+        from f group by fiscal_year, quarter, fs_div
+    ),
+    chosen as (
+        select distinct on (fiscal_year, quarter) *
+        from pivoted order by fiscal_year, quarter, (fs_div = 'CFS') desc
+    )
+    select fiscal_year, min(fs_div), sum(net_income)
+    from chosen
+    group by fiscal_year
+    having count(net_income) = 4 and min(fs_div) = max(fs_div)
+    order by fiscal_year desc
+    limit 1
+"""
 
 
 def get_metric(ticker: str, metric_id: str, as_of: str) -> dict:
@@ -113,31 +162,55 @@ def get_metric(ticker: str, metric_id: str, as_of: str) -> dict:
     display는 토론·트렌드 리포트가 문장에 그대로 넣을 표시용 문자열이다(format_display).
     형식 문서: processing/docs/get_metric.md
     """
+    return get_metrics(ticker, [metric_id], as_of)[0]
+
+
+def get_metrics(ticker: str, metric_ids: list[str], as_of: str) -> list[dict]:
+    """여러 지표를 DB 연결 하나로 계산한다. 결과는 metric_ids 순서이고 항목마다 get_metric과 같다.
+
+    지표마다 연결을 새로 열면 연결에만 약 0.35초씩 들어서(운영 DB), 토론 아젠다 하나(지표 최대 8개)에 3초가 걸렸다.
+    한 지표의 조회가 실패해도 나머지는 계산한다(연결이 autocommit이라 실패가 다음 조회로 번지지 않음).
+    """
     requested = date.fromisoformat(as_of).isoformat()
-    return _finish(_compute(ticker, metric_id, requested), requested)
+    known = [metric_id for metric_id in metric_ids if metric_id in METRIC_IDS]
+    results: dict[str, dict] = {}
+    if known:
+        # 조회 실패로 토론·온톨로지가 멈추지 않게 한다. 접속 주소가 메시지에 섞일 수 있어 종류만 남긴다
+        try:
+            from crawling.db.postgres import connect
+
+            with connect() as connection:
+                for metric_id in known:
+                    results[metric_id] = _compute(connection, ticker, metric_id, requested)
+        except Exception as exc:
+            logger.error("지표 조회 실패: %s(%s)", ticker, type(exc).__name__)
+            for metric_id in known:
+                results.setdefault(metric_id, _unavailable(ticker, metric_id, requested))
+    return [
+        _finish(results.get(metric_id) or _result(ticker, metric_id, None, "", "", requested, [], "unknown_metric"),
+                requested)
+        for metric_id in metric_ids
+    ]
 
 
-def _compute(ticker: str, metric_id: str, as_of: str) -> dict:
-    if metric_id not in METRIC_IDS:
-        return _result(ticker, metric_id, None, "", "", as_of, [], "unknown_metric")
-
-    # 조회 실패로 토론·온톨로지가 멈추지 않게 한다. 접속 주소가 메시지에 섞일 수 있어 종류만 남긴다
+def _compute(connection, ticker: str, metric_id: str, as_of: str) -> dict:
     try:
-        from crawling.db.postgres import connect
-
-        with connect() as connection:
-            if metric_id in FINANCIAL_METRICS:
-                return _financial_metric(connection, ticker, metric_id, as_of)
-            if metric_id in FLOW_METRICS:
-                return _flow_metric(connection, ticker, metric_id, as_of)
-            if metric_id == "short_balance_ratio":
-                return _short_balance_metric(connection, ticker, as_of)
-            if metric_id in INSIDER_METRICS:
-                return _insider_metric(connection, ticker, metric_id, as_of)
-            return _daily_metric(connection, ticker, metric_id, as_of)
+        if metric_id in FINANCIAL_METRICS:
+            return _financial_metric(connection, ticker, metric_id, as_of)
+        if metric_id in FLOW_METRICS:
+            return _flow_metric(connection, ticker, metric_id, as_of)
+        if metric_id == "short_balance_ratio":
+            return _short_balance_metric(connection, ticker, as_of)
+        if metric_id in INSIDER_METRICS:
+            return _insider_metric(connection, ticker, metric_id, as_of)
+        return _daily_metric(connection, ticker, metric_id, as_of)
     except Exception as exc:
         logger.error("지표 조회 실패: %s %s(%s)", ticker, metric_id, type(exc).__name__)
-        return _result(ticker, metric_id, None, _unit(metric_id), "", as_of, [], "metric_unavailable")
+        return _unavailable(ticker, metric_id, as_of)
+
+
+def _unavailable(ticker: str, metric_id: str, as_of: str) -> dict:
+    return _result(ticker, metric_id, None, _unit(metric_id), "", as_of, [], "metric_unavailable")
 
 
 def _finish(result: dict, requested: str) -> dict:
@@ -155,9 +228,11 @@ REASONS = {
     "unknown_metric": "metric_id가 METRIC_IDS에 없음",
     "metric_unavailable": "DB 조회 실패(일시적)",
     "no_data": "그날까지 이 종목의 데이터가 없음(적재 범위 밖 포함)",
-    "no_value": "데이터 행은 있지만 이 지표 값이 비어 있음(예: 적자라 PER 없음)",
+    "no_value": "데이터 행은 있지만 이 지표 값이 비어 있음",
+    "loss_making": "직전 사업연도 순이익이 적자라 PER·EPS가 공시되지 않음",
     "partial_window": "계산 창(예: 최근 20거래일) 중 값이 빈 날이 있어 일부 날짜만으로는 계산하지 않음",
     "not_applicable_financials": "금융업이라 의미 없는 지표(부채비율)",
+    "capital_impaired": "자본잠식(자본 0 이하)이라 부채비율이 의미 없음",
 }
 # 주당 값·가격은 그대로(1,176,000원), 합계 금액은 조·억 단위로(−1.17조 원)
 PER_SHARE_WON = {"close", "eps", "bps", "dps"}
@@ -223,10 +298,30 @@ def _daily_metric(connection, ticker: str, metric_id: str, as_of: str) -> dict:
     if row is None:
         return _result(ticker, metric_id, None, unit, basis, as_of, [table], "no_data")
     value, trade_date = row
+    if value is None and metric_id in LOSS_CHECKED_METRICS:
+        loss = _annual_loss(connection, ticker, as_of)
+        if loss:
+            return _result(ticker, metric_id, None, unit, loss, trade_date.isoformat(), [table, "financials"],
+                           "loss_making")
     return _result(
         ticker, metric_id, _number(value), unit, basis, trade_date.isoformat(), [table],
         None if value is not None else "no_value",
     )
+
+
+def _annual_loss(connection, ticker: str, as_of: str) -> str | None:
+    """직전 사업연도 순이익이 적자면 그 근거 문장, 아니면 None.
+
+    KRX의 PER·EPS는 지배주주 순이익 기준인데 재무 표에는 당기순이익(지배+비지배)만 있다. 그래서 당기순이익이 적자일
+    때만 적자로 본다. 당기순이익은 흑자인데 PER이 비는 종목(지배주주 몫만 적자 등)은 no_value로 남는다.
+    """
+    row = connection.execute(ANNUAL_NET_INCOME_QUERY, (as_of, ticker)).fetchone()
+    if row is None or row[2] is None or row[2] >= 0:
+        return None
+    fiscal_year, fs_div, net_income = row
+    amount = format_display("market_cap", float(net_income), "원")   # 합계 금액 표기(조·억 원)를 그대로 씀
+    return f"직전 사업연도({fiscal_year}) 당기순이익 {amount}({FS_LABELS.get(fs_div, fs_div)}) 적자"
+
 
 
 def _flow_metric(connection, ticker: str, metric_id: str, as_of: str) -> dict:
@@ -325,16 +420,18 @@ def _financial_metric(connection, ticker: str, metric_id: str, as_of: str) -> di
     row = connection.execute(FINANCIAL_QUERY, (as_of, ticker)).fetchone()
     if row is None:
         return _result(ticker, metric_id, None, unit, "", as_of, source, "no_data")
-    fiscal_year, quarter, fs_div, rcept_dt, *values = row
+    fiscal_year, quarter, fs_div, rcept_dt, *values, capital_impaired = row
     value = dict(zip(FINANCIAL_COLUMNS, values))[metric_id]
+    reason = None if value is not None else "no_value"
+    if metric_id == "debt_ratio" and value is None and capital_impaired:
+        reason = "capital_impaired"
     basis = f"{fiscal_year}Q{quarter} {FS_LABELS.get(fs_div, fs_div)}"
     if metric_id == "roe_ttm":
         basis += ", 최근 4개 분기 순이익 합 / 평균 자본"
     elif metric_id == "revenue_growth_yoy":
         basis += ", 전년 동기 대비"
     result = _result(
-        ticker, metric_id, _number(value), unit, basis, rcept_dt.isoformat(), source,
-        None if value is not None else "no_value",
+        ticker, metric_id, _number(value), unit, basis, rcept_dt.isoformat(), source, reason,
     )
     result["period"] = f"{fiscal_year}Q{quarter}"
     return result

@@ -15,7 +15,6 @@ import argparse
 import logging
 import sys
 from collections import Counter
-from datetime import date
 from pathlib import Path
 
 if __package__ in (None, ""):
@@ -26,6 +25,7 @@ import psycopg
 from crawling.collectors.dart_financials import DartFinancialsClient, financial_rows
 from crawling.config.settings import SETTINGS
 from crawling.db.postgres import connect, upsert
+from crawling.config.clock import today_kst
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +91,7 @@ def main() -> None:
     args = parse_args()
     if not SETTINGS.dart_api_key:
         raise SystemExit("DART_API_KEY가 설정되지 않았습니다 (data-pipeline/.env 확인)")
-    this_year = date.today().year
+    this_year = today_kst().year
     first = this_year - (args.years if args.backfill else 1)
     with connect() as connection:
         load(connection, list(range(first, this_year + 1)), args.all)

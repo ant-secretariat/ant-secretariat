@@ -1,8 +1,9 @@
 import json
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 from processing.interfaces import BaseRelationalDB, BaseEmbeddingModel, BaseVectorDB
 
 logger = logging.getLogger(__name__)
@@ -56,6 +57,20 @@ MACRO_LOOKBACK_DAYS = 430    # 13개월을 덮도록 넉넉히 읽고 지표마�
 
 # 트렌드 리포트 문서 후보 수(종류마다). 받는 쪽이 문서당 2조각·리포트 5·뉴스 4개로 줄이므로 넉넉히 준다(#69 리뷰)
 TREND_REPORT_TOP_K = 15
+# 묶음 안 조회를 동시에 몇 개까지 돌릴지(#71 R12, 트렌드 리포트 10초 목표). 조회마다 DB 연결을 따로 열므로,
+# 토론이 아젠다 묶음을 병렬로 부를 때 연결 수가 아젠다 수 × 이 값까지 늘 수 있다
+MAX_PARALLEL = 6
+
+
+def run_parallel(tasks: dict[str, Callable]) -> dict:
+    """서로 기다리지 않는 조회들을 스레드로 동시에 돌린다. 결과 순서는 tasks 순서 그대로.
+    조회는 저마다 DB 연결·HTTP 요청을 따로 열고 실패를 스스로 처리하므로 공유 상태가 없다.
+    예외는 순차 실행 때처럼 그대로 올라간다(다른 조회는 끝날 때까지 기다린 뒤)."""
+    if len(tasks) <= 1:
+        return {key: task() for key, task in tasks.items()}
+    with ThreadPoolExecutor(max_workers=min(MAX_PARALLEL, len(tasks))) as pool:
+        futures = {key: pool.submit(task) for key, task in tasks.items()}
+        return {key: future.result() for key, future in futures.items()}
 
 
 def get_agent_context(
@@ -97,6 +112,8 @@ def get_agent_context(
     이때는 목표가 전체 이력(target_prices)과 매크로 전체 이력(macro_data, 약 180만 자)을 넣지 않는다.
     아젠다 문서 검색이 0건이면 다른 문서 종류(리포트 → 뉴스 → 공시)로 한 번 더 찾고 widened=true로 표시한다.
     매크로 문서는 document_chunks에 없어서(0건) 검색하지 않는다. 매크로는 macro_data(정형 값)를 쓴다.
+    묶음 안의 조회(지표·블록·문서 종류별 검색·데이터 상태)는 서로 기다리지 않으므로 동시에 돌린다(MAX_PARALLEL, #71 R12).
+    목표가 블록은 지표의 종가를, 매크로 블록은 민감도를 쓰므로 그 조회만 끝나기를 기다린다.
     """
     from processing.enums import AgendaId
     from processing.functions.get_target_price_data import get_target_price_data
@@ -114,39 +131,45 @@ def get_agent_context(
         return search_documents(query=query, ticker=ticker, document_type=document_type, top_k=top_k,
                                 as_of=as_of, embedding_model=embedding_model, vector_db=vector_db)
 
+    target_prices = lambda: get_target_price_data(ticker=ticker, as_of=as_of, relational_db=relational_db)  # noqa: E731
+    price_data = lambda: get_price_data(ticker=ticker, as_of=as_of, relational_db=relational_db)  # noqa: E731
+    macro_data = lambda: get_macro_data(as_of=as_of, relational_db=relational_db)  # noqa: E731
+    # 데이터 상태(data_tier)도 다른 조회와 함께 돌린다. 결과에 넣는 자리는 그대로 맨 뒤
+    tier_task = {"_tier": lambda: _data_tier(ticker, data_status)}
+
     if agent_type == "trend_report":
-        result = {
-            "ticker":        ticker,
-            "agent_type":    agent_type,
-            "target_prices": get_target_price_data(ticker=ticker, as_of=as_of, relational_db=relational_db),
-            "price_data":    get_price_data(ticker=ticker, as_of=as_of, relational_db=relational_db),
-            "macro_data":    get_macro_data(as_of=as_of, relational_db=relational_db),
-        }
+        tasks = {"target_prices": target_prices, "price_data": price_data, "macro_data": macro_data}
         if query:
-            result["report_documents"] = documents("report", TREND_REPORT_TOP_K)
-            result["news_documents"] = documents("news", TREND_REPORT_TOP_K)
+            tasks["report_documents"] = lambda: documents("report", TREND_REPORT_TOP_K)
+            tasks["news_documents"] = lambda: documents("news", TREND_REPORT_TOP_K)
+        fetched = run_parallel({**tasks, **tier_task})
+        result = {"ticker": ticker, "agent_type": agent_type, **{key: fetched[key] for key in tasks}}
 
     elif agent_type == "debate":
         result = {"ticker": ticker, "agent_type": agent_type}
         if intent:
-            # 아젠다 묶음에는 목표가 전체 이력·매크로 전체 이력 대신 그 아젠다의 블록만 준다
-            result["metrics"] = _agenda_metrics(ticker, intent, as_of)
-            result.update(_agenda_blocks(ticker, intent, as_of, result["metrics"]))
-            result["documents"] = _agenda_documents(search_documents, ticker, intent, query, as_of)
+            # 아젠다 묶음에는 목표가 전체 이력·매크로 전체 이력 대신 그 아젠다의 블록만 준다.
+            # 지표·문서·상태를 먼저 띄우고, 블록은 지표 결과(목표가 상승여력의 종가)를 필요할 때 기다린다
+            with ThreadPoolExecutor(max_workers=3) as pool:
+                metrics_future = pool.submit(_agenda_metrics, ticker, intent, as_of)
+                documents_future = pool.submit(_agenda_documents, search_documents, ticker, intent, query, as_of)
+                tier_future = pool.submit(tier_task["_tier"])
+                blocks = _agenda_blocks(ticker, intent, as_of, metrics_future.result)
+                result["metrics"] = metrics_future.result()
+                result.update(blocks)
+                result["documents"] = documents_future.result()
+                fetched = {"_tier": tier_future.result()}
         else:
-            result["target_prices"] = get_target_price_data(ticker=ticker, as_of=as_of, relational_db=relational_db)
-            result["macro_data"] = get_macro_data(as_of=as_of, relational_db=relational_db)
-        if not intent and query:
-            result["documents"] = documents(None, 5)
+            tasks = {"target_prices": target_prices, "macro_data": macro_data}
+            if query:
+                tasks["documents"] = lambda: documents(None, 5)
+            fetched = run_parallel({**tasks, **tier_task})
+            result.update({key: fetched[key] for key in tasks})
 
     elif agent_type == "simulation":
-        result = {
-            "ticker":        ticker,
-            "agent_type":    agent_type,
-            "target_prices": get_target_price_data(ticker=ticker, as_of=as_of, relational_db=relational_db),
-            "price_data":    get_price_data(ticker=ticker, as_of=as_of, relational_db=relational_db),
-            "macro_data":    get_macro_data(as_of=as_of, relational_db=relational_db),
-        }
+        tasks = {"target_prices": target_prices, "price_data": price_data, "macro_data": macro_data}
+        fetched = run_parallel({**tasks, **tier_task})
+        result = {"ticker": ticker, "agent_type": agent_type, **{key: fetched[key] for key in tasks}}
 
     else:
         logger.warning(f"알 수 없는 agent_type: {agent_type}")
@@ -155,10 +178,11 @@ def get_agent_context(
             "agent_type": agent_type,
             "error":      f"지원하지 않는 agent_type: {agent_type}",
         }
+        fetched = run_parallel(tier_task)
 
     result["intent"] = intent
     result["as_of"] = as_of
-    tier = _data_tier(ticker, data_status)
+    tier = fetched["_tier"]
     result["data_tier"] = tier["data_tier"]
     if "error" in tier:
         result.setdefault("error", tier["error"])  # agent_type 오류가 있으면 그것을 남긴다
@@ -192,9 +216,14 @@ def _agenda_documents(search_documents, ticker: str, intent: str, query: Optiona
     semantic, keyword = (query, f"{query} {terms}") if query else (terms, terms)
     quotas = _quotas(DEBATE_TOP_K, len(types))
     found, modes, failed = {}, [], []
-    for document_type, quota in zip(types, quotas):
-        searched = search_documents(query=semantic, keyword_query=keyword, ticker=ticker, document_type=document_type,
-                                    top_k=quota * OVERSAMPLE, as_of=as_of)
+    # 문서 종류마다 따로 찾는 검색은 서로 기다리지 않으므로 동시에 돌린다(결과는 종류 순서대로 모은다)
+    searches = run_parallel({
+        document_type: (lambda document_type=document_type, quota=quota: search_documents(
+            query=semantic, keyword_query=keyword, ticker=ticker, document_type=document_type,
+            top_k=quota * OVERSAMPLE, as_of=as_of))
+        for document_type, quota in zip(types, quotas)
+    })
+    for document_type, searched in searches.items():
         if searched.get("reason"):
             failed.append(document_type)
         else:
@@ -289,21 +318,31 @@ def pick_diverse(found: dict[str, list[dict]], quotas: dict[str, int], total: in
 # ---------------------------------------------------------------------------
 # 아젠다 블록 (#84 ②)
 
-def _agenda_blocks(ticker: str, intent: str, as_of: str, metrics: Optional[list] = None) -> dict:
-    """아젠다 블록들. 블록 하나가 실패해도 나머지는 준다. metrics는 같은 묶음의 지표(목표가 상승여력의 종가)."""
+def _agenda_blocks(ticker: str, intent: str, as_of: str, metrics=None) -> dict:
+    """아젠다 블록들. 블록 하나가 실패해도 나머지는 준다. metrics는 같은 묶음의 지표(목표가 상승여력의 종가)이고,
+    목록이나 목록을 돌려주는 함수(다른 스레드에서 계산 중인 지표의 future.result)를 받는다.
+    블록은 동시에 만든다. 매크로 블록은 민감도 결과를 쓰므로 민감도 조회는 한 번만 하고 그것을 기다린다."""
     names = AGENDA_BLOCKS[intent]
     if not names:
         return {}
-    sensitivities = _sensitivities_block(ticker, as_of) if "sensitivities" in names or "macro" in names else None
+    metrics_of = metrics if callable(metrics) else (lambda: metrics)
+    if "sensitivities" in names or "macro" in names:
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            sensitivities_future = pool.submit(_sensitivities_block, ticker, as_of)
+            return _build_blocks(ticker, intent, as_of, names, metrics_of, sensitivities_future.result)
+    return _build_blocks(ticker, intent, as_of, names, metrics_of, lambda: None)
+
+
+def _build_blocks(ticker, intent, as_of, names, metrics_of, sensitivities_of) -> dict:
     builders = {
-        "target_price": lambda: _target_price_block(ticker, as_of, metrics or []),
+        "target_price": lambda: _target_price_block(ticker, as_of, metrics_of() or []),
         "financials": lambda: _financials_block(ticker, as_of),
         "disclosures": lambda: _disclosures_block(ticker, intent, as_of),
-        "macro": lambda: _macro_block(ticker, as_of, sensitivities),
+        "macro": lambda: _macro_block(ticker, as_of, sensitivities_of()),
         "index": lambda: _index_block(ticker, as_of),
-        "sensitivities": lambda: sensitivities,
+        "sensitivities": sensitivities_of,
     }
-    return {name: builders[name]() for name in names}
+    return run_parallel({name: builders[name] for name in names})
 
 
 def _block(ticker: str, name: str, source: str, block_as_of, content: dict, error=None) -> dict:

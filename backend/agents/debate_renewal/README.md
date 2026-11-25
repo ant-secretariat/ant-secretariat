@@ -15,6 +15,7 @@
 | 기준선 비교 실험 루브릭(6항목)·문항(48개)·블라인드 채점 집계(승률 포함) | 완료 (테스트 13개) — 실험 실행은 출력 생성 후 |
 | Bull·Bear·Judge 프롬프트 v3 (`prompts/`, 메시지 조립·strict 출력 스키마) | 완료 (테스트 13개) — LLM 호출은 run_debate 연동 때 |
 | Solar 호출 클라이언트 (`llm.py`, strict json_schema + Pydantic 검증, 형식 오류 1회 재요청) | 완료 (테스트 11개) |
+| 단일 모드 `run_debate` (`service.py`: 근거 → 아젠다별 Bull→Bear 병렬 → Judge → DebateResult → L1, 이벤트 emit 주입) | 완료 (테스트 11개, 실데이터 2종목 확인) |
 | 근거 부족 루프, 비교 모드 실행, 2라운드 프롬프트 | 예정 |
 
 ## 실행
@@ -48,6 +49,8 @@ backend/agents/debate_renewal/
   prompts/                  # Bull·Bear·Judge 프롬프트 v3 문구·메시지 조립·Judge 출력 모양 (LLM 호출 없음)
   config.py                 # 모델·온도·타임아웃 (DEBATE_RENEWAL_LLM_* 환경변수로 덮어씀)
   llm.py                    # Solar 구조화 출력 호출 complete_structured()
+  evidence.py               # 검색 결과 → Evidence(S1…), chunk_id 중복 제거
+  service.py                # 단일 모드 run_debate()
   data/keyword_dictionary.json
   data/intent_data_sources.json   # 수경 제안값 반영 (소유자는 데이터 에이전트)
 ```
@@ -62,3 +65,7 @@ backend/agents/debate_renewal/
 - 토론 모델 `solar-pro-4`, 온도 0.2, 타임아웃 60초, SDK 재시도 2회는 임시값. 11/23 프로브에서 pro-4·mini-4 모두 strict 스키마 통과(pro 약 2~4초, mini 약 1초). 기준선 평가(#51) 후 확정
 - 출력이 재요청 후에도 스키마와 다르면 `LLMOutputInvalidError`(지금은 503 `upstream_unavailable`). 전용 코드는 정책표(OQ-2) 확정 후
 - 환경변수 이름은 기존 `agents/debate`의 `DEBATE_LLM_MODEL`과 겹치지 않게 `DEBATE_RENEWAL_LLM_*`
+- `run_debate` claim_id: 프롬프트는 아젠다마다 `B1`·`R1`부터 매기고, 코드가 아젠다 ID를 앞에 붙인다(`valuation-B1`). L1이 결과 전체에서 유일한 id를 요구해서
+- 근거 본문 길이 `PREVIEW_CHARS` 600자, `data_richness`는 `data_tier == report`면 rich 그 외 limited (임시값)
+- 진행 이벤트는 계약 `JobEvent`(ADR 0009) 이름·payload: `data_collected`(문서 종류별 건수) → 아젠다마다 `claim_completed`(`role`·`agenda_id`·`claim`)·`bull_completed`·`bear_completed`(`agenda_id`·`claim_count`) → `judge_completed` → `verifying`. `job_started`·`completed`·`failed`는 워커
+- Judge가 아젠다 판정을 빠뜨리면 채우지 않고 `LLMOutputInvalidError`

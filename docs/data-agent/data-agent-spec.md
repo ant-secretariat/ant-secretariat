@@ -100,7 +100,7 @@
 | `resolve_company(company_input)` | 종목 특정. 확정이면 종목코드·이름·업종·시총·티어·우선주·`data_status`, 애매하면 후보 목록 | ✅ |
 | `search_companies(query, limit=10)` | 종목 후보 검색(완전일치 → 별칭 → 접두어 → 초성, 같으면 시총순) | ✅ |
 | `extract_company_mentions(text)` | 문장 속 종목 찾기 | ✅ 조회 실패를 빈 목록과 구분하는 일은 #88 리뷰 중 |
-| `search_documents(query, ticker, …, as_of, mode)` | 리포트·뉴스·공시 조각 검색(기본 하이브리드). 결과에 `chunk_id`, `doc_id`, 제목, 출처, 증권사, `broker_key`, 날짜, 본문. `keyword_query`를 주면 키워드 검색에만 씀(#106) | ✅ |
+| `search_documents(query, ticker, …, as_of, mode)` | 리포트·뉴스·공시 조각 검색(기본 하이브리드). 결과에 `chunk_id`, `doc_id`, 제목, 출처, 증권사, `broker_key`, 날짜, 본문. `keyword_query`를 주면 키워드 검색에만 씀(#106) | ✅ 종목 필터 GIN 색인(#111)·`chunk_type` 인자(#112)는 리뷰 중 |
 | `get_chunks_by_ids(chunk_ids)` | 청크 ID로 본문 꺼내기(입력 순서대로, 없는 ID는 `missing`) | ✅ |
 | `get_report_metadata`, `get_report_chunks` | 리포트 목록, 리포트 조각 전체 | ✅ |
 | `get_target_price_data(ticker, …, as_of, revision_window_days)` | 증권사 목표가·의견 이력과 컨센서스(최근 180일, 증권사별 최신 1건, `broker_key`로 묶음), 개정 수 `revisions`(기본 90일) | ✅ #75, #105 |
@@ -110,12 +110,12 @@
 | `get_financials(ticker, period_type, …, as_of)` | 분기·연간 재무(공시 접수일 기준, 연결/별도 표시) | ✅ |
 | `get_market_snapshot(sector, top_n, sort_by, as_of)` | 조건에 맞는 종목 목록(WICS 업종) | ✅ 지금은 T1 안에서만 |
 | `get_derived_snapshot(ticker, as_of)` | 계산 근거 4묶음: 밸류에이션 위치, 주가 흐름(수익률·변동성·52주 위치), 실적 추세, 수급 | ✅ 한 묶음 실패 시 전부 비는 문제는 #88 리뷰 중, 표본 부족 시 값이 나가는 문제 남음 |
-| `get_metric(ticker, metric_id, as_of)` | 지표 하나를 정해진 정의로 계산(22개: 시세·밸류에이션 10, 재무 4, 수급 5, 지분공시 3). 표시용 `display` 포함 | ✅ |
+| `get_metric(ticker, metric_id, as_of)` | 지표 하나를 정해진 정의로 계산(22개: 시세·밸류에이션 10, 재무 4, 수급 5, 지분공시 3). 표시용 `display` 포함. PER·EPS가 비면 직전 사업연도 적자인지 확인(`loss_making`) | ✅ #113 |
 | `get_metrics(ticker, metric_ids, as_of)` | 여러 지표를 DB 연결 하나로 계산(지표마다 연결을 열면 약 0.35초씩 듦) | ✅ #108 |
 | `get_index_data(indexes, as_of, days)` | 코스피·코스닥(·코스피200) 일별 종가 | ✅ #109 |
 | `get_sensitivities(ticker, as_of)` | 종목의 시장 효과를 뺀 매크로 민감도(일별 3, 월별 3) | ✅ #109 |
 | `get_available_data_status(ticker, as_of)` | 데이터 보유 상태. 소스 11개(리포트·뉴스·공시·시세·매크로·목표가·재무·수급·지분공시·민감도·계산 근거)의 건수와 최신일, `simulation_ready` | ✅ `as_of`(기준일 이전 파라미터로 `simulation_ready` 판정)는 #103 리뷰 중 |
-| `get_agent_context(ticker, agent_type, query, intent, data_status, as_of)` | 에이전트별 데이터 묶음. `data_tier`·`as_of` 항상 포함 | 🟡 intent별 묶음(4절): 문서 검색 #106, 지표 #108 머지. 블록 #110 리뷰 중, 계산 근거 블록은 #88 뒤 |
+| `get_agent_context(ticker, agent_type, query, intent, data_status, as_of)` | 에이전트별 데이터 묶음. `data_tier`·`as_of` 항상 포함 | 🟡 intent별 묶음(4절): 문서 검색 #106, 지표 #108, 블록·넓혀 찾기 #110 머지. 계산 근거 블록은 #88 뒤 |
 | `suggest_alternatives(ticker, n=3)` | 대안 종목: 커버 종목 중 같은 중분류 → 대분류 → 전체, 시총순 | 🟡 #85 리뷰 중 |
 | `ensure_company_data(ticker, user_id)` | T2 수집 예약 | Post-MVP |
 
@@ -414,16 +414,19 @@
 | 함수 계약 추가(`doc_id`, `broker_key`, `coverage_from`, `get_agent_context`의 `as_of`) | 수경 | ✅ #75 |
 | `suggest_alternatives` 머지 | 수경 (리뷰: 태은) | 🟡 #85 리뷰 중 |
 | 실패 표시(`resolve_company` 등, `extract_company_mentions`), 한국 날짜, `get_derived_snapshot` 묶음 문제 | 수경 | 🟡 #88·#90·#91 리뷰 중(#55, 12/6까지) |
-| `get_derived_snapshot` 표본 부족, 정정 리포트 중복 등 #41·#42·#55 조사 항목 | 수경 | ❌ |
+| 지분공시 지표(수집 전 기간·증감 0 보고), 월별 상관 `as_of` 문서화, 조사 5건(정정보고 중복 아님, 무상증자는 알려진 한계 등) | 수경 | 🟡 #111 리뷰 중 |
+| 적자 기업 PER·EPS 사유(`loss_making`) | 수경 | ✅ #113 |
+| `get_derived_snapshot` 표본 부족, `is_latest` 뷰(마이그레이션), 지배주주 순이익 적재 | 수경 | ❌ |
 | 아젠다 키워드 검색, 문서 종류별 몫·한 문서 2조각 | 수경 | ✅ #106 |
 | 아젠다별 지표 목록(`metrics`)과 지표 근거 ID | 수경 | ✅ #108 |
 | 지수·민감도 조회 함수(`get_index_data`, `get_sensitivities`) | 수경 | ✅ #109 |
-| 묶음 블록(`target_price`·`financials`·`disclosures`·`macro`·`index`·`sensitivities`), 블록 근거 ID, `evidence_id` → `chunk_id`, 문서 넓혀 찾기 | 수경 | 🟡 #110 리뷰 중 |
+| 묶음 블록(`target_price`·`financials`·`disclosures`·`macro`·`index`·`sensitivities`), 블록 근거 ID, `evidence_id` → `chunk_id`, 문서 넓혀 찾기, 컨센서스 최근 의견 수 | 수경 | ✅ #110 |
 | 계산 근거 블록(`valuation`·`fundamental_trend`·`price_trend`·`flow`) | 수경 | ❌ #88 머지 뒤 |
-| 과거 시점 `data_tier`, 묶음 속도(연결 공유·병렬) | 수경 | ❌ |
+| 과거 시점 `data_tier`, 묶음 속도(연결 공유·병렬, #111 머지 뒤 다시 잼) | 수경 | ❌ |
 | 목표가 방향 라벨 경계값 상수 | 수경 | ❌ #82 ADR 뒤 |
 | `simulation_ready`를 기준일로 판정(`as_of`) | 수경 | 🟡 #103 리뷰 중 |
-| `broker_key` 보강(`(주)` 떼기, 예외 사전 적용 기간), `chunk_type` 인자, 계약서 `DataStatus` 한국 날짜 명시 | 수경 | ❌ #73 (컨센서스 `broker_key` 묶기·`revisions`는 ✅ #105) |
+| `broker_key` 보강(`(주)` 떼기, 예외 사전 적용 기간), `chunk_type` 인자 | 수경 | 🟡 #112 리뷰 중 (컨센서스 `broker_key` 묶기·`revisions`는 ✅ #105, `DataStatus` 한국 날짜는 ✅ #75) |
+| 근거 조각 보존 규칙 문서(12절 Q3) | 수경 | 🟡 #114 리뷰 중 |
 | 평가셋: 종목 해석셋, 목표가 검수셋(9절) | 수경 | ❌ |
 | 남은 리포트 적재(11/9–11/17 117건) | 수경 | ✅ 11/24 완료. 7건은 PDF를 자르다 멈춤(PyMuPDF 오류), 따로 확인 필요 |
 | 뉴스 빈 기간(11/10–11/19) 채우기 | 수경 | ❌ DB 용량(Q1) 결정 뒤 |

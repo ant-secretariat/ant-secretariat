@@ -1,3 +1,4 @@
+import pytest
 from datetime import date
 
 from processing.functions.get_target_price_data import get_target_price_data
@@ -228,7 +229,8 @@ def test_get_target_price_data_applies_as_of_and_dates(monkeypatch):
 
     assert "broker_opinions_adjusted" in connection.query
     assert "superseded_at <= %s::date" in connection.query
-    assert connection.params == ["2026-06-20", "005930", "2026-06-20", "2026-01-01", "2026-06-30"]
+    # 기간은 조회 뒤에 거른다(개정을 세려면 date_from 이전의 직전 의견도 필요, #82)
+    assert connection.params == ["2026-06-20", "005930", "2026-06-20"]
     assert result["records"] == []
     assert result["consensus"]["avg_target_price"] is None
     assert result["consensus"]["broker_count"] == 0
@@ -247,3 +249,105 @@ def test_get_target_price_data_failure_does_not_stop_agents_or_leak_url(monkeypa
     assert result["target_prices"] == []
     assert result["summary"]["count"] == 0
     assert "SECRET" not in caplog.text
+
+
+def test_date_range_filters_records_but_not_revision_history(monkeypatch):
+    # 5/1 의견은 date_from 밖이라 records에는 없지만, 테스트증권 6/15 개정의 직전 의견으로는 쓴다
+    monkeypatch.setattr("crawling.db.postgres.connect", lambda: FakeSupabase(OPINION_ROWS))
+
+    result = get_target_price_data(ticker="005930", date_from="2026-06-01", as_of="2026-06-20")
+
+    assert [r["published_at"] for r in result["records"]] == ["2026-06-15", "2026-06-14", "2026-06-13", "2026-06-12"]
+    assert result["revisions"]["up"] == 1
+
+
+# 같은 증권사의 직전 → 최신 환산 목표가 개정 (#82)
+REVISION_ROWS = [
+    (date(2026, 11, 16), "키움", "BUY", "buy", "BUY", 290000, 290000, None, "삼성전자"),
+    (date(2026, 11, 10), "하나증권", "BUY", "buy", "BUY", 400000, 400000, None, "삼성전자"),
+    (date(2026, 11, 5), "같은증권", "BUY", "buy", "BUY", 300000, 300000, None, "삼성전자"),
+    (date(2026, 11, 1), "새증권", "BUY", "buy", None, 310000, 310000, None, "삼성전자"),
+    (date(2026, 10, 30), "목표가없음", "Hold", "hold", "BUY", None, None, None, "삼성전자"),
+    (date(2026, 8, 10), "키움", "BUY", "buy", "BUY", 350000, 350000, date(2026, 11, 16), "삼성전자"),
+    (date(2026, 7, 1), "하나증권", "BUY", "buy", "BUY", 1500000, 300000, date(2026, 11, 10), "삼성전자"),  # 분할 전
+    (date(2026, 6, 1), "같은증권", "BUY", "buy", "BUY", 300000, 300000, date(2026, 11, 5), "삼성전자"),
+    (date(2026, 5, 1), "목표가없음", "BUY", "buy", "BUY", 280000, 280000, date(2026, 10, 30), "삼성전자"),
+    (date(2026, 7, 20), "오래된증권", "BUY", "buy", "BUY", 330000, 330000, None, "삼성전자"),      # 90일 밖
+    (date(2026, 3, 1), "오래된증권", "BUY", "buy", "BUY", 300000, 300000, date(2026, 7, 20), "삼성전자"),
+]
+
+
+def test_revisions_count_changes_from_previous_opinion_of_same_broker(monkeypatch):
+    monkeypatch.setattr("crawling.db.postgres.connect", lambda: FakeSupabase(REVISION_ROWS))
+
+    revisions = get_target_price_data(ticker="005930", as_of="2026-11-23")["revisions"]
+
+    # 하향 키움, 상향 하나(분할 환산값으로 비교: 30만 → 40만), 같은 가격 같은증권, 첫 의견 새증권
+    # 최신 의견에 목표가가 없는 증권사와 최신 의견이 90일 밖인 증권사는 세지 않는다
+    assert {k: revisions[k] for k in ("window_days", "up", "down", "unchanged", "new")} == {
+        "window_days": 90, "up": 1, "down": 1, "unchanged": 1, "new": 1}
+    kiwoom = next(b for b in revisions["brokers"] if b["broker"] == "키움")
+    assert kiwoom == {"broker": "키움", "broker_key": "키움",
+                      "prev_date": "2026-08-10", "prev": 350000, "latest_date": "2026-11-16", "latest": 290000,
+                      "change_pct": -17.14}
+    new = next(b for b in revisions["brokers"] if b["broker"] == "새증권")
+    assert (new["prev_date"], new["prev"], new["change_pct"]) == (None, None, None)
+    assert [b["latest_date"] for b in revisions["brokers"]] == sorted((b["latest_date"] for b in revisions["brokers"]), reverse=True)
+
+
+def test_revision_window_is_an_argument(monkeypatch):
+    monkeypatch.setattr("crawling.db.postgres.connect", lambda: FakeSupabase(REVISION_ROWS))
+
+    revisions = get_target_price_data(ticker="005930", as_of="2026-11-23", revision_window_days=180)["revisions"]
+
+    assert revisions["window_days"] == 180
+    assert revisions["up"] == 2   # 오래된증권(7/20 상향)이 들어온다
+
+
+@pytest.mark.parametrize("window", [0, -1, "90"])
+def test_revision_window_must_be_positive_int(monkeypatch, window):
+    monkeypatch.setattr("crawling.db.postgres.connect", lambda: FakeSupabase([]))
+    with pytest.raises(ValueError):
+        get_target_price_data(ticker="005930", revision_window_days=window)
+
+
+def test_revisions_unknown_on_failure(monkeypatch):
+    def fail():
+        raise RuntimeError("down")
+
+    monkeypatch.setattr("crawling.db.postgres.connect", fail)
+
+    result = get_target_price_data(ticker="005930")
+
+    # 모르는 개정 수를 0으로 두면 "개정 없음"으로 읽힌다
+    assert result["error"] == "target_price_unavailable" and result["revisions"] is None
+
+
+def test_renamed_broker_is_one_broker_for_revisions_and_consensus(monkeypatch):
+    # 하이투자증권 → iM증권(2024): 옛 이름의 의견도 같은 증권사의 직전 의견이다(#105 리뷰)
+    rows = [
+        (date(2026, 11, 10), "iM증권", "BUY", "buy", "BUY", 120000, 120000, None, "삼성전자"),
+        (date(2026, 9, 1), "하이투자증권", "BUY", "buy", "BUY", 100000, 100000, None, "삼성전자"),
+    ]
+    monkeypatch.setattr("crawling.db.postgres.connect", lambda: FakeSupabase(rows))
+
+    result = get_target_price_data(ticker="005930", as_of="2026-11-23")
+
+    assert (result["revisions"]["up"], result["revisions"]["new"]) == (1, 0)
+    (broker,) = result["revisions"]["brokers"]
+    assert (broker["broker"], broker["broker_key"], broker["prev"]) == ("iM증권", "IM", 100000)
+    # 컨센서스도 같은 증권사의 최신 1건만 쓴다
+    assert result["consensus"]["broker_count"] == 1 and result["consensus"]["avg_target_price"] == 120000
+
+
+def test_zero_previous_target_is_not_used(monkeypatch):
+    rows = [
+        (date(2026, 11, 10), "한증권", "BUY", "buy", "BUY", 120000, 120000, None, "삼성전자"),
+        (date(2026, 9, 1), "한증권", "BUY", "buy", "BUY", 0, 0, date(2026, 11, 10), "삼성전자"),
+    ]
+    monkeypatch.setattr("crawling.db.postgres.connect", lambda: FakeSupabase(rows))
+
+    revisions = get_target_price_data(ticker="005930", as_of="2026-11-23")["revisions"]
+
+    # 0으로 나누지 않고, 쓸 수 있는 직전 목표가가 없으니 첫 의견으로 센다
+    assert (revisions["new"], revisions["brokers"][0]["change_pct"]) == (1, None)

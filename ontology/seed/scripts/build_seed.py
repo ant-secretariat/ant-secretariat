@@ -1,8 +1,20 @@
-"""온톨로지 관계사전 시드 v0.7 생성 — 기획서 v1.2 엣지 7종 정의 기준
+"""온톨로지 관계사전 시드 v0.9 생성 — 기획서 v1.2 엣지 7종 정의 기준
 
 사용법: python build_seed.py <core_companies.csv> <출력 폴더>
   - core_companies.csv 는 수경 파이프라인 companies.is_core 내보내기 (extract_t1.py 로 형식 검증)
   - 출력 폴더의 ontology_seed.json 하나만 덮어쓴다 (원본은 이 파일 하나. 읽기는 ontology_seed.py 로더)
+
+v0.9 변경 (#56 종목 단위 값, 유민 제안 기준 — 이 PR 리뷰가 팀 합의)
+  - 종목 → 매크로 SENSITIVE_TO 10개 추가(src_type COMPANY). 기준: 시장 효과 뺀 값의 95% 구간이 0 미포함,
+    |값| ≥ 0.10, 경제적 가설이 있고 부호가 같음, 가설 엣지끼리 BH 보정 q < 0.05(수경 제안). weight 는 시장 효과를 뺀 값(market_adjusted True)
+  - 로더 company_context 에 company_sensitivities 추가
+
+v0.8 변경 (수경 #61 온톨로지 입력값 2026-11-23, 유민 결정 #61 코멘트)
+  - MACRO direction: 데이터(시장과 지표 변화 상관, Fisher 95%)와 초안이 같은 4개(KTB_3Y_KR·KTB_10Y_KR up_negative,
+    USD_KRW·BRENT mixed)만 direction_evidence 를 붙이고 draft_fields 에서 뺀다. 나머지는 초안 유지
+  - IMPACTS: CPI_KR → BASE_RATE_KR(same) 하나만 데이터로 확인돼 active. 나머지는 unclear 라 draft 유지
+  - COMPANY: is_holding 을 KRX KIND(법적 지주) + 사업형 지주로 확정(holding_type), sub_industry 는 KIND 후보를
+    고쳐 확정한 34개만 노출. 섹터 rate·fx 등급은 계속 초안(시장 효과를 빼면 섹터 단위 신호가 없음)
 
 v0.7 변경 (수경 PR #29 검증 코멘트 2026-11-23, 유민 결정)
   - needs_review 였던 SENSITIVE_TO 9개 → status "rejected" (시장 효과를 빼면 관계가 남지 않음, REJECTED 표에 근거)
@@ -132,11 +144,63 @@ for _m in MACROS:
     _m["inactive_reason"] = None if _p else "no_data_source"
     if not _p:
         _m["notes"] += " 수집 계획 없음(수경 2026-11-10) — 필요하면 추가 요청."
+# v0.8: 방향 근거 (수경 #61, crawling.ontology_inputs #62, as_of 2026-11-23). 시장(일별 코스피 수익률, 월별 핵심 종목
+# 동일가중 평균)과 지표 변화의 상관. 신뢰구간이 0을 포함하지 않으면 up_positive/up_negative, 아니면 mixed.
+# 데이터 판정이 초안과 같은 것만 확정한다. BASE_RATE_KR·CPI_KR(초안 up_negative)·DRAM_EXPORT_PRICE(초안 up_positive)는
+# 데이터가 mixed 라 초안 유지. KOSPI 는 시장 자체라 계산 대상이 아니다.
+_DIR_SRC = "수경 #61 2026-11-23 (crawling.ontology_inputs, PR #62)"
+DIRECTION_EVIDENCE = {  # indicator_id: (method, corr, ci_low, ci_high, n)
+    "KTB_3Y_KR": ("corr_daily_with_kospi", -0.164, -0.23, -0.09, 727),
+    "KTB_10Y_KR": ("corr_daily_with_kospi", -0.132, -0.20, -0.06, 727),
+    "USD_KRW": ("corr_daily_with_kospi", -0.005, -0.08, 0.07, 727),
+    "BRENT": ("corr_monthly_with_core_market", 0.131, -0.05, 0.30, 120),
+}
+
+
+def _dir_from_ci(lo, hi):
+    return "up_positive" if lo > 0 else "up_negative" if hi < 0 else "mixed"
+
+
+for _m in MACROS:
+    _ev = DIRECTION_EVIDENCE.get(_m["indicator_id"])
+    _m["direction_evidence"] = None
+    if _ev:
+        method, corr, lo, hi, n = _ev
+        assert _dir_from_ci(lo, hi) == _m["direction"], ("데이터 판정과 초안이 다르면 확정하지 않는다", _m["indicator_id"])
+        _m["direction_evidence"] = dict(source=_DIR_SRC, method=method, as_of="2026-11-23", corr=corr,
+                                        ci95=[lo, hi], n=n, decided_by="유민", decided_on="2026-11-23")
+        _m["draft_fields"] = ["notes"]
 INACTIVE_MACROS = {m["indicator_id"] for m in MACROS if m["status"] == "inactive"}
 
 # ───────────────────────── 5. COMPANY (T1 = 수경 파이프라인 core 100) ─────────────────────────
 # 종목·시장·섹터는 파이프라인 값 그대로. 지주사 여부·세부 산업은 Claude 초안(섹터 상속 보정용).
-HOLDINGS = {"402340", "028260", "034730", "009540", "003550", "180640", "267250", "000150", "0126Z0", "078930", "006260", "000880"}
+# v0.8: 지주사 확정 (유민 2026-11-23, #61). KRX KIND 상장법인목록은 100종목 모두 있어 is_holding 은 전부 검토 끝(노출).
+#   legal     = KIND 업종·주요제품·이름으로 확인한 지주회사
+#   financial = 금융지주 (KB금융은 이름 규칙에 안 걸렸지만 금융지주회사라 넣음)
+#   business  = 법적 지주는 아니지만 자회사 지분 가치가 큰 사업형·중간 지주 (v0.7 이전 시드 목록)
+HOLDING_TYPE = {
+    "003550": "legal", "005490": "legal", "0126Z0": "legal", "034730": "legal", "078930": "legal",
+    "180640": "legal", "267250": "legal", "402340": "legal",
+    "105560": "financial", "055550": "financial", "071050": "financial", "086790": "financial",
+    "138040": "financial", "316140": "financial",
+    "028260": "business", "009540": "business", "000150": "business", "006260": "business", "000880": "business",
+}
+HOLDINGS = set(HOLDING_TYPE)
+# v0.8: 세부 산업 확정. KIND 후보(#61 SUB_INDUSTRY_RULES)를 유민이 검토해 고친 값만 노출한다.
+#   고친 것: 한화솔루션 방산→화학·태양광, 한화시스템 전자부품·PCB→방산·ICT, 레인보우로보틱스 반도체 장비→로봇,
+#   리노공업 전자부품·PCB→반도체 테스트 소켓, LG이노텍→카메라모듈·기판, 삼성전기→MLCC·패키지기판, 두산→전자소재(CCL),
+#   포스코퓨처엠·에코프로비엠 2차전지→2차전지 소재(양극재), SK이노베이션 정유→정유·배터리
+SUB_REVIEWED = {
+    "000150": "전자소재(CCL)", "000500": "전선", "003490": "항공운송", "003670": "2차전지 소재(양극재·음극재)",
+    "006400": "2차전지", "007660": "PCB", "009150": "MLCC·패키지기판", "009830": "화학·태양광",
+    "010120": "전력기기", "010140": "조선", "010950": "정유", "011070": "카메라모듈·기판",
+    "011200": "컨테이너 해운", "012450": "방산·항공엔진", "034020": "원전·발전설비", "036930": "반도체 장비",
+    "039030": "반도체 장비(레이저)", "042660": "조선", "042700": "반도체 장비", "047810": "방산·항공",
+    "058470": "반도체 테스트 소켓", "062040": "전력기기(변압기)", "079550": "방산", "086280": "자동차 물류",
+    "096770": "정유·배터리", "240810": "반도체 장비", "247540": "2차전지 소재(양극재)", "267260": "전력기기",
+    "272210": "방산·ICT", "277810": "로봇", "298040": "전력기기", "329180": "조선", "353200": "PCB",
+    "373220": "2차전지",
+}
 SUB = {  # 세부 산업 메모 (탐색 시 섹터 상속 보정용)
  "373220":"2차전지","006400":"2차전지","003670":"양극재","402340":"SK하이닉스 지분 투자회사",
  "009540":"조선 중간지주","0126Z0":"삼성바이오에피스 지주","078930":"정유 중심 지주",
@@ -144,6 +208,7 @@ SUB = {  # 세부 산업 메모 (탐색 시 섹터 상속 보정용)
  "034020":"원전·발전설비","267260":"전력기기","298040":"전력기기","010120":"전력기기","000500":"전선",
  "062040":"전력기기(변압기)","007660":"PCB","353200":"PCB","042700":"반도체 장비",
 }
+SUB = {**SUB, **SUB_REVIEWED}
 COMPANIES = []
 with open(RAW, encoding="utf-8-sig") as f:
     for row in csv.DictReader(f):
@@ -151,12 +216,14 @@ with open(RAW, encoding="utf-8-sig") as f:
         COMPANIES.append(dict(
             ticker=code, name=row["name"], market=row["market"], sector_id=WICS_L1[row["sector_l1"]],
             sector_l1=row["sector_l1"], sector_l2=row["sector_l2"], sub_industry=SUB.get(code),
-            is_holding=code in HOLDINGS, tier="T1", is_core=True, tier_assigned_on=TIER_ASSIGNED,
-            sector_source="pipeline:companies.sector_l1(WICS)", sub_industry_source="claude_draft",
-            status="active", reviewed=True, draft_fields=["sub_industry", "is_holding"]))
+            is_holding=code in HOLDINGS, holding_type=HOLDING_TYPE.get(code), tier="T1", is_core=True,
+            tier_assigned_on=TIER_ASSIGNED, sector_source="pipeline:companies.sector_l1(WICS)",
+            sub_industry_source=("krx_kind+review(#61)" if code in SUB_REVIEWED else "claude_draft" if code in SUB else None),
+            holding_source="krx_kind+review(#61)",
+            status="active", reviewed=True, draft_fields=[] if code in SUB_REVIEWED else ["sub_industry"]))
 TICKERS = {c["ticker"]: c["name"] for c in COMPANIES}
 assert len(COMPANIES) == 100 and len(TICKERS) == 100, "core는 100종목·중복 없음이어야 한다"
-assert HOLDINGS <= set(TICKERS) and set(SUB) <= set(TICKERS), "HOLDINGS/SUB에 core에 없는 종목이 있다"
+assert HOLDINGS <= set(TICKERS) and set(SUB) <= set(TICKERS) and len(SUB_REVIEWED) == 34, "HOLDINGS/SUB에 core에 없는 종목이 있다"
 
 # ───────────────────────── 3. ISSUE + BENEFITS/HURTS ─────────────────────────
 # 필수 속성(v1.2): evidence_chunk_ids(근거 청크), valid_from/valid_to(유효기간). 채워지고 검수되기 전에는 노출 안 됨
@@ -427,6 +494,121 @@ def _sens_edge(s, m, sign, why):
                 weight_frequency=freq, merged_from=MERGED_FROM.get((s, m), []), rationale=why)
 SENSITIVE = [_sens_edge(*t) for t in SENS]
 
+# v0.9: 종목 → 매크로 SENSITIVE_TO (#56, 수경 종목 단위 값 2026-11-23). 섹터 중앙값은 관련 없는 종목이 섞여 작아지지만
+# 핵심 종목은 시장 효과를 빼도 관계가 남는다. 노출 기준(유민 제안, PR 리뷰로 합의):
+#   1) 시장 효과 뺀 값의 95% 구간이 0을 포함하지 않음  2) |값| ≥ 0.10  3) 경제적 가설이 있고 부호가 같음
+#   4) 가설 엣지끼리 BH 보정한 q값 < 0.05 (수경 #56 제안 2026-11-23: 보정은 "몇 개를 봤는가"에 맞춘다.
+#      가설 없이 데이터에서 찾는 관계는 지표별 99종목 q값으로 거른다 — 지금은 넣지 않음)
+# 3)은 다중 비교 대비다(지표마다 99종목이라 5% 기준이면 우연히 ~5개가 확실로 나옴). 가설 없이 데이터에서만 나온 관계
+# (레인보우로보틱스→D램, 크래프톤→CPI, 은행·보험→유가 등)와 가설과 부호가 반대인 관계(에이피알→원/달러)는 넣지 않는다.
+CO_SENS_MIN = 0.10
+# 운영 규칙 (수경 #64 리뷰 2026-11-23, ADR 0003 개정에서 확정):
+#   - 이 10개는 방향 확실 68개를 본 뒤 가설을 붙였다(hypothesis_preregistered False). 목록·가설을 여기 고정하고,
+#     다음 월간 계산부터 같은 목록을 새 값으로 다시 판정한다. 새 엣지는 가설을 먼저 적고 값을 본다
+#   - 다시 판정해서 기준에서 한 번 떨어지면 needs_review(노출 멈춤), 두 달 연속이면 rejected
+#   - 근거 칩은 chip_text(인과가 아닌 "경향")를 쓰고, rationale 은 "왜 그럴 수 있는지"로만 쓴다
+CO_HYPOTHESIS_FIXED_ON = "2026-11-23"
+# 값은 ontology_sensitivity_inputs(#67) 스냅샷을 내보낸 CSV에서 읽는다(ADR 0011 6번, 손으로 옮기지 않음).
+# 다시 만들기: python ontology/seed/scripts/export_sensitivity_inputs.py <as_of>  → 아래 날짜를 바꾼다
+CO_INPUTS_AS_OF = "2026-11-23"
+# 직전 기준일. 다음 달 CSV를 넣을 때 이전 CSV는 지우지 않고 여기에 그 날짜를 적는다(두 달 연속 탈락 → rejected, ADR 0011 4번)
+CO_PREV_INPUTS_AS_OF = None
+CO_Q_MAX = 0.05
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from co_hypotheses import CO_HYPOTHESES, co_failed_criteria, co_status  # noqa: E402
+
+
+def bh_q_values(ps):
+    """Benjamini-Hochberg q값 (#62 crawling.analytics.ontology_inputs.bh_q_values 와 같은 계산)."""
+    m = len(ps)
+    order = sorted(range(m), key=lambda i: ps[i])
+    q, running = [0.0] * m, 1.0
+    for rank in range(m, 0, -1):
+        i = order[rank - 1]
+        running = min(running, ps[i] * m / rank)
+        q[i] = running
+    return q
+
+
+def _load_inputs(as_of):
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", f"sensitivity_inputs_{as_of}.csv")
+    with open(path, encoding="utf-8") as f:
+        rows = {(r["group_id"], r["factor"]): r for r in csv.DictReader(f)}
+    assert all(r["as_of"] == as_of for r in rows.values()), f"CSV 기준일이 {as_of}와 다름"
+    return rows
+
+
+def _q_hyp(rows):
+    """가설 엣지끼리 BH 보정(ADR 0011 2-4). 값이 없는 가설도 개수에 넣고 p=1로 둔다(덜 낙관적, 수경 #80 리뷰)."""
+    keys = [(tk, m) for tk, m, *_ in CO_HYPOTHESES]
+    qs = bh_q_values([float(rows[k]["p_value"]) if k in rows else 1.0 for k in keys])
+    return {k: q for k, q in zip(keys, qs) if k in rows}
+
+
+def _failed(rows, q_hyp, tk, m, sign):
+    """그 기준일 판정에서 못 넘은 기준. 값이 없으면 no_input."""
+    row = rows.get((tk, m))
+    return ["no_input"] if row is None else co_failed_criteria(row, sign, round(q_hyp[(tk, m)], 6), CO_SENS_MIN, CO_Q_MAX)
+
+
+CO_ROWS = _load_inputs(CO_INPUTS_AS_OF)
+CO_Q_HYP = _q_hyp(CO_ROWS)
+CO_PREV = None  # (직전 기준일 rows, q값)
+if CO_PREV_INPUTS_AS_OF:
+    _prev_rows = _load_inputs(CO_PREV_INPUTS_AS_OF)
+    CO_PREV = (_prev_rows, _q_hyp(_prev_rows))
+
+
+_MACRO_NAME = {mm["indicator_id"]: mm["name"] + (" 금리" if mm["category"] == "rate" and "금리" not in mm["name"] else "")
+               for mm in MACROS}
+
+
+def _ga(word):
+    """주격 조사 이/가 (마지막 글자 받침 여부)."""
+    c = ord(word[-1]) - 0xAC00
+    return "이" if 0 <= c < 11172 and c % 28 else "가"
+
+
+def _chip_text(m, adj, freq):
+    name = _MACRO_NAME[m]
+    if freq == "daily":
+        return f"시장 효과를 빼도 {name}{_ga(name)} 오르는 날 주가가 상대적으로 {'강한' if adj > 0 else '약한'} 경향 (일별, 최근 3년)"
+    return f"시장 효과를 빼도 주가가 다음 달 {name} 변화와 {'같은' if adj > 0 else '반대'} 방향으로 움직이는 경향 (월별)"
+
+
+def _co_sens_edge(tk, m, sign, why, prereg, fixed_on):
+    freq = WEIGHT_FREQ[m]
+    row = CO_ROWS.get((tk, m))
+    adj = round(float(row["adjusted"]), 3) if row else None
+    q_hyp = round(CO_Q_HYP[(tk, m)], 6) if row else None
+    failed = _failed(CO_ROWS, CO_Q_HYP, tk, m, sign)
+    prev_failed = _failed(*CO_PREV, tk, m, sign) if CO_PREV else []
+    # 한 번 떨어지면 needs_review(노출 멈춤), 직전 기준일에도 떨어졌으면 rejected (ADR 0011 4번)
+    status = co_status(failed, prev_failed)
+    review = ",".join(failed) or None
+    rejection = None if status != "rejected" else dict(
+        decided_by="규칙(ADR 0011 4번)", decided_on=CO_INPUTS_AS_OF,
+        reason=f"두 기준일 연속 기준 미달: {CO_PREV_INPUTS_AS_OF} {','.join(prev_failed)} / {CO_INPUTS_AS_OF} {review}")
+    f = (lambda k: float(row[k])) if row else (lambda k: None)
+    r3 = (lambda k: round(float(row[k]), 3)) if row else (lambda k: None)
+    # 칸 순서는 v0.9와 같게 둔다(시드 JSON diff를 줄이려고)
+    return edge("SENSITIVE_TO", tk, "COMPANY", m, "MACRO", status=status, reviewed=True,
+                source=f"ontology_sensitivity_inputs as_of {CO_INPUTS_AS_OF} (수경 #67, 계산 #62)",
+                method=row["method"] if row else "partial_corr_market_adjusted", as_of=CO_INPUTS_AS_OF,
+                inactive_reason=None, review_reason=review, rejection=rejection, market_adjusted=True,
+                weight=adj, weight_raw=r3("raw"), weight_ci95=[r3("ci_low"), r3("ci_high")] if row else None,
+                weight_n_obs=int(row["n_obs"]) if row else None, weight_p_value=f("p_value"),
+                weight_computed_at=row.get("computed_at") if row else None,
+                weight_q_value_hypothesis=q_hyp if row else None, weight_q_value_all=f("q_value"),
+                weight_window=(f"{row['window_start']}~{row['window_end']}" + (" 일별" if freq == "daily" else " 월별, t+1월 지표 변화")) if row else None,
+                weight_n_tickers=None, expected_sign=sign, sign_check=_sign_check(sign, adj) if row else None, weight_low_n=False,
+                weight_status="filled" if row else "missing", weight_frequency=freq, merged_from=[], rationale=why,
+                chip_text=_chip_text(m, adj, freq) if row else None, hypothesis_preregistered=prereg,
+                hypothesis_fixed_on=fixed_on, decided_by="유민", decided_on="2026-11-23")
+
+
+COMPANY_SENSITIVE = [_co_sens_edge(*h) for h in CO_HYPOTHESES]
+
 # IMPACTS: MACRO → MACRO (지표 간 전이). relation: same = 같은 방향, opposite = 반대 방향
 IMP = [
  ("US_FFR","US_10Y_YIELD","same","정책금리→장기금리"),("US_FFR","USD_KRW","same","미 금리↑ 달러 강세"),
@@ -438,10 +620,29 @@ IMP = [
  ("USD_CNY","USD_KRW","same","위안-원 동조화"),("CHINA_PMI_MFG","KOSPI","same","수출 경기"),
  ("DRAM_EXPORT_PRICE","KOSPI","same","반도체 지수 비중"),
 ]
-IMPACTS = [edge("IMPACTS", a, "MACRO", b, "MACRO", **{**DRAFT, "status": "inactive" if {a, b} & INACTIVE_MACROS else "draft"},
-                inactive_reason="no_data_source" if {a, b} & INACTIVE_MACROS else None,
-                inactive_macros=sorted({a, b} & INACTIVE_MACROS),
-                direction=rel, rationale=why) for a, b, rel, why in IMP]
+# v0.8: 데이터로 방향을 확인한 IMPACTS (수경 #61). 판정 기준: 상관은 신뢰구간이 0을 포함하지 않을 때,
+# 사건 분석(기준금리 변경 −1→+5거래일)은 같은 방향 65% 이상. 확인된 것은 CPI_KR → BASE_RATE_KR 하나.
+# 나머지(기준금리 → 국고채·환율 52~57%, 환율 → CPI, D램 → KOSPI)는 unclear 라 초안 유지.
+IMPACT_EVIDENCE = {
+    ("CPI_KR", "BASE_RATE_KR"): dict(method="corr_monthly_lag1", corr=0.166, ci95=[0.04, 0.29], n=240,
+                                     result="same", decided_by="유민", decided_on="2026-11-23"),
+}
+
+
+def _impact(a, b, rel, why):
+    off = {a, b} & INACTIVE_MACROS
+    ev = IMPACT_EVIDENCE.get((a, b))
+    if ev:
+        assert ev["result"] == rel, ("데이터 방향과 초안이 다르면 확정하지 않는다", a, b)
+        base = dict(status="active", reviewed=True, source="pipeline:macro_data (" + _DIR_SRC + ")",
+                    method=ev["method"], as_of="2026-11-23")
+    else:
+        base = {**DRAFT, "status": "inactive" if off else "draft"}
+    return edge("IMPACTS", a, "MACRO", b, "MACRO", **base, inactive_reason="no_data_source" if off else None,
+                inactive_macros=sorted(off), direction=rel, evidence=ev, rationale=why)
+
+
+IMPACTS = [_impact(*x) for x in IMP]
 
 BELONGS = [edge("BELONGS_TO", c["ticker"], "COMPANY", c["sector_id"], "SECTOR", status="active", reviewed=True,
                 source="pipeline:companies.sector_l1(WICS)", method="pipeline", as_of=CORE_EXPORT)
@@ -477,7 +678,9 @@ assert all(c == 1 for c in _rate_cnt.values()), _rate_cnt
 assert len({(e["src"], e["dst"]) for e in SENSITIVE}) == len(SENSITIVE), "SENSITIVE_TO 쌍 중복"
 
 nodes = dict(sectors=SECTORS, macros=MACROS, issues=ISSUES, companies_t1=COMPANIES)
-edges = dict(belongs_to=BELONGS, sensitive_to=SENSITIVE, impacts=IMPACTS,
+for e in COMPANY_SENSITIVE: assert e["src"] in TICKERS and e["dst"] in mac_ids and e["dst"] not in INACTIVE_MACROS, e
+assert len({(e["src"], e["dst"]) for e in COMPANY_SENSITIVE}) == len(COMPANY_SENSITIVE), "종목 SENSITIVE_TO 쌍 중복"
+edges = dict(belongs_to=BELONGS, sensitive_to=SENSITIVE + COMPANY_SENSITIVE, impacts=IMPACTS,
              benefits_hurts=IMPACT_EDGES, exposed_to=EXPOSED)
 # 노출 가능한 노드·엣지는 출처·방법·기준일이 반드시 있다 (헌법 원칙 IV)
 for k, v in edges.items():
@@ -489,7 +692,7 @@ for k, v in nodes.items():
     for n in v:
         assert isinstance(n["reviewed"], bool) and n["status"] in ("active", "draft", "inactive"), n
 assert set(REJECTED) <= {(e["src"], e["dst"]) for e in SENSITIVE}, "REJECTED에 없는 엣지가 있다"
-meta = dict(version="seed-v0.7", generated=GENERATED, spec="온톨로지 기획서 v1.2",
+meta = dict(version="seed-v0.10", generated=GENERATED, spec="온톨로지 기획서 v1.2",
             exposure_rule='status == "active" and reviewed == True (ADR 0008). draft_fields 는 include_draft 일 때만',
             merged_sensitive_edges=MERGED, inactive_macros=sorted(INACTIVE_MACROS),
             t1_definition="KOSPI+KOSDAQ 통합 시가총액 상위 100 보통주(우선주 제외). 수경 파이프라인 companies.is_core, 2026-10-22 지정 후 고정",
@@ -508,7 +711,8 @@ print("macros collecting:", sum(m["in_pipeline"] for m in MACROS), "/", len(MACR
 print("sensitive_to status:", {k: sum(e["status"] == k for e in SENSITIVE) for k in ("active", "needs_review", "rejected", "inactive")},
       "| weight_status:", {k: sum(e["weight_status"] == k for e in SENSITIVE) for k in ("filled", "not_available")},
       "| sign_check:", {k: sum(e["sign_check"] == k for e in SENSITIVE) for k in ("match", "mismatch", "near_zero")})
-print("impacts status:", {k: sum(e["status"] == k for e in IMPACTS) for k in ("draft", "inactive")})
+print("company sensitive_to:", len(COMPANY_SENSITIVE))
+print("impacts status:", {k: sum(e["status"] == k for e in IMPACTS) for k in ("active", "draft", "inactive")})
 print("exposed edges:", {k: sum(e["status"] == "active" and e["reviewed"] for e in v) for k, v in edges.items()})
 print("macros inactive:", sorted(INACTIVE_MACROS))
 print("BASE_RATE_KR 합침:", [(m["sector"], m["action"]) for m in MERGED])

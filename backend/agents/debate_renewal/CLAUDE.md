@@ -5,7 +5,7 @@
 ## 가장 중요한 규칙
 
 1. **기존 `backend/agents/debate/`는 재활용도 수정도 하지 않는다.** 1차 프로토타입이고 오케스트레이터가 아직 호출하므로 당분간 그대로 병행한다. 교체는 새 버전 완성·연동 후 별도 PR로 한다.
-2. **기준 문서는 `docs/debate-renewal/debate-agent-rebuild-spec-v3.0.html`** (토론 에이전트 리빌드 기획서 v3.0). 구현이 기획서와 다르면 코드를 맞추거나, 기획서를 바꿔야 하는 이유를 유민에게 먼저 묻는다. 온톨로지는 `docs/debate-renewal/ontology-spec-v1.2.html` (이번 범위에서는 인터페이스 참조용).
+2. **기준 문서는 `docs/debate-renewal/debate-agent-rebuild-spec-v3.0.md`** (토론 에이전트 리빌드 기획서 v3.0, 2026-11-22 HTML에서 옮김 · PR #20). 구현이 기획서와 다르면 코드를 맞추거나, 기획서를 바꿔야 하는 이유를 유민에게 먼저 묻는다. 온톨로지는 `docs/debate-renewal/ontology-spec-v1.2.html` (이번 범위에서는 인터페이스 참조용).
 3. 내 담당이 아닌 부분은 만들지 않고 인터페이스(Protocol·스텁)만 둔다.
 
 | 소유 | 항목 |
@@ -38,7 +38,7 @@
 - **라벨·담당자**: 수경 PR처럼 유형(`작업`/`문서`)·상태(`리뷰중`) 라벨과 담당자를 붙이고, 우리 에이전트 라벨 `토론 에이전트`를 함께 단다. `03 에이전트`는 쓰지 않는다
 - **Draft**: 방향 확인이 필요하면 Draft로 먼저 연다
 - **쌓인 PR(스택)**: 앞 PR이 머지되기 전에 그 위에서 다음 작업을 해야 하면, 다음 PR의 대상(base)을 앞 PR 브랜치로 열고 본문 맨 위에 인용문(`>`)으로 "N개 중 몇 번째, 머지 순서, 앞 PR 먼저 머지할 것, 앞 PR 머지 후 대상 변경은 작성자가 함"을 적는다 (PR #17 형식). 가능하면 main 기준 독립 PR을 우선한다
-- **PR 크기**: 400줄 이하. 기획서 HTML(`docs/debate-renewal/`)은 줄 수가 커서 코드 PR에서 빼고 별도 `docs:` PR로 올린다
+- **PR 크기**: 400줄 이하. 기획서(`docs/debate-renewal/`)는 줄 수가 커서 코드 PR에서 빼고 별도 `docs:` PR로 올린다
 - **리뷰어**: @taeeunni 한 명만 지정한다 (멀티에이전트 담당. `.github/CODEOWNERS` 기본값으로 자동 지정됨). 수경은 리뷰어로 추가하지 않고, 데이터 계약 관련 확인이 필요하면 "리뷰 포인트"에 `@멘션`만 한다
 
 ## 다른 쪽과 맞춰야 할 때 읽을 곳 (같은 레포)
@@ -58,32 +58,34 @@
 - 사실 층(근거·verdict·stance)은 사용자 성향과 무관하게 동일. 성향은 Judge의 `points_to_check`·`caution`에만 반영. **적합/부적합 label 노출 금지**
 - 비교 모드는 최대 2종목: 종목별 Bull→Bear(종목끼리 병렬) + Judge 축별 비교, 제시 순서 무작위화, 한쪽 실패 시 단일 분석으로 전환
 - 2라운드(D5)·시뮬레이션 버튼은 단일 모드 전용
-- job 상태: `queued → running → debate_completed → (단일) simulation_pending → … → completed/failed`. `simulation_handoff` 필드는 없다(삭제됨)
+- job 상태(계약 `RunDebateInput`, 오케스트레이터 기획서 v2.1 6.3): 단일 `queued → running → simulation_pending →(버튼) simulation_running → completed`, 비교 `queued → running → debate_completed`(종료), 실패는 `failed`. 버튼을 누르지 않으면 `simulation_pending`에 머문다. 상태 전환은 오케스트레이터 워커가 하고 `run_debate`는 결과만 돌려준다(#68 재리뷰에서 draft.6 반영 제안). `simulation_handoff` 필드는 없다(삭제됨)
 - 진행 이벤트는 노드·주장 단위(`node_started`·`claim_completed`·`agenda_completed`·`node_completed`). 토큰 단위 금지 (D8) — 단, 태은 쪽 확정 전까지는 제안 상태
 
 ## 구현 순서
 
 | # | 항목 | 상태 |
 | --- | --- | --- |
-| 1 | `precheck()` + 키워드 사전 + `intent_data_sources.json` 로더 | 완료 (24 tests). PR 2개로 나눠 병합: 계약·설정 로더 → 엔진·테스트 |
+| 1 | `precheck()` + 키워드 사전 + `intent_data_sources.json` 로더 | 완료 (24 tests). PR 2개로 나눠 병합: 계약·설정 로더 → 엔진·테스트. 관문1 결과 → precheck 입력 어댑터는 #72(ds-0.3.0: 매크로 아젠다는 종목 데이터 필요) |
 | 2 | 거절셋 수집 (`ReasonCode` 라벨) | v0.3 완료 (dev 47 + holdout 22 + holdout2 22문항, 측정기 `eval/refusal.py`). 사전 kw-0.3.1(holdout2 오답변율 20%). 남은 실패는 규칙으로 한계 — 경량 모델 승격 여부는 확정 필요 |
 | 3 | Pydantic 스키마: Evidence·Claim·DebateResult(단일→비교), Bull·Bear·Judge 출력 | 완료 (`schemas.py`, 10 tests) |
-| 3b | Bull·Bear·Judge 프롬프트 v3 (D6 `agreed_points`, Bear의 Bull Claim 인용) | 예정 |
-| 4 | 검증 레이어 L1 + 근거 부족 루프(1회 수정) | L1 완료 (`validation/l1.py`, 10 tests). 근거 부족 루프·1회 수정은 검색·LLM 연동 후 |
-| 5 | 기준선 비교 실험 루브릭 5~6항목 + 문항 30~50개 | 루브릭 6항목·문항 48개(6아젠다×8, qs-0.2.0)·블라인드 채점 집계(승률·항목별 일치율·재현 정보) 완료 (`eval/baseline/`, 13 tests). 실제 실험은 토론·단일 출력 생성 후 |
+| 3b | Bull·Bear·Judge 프롬프트 v3 (D6 `agreed_points`, Bear의 Bull Claim 인용) | #51 (pv-3.0.0, 승인됨). 기준선 비교표가 나오면 머지 |
+| 3c | Solar 호출 클라이언트 (strict json_schema + Pydantic, 형식 오류 1회 재요청) | #74 (모델 `solar-pro-4` 임시값) |
+| 3d | 단일 모드 `run_debate` (근거 → Bull→Bear 병렬 → Judge → L1, `emit`·`fetch_evidence` 주입) | #76 (실데이터 2종목 약 39초) |
+| 4 | 검증 레이어 L1 + 근거 부족 루프(1회 수정) | L1 완료 (`validation/l1.py`, 10 tests). 근거 부족 루프·1회 수정 진행 중(#76 위) |
+| 5 | 기준선 비교 실험 루브릭 5~6항목 + 문항 30~50개 | 루브릭 6항목·문항 48개(6아젠다×8, qs-0.2.0)·블라인드 채점 집계 완료 (`eval/baseline/`, 13 tests). 출력 생성기 #77. 48문항 실행은 #75(`get_agent_context(as_of)`) 머지 후, 채점은 #65 채점자 확정 후 |
 | 6 | 온톨로지 ISSUE 시드 20~30개 | 예정 (온톨로지 기획서) |
 
 ## 확정 필요한 임시값 (코드 곳곳에 TODO)
 
-- 비교 모드 Judge 판정은 종목별로 하나씩(`judge.per_company_verdict`, ticker → 판정)이고 `overall_verdict`는 단일 모드만 쓴다(유민 결정 2026-11-22). 계약 반영은 #46에 요청
+- 비교 모드 Judge 판정은 종목별로 하나씩(`judge.per_company_verdict`, ticker → 판정)이고 `overall_verdict`는 단일 모드만 쓴다(유민 결정 2026-11-22). 계약 draft.5(#46, 2026-11-23 머지)에 반영됨
 - ~~`ReasonCode.insufficient_data`~~ → 계약의 `no_data`로 확정(11/17, 계약 draft.5 PR #46). 다음 행동은 `choose_alternative_company`
-- 관문1 거절 코드(미커버 종목·3종목 이상·비교 한쪽 미커버)의 `envelope.py` 이름. 11/9 기준 회의에서 확정되지 않았다. precheck 밖이라 이 패키지는 정의하지 않고, 확정되면 `ReasonCode`에 추가한다
+- ~~관문1 거절 코드 이름~~ → 계약 draft.5(#46)에서 `uncovered_company`·`too_many_companies`·`partial_coverage`로 확정. 관문1은 오케스트레이터(태은) 담당이라 이 패키지의 `ReasonCode`에는 넣지 않는다(precheck가 쓰는 코드만 정의)
 - 거절셋 수치(rs-0.3.0, 사전 kw-0.3.0): dev 오답변율 5%·과잉거절 0%, holdout 20%·8.3%, **holdout2 20%**·0%(목표 ≤5%). holdout은 kw-0.2.0 실패를 본 뒤 규칙을 만들어 더는 깨끗하지 않고, holdout2가 확인용이다. 남은 실패는 아젠다 키워드(`금리`·`산업`)가 우연히 들어간 범위 밖 질의라 규칙으로는 한계가 있다. 기획서 D1대로 경량 모델 승격 여부 확정 필요. 질의에 종목명이 없을 때(`분석해줘`만 입력 등) 일반·약한 표현을 거절하는 규칙이 챗 UX에 맞는지도 확인 필요
 - 거절셋 수치(rs-0.2.0, 사전 kw-0.2.0): dev 오답변율 5%·과잉거절 0%, **holdout 오답변율 40%**(목표 ≤5%)·과잉거절 8%. dev는 튜닝에 썼으니 holdout이 실제 수준이다. 실패 원인은 "추천" 같은 투자 권유 단어 하나만 걸려도 통과하는 구조와 일반 단어 오탐. 기획서 D1대로 룰이 놓치는 비율이 높아 경량 모델 승격 대상인지 확정 필요. "주가가 왜 떨어졌어?"·"들고 있어도 돼?"는 범위 안으로 보고 사전에 반영했다(임시 판단)
 - 거절셋 기준선(rs-0.1.0, 사전 kw-0.1.0): 오답변율 35%(목표 ≤5%), 과잉거절률 22%. 주가 변동 이유("주가가 왜 떨어졌어?")·보유 여부("들고 있어도 돼?")처럼 `valuation`·`risk`로 볼 만한 질의를 범위 안으로 볼지, 키워드 사전을 어디까지 넓힐지 확정 필요
 - `validation/l1.py` 금지 표현(`FORBIDDEN_PATTERNS`)은 권유형 어미까지 포함한 정규식이다. 테스트의 차단 10문장·통과 7문장으로 고정했고, 문장을 추가할 때는 두 목록에 같이 넣는다. 기획서에 목록이 없어 확정은 거절셋처럼 문항 측정 후
 - `schemas.py`는 계약 draft.5(PR #46) DebateResult와 같은 필드다(점수 integer, `data_richness`·`ontology`, `companies[].data_tier`). `confidence`는 계약에도 타입이 `str`뿐이라 값 목록이 없다. 근거 제외 후 `partial` 고지를 담을 필드 위치도 기획서에 없어 아직 없음(검증 레이어 구현 때 결정)
-- 기준선 실험 `rubric.json`(rb-0.1.0)은 초안이다. 시험 채점 후 채점자 일치율이 낮은 항목부터 다듬는다. 채점자 2명이 누구인지 확정 필요. "같은 근거"는 수경 제안(#28)대로 문항별 `as_of` + 검색된 `chunk_id` 목록을 스냅샷 태그(`2026-11-10-baseline-v1`)로 묶어 저장한다. 문항 `as_of` 2026-11-10은 임시값. 승률은 동점을 승으로 세지 않는다(임시 규칙). 채점용 텍스트 형식 정규화(Bull·Bear 표기로 시스템이 드러나는 문제)는 출력 생성 단계에서 정한다
+- 기준선 실험 `rubric.json`(rb-0.1.0)은 초안이다. 시험 채점 후 채점자 일치율이 낮은 항목부터 다듬는다. 채점자 2명이 누구인지 확정 필요(#65). "같은 근거"는 수경 제안(#28)대로 문항별 `as_of` + 검색된 `chunk_id` 목록을 스냅샷 태그(`2026-11-10-baseline-v1`)로 묶어 저장한다. 문항 `as_of` 2026-11-10은 임시값. 승률은 동점을 승으로 세지 않는다(임시 규칙). 채점용 텍스트 형식 정규화(Bull·Bear 표기로 시스템이 드러나는 문제)는 출력 생성 단계에서 정한다
 - `AgendaId`·`DataTier`·`Tier`는 `processing.enums`(#30, main)에서 import한다. 멤버 이름은 `UPPER_SNAKE`(예: `AgendaId.VALUATION`). `ReasonCode`·`NextAction`·`PrecheckResult`는 `backend/contracts/`가 생기면 옮긴다
 - `data/intent_data_sources.json` — 값은 수경 제안(#21 리뷰 2026-11-10) 반영. `financials`·`flow`·`insider`·`sensitivity`·`derived` 키는 데이터 쪽이 `get_available_data_status`에 추가할 예정(#35 병합 후)이라 그 전에는 해당 키가 provider에 없다 — 남은 키로 판정된다
 - 아젠다 대체 우선순위(`data/keyword_dictionary.json`의 `selection_rules`) — 기획서에 "최대 3개 유지"만 있음

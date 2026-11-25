@@ -353,6 +353,18 @@ def test_status_rejects_bad_as_of_without_query(monkeypatch):
     assert connection.queries == []
 
 
+def test_metric_contract_lists_extra_fields():
+    # 구현이 붙이는 requested_as_of·display·period가 계약서 MetricValue에 있다 (#55)
+    from pathlib import Path
+
+    import yaml
+
+    spec = yaml.safe_load((Path(__file__).resolve().parents[3] / "docs/api/openapi.yaml").read_text(encoding="utf-8"))
+    metric = spec["components"]["schemas"]["MetricValue"]
+    assert {"requested_as_of", "display", "period"} <= set(metric["properties"])
+    assert {"requested_as_of", "display"} <= set(metric["required"])
+
+
 def test_get_metrics_uses_one_connection_and_keeps_order(monkeypatch):
     # 지표마다 연결을 열면 연결에만 약 0.35초씩 든다. 여러 지표는 연결 하나로 (#84)
     from processing.functions.get_metric import get_metrics

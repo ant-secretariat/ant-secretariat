@@ -2221,6 +2221,8 @@ components:
       - basis
       - as_of
       - source
+      - requested_as_of
+      - display
       properties:
         ticker:
           $ref: '#/components/schemas/TickerValue'
@@ -2246,6 +2248,18 @@ components:
           - string
           - 'null'
           description: 계산 불가 사유
+        requested_as_of:
+          type: string
+          format: date
+          description: 요청한 기준일입니다. `as_of`는 실제로 쓴 데이터의 날짜(거래일·공시 접수일)라 이보다 앞설 수 있습니다.
+        display:
+          type:
+          - string
+          - 'null'
+          description: 문장에 그대로 넣을 표시용 문자열입니다(예 "12.34%", "123.45조 원"). 값이 null이거나 숫자가 아니면 null입니다.
+        period:
+          type: string
+          description: 재무 지표만 값이 있습니다. 쓴 분기입니다(예 "2026Q3").
     Evidence:
       type: object
       required:

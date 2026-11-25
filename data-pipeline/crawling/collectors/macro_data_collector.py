@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup
 
 from crawling.config.settings import SETTINGS, Settings
 from crawling.crawler.http import create_ssl_context
+from crawling.config.clock import today_kst
 
 logger = logging.getLogger(__name__)
 
@@ -354,7 +355,7 @@ class NaverMarketIndexProvider:
             response.raise_for_status()
 
         value = self._parse_usd_krw(response.text)
-        row_date = date_to or date_from or date.today().isoformat()
+        row_date = date_to or date_from or today_kst().isoformat()
         return [
             {
                 "indicator_id": "USD_KRW",
@@ -393,7 +394,7 @@ class MockMacroProvider:
         date_to: str | None,
     ) -> list[dict]:
         selected = indicators or list(DEFAULT_INDICATORS)
-        row_date = date_to or date_from or date.today().isoformat()
+        row_date = date_to or date_from or today_kst().isoformat()
         rows: list[dict] = []
         for indicator_id in selected:
             metadata = DEFAULT_INDICATORS.get(indicator_id)
@@ -458,7 +459,7 @@ def _ecos_date_range(
     date_from: str | None,
     date_to: str | None,
 ) -> tuple[str, str]:
-    end = _parse_iso_date(date_to) or date.today()
+    end = _parse_iso_date(date_to) or today_kst()
     if date_from:
         start = _parse_iso_date(date_from) or end
     elif cycle == "M":

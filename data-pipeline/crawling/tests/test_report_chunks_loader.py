@@ -88,3 +88,49 @@ def test_stale_embedding_ids_only_for_retitled_chunks():
     ]
 
     assert stale_embedding_ids(existing, rows) == ["R:b"]
+
+
+def test_empty_new_chunks_do_not_deactivate_existing(caplog):
+    # 빈 결과를 "청크가 모두 사라짐"으로 보지 않는다 (#35 리뷰, #55)
+    from crawling.report_chunks_loader import replace_chunks
+
+    class Connection:
+        def __init__(self):
+            self.statements = []
+
+        def execute(self, sql, params=None):
+            self.statements.append(sql)
+
+    connection = Connection()
+    replace_chunks(connection, "NAVER_005930_20261120_abc", [])
+    assert connection.statements == []
+    assert "기존 청크를 그대로 둠" in caplog.text
+
+
+def test_report_with_text_but_no_chunks_fails(monkeypatch, tmp_path):
+    # 글자는 뽑혔는데 청크가 0개면 chunked(0개)가 아니라 실패로 남긴다
+    import datetime as dt
+
+    import pytest
+
+    from crawling import report_chunks_loader as loader
+
+    class Downloader:
+        def download_to_temp(self, url, path):
+            path.write_bytes(b"%PDF")
+
+            class Result:
+                temp_path = path
+                pdf_hash = "hash"
+
+            return Result()
+
+    class Worker:
+        def run(self, func, *args):
+            return True, []
+
+    monkeypatch.setattr(loader, "chunk_rows", lambda chunks, report: [])
+    report = {"report_id": "R1", "pdf_url": "http://x", "ticker": "005930", "company": "삼성전자",
+              "broker": "증권", "published_at": dt.date(2026, 11, 20), "title": "t"}
+    with pytest.raises(RuntimeError, match="청크가 0개"):
+        loader.chunk_one(None, Downloader(), Worker(), report, tmp_path)

@@ -120,6 +120,28 @@ def test_role_names_get_matching_particles():
     assert _neutral("Bulls Bearing") == "Bulls Bearing"  # 다른 영어 단어는 그대로
 
 
+def test_render_debate_pairs_bull_claim_with_bear_rebuttal():
+    # R4: 엇갈리는 점 = bull_claim_ref가 가리키는 Bull 주장 + Bear R1. 판정 이유는 넣지 않는다(#77 리뷰)
+    from agents.debate_renewal.eval.baseline.render import render_debate
+    from agents.debate_renewal.schemas import Claim
+
+    def claim(cid, text, ev):
+        return Claim(claim_id=cid, text=text, claim_type="event", evidence_ids=[ev])
+    ns = SimpleNamespace
+    agenda = ns(bull=ns(claims=[claim("valuation-B1", "실적 개선", "S1"), claim("valuation-B2", "수주 증가", "S2")]),
+                bear=ns(bull_claim_ref="valuation-B2", agreed_points=["실적 개선은 맞다"],
+                        claims=[claim("valuation-R1", "Bull은 수주를 보지만 단가가 낮다", "S3"),
+                                claim("valuation-R2", "환율 부담", "S4")]),
+                verdict=ns(reason="판정이유문장"))
+    # 렌더러가 읽는 필드만 둔다
+    result = ns(agendas=[agenda], judge=ns(overall_verdict=ns(final_brief="종합")), evidence=[])
+    text = render_debate("q", result)
+    conflicts = text.split("## 엇갈리는 점\n")[1].split("\n\n")[0]
+    assert conflicts == "- 긍정론: 수주 증가 [S2]\n  부정론: 긍정론은 수주를 보지만 단가가 낮다 [S3]"
+    assert "판정이유문장" not in text
+    assert "종합 인정되는 점: 실적 개선은 맞다" in text
+
+
 def test_render_single_marks_empty_sections():
     out = SingleOutput(positives=[], negatives=[], conflicts=[], summary="", confidence="low")
     text = render_single("q", out, [])

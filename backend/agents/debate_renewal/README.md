@@ -71,5 +71,5 @@ backend/agents/debate_renewal/
 - 진행 이벤트는 계약 `JobEvent`(ADR 0009) 이름·payload: `data_collected`(문서 종류별 건수) → 아젠다마다 `claim_completed`(`role`·`agenda_id`·`claim`)·`bull_completed`·`bear_completed`(`agenda_id`·`claim_count`) → `judge_completed` → `verifying`. `job_started`·`completed`·`failed`는 워커
 - Judge가 아젠다 판정을 빠뜨리면 채우지 않고 `LLMOutputInvalidError`
 - 기준선 단일 LLM 프롬프트(`eval/baseline/single.py`, single-1.0.0): 토론과 같은 `COMMON_RULES`, 긍정 2~4·부정 1~3·엇갈리는 점·요약. 토론에 불리하거나 유리하지 않은지 채점 전에 한 번 더 확인 필요
-- 블라인드 텍스트(`render.py`): 두 시스템을 긍정·부정·엇갈리는 점·종합·근거 목록으로 맞추고 Bull·Bear 이름을 긍정론·부정론으로 바꾼다. 토론의 엇갈리는 점에는 Judge 판정 이유와 Bear `agreed_points`를 넣는다. 반박 문체("~라고 보지만")로 짐작될 수 있는 한계는 남음
+- 블라인드 텍스트(`render.py`): 두 시스템을 긍정·부정·엇갈리는 점·종합·근거 목록으로 맞추고 Bull·Bear 이름을 긍정론·부정론으로 바꾼다. 토론의 엇갈리는 점에는 Bear가 `bull_claim_ref`로 지목한 Bull 주장과 Bear R1(반박)의 짝을 넣는다(pv-3.1.0 Bear 규칙 "R1 = 반박"). Bear `agreed_points`는 종합 끝에 붙이고 Judge 판정 이유는 넣지 않는다(#77 리뷰). 반박 문체("~라고 보지만")로 짐작될 수 있는 한계는 남음
 - 기준선 문항은 아젠다를 문항의 `agenda_id` 하나로 고정해 토론을 돌린다(precheck 아젠다 선택은 거치지 않음)

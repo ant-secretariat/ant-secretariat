@@ -160,6 +160,12 @@ def test_terms_file_is_consistent():
     assert all(value[0] in ("l1", "l2") for k, value in terms["sector_terms"].items() if not k.startswith("_"))
 
 
+def test_common_words_are_excluded_from_sentence_extraction():
+    # 흔한 2글자 낱말이 종목으로 잡히지 않게 한다 (#32 리뷰, #41)
+    names = set(load_terms()["extract_exclude"]["names"])
+    assert {"한창", "전방", "남성"} <= names
+
+
 def test_fullwidth_ticker_and_spaced_names(index):
     # 전각 종목코드, 이름 안 띄어쓰기를 resolve와 추출이 똑같이 다룬다 (#32 리뷰, #42)
     assert index.exact("００５９３０")[0] == ["005930"]

@@ -98,7 +98,11 @@ class KisOpinionClient:
 
     def _fetch_range(self, ticker: str, start: date, end: date) -> list[dict]:
         rows = self._fetch(ticker, start, end)
-        if len(rows) < MAX_ROWS_PER_CALL or start >= end:
+        if len(rows) < MAX_ROWS_PER_CALL:
+            return rows
+        if start >= end:
+            # 하루치가 한도를 넘으면 더 나눌 수 없어 잘린 채로 둔다. 조용히 넘기지 않게 남긴다
+            logger.warning("%s %s 의견이 %s행 이상이라 일부가 빠졌을 수 있음", ticker, start, MAX_ROWS_PER_CALL)
             return rows
         middle = start + (end - start) // 2
         return self._fetch_range(ticker, start, middle) + self._fetch_range(

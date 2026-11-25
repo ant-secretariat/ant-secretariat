@@ -403,3 +403,37 @@ def test_get_metrics_connection_failure_marks_every_metric(monkeypatch):
     results = get_metrics("005930", ["close", "per", "nope"], "2026-11-10")
 
     assert [r["reason"] for r in results] == ["metric_unavailable", "metric_unavailable", "unknown_metric"]
+
+
+@pytest.mark.parametrize("metric_id", ["per", "eps"])
+def test_empty_per_with_annual_loss_is_loss_making(monkeypatch, metric_id):
+    # KRX는 직전 사업연도가 적자면 PER·EPS를 비운다. 그 이유를 재무로 확인해 알려 준다
+    from decimal import Decimal
+
+    connection = _use(monkeypatch, FakeConnection((None, date(2026, 11, 23)), (2025, "CFS", Decimal("-977062000000"))))
+
+    result = get_metric("051910", metric_id, "2026-11-24")
+
+    assert (result["value"], result["reason"]) == (None, "loss_making")
+    assert result["basis"] == "직전 사업연도(2025) 당기순이익 -9,770.62억 원(연결) 적자"
+    assert result["source"] == ["market_daily", "financials"]
+    assert "financials_as_of" in str(connection.queries[1][0])   # 그날까지 접수된 재무만
+
+
+@pytest.mark.parametrize("annual", [
+    (2025, "CFS", 80803000000),   # 당기순이익은 흑자(지배주주 몫만 적자일 수 있음)
+    None,                          # 신규 상장이라 직전 사업연도가 없음
+])
+def test_empty_per_without_confirmed_loss_stays_no_value(monkeypatch, annual):
+    _use(monkeypatch, FakeConnection((None, date(2026, 11, 23)), annual))
+
+    result = get_metric("373220", "per", "2026-11-24")
+
+    assert (result["value"], result["reason"]) == (None, "no_value")
+
+
+def test_pbr_is_not_checked_for_loss(monkeypatch):
+    connection = _use(monkeypatch, FakeConnection((None, date(2026, 11, 23))))
+
+    assert get_metric("051910", "pbr", "2026-11-24")["reason"] == "no_value"
+    assert len(connection.queries) == 1

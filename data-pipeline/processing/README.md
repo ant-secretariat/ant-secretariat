@@ -567,6 +567,38 @@ result = get_macro_data(
 
 ---
 
+### get_index_data()
+
+시장 지수 일별 종가. Supabase `index_daily`(pykrx)를 읽습니다. 토론 macro 아젠다의 지수 블록과 시뮬레이션 묶음이 씁니다(#84).
+
+- `indexes`: 지수 ID 목록(`KOSPI`·`KOSDAQ`·`KOSPI200`), 없으면 코스피·코스닥. 모르는 ID면 `ValueError`
+- `as_of`까지의 최근 `days`거래일(기본 60, 최대 800). 없으면 오늘(KST)
+- 지수마다 `rows`(오래된 날부터 `date`·`close`), `latest`, `change_pct`(기간 첫날 대비 %, 소수 둘째 자리). 값이 없으면 `rows: []`·`reason: "no_data"`
+- 조회 실패면 `indexes: null`·`"error": "index_unavailable"`
+
+```python
+from processing.functions.get_index_data import get_index_data
+
+get_index_data(as_of="2026-11-10")   # 코스피·코스닥 최근 60거래일
+```
+
+### get_sensitivities()
+
+종목의 **시장 효과를 뺀** 매크로 민감도. Supabase `ontology_sensitivity_inputs`(#67, 매달 `ontology_inputs monthly --save`)의 종목 행을 읽습니다. 토론 macro 아젠다의 민감도 블록이 씁니다(#84 Q4-1).
+
+- 원래 상관(`raw`)은 주지 않음. 시장 전체 움직임이 섞인 관계라 ADR 0011이 노출하지 않기로 함. 엣지 노출 여부는 온톨로지가 따로 판단
+- `as_of` 이전 가장 최근 계산 기준일의 값. 그날 이전에 계산된 값이 없으면 `factors: []`·`reason: "no_data"`(미래에 계산한 값을 과거 기준일에 쓰지 않음)
+- `factors`: 요인마다 `frequency`(daily·monthly), `adjusted`(편상관), `ci_low`·`ci_high`(Fisher 95%), `certain`, `q_value`(지표별 전체 종목 BH), `n_obs`, `window_start`·`window_end`. 일별(국고채 3·10년, 원/달러) 먼저, 월별(브렌트유, 소비자물가, D램 수출물가) 다음
+- 코스피는 없음: 시장 자체라 "시장 효과를 뺀 값"이 정의되지 않음. 시장 민감도(베타)는 `sensitivities` 표에 있고 시뮬레이션이 씀
+- `caution`: 해석 주의 문구(인과 아님, 월별은 1달 시차, `certain=false`면 방향 불확실)
+- 조회 실패면 `factors: null`·`"error": "sensitivities_unavailable"`
+
+```python
+from processing.functions.get_sensitivities import get_sensitivities
+
+get_sensitivities("005930", as_of="2026-11-24")
+```
+
 ### get_disclosure_data()
 
 공시 데이터 조회. Supabase `disclosure_metadata`(DART 수시공시·주요사항보고서)를 읽습니다(`SUPABASE_DB_URL` 필요).
@@ -750,7 +782,7 @@ result = get_available_data_status(
 - 수급 지표: 그날까지 최근 20거래일 합계(순매수) 또는 평균(공매도 비중). 20일보다 적으면 `basis`에 실제 일수를 적음
 - 공매도 잔고 비중: KRX가 약 2거래일 늦게 공개하므로 그날 기준 2거래일 전까지의 값만 씀
 - 지분공시 지표: 그날까지 접수된 최근 90일 보고. 지분공시를 받는 종목에서 보고가 없으면 0, 받지 않는 종목은 `no_data`. 임원 보고에는 주식 보상 같은 소액 변동도 들어 있음
-- 값을 낼 수 없으면 `value`는 `null`이고 `reason`에 사유: `unknown_metric`, `no_data`, `no_value`, `not_applicable_financials`(금융 섹터 부채비율), `metric_unavailable`(조회 실패)
+- 값을 낼 수 없으면 `value`는 `null`이고 `reason`에 사유: `unknown_metric`, `no_data`, `no_value`, `not_applicable_financials`(금융 섹터 부채비율), `loss_making`(PER·EPS: 직전 사업연도 당기순이익 적자, `basis`에 금액), `metric_unavailable`(조회 실패)
 - 여러 지표는 `get_metrics(ticker, metric_ids, as_of)`로 DB 연결 하나에서 계산(결과는 `metric_ids` 순서, 항목은 `get_metric`과 같음). 지표마다 연결을 열면 연결에만 약 0.35초씩 듦. 한 지표의 조회가 실패해도 나머지는 계산
 - 사람이 읽는 지표 이름은 `METRIC_NAMES`(예: `per` → "PER(주가수익비율)")
 
@@ -806,7 +838,7 @@ result = get_metric(ticker="005930", metric_id="roe_ttm", as_of="2026-09-01")
   - `documents`에 `query`(의미 검색)·`keyword_query`(키워드 검색)·`document_types`·`mode`. 한 종류의 검색이 실패하면 나머지는 주고 `reason="search_unavailable"`·`failed_types`. 동점이면 최신 문서가 앞
 - `debate`에 `intent`를 주면 그 아젠다의 지표 목록 `metrics`도 줌(`AGENDA_METRICS`, #84)
   - 항목은 `get_metric` 결과 그대로(`value`·`unit`·`display`·`as_of`·`reason` 등)이고 값이 없는 지표도 빼지 않음
-  - 항목마다 `name`(지표 이름)과 `evidence_id`(`metric:{종목}:{지표}:{지표의 as_of}`). 근거 ID의 날짜는 요청일이 아니라 그 지표가 실제로 쓴 데이터의 날짜
+  - 항목마다 `name`(지표 이름)과 `chunk_id`(`metric:{종목}:{지표}:{지표의 as_of}`, 문서 결과와 같은 이름). 근거 ID의 날짜는 요청일이 아니라 그 지표가 실제로 쓴 데이터의 날짜
   - 토론은 `value`와 `display`가 둘 다 있는 지표만 `{{metric_id}}` 자리표시자로 씀(#84 Q1)
 
 | intent | `metrics` |
@@ -817,6 +849,23 @@ result = get_metric(ticker="005930", metric_id="roe_ttm", as_of="2026-09-01")
 | `flow` | `foreign_net_buy_20d`, `inst_net_buy_20d`, `individual_net_buy_20d`, `short_volume_ratio_20d`, `short_balance_ratio` |
 | `shareholder_return` | `dividend_yield`, `dps`, `eps`, `close` |
 | `macro` | (없음) |
+
+- `debate`에 `intent`를 주면 아젠다 블록도 최상위 키로 줌(#84 ②). 이때는 목표가 전체 이력(`target_prices`)과 매크로 전체 이력(`macro_data`, 약 180만 자)을 넣지 않음
+- 아젠다 문서 검색이 0건이면 다른 문서 종류(리포트 → 뉴스 → 공시 순, 아젠다 종류 제외)로 한 번 더 찾고 `documents.widened: true`, `widened_types`에 찾아본 종류. 찾으면 거기서 멈춤
+  - 블록마다 `source`(함수), `as_of`(블록이 실제로 쓴 데이터의 날짜), `chunk_id`(`block:{종목}:{블록}:{as_of}`), `reason`. 조회 실패면 `chunk_id: null` + `error`, 값이 없으면 `reason: "no_data"`
+  - 블록 하나가 실패해도 나머지는 줌
+
+| intent | 블록 |
+| --- | --- |
+| `valuation` | `target_price`(컨센서스, `upside_pct` = 컨센서스 평균 ÷ 같은 묶음의 종가 − 1, `revisions`(#105), 최근 의견 10건), `financials`(최근 8분기, 연결/별도 표시) |
+| `growth` | `financials` |
+| `risk` | `disclosures`(최근 90일, 10건까지, `total`은 전체 건수) |
+| `shareholder_return` | `disclosures`(최근 1년 주주환원 공시만, 10건까지) |
+| `macro` | `macro`(국고채 3·10년·원/달러·기준금리는 최근 60개, 소비자물가·브렌트유·D램 수출물가는 최근 13개월, 최신 먼저. 이 종목에 방향이 확실한 민감도 요인을 앞에), `index`(코스피·코스닥 60거래일), `sensitivities`(시장 효과를 뺀 값, `get_sensitivities`) |
+| `flow` | (아직 없음) |
+
+  - `valuation`(밸류에이션 위치)·`fundamental_trend`·`price_trend`·`flow` 블록은 `get_derived_snapshot` 실패 처리(#88)가 들어간 뒤 더함
+  - 목표가 방향 라벨(상향·하향·혼조)은 받는 쪽이 `revisions`로 정함(#82)
 
 | intent | 키워드 | 문서 종류 |
 | --- | --- | --- |

@@ -56,7 +56,7 @@ class DebateRun:
 
     @property
     def partial(self) -> bool:
-        """뺀 Claim이 있으면 partial 고지 대상. 계약 DebateResult에 담을 칸은 아직 없다(draft.6 요청)."""
+        """뺀 Claim이 있는지(내부 값). MVP는 결과에 고지 칸 없이 로그로만 남긴다(#78 리뷰, 기준선 빈도 보고 다시 정함)."""
         return bool(self.removed_claim_ids)
 
 
@@ -159,7 +159,7 @@ async def run_debate(
     result = await judge_and_build(feedback(judge_fix) if judge_fix else None)
     report = check_l1(result)
 
-    # 6. 그래도 실패한 Claim은 빼고 partial로 알린다
+    # 6. 그래도 실패한 Claim은 빼고 로그로 남긴다(결과 고지 칸은 MVP에서 없음)
     result, removed = drop_failed_claims(result, report)
     if removed:
         report = check_l1(result)

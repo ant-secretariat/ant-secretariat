@@ -985,7 +985,7 @@ x-internal-functions:
 - name: search_companies
   agent: 데이터 에이전트
   summary: 종목 후보 검색
-  signature: 'search_companies(query: str, limit: int = 10) -> list[dict]'
+  signature: 'search_companies(query: str, limit: int = 10) -> dict'
   input: SearchCompaniesInput
   output: SearchCompaniesOutput
   status: new
@@ -993,7 +993,7 @@ x-internal-functions:
 - name: extract_company_mentions
   agent: 데이터 에이전트
   summary: 문장 속 종목 추출
-  signature: 'extract_company_mentions(text: str) -> list[dict]'
+  signature: 'extract_company_mentions(text: str) -> dict'
   input: ExtractCompanyMentionsInput
   output: ExtractCompanyMentionsOutput
   status: new
@@ -1107,7 +1107,10 @@ x-internal-functions:
     검색(`macro_documents`)은 없습니다(문서가 없어 매크로는 `macro_data` 정형 값만). `debate`에 `intent`를 주면 문서 검색에 아젠다
     키워드를 씁니다: 키워드 검색은 질문 + 키워드, 의미 검색은 질문만, 질문이 없으면 둘 다 키워드라 질문이 없어도 `documents`가 있습니다.
     아젠다의 문서 종류마다 따로 찾아 5개를 나누고(예: 리포트 3 + 뉴스 2), 한 문서는 최대 2조각입니다. 아젠다의 지표 목록 `metrics`도
-    줍니다: 항목은 `MetricValue` + `name` + `evidence_id`(`metric:{종목}:{지표}:{지표의 as_of}`)이고 값이 없는 지표도 사유와 함께 둡니다(#84).'
+    줍니다: 항목은 `MetricValue` + `name` + `chunk_id`(`metric:{종목}:{지표}:{지표의 as_of}`)이고 값이 없는 지표도 사유와 함께 둡니다. 아젠다 블록
+    (valuation `target_price`·`financials`, growth `financials`, risk·shareholder_return `disclosures`, macro `macro`·`index`·`sensitivities`)도
+    최상위 키로 주고, 블록마다 `chunk_id`(`block:{종목}:{블록}:{블록 기준일}`)·`as_of`·`source`가 있습니다. 이때는 목표가 전체 이력(`target_prices`)과
+    매크로 전체 이력(`macro_data`)을 넣지 않습니다. 아젠다 문서 검색이 0건이면 다른 문서 종류로 넓혀 찾고 `documents.widened`를 true로 둡니다(#84).'
 - name: get_financials
   agent: 데이터 에이전트
   summary: 재무제표 조회
@@ -1960,11 +1963,28 @@ components:
           deprecated: true
           description: 이행 기간에만 반환합니다
         ticker:
-          $ref: '#/components/schemas/TickerValue'
+          description: exact일 때만 값이 있고 ambiguous·not_found면 null입니다.
+          anyOf:
+          - $ref: '#/components/schemas/TickerValue'
+          - type: 'null'
         company:
-          type: string
+          type:
+          - string
+          - 'null'
+          description: exact일 때만 값이 있고 ambiguous·not_found면 null입니다.
         sector:
-          type: string
+          type:
+          - string
+          - 'null'
+          description: exact일 때만 값이 있고 ambiguous·not_found면 null입니다.
+        error:
+          type:
+          - string
+          - 'null'
+          enum:
+          - company_lookup_unavailable
+          - null
+          description: 종목 목록을 읽지 못했을 때만 값이 있습니다. 이때 status=not_found는 "없는 회사"가 아니라 조회 실패입니다.
         market_cap:
           type:
           - number
@@ -2178,6 +2198,21 @@ components:
           type: object
           additionalProperties: true
           description: 기관·외국인 순매수 동향
+        failed_groups:
+          type: array
+          items:
+            type: string
+            enum:
+            - valuation
+            - price_trend
+            - fundamental_trend
+            - flow
+          description: 조회에 실패한 묶음입니다. 그 묶음의 reason은 query_failed(데이터 없음 no_data와 구분)이고, 네 묶음이 모두 실패하면 error=snapshot_unavailable입니다.
+        error:
+          type:
+          - string
+          - 'null'
+          description: 종목이 없으면 unknown_ticker, 조회가 모두 실패하면 snapshot_unavailable입니다.
     MetricValue:
       type: object
       required:
@@ -3558,9 +3593,23 @@ components:
           description: 채팅 5개
           자동완성 10개: null
     SearchCompaniesOutput:
-      type: array
-      items:
-        $ref: '#/components/schemas/Candidate'
+      type: object
+      required:
+      - candidates
+      - error
+      properties:
+        candidates:
+          type: array
+          items:
+            $ref: '#/components/schemas/Candidate'
+        error:
+          type:
+          - string
+          - 'null'
+          enum:
+          - company_lookup_unavailable
+          - null
+          description: 종목 목록을 읽지 못했을 때만 값이 있습니다. 빈 candidates는 "후보 없음"입니다.
     ExtractCompanyMentionsInput:
       type: object
       required:
@@ -3569,16 +3618,30 @@ components:
         text:
           type: string
     ExtractCompanyMentionsOutput:
-      type: array
-      items:
-        allOf:
-        - $ref: '#/components/schemas/ResolvedCompany'
-        - type: object
-          required:
-          - mention
-          properties:
-            mention:
-              type: string
+      type: object
+      required:
+      - mentions
+      - error
+      properties:
+        mentions:
+          type: array
+          items:
+            allOf:
+            - $ref: '#/components/schemas/ResolvedCompany'
+            - type: object
+              required:
+              - mention
+              properties:
+                mention:
+                  type: string
+        error:
+          type:
+          - string
+          - 'null'
+          enum:
+          - company_lookup_unavailable
+          - null
+          description: 종목 목록이나 찾은 종목의 데이터 상태를 읽지 못했을 때 값이 있습니다. 빈 mentions는 "문장에 종목 없음"입니다.
     SearchDocumentsInput:
       type: object
       required:

@@ -5,6 +5,8 @@
 - ambiguous면 candidates(최대 5개, search_companies와 같은 순서)를 채운다
 - 이행 기간: 기존 호출부가 쓰는 matched(exact일 때만 true)와 match_status·match_confidence도 함께 준다
 - 종목 목록은 Supabase companies에서 읽는다(고정 목록 supported_companies는 더 쓰지 않음)
+- 실패 표시(헌법 원칙 III): 종목 목록을 못 읽으면 error="company_lookup_unavailable".
+  exact인데 데이터 상태를 못 읽으면 data_status=None(오케스트레이터가 503으로 바꿈)
 """
 
 from __future__ import annotations

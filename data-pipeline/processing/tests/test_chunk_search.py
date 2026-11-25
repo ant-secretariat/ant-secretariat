@@ -129,3 +129,34 @@ def test_query_embedding_has_timeout(monkeypatch):
     assert created["timeout"] == chunk_search.EMBED_TIMEOUT_SECONDS == 10
     assert created["max_retries"] == 1
     chunk_search._embed_query_cached.cache_clear()
+
+
+def test_keyword_query_goes_to_bm25_and_question_to_embedding(monkeypatch):
+    # 질문에 아젠다 키워드를 붙이면 BM25에는 도움이 되지만 임베딩에서는 질문 의도가 흐려진다(#84)
+    from processing.search import chunk_search
+
+    seen = {}
+    monkeypatch.setattr(chunk_search, "embed_query", lambda text: seen.setdefault("embedded", text) and [0.0])
+    monkeypatch.setattr(chunk_search, "bm25_search",
+                        lambda connection, text, where, params, limit: seen.setdefault("bm25", text) and [])
+    monkeypatch.setattr(chunk_search, "vector_search", lambda connection, vector, where, params, limit: [])
+
+    chunk_search.search_chunks(None, "외국인 매도 이유", ticker="005930", keyword_query="외국인 매도 이유 수급")
+
+    assert seen == {"embedded": "외국인 매도 이유", "bm25": "외국인 매도 이유 수급"}
+
+
+def test_bm25_fallback_uses_keyword_query(monkeypatch):
+    from processing.search import chunk_search
+
+    def no_embedding(text):
+        raise RuntimeError("no key")
+
+    seen = {}
+    monkeypatch.setattr(chunk_search, "embed_query", no_embedding)
+    monkeypatch.setattr(chunk_search, "bm25_search",
+                        lambda connection, text, where, params, limit: seen.setdefault("bm25", text) and [])
+
+    _, mode = chunk_search.search_chunks(None, "질문", ticker="005930", keyword_query="질문 키워드")
+
+    assert (mode, seen["bm25"]) == ("bm25", "질문 키워드")

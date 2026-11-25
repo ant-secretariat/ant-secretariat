@@ -101,9 +101,9 @@ def test_extract_company_mentions_groups_and_dedupes(monkeypatch, index):
     from processing.functions.extract_company_mentions import extract_company_mentions
 
     monkeypatch.setattr("processing.company_lookup.get_index", lambda refresh=False: index)
-    monkeypatch.setattr(resolve_module, "_data_status", lambda ticker: None)
+    monkeypatch.setattr(resolve_module, "_data_status", lambda ticker: {"error": None})
 
-    found = extract_company_mentions("삼성이랑 삼전, 그리고 삼성전자랑 네이버")
+    found = extract_company_mentions("삼성이랑 삼전, 그리고 삼성전자랑 네이버")["mentions"]
     assert [(m["mention"], m["status"]) for m in found] == [("삼성", "ambiguous"), ("삼전", "exact"), ("네이버", "exact")]
     assert [c["ticker"] for c in found[0]["candidates"]] == ["005930", "207940", "006400"]
     assert found[1]["ticker"] == "005930" and found[1]["position"] == 5
@@ -121,9 +121,33 @@ def test_lookup_failure_does_not_raise(monkeypatch, caplog):
     monkeypatch.setattr("processing.company_lookup.get_index", fail)
 
     assert resolve_company("삼성전자")["error"] == "company_lookup_unavailable"
-    assert search_companies("삼성") == [] and extract_company_mentions("삼성") == []
-    assert find_terms("PER") == {"sectors": [], "metrics": []}
+    # 빈 목록만 주면 "후보 없음"과 구분되지 않으므로 error로 표시한다 (헌법 원칙 III, #55)
+    assert search_companies("삼성") == {"candidates": [], "error": "company_lookup_unavailable"}
+    assert extract_company_mentions("삼성") == {"mentions": [], "error": "company_lookup_unavailable"}
+    assert find_terms("PER") == {"sectors": [], "metrics": [], "error": "company_lookup_unavailable"}
     assert "SECRET" not in caplog.text
+
+
+def test_lookup_success_has_null_error(monkeypatch, index):
+    from processing.functions.find_terms import find_terms
+    from processing.functions.search_companies import search_companies
+
+    monkeypatch.setattr("processing.company_lookup.get_index", lambda refresh=False: index)
+
+    assert search_companies("없는회사") == {"candidates": [], "error": None}
+    assert find_terms("아무말")["error"] is None
+
+
+def test_extract_marks_error_when_data_status_fails(monkeypatch, index):
+    from processing.functions import resolve_company as resolve_module
+    from processing.functions.extract_company_mentions import extract_company_mentions
+
+    monkeypatch.setattr("processing.company_lookup.get_index", lambda refresh=False: index)
+    monkeypatch.setattr(resolve_module, "_data_status", lambda ticker: None)
+
+    result = extract_company_mentions("삼전 사도 돼?")
+    assert result["mentions"][0]["ticker"] == "005930"
+    assert result["error"] == "company_lookup_unavailable"
 
 
 def test_terms_file_is_consistent():

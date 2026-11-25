@@ -312,3 +312,90 @@ def test_status_reads_each_document_type_once(monkeypatch):
     get_available_data_status("005930")
 
     assert connection.queries[0][0].count("from document_chunks") == 3
+
+
+def test_get_metrics_uses_one_connection_and_keeps_order(monkeypatch):
+    # 지표마다 연결을 열면 연결에만 약 0.35초씩 든다. 여러 지표는 연결 하나로 (#84)
+    from processing.functions.get_metric import get_metrics
+
+    opened = []
+
+    def connect():
+        connection = FakeConnection((70000, date(2026, 11, 7)), (1.2, date(2026, 11, 7)))
+        opened.append(connection)
+        return connection
+
+    monkeypatch.setattr("crawling.db.postgres.connect", connect)
+
+    results = get_metrics("005930", ["close", "nope", "pbr"], "2026-11-10")
+
+    assert len(opened) == 1
+    assert [r["metric_id"] for r in results] == ["close", "nope", "pbr"]
+    assert (results[0]["value"], results[1]["reason"], results[2]["value"]) == (70000, "unknown_metric", 1.2)
+    assert all(r["requested_as_of"] == "2026-11-10" for r in results)
+
+
+def test_get_metrics_isolates_one_failing_metric(monkeypatch):
+    from processing.functions.get_metric import get_metrics
+
+    class HalfBroken(FakeConnection):
+        def execute(self, query, params=None):
+            if "pbr" in str(query):
+                raise RuntimeError("postgresql://user:SECRET@host/db")
+            return super().execute(query, params)
+
+    monkeypatch.setattr("crawling.db.postgres.connect", lambda: HalfBroken((70000, date(2026, 11, 7))))
+
+    close, pbr = get_metrics("005930", ["close", "pbr"], "2026-11-10")
+
+    # 한 지표가 실패해도 나머지는 계산하고, 실패는 "값 없음"이 아니라 metric_unavailable
+    assert close["value"] == 70000 and close["reason"] is None
+    assert pbr["value"] is None and pbr["reason"] == "metric_unavailable"
+
+
+def test_get_metrics_connection_failure_marks_every_metric(monkeypatch):
+    from processing.functions.get_metric import get_metrics
+
+    def fail():
+        raise RuntimeError("down")
+
+    monkeypatch.setattr("crawling.db.postgres.connect", fail)
+
+    results = get_metrics("005930", ["close", "per", "nope"], "2026-11-10")
+
+    assert [r["reason"] for r in results] == ["metric_unavailable", "metric_unavailable", "unknown_metric"]
+
+
+
+@pytest.mark.parametrize("metric_id", ["per", "eps"])
+def test_empty_per_with_annual_loss_is_loss_making(monkeypatch, metric_id):
+    # KRX는 직전 사업연도가 적자면 PER·EPS를 비운다. 그 이유를 재무로 확인해 알려 준다
+    from decimal import Decimal
+
+    connection = _use(monkeypatch, FakeConnection((None, date(2026, 11, 23)), (2025, "CFS", Decimal("-977062000000"))))
+
+    result = get_metric("051910", metric_id, "2026-11-24")
+
+    assert (result["value"], result["reason"]) == (None, "loss_making")
+    assert result["basis"] == "직전 사업연도(2025) 당기순이익 -9,770.62억 원(연결) 적자"
+    assert result["source"] == ["market_daily", "financials"]
+    assert "financials_as_of" in str(connection.queries[1][0])   # 그날까지 접수된 재무만
+
+
+@pytest.mark.parametrize("annual", [
+    (2025, "CFS", 80803000000),   # 당기순이익은 흑자(지배주주 몫만 적자일 수 있음)
+    None,                          # 신규 상장이라 직전 사업연도가 없음
+])
+def test_empty_per_without_confirmed_loss_stays_no_value(monkeypatch, annual):
+    _use(monkeypatch, FakeConnection((None, date(2026, 11, 23)), annual))
+
+    result = get_metric("373220", "per", "2026-11-24")
+
+    assert (result["value"], result["reason"]) == (None, "no_value")
+
+
+def test_pbr_is_not_checked_for_loss(monkeypatch):
+    connection = _use(monkeypatch, FakeConnection((None, date(2026, 11, 23))))
+
+    assert get_metric("051910", "pbr", "2026-11-24")["reason"] == "no_value"
+    assert len(connection.queries) == 1

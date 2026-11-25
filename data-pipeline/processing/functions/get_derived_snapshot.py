@@ -23,6 +23,12 @@ logger = logging.getLogger(__name__)
 TRADING_DAYS = {"1w": 5, "1m": 21, "3m": 63}
 YEAR_DAYS = 252
 MIN_VOLATILITY_RETURNS = 15
+# 창마다 필요한 최소 수익률 개수. 63일 창을 수익률 15개로 계산하면 상장 직후 종목의 3개월 변동성이
+# 1개월 변동성과 같은 값이 된다(#31 리뷰 3번). 1개월은 기존 15 그대로(시장 기준값 쿼리와 같음)
+MIN_RETURNS_BY_WINDOW = {TRADING_DAYS["1m"]: MIN_VOLATILITY_RETURNS, TRADING_DAYS["3m"]: 55}
+# 52주 값은 거래일 252개가 있거나, 첫 종가부터 마지막 종가까지 51주(357일) 이상일 때만 낸다.
+# 거래일 수만 보면 상장 1년 된 종목도 휴장일 차이로 빠질 수 있어 달력 기간도 함께 본다
+MIN_52W_SPAN_DAYS = 357
 VALUATION_YEARS = 3
 MARKET_THRESHOLD_QUANTILE = 0.8
 FLOW_WINDOWS = (5, 20)
@@ -137,19 +143,28 @@ def price_trend(closes: list[tuple], index_closes: list[tuple], market_volatilit
     result["volatility_1m"] = annualized_volatility(values, TRADING_DAYS["1m"])
     result["volatility_3m"] = annualized_volatility(values, TRADING_DAYS["3m"])
     result["volatility_1m_market_threshold"] = _quantile(market_volatilities, MARKET_THRESHOLD_QUANTILE)
-    year = values[-YEAR_DAYS:]
-    high, low = max(year), min(year)
+    year = closes[-YEAR_DAYS:]
+    year_values = [value for _, value in year]
+    full_year = len(year) >= YEAR_DAYS or (year[-1][0] - year[0][0]).days >= MIN_52W_SPAN_DAYS
+    high, low = max(year_values), min(year_values)
     result.update({
-        "high_52w": high,
-        "low_52w": low,
-        "position_52w": round((values[-1] - low) / (high - low), 4) if high > low else None,
-        "drawdown_from_52w_high": round((values[-1] / high - 1) * 100, 2),
+        "high_52w": high if full_year else None,
+        "low_52w": low if full_year else None,
+        "position_52w": round((values[-1] - low) / (high - low), 4) if full_year and high > low else None,
+        "drawdown_from_52w_high": round((values[-1] / high - 1) * 100, 2) if full_year else None,
+        "sample_days_52w": len(year),
+        "sample_start_52w": year[0][0].isoformat(),
         "index_code": index_code,
         "as_of": closes[-1][0].isoformat(),
         "basis": ("수익률(%)은 5·21·63거래일 전 종가 대비. 변동성은 일별 로그수익률 표준편차 × √252(연율, 소수). "
-                  f"volatility_1m_market_threshold는 그날 시세가 있는 종목들의 volatility_1m 상위 {round((1 - MARKET_THRESHOLD_QUANTILE) * 100)}% 값"),
+                  f"volatility_1m_market_threshold는 그날 시세가 있는 종목들의 volatility_1m 상위 {round((1 - MARKET_THRESHOLD_QUANTILE) * 100)}% 값. "
+                  f"표본이 모자라면 null: 변동성은 수익률 1개월 {MIN_RETURNS_BY_WINDOW[TRADING_DAYS['1m']]}개·"
+                  f"3개월 {MIN_RETURNS_BY_WINDOW[TRADING_DAYS['3m']]}개 미만, 52주 값은 거래일 {YEAR_DAYS}개 미만이면서 "
+                  f"기간이 {MIN_52W_SPAN_DAYS}일 미만(상장 1년 전 등)"),
         "reason": None,
     })
+    if not full_year:
+        result["note_52w"] = f"시세가 {result['sample_start_52w']}부터 {len(year)}거래일뿐이라 52주 값을 내지 않음"
     return result
 
 
@@ -226,7 +241,7 @@ def annualized_volatility(values: list[float], days: int) -> float | None:
     """최근 days거래일 일별 로그수익률 표준편차 × √252 (연율, 소수)."""
     recent = values[-(days + 1):]
     returns = [math.log(b / a) for a, b in zip(recent, recent[1:]) if a > 0 and b > 0]
-    if len(returns) < min(days, MIN_VOLATILITY_RETURNS):
+    if len(returns) < min(days, MIN_RETURNS_BY_WINDOW.get(days, MIN_VOLATILITY_RETURNS)):
         return None
     mean = sum(returns) / len(returns)
     variance = sum((r - mean) ** 2 for r in returns) / (len(returns) - 1)

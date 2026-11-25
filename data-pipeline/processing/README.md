@@ -384,10 +384,18 @@ result = get_report_metadata(
 - `records`: 계약서 필드 `hts_goal_prc`(목표가), `invt_opnn`(투자의견), `rgbf_invt_opnn`(직전 투자의견), `mbcr_name`(증권사)은 KIS 원래 값 그대로
 - `records` 추가 필드: `broker_key`(증권사 비교용 키, 예: "키움"·"NH투자" → "키움"·"NH". 리포트 검색 결과의 `broker_key`와 같은 값), `published_at`(발표일), `target_price_adjusted`(액면분할 환산 목표가), `opinion_norm`(매수 / 중립 / 매도 또는 `null`), `valid_from`(발표일), `superseded_at`(같은 증권사의 다음 발표일, 아직 없으면 `null`)
 - `consensus`: 증권사마다 가장 최근 의견 1건의 환산 목표가로 계산한 평균·최고·최저(원 단위 정수, 0.5 올림). **`as_of`로부터 최근 180일 안에 발표된 의견만** 씀(ADR 0010). 최신 의견이 180일보다 오래되거나 목표가가 없는 증권사는 빼고, 그 증권사의 더 오래된 의견으로 채우지 않음. `broker_count`에 계산에 쓴 증권사 수, `basis`에 "증권사별 최신 1건, 최근 180일, 증권사 N곳". 180일 안에 의견이 없으면 평균·최고·최저는 `null`
-- `as_of`: 주면 그날까지 발표된 의견만 쓰고, 그 뒤에 나온 의견은 `superseded_at`에도 드러내지 않음. 기본값은 오늘(KST). 형식이 틀리면 `ValueError`
+- `revisions`: 같은 증권사의 **직전 → 최신 환산 목표가 개정** 수(#82). 최근 `revision_window_days`(기본 90일) 안에 최신 의견을 낸 증권사만 셈
+  - `up`·`down`·`unchanged`(같은 가격 재발행)·`new`(직전 목표가가 없는 첫 의견), `brokers`(증권사별 직전·최신 날짜와 목표가, `change_pct`는 %), `basis`
+  - 직전은 그 증권사의 바로 앞 의견 가운데 목표가가 있는(0이 아닌) 것. 최신 의견에 목표가가 없는 증권사는 세지 않음
+  - 증권사는 `broker_key`로 묶음. 이름이 바뀐 증권사(하이투자 → iM 등)의 옛 의견도 직전으로 봄. `consensus`도 같은 기준
+  - 기간은 경계일 포함(`as_of` − N일부터, 기본 90이면 실제 91일). `consensus`의 180일과 같은 규칙
+  - 분할 환산 목표가로 비교. 방향 라벨(상향·하향·혼조)의 경계값은 받는 쪽(트렌드 리포트·토론)이 적용
+  - `date_from`·`date_to`는 `records`·`consensus`에만 적용하고, 개정은 그 이전 의견까지 보고 셈
+  - 조회 실패면 `null`(0으로 두면 "개정 없음"으로 읽힘)
+- `as_of`: 주면 그날까지 발표된 의견만 쓰고, 그 뒤에 나온 의견은 `superseded_at`에도 드러내지 않음. 기본값은 오늘(KST). `as_of`·`date_from`·`date_to` 형식이 틀리거나 `revision_window_days`가 1 미만이면 `ValueError`
 - `target_prices`, `summary`: 트렌드 리포트가 계약서 형식으로 옮겨 갈 때까지 함께 주는 이전 형식(`summary`의 평균·최고·최저는 `consensus`와 같고, `count`는 기간 안 의견 수)
 - `relational_db` 인자: 기존 호출과의 호환을 위해 받기만 하고 쓰지 않음. `report_type` 인자는 계약서대로 삭제
-- 조회 실패 시 예외 대신 빈 결과와 `"error": "target_price_unavailable"`을 반환
+- 조회 실패 시 예외 대신 빈 결과와 `"error": "target_price_unavailable"`을 반환(`revisions`는 `null`)
 - 현재 T1/T2만 적재되어 있어 그 외 종목은 빈 결과
 
 ```python
@@ -425,6 +433,14 @@ result = get_target_price_data(
     "min_target_price": 95000,
     "broker_count": 1,
     "basis": "증권사별 최신 1건, 최근 180일, 증권사 1곳"
+  },
+  "revisions": {
+    "window_days": 90, "up": 0, "down": 0, "unchanged": 0, "new": 1,
+    "brokers": [
+      {"broker": "삼성", "broker_key": "삼성", "prev_date": null, "prev": null,
+       "latest_date": "2026-06-15", "latest": 95000, "change_pct": null}
+    ],
+    "basis": "같은 증권사 직전 → 최신 환산 목표가, 최근 90일 안에 최신 의견을 낸 증권사"
   },
   "target_prices": [
     {
@@ -550,6 +566,38 @@ result = get_macro_data(
 ```
 
 ---
+
+### get_index_data()
+
+시장 지수 일별 종가. Supabase `index_daily`(pykrx)를 읽습니다. 토론 macro 아젠다의 지수 블록과 시뮬레이션 묶음이 씁니다(#84).
+
+- `indexes`: 지수 ID 목록(`KOSPI`·`KOSDAQ`·`KOSPI200`), 없으면 코스피·코스닥. 모르는 ID면 `ValueError`
+- `as_of`까지의 최근 `days`거래일(기본 60, 최대 800). 없으면 오늘(KST)
+- 지수마다 `rows`(오래된 날부터 `date`·`close`), `latest`, `change_pct`(기간 첫날 대비 %, 소수 둘째 자리). 값이 없으면 `rows: []`·`reason: "no_data"`
+- 조회 실패면 `indexes: null`·`"error": "index_unavailable"`
+
+```python
+from processing.functions.get_index_data import get_index_data
+
+get_index_data(as_of="2026-11-10")   # 코스피·코스닥 최근 60거래일
+```
+
+### get_sensitivities()
+
+종목의 **시장 효과를 뺀** 매크로 민감도. Supabase `ontology_sensitivity_inputs`(#67, 매달 `ontology_inputs monthly --save`)의 종목 행을 읽습니다. 토론 macro 아젠다의 민감도 블록이 씁니다(#84 Q4-1).
+
+- 원래 상관(`raw`)은 주지 않음. 시장 전체 움직임이 섞인 관계라 ADR 0011이 노출하지 않기로 함. 엣지 노출 여부는 온톨로지가 따로 판단
+- `as_of` 이전 가장 최근 계산 기준일의 값. 그날 이전에 계산된 값이 없으면 `factors: []`·`reason: "no_data"`(미래에 계산한 값을 과거 기준일에 쓰지 않음)
+- `factors`: 요인마다 `frequency`(daily·monthly), `adjusted`(편상관), `ci_low`·`ci_high`(Fisher 95%), `certain`, `q_value`(지표별 전체 종목 BH), `n_obs`, `window_start`·`window_end`. 일별(국고채 3·10년, 원/달러) 먼저, 월별(브렌트유, 소비자물가, D램 수출물가) 다음
+- 코스피는 없음: 시장 자체라 "시장 효과를 뺀 값"이 정의되지 않음. 시장 민감도(베타)는 `sensitivities` 표에 있고 시뮬레이션이 씀
+- `caution`: 해석 주의 문구(인과 아님, 월별은 1달 시차, `certain=false`면 방향 불확실)
+- 조회 실패면 `factors: null`·`"error": "sensitivities_unavailable"`
+
+```python
+from processing.functions.get_sensitivities import get_sensitivities
+
+get_sensitivities("005930", as_of="2026-11-24")
+```
 
 ### get_disclosure_data()
 
@@ -730,7 +778,9 @@ result = get_available_data_status(
 - 수급 지표: 그날까지 최근 20거래일 합계(순매수) 또는 평균(공매도 비중). 20일보다 적으면 `basis`에 실제 일수를 적음
 - 공매도 잔고 비중: KRX가 약 2거래일 늦게 공개하므로 그날 기준 2거래일 전까지의 값만 씀
 - 지분공시 지표: 그날까지 접수된 최근 90일 보고. 지분공시를 받는 종목에서 보고가 없으면 0, 받지 않는 종목은 `no_data`. 임원 보고에는 주식 보상 같은 소액 변동도 들어 있음
-- 값을 낼 수 없으면 `value`는 `null`이고 `reason`에 사유: `unknown_metric`, `no_data`, `no_value`, `not_applicable_financials`(금융 섹터 부채비율), `metric_unavailable`(조회 실패)
+- 값을 낼 수 없으면 `value`는 `null`이고 `reason`에 사유: `unknown_metric`, `no_data`, `no_value`, `not_applicable_financials`(금융 섹터 부채비율), `loss_making`(PER·EPS: 직전 사업연도 당기순이익 적자, `basis`에 금액), `metric_unavailable`(조회 실패)
+- 여러 지표는 `get_metrics(ticker, metric_ids, as_of)`로 DB 연결 하나에서 계산(결과는 `metric_ids` 순서, 항목은 `get_metric`과 같음). 지표마다 연결을 열면 연결에만 약 0.35초씩 듦. 한 지표의 조회가 실패해도 나머지는 계산
+- 사람이 읽는 지표 이름은 `METRIC_NAMES`(예: `per` → "PER(주가수익비율)")
 
 | metric_id | 단위 | 출처 |
 |---|---|---|
@@ -781,7 +831,20 @@ result = get_metric(ticker="005930", metric_id="roe_ttm", as_of="2026-09-01")
   - 그래서 질문이 없어도 `documents`가 있음. `intent`가 없으면 지금처럼 `query`가 있을 때만 검색
   - 아젠다의 문서 종류마다 따로 찾아 5개를 나눔(1종류 5, 2종류 3·2, 3종류 2·2·1). 한 종류가 모자라면 다른 종류로 채움
   - 한 문서에서는 최대 2조각(같은 리포트가 몫을 다 차지하지 않게)
-  - `documents`에 `query`(의미 검색)·`keyword_query`(키워드 검색)·`document_types`·`mode`. 한 종류의 검색이 실패하면 나머지는 주고 `reason="search_unavailable"`·`failed_types`
+  - `documents`에 `query`(의미 검색)·`keyword_query`(키워드 검색)·`document_types`·`mode`. 한 종류의 검색이 실패하면 나머지는 주고 `reason="search_unavailable"`·`failed_types`. 동점이면 최신 문서가 앞
+- `debate`에 `intent`를 주면 그 아젠다의 지표 목록 `metrics`도 줌(`AGENDA_METRICS`, #84)
+  - 항목은 `get_metric` 결과 그대로(`value`·`unit`·`display`·`as_of`·`reason` 등)이고 값이 없는 지표도 빼지 않음
+  - 항목마다 `name`(지표 이름)과 `evidence_id`(`metric:{종목}:{지표}:{지표의 as_of}`). 근거 ID의 날짜는 요청일이 아니라 그 지표가 실제로 쓴 데이터의 날짜
+  - 토론은 `value`와 `display`가 둘 다 있는 지표만 `{{metric_id}}` 자리표시자로 씀(#84 Q1)
+
+| intent | `metrics` |
+| --- | --- |
+| `valuation` | `per`, `pbr`, `eps`, `bps`, `roe_ttm`, `operating_margin`, `close`, `market_cap` |
+| `growth` | `revenue_growth_yoy`, `operating_margin`, `roe_ttm` |
+| `risk` | `debt_ratio`, `short_volume_ratio_20d`, `short_balance_ratio`, `insider_net_shares_90d`, `insider_sell_reports_90d`, `major_holder_ratio_change_90d`, `foreign_net_buy_20d` |
+| `flow` | `foreign_net_buy_20d`, `inst_net_buy_20d`, `individual_net_buy_20d`, `short_volume_ratio_20d`, `short_balance_ratio` |
+| `shareholder_return` | `dividend_yield`, `dps`, `eps`, `close` |
+| `macro` | (없음) |
 
 | intent | 키워드 | 문서 종류 |
 | --- | --- | --- |

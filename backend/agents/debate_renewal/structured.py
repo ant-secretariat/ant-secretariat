@@ -126,8 +126,14 @@ def _target_price(b: Mapping) -> str:
 def _financials(b: Mapping) -> str:
     out = [b.get("basis") or ""]
     for r in (b.get("records") or [])[:8]:
-        out.append(f"{r.get('period')}: 매출 {_big(r.get('revenue'))}, 영업이익 {_big(r.get('operating_income'))}, "
-                   f"순이익 {_big(r.get('net_income'))}, 영업이익률 {r.get('operating_margin')}%, 부채비율 {r.get('debt_ratio')}%")
+        # 값이 없는 항목은 빼서 LLM이 "None%"를 숫자처럼 쓰지 않게 한다(#120 리뷰). 금융업 매출 계정 없음 등
+        parts = [f"{label} {_big(r[key])}" for label, key in (("매출", "revenue"), ("영업이익", "operating_income"),
+                                                               ("순이익", "net_income")) if r.get(key) is not None]
+        parts += [f"{label} {r[key]}%" for label, key in (("영업이익률", "operating_margin"), ("부채비율", "debt_ratio"))
+                  if r.get(key) is not None]
+        if r.get("debt_ratio") is None and r.get("debt_ratio_note") in REASON_FACTS:
+            parts.append(f"부채비율 값 없음({REASON_FACTS[r['debt_ratio_note']]})")
+        out.append(f"{r.get('period')}: " + (", ".join(parts) or "값 없음"))
     return ". ".join(x for x in out if x)
 
 
@@ -154,7 +160,9 @@ def _sensitivities(b: Mapping) -> str:
     sure = [f"{f.get('factor')}({f.get('frequency')}) 편상관 {f.get('adjusted')}" for f in b.get("factors") or []
             if f.get("certain")]
     head = "뚜렷한 관계: " + ", ".join(sure) if sure else "뚜렷한 관계가 있는 요인 없음"
-    return f"{head}. 나머지 요인은 뚜렷한 관계가 없다. {b.get('caution') or ''}".strip()
+    caution = b.get("caution") or ""
+    caution = " ".join(caution) if isinstance(caution, list) else caution  # 데이터 쪽은 문자열 목록(#120 리뷰)
+    return f"{head}. 나머지 요인은 뚜렷한 관계가 없다. {caution}".strip()
 
 
 _BLOCK_TEXT = {"target_price": _target_price, "financials": _financials, "disclosures": _disclosures,

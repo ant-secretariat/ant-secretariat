@@ -52,9 +52,9 @@ def test_sensitivities_only_states_certain_factors():
     block = {"source": "get_sensitivities", "as_of": "2026-11-01", "chunk_id": "block:005930:sensitivities:2026-11-01",
              "factors": [{"factor": "usd_krw", "frequency": "daily", "adjusted": -0.21, "certain": True},
                          {"factor": "wti", "frequency": "daily", "adjusted": 0.05, "certain": False}],
-             "caution": "상관관계이며 인과가 아니다"}
+             "caution": ["상관관계이며", "인과가 아니다"]}
     text = from_bundle({"sensitivities": block}).rows[0]["content"]
-    assert "usd_krw" in text and "wti" not in text and "인과가 아니다" in text
+    assert "usd_krw" in text and "wti" not in text and "상관관계이며 인과가 아니다" in text and "[" not in text
 
 
 def test_financials_amounts_are_readable():
@@ -62,7 +62,16 @@ def test_financials_amounts_are_readable():
              "basis": "연결 우선", "records": [{"period": "2026Q2", "revenue": 171499470000000, "operating_income": -2500000000,
                                               "net_income": None, "operating_margin": 52.18, "debt_ratio": 31.1}]}
     text = from_bundle({"financials": block}).rows[0]["content"]
-    assert "매출 171.5조 원" in text and "영업이익 -25억 원" in text and "순이익 알 수 없음" in text
+    assert "매출 171.5조 원" in text and "영업이익 -25억 원" in text and "순이익" not in text
+
+
+def test_financials_sector_drops_missing_values_and_states_reason():
+    # 금융업: 매출 계정 없음, 부채비율은 의미 없음 → None을 쓰지 않고 사유 문장으로(#120 리뷰)
+    block = {"source": "get_financials", "as_of": "2026-08-14", "chunk_id": "block:105560:financials:2026-08-14",
+             "records": [{"period": "2026Q2", "revenue": None, "operating_income": 1500000000000, "net_income": 1100000000000,
+                          "operating_margin": None, "debt_ratio": None, "debt_ratio_note": "not_applicable_financials"}]}
+    text = from_bundle({"financials": block}).rows[0]["content"]
+    assert "None" not in text and "매출" not in text and "영업이익 1.5조 원" in text and "금융업이라" in text
 
 
 def test_fill_replaces_known_and_keeps_unknown_placeholders():

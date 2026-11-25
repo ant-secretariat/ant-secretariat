@@ -63,7 +63,7 @@ def test_every_metric_unit_is_in_the_fixed_list():
     units |= {unit for unit, *_ in INSIDER_METRICS.values()} | {"%"}  # short_balance_ratio
     assert units <= set(UNITS)
     assert set(REASONS) == {"unknown_metric", "metric_unavailable", "no_data", "no_value", "not_applicable_financials", "partial_window",
-                            "loss_making"}
+                            "capital_impaired", "loss_making"}
 
 
 def test_result_keeps_contract_fields_and_adds_display_and_requested_as_of(monkeypatch):

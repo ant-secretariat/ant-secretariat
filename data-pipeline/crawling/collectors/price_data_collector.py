@@ -13,6 +13,7 @@ from bs4 import BeautifulSoup
 from crawling.config.settings import SETTINGS, Settings
 from crawling.crawler.base_crawler import subtract_months
 from crawling.crawler.http import create_ssl_context
+from crawling.config.clock import today_kst
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ class PriceDataCollector:
         date_from: str | None = None,
         date_to: str | None = None,
     ) -> list[dict]:
-        end = _parse_date(date_to) or date.today()
+        end = _parse_date(date_to) or today_kst()
         start = _parse_date(date_from) or subtract_months(end, self.settings.months)
         resolved_date_from = start.isoformat()
         resolved_date_to = end.isoformat()
@@ -62,7 +63,7 @@ class NaverPriceProvider:
         date_from: str | None,
         date_to: str | None,
     ) -> list[dict]:
-        end = _parse_date(date_to) or date.today()
+        end = _parse_date(date_to) or today_kst()
         start = _parse_date(date_from) or end - timedelta(days=45)
         rows: list[dict] = []
         with httpx.Client(
@@ -152,7 +153,7 @@ class MockPriceProvider:
         date_from: str | None,
         date_to: str | None,
     ) -> list[dict]:
-        end = _parse_date(date_to) or date.today()
+        end = _parse_date(date_to) or today_kst()
         start = _parse_date(date_from) or end - timedelta(days=4)
         rows: list[dict] = []
         current = start

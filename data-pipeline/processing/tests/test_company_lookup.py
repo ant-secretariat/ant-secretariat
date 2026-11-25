@@ -164,3 +164,17 @@ def test_common_words_are_excluded_from_sentence_extraction():
     # 흔한 2글자 낱말이 종목으로 잡히지 않게 한다 (#32 리뷰, #41)
     names = set(load_terms()["extract_exclude"]["names"])
     assert {"한창", "전방", "남성"} <= names
+
+
+def test_fullwidth_ticker_and_spaced_names(index):
+    # 전각 종목코드, 이름 안 띄어쓰기를 resolve와 추출이 똑같이 다룬다 (#32 리뷰, #42)
+    assert index.exact("００５９３０")[0] == ["005930"]
+    assert [m for m, _ in index.mentions("삼성 전자 실적 어때")] == ["삼성 전자"]
+    assert index.exact("삼성 전자")[0] == ["005930"]
+
+
+def test_find_terms_skips_terms_inside_longer_terms():
+    # "주가수익비율" 안의 "주가"는 close로 따로 잡지 않는다 (#32 리뷰, #42)
+    index = build_index(ROWS, {**TERMS, "metric_terms": {"주가수익비율": "per", "주가": "close"}})
+    assert [m["metric_id"] for m in index.find_terms("주가수익비율 알려줘")["metrics"]] == ["per"]
+    assert [m["metric_id"] for m in index.find_terms("주가 알려줘")["metrics"]] == ["close"]

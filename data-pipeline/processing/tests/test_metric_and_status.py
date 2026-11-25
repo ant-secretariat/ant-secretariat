@@ -72,7 +72,7 @@ def test_financial_metric_is_point_in_time(monkeypatch):
 
 
 def test_roe_basis_explains_ttm(monkeypatch):
-    row = (2026, 2, "OFS", date(2026, 8, 14), 31.1, 12.5, 98.67, 31.39)
+    row = (2026, 2, "OFS", date(2026, 8, 14), 31.1, 12.5, 98.67, 31.39, False)
     _use(monkeypatch, FakeConnection(row))
 
     result = get_metric("005930", "roe_ttm", "2026-09-01")
@@ -312,6 +312,27 @@ def test_status_reads_each_document_type_once(monkeypatch):
     get_available_data_status("005930")
 
     assert connection.queries[0][0].count("from document_chunks") == 3
+
+
+def test_metric_contract_lists_extra_fields():
+    # 구현이 붙이는 requested_as_of·display·period가 계약서 MetricValue에 있다 (#55)
+    from pathlib import Path
+
+    import yaml
+
+    spec = yaml.safe_load((Path(__file__).resolve().parents[3] / "docs/api/openapi.yaml").read_text(encoding="utf-8"))
+    metric = spec["components"]["schemas"]["MetricValue"]
+    assert {"requested_as_of", "display", "period"} <= set(metric["properties"])
+    assert {"requested_as_of", "display"} <= set(metric["required"])
+
+
+def test_debt_ratio_capital_impaired_reason(monkeypatch):
+    # 자본잠식이면 음수 부채비율 대신 null + capital_impaired (#33 리뷰, #42)
+    row = (2026, 3, "CFS", date(2026, 11, 14), None, 5.0, 1.0, None, True)
+    _use(monkeypatch, FakeConnection(("IT",), row))  # 업종 조회(금융업 아님) → 재무 조회
+
+    result = get_metric("005930", "debt_ratio", "2026-11-20")
+    assert result["value"] is None and result["reason"] == "capital_impaired"
 
 
 def test_get_metrics_uses_one_connection_and_keeps_order(monkeypatch):

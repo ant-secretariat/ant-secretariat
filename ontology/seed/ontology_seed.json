@@ -1,6 +1,6 @@
 {
   "meta": {
-    "version": "seed-v0.7",
+    "version": "seed-v0.10",
     "generated": "2026-11-23",
     "spec": "온톨로지 기획서 v1.2",
     "exposure_rule": "status == \"active\" and reviewed == True (ADR 0008). draft_fields 는 include_draft 일 때만",
@@ -288,7 +288,8 @@
           "direction",
           "notes"
         ],
-        "inactive_reason": null
+        "inactive_reason": null,
+        "direction_evidence": null
       },
       {
         "indicator_id": "KTB_3Y_KR",
@@ -308,10 +309,22 @@
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "direction",
           "notes"
         ],
-        "inactive_reason": null
+        "inactive_reason": null,
+        "direction_evidence": {
+          "source": "수경 #61 2026-11-23 (crawling.ontology_inputs, PR #62)",
+          "method": "corr_daily_with_kospi",
+          "as_of": "2026-11-23",
+          "corr": -0.164,
+          "ci95": [
+            -0.23,
+            -0.09
+          ],
+          "n": 727,
+          "decided_by": "유민",
+          "decided_on": "2026-11-23"
+        }
       },
       {
         "indicator_id": "KTB_10Y_KR",
@@ -331,10 +344,22 @@
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "direction",
           "notes"
         ],
-        "inactive_reason": null
+        "inactive_reason": null,
+        "direction_evidence": {
+          "source": "수경 #61 2026-11-23 (crawling.ontology_inputs, PR #62)",
+          "method": "corr_daily_with_kospi",
+          "as_of": "2026-11-23",
+          "corr": -0.132,
+          "ci95": [
+            -0.2,
+            -0.06
+          ],
+          "n": 727,
+          "decided_by": "유민",
+          "decided_on": "2026-11-23"
+        }
       },
       {
         "indicator_id": "US_FFR",
@@ -357,7 +382,8 @@
           "direction",
           "notes"
         ],
-        "inactive_reason": "no_data_source"
+        "inactive_reason": "no_data_source",
+        "direction_evidence": null
       },
       {
         "indicator_id": "US_10Y_YIELD",
@@ -380,7 +406,8 @@
           "direction",
           "notes"
         ],
-        "inactive_reason": "no_data_source"
+        "inactive_reason": "no_data_source",
+        "direction_evidence": null
       },
       {
         "indicator_id": "USD_KRW",
@@ -400,10 +427,22 @@
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "direction",
           "notes"
         ],
-        "inactive_reason": null
+        "inactive_reason": null,
+        "direction_evidence": {
+          "source": "수경 #61 2026-11-23 (crawling.ontology_inputs, PR #62)",
+          "method": "corr_daily_with_kospi",
+          "as_of": "2026-11-23",
+          "corr": -0.005,
+          "ci95": [
+            -0.08,
+            0.07
+          ],
+          "n": 727,
+          "decided_by": "유민",
+          "decided_on": "2026-11-23"
+        }
       },
       {
         "indicator_id": "USD_CNY",
@@ -426,7 +465,8 @@
           "direction",
           "notes"
         ],
-        "inactive_reason": "no_data_source"
+        "inactive_reason": "no_data_source",
+        "direction_evidence": null
       },
       {
         "indicator_id": "CPI_KR",
@@ -449,7 +489,8 @@
           "direction",
           "notes"
         ],
-        "inactive_reason": null
+        "inactive_reason": null,
+        "direction_evidence": null
       },
       {
         "indicator_id": "PPI_KR",
@@ -472,7 +513,8 @@
           "direction",
           "notes"
         ],
-        "inactive_reason": "no_data_source"
+        "inactive_reason": "no_data_source",
+        "direction_evidence": null
       },
       {
         "indicator_id": "BRENT",
@@ -492,10 +534,22 @@
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "direction",
           "notes"
         ],
-        "inactive_reason": null
+        "inactive_reason": null,
+        "direction_evidence": {
+          "source": "수경 #61 2026-11-23 (crawling.ontology_inputs, PR #62)",
+          "method": "corr_monthly_with_core_market",
+          "as_of": "2026-11-23",
+          "corr": 0.131,
+          "ci95": [
+            -0.05,
+            0.3
+          ],
+          "n": 120,
+          "decided_by": "유민",
+          "decided_on": "2026-11-23"
+        }
       },
       {
         "indicator_id": "DRAM_EXPORT_PRICE",
@@ -518,7 +572,8 @@
           "direction",
           "notes"
         ],
-        "inactive_reason": null
+        "inactive_reason": null,
+        "direction_evidence": null
       },
       {
         "indicator_id": "CHINA_PMI_MFG",
@@ -541,7 +596,8 @@
           "direction",
           "notes"
         ],
-        "inactive_reason": "no_data_source"
+        "inactive_reason": "no_data_source",
+        "direction_evidence": null
       },
       {
         "indicator_id": "VIX",
@@ -564,7 +620,8 @@
           "direction",
           "notes"
         ],
-        "inactive_reason": "no_data_source"
+        "inactive_reason": "no_data_source",
+        "direction_evidence": null
       },
       {
         "indicator_id": "KOSPI",
@@ -587,7 +644,8 @@
           "direction",
           "notes"
         ],
-        "inactive_reason": null
+        "inactive_reason": null,
+        "direction_evidence": null
       }
     ],
     "issues": [
@@ -1089,16 +1147,17 @@
         "sector_l2": "제약과생물공학",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -1110,16 +1169,17 @@
         "sector_l2": "건강관리장비와서비스",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -1129,19 +1189,18 @@
         "sector_id": "SEC_IT",
         "sector_l1": "IT",
         "sector_l2": "반도체와반도체장비",
-        "sub_industry": null,
+        "sub_industry": "반도체 장비",
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": "krx_kind+review(#61)",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
-        "draft_fields": [
-          "sub_industry",
-          "is_holding"
-        ]
+        "draft_fields": []
       },
       {
         "ticker": "039030",
@@ -1150,19 +1209,18 @@
         "sector_id": "SEC_IT",
         "sector_l1": "IT",
         "sector_l2": "반도체와반도체장비",
-        "sub_industry": null,
+        "sub_industry": "반도체 장비(레이저)",
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": "krx_kind+review(#61)",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
-        "draft_fields": [
-          "sub_industry",
-          "is_holding"
-        ]
+        "draft_fields": []
       },
       {
         "ticker": "058470",
@@ -1171,19 +1229,18 @@
         "sector_id": "SEC_IT",
         "sector_l1": "IT",
         "sector_l2": "반도체와반도체장비",
-        "sub_industry": null,
+        "sub_industry": "반도체 테스트 소켓",
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": "krx_kind+review(#61)",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
-        "draft_fields": [
-          "sub_industry",
-          "is_holding"
-        ]
+        "draft_fields": []
       },
       {
         "ticker": "086520",
@@ -1194,16 +1251,17 @@
         "sector_l2": "소재",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -1215,16 +1273,17 @@
         "sector_l2": "제약과생물공학",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -1234,19 +1293,18 @@
         "sector_id": "SEC_IT",
         "sector_l1": "IT",
         "sector_l2": "반도체와반도체장비",
-        "sub_industry": null,
+        "sub_industry": "반도체 장비",
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": "krx_kind+review(#61)",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
-        "draft_fields": [
-          "sub_industry",
-          "is_holding"
-        ]
+        "draft_fields": []
       },
       {
         "ticker": "247540",
@@ -1255,19 +1313,18 @@
         "sector_id": "SEC_IT",
         "sector_l1": "IT",
         "sector_l2": "전자와 전기제품",
-        "sub_industry": null,
+        "sub_industry": "2차전지 소재(양극재)",
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": "krx_kind+review(#61)",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
-        "draft_fields": [
-          "sub_industry",
-          "is_holding"
-        ]
+        "draft_fields": []
       },
       {
         "ticker": "277810",
@@ -1276,19 +1333,18 @@
         "sector_id": "SEC_INDUS",
         "sector_l1": "산업재",
         "sector_l2": "자본재",
-        "sub_industry": null,
+        "sub_industry": "로봇",
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": "krx_kind+review(#61)",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
-        "draft_fields": [
-          "sub_industry",
-          "is_holding"
-        ]
+        "draft_fields": []
       },
       {
         "ticker": "000100",
@@ -1299,16 +1355,17 @@
         "sector_l2": "제약과생물공학",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -1318,19 +1375,18 @@
         "sector_id": "SEC_INDUS",
         "sector_l1": "산업재",
         "sector_l2": "자본재",
-        "sub_industry": null,
+        "sub_industry": "전자소재(CCL)",
         "is_holding": true,
+        "holding_type": "business",
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": "krx_kind+review(#61)",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
-        "draft_fields": [
-          "sub_industry",
-          "is_holding"
-        ]
+        "draft_fields": []
       },
       {
         "ticker": "000270",
@@ -1341,16 +1397,17 @@
         "sector_l2": "자동차와부품",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -1362,17 +1419,16 @@
         "sector_l2": "자본재",
         "sub_industry": "전선",
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": "krx_kind+review(#61)",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
-        "draft_fields": [
-          "sub_industry",
-          "is_holding"
-        ]
+        "draft_fields": []
       },
       {
         "ticker": "000660",
@@ -1383,16 +1439,17 @@
         "sector_l2": "반도체와반도체장비",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -1404,16 +1461,17 @@
         "sector_l2": "자본재",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -1425,16 +1483,17 @@
         "sector_l2": "보험",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -1446,16 +1505,17 @@
         "sector_l2": "자본재",
         "sub_industry": null,
         "is_holding": true,
+        "holding_type": "business",
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -1467,16 +1527,17 @@
         "sector_l2": "식품,음료,담배",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -1486,19 +1547,18 @@
         "sector_id": "SEC_INDUS",
         "sector_l1": "산업재",
         "sector_l2": "운송",
-        "sub_industry": null,
+        "sub_industry": "항공운송",
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": "krx_kind+review(#61)",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
-        "draft_fields": [
-          "sub_industry",
-          "is_holding"
-        ]
+        "draft_fields": []
       },
       {
         "ticker": "003550",
@@ -1509,16 +1569,17 @@
         "sector_l2": "자본재",
         "sub_industry": null,
         "is_holding": true,
+        "holding_type": "legal",
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -1528,19 +1589,18 @@
         "sector_id": "SEC_MATERIAL",
         "sector_l1": "소재",
         "sector_l2": "소재",
-        "sub_industry": "양극재",
+        "sub_industry": "2차전지 소재(양극재·음극재)",
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": "krx_kind+review(#61)",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
-        "draft_fields": [
-          "sub_industry",
-          "is_holding"
-        ]
+        "draft_fields": []
       },
       {
         "ticker": "005380",
@@ -1551,16 +1611,17 @@
         "sector_l2": "자동차와부품",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -1571,17 +1632,18 @@
         "sector_l1": "소재",
         "sector_l2": "소재",
         "sub_industry": null,
-        "is_holding": false,
+        "is_holding": true,
+        "holding_type": "legal",
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -1593,16 +1655,17 @@
         "sector_l2": "보험",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -1614,16 +1677,17 @@
         "sector_l2": "반도체와반도체장비",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -1635,16 +1699,17 @@
         "sector_l2": "증권",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -1656,16 +1721,17 @@
         "sector_l2": "자본재",
         "sub_industry": null,
         "is_holding": true,
+        "holding_type": "business",
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -1677,17 +1743,16 @@
         "sector_l2": "전자와 전기제품",
         "sub_industry": "2차전지",
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": "krx_kind+review(#61)",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
-        "draft_fields": [
-          "sub_industry",
-          "is_holding"
-        ]
+        "draft_fields": []
       },
       {
         "ticker": "006800",
@@ -1698,16 +1763,17 @@
         "sector_l2": "증권",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -1719,17 +1785,16 @@
         "sector_l2": "반도체와반도체장비",
         "sub_industry": "PCB",
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": "krx_kind+review(#61)",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
-        "draft_fields": [
-          "sub_industry",
-          "is_holding"
-        ]
+        "draft_fields": []
       },
       {
         "ticker": "009150",
@@ -1738,19 +1803,18 @@
         "sector_id": "SEC_IT",
         "sector_l1": "IT",
         "sector_l2": "기술하드웨어와장비",
-        "sub_industry": null,
+        "sub_industry": "MLCC·패키지기판",
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": "krx_kind+review(#61)",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
-        "draft_fields": [
-          "sub_industry",
-          "is_holding"
-        ]
+        "draft_fields": []
       },
       {
         "ticker": "009540",
@@ -1761,16 +1825,17 @@
         "sector_l2": "자본재",
         "sub_industry": "조선 중간지주",
         "is_holding": true,
+        "holding_type": "business",
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
         "sub_industry_source": "claude_draft",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -1780,19 +1845,18 @@
         "sector_id": "SEC_ENERGY",
         "sector_l1": "에너지",
         "sector_l2": "에너지",
-        "sub_industry": null,
+        "sub_industry": "화학·태양광",
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": "krx_kind+review(#61)",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
-        "draft_fields": [
-          "sub_industry",
-          "is_holding"
-        ]
+        "draft_fields": []
       },
       {
         "ticker": "010120",
@@ -1803,17 +1867,16 @@
         "sector_l2": "자본재",
         "sub_industry": "전력기기",
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": "krx_kind+review(#61)",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
-        "draft_fields": [
-          "sub_industry",
-          "is_holding"
-        ]
+        "draft_fields": []
       },
       {
         "ticker": "010130",
@@ -1824,16 +1887,17 @@
         "sector_l2": "소재",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -1843,19 +1907,18 @@
         "sector_id": "SEC_INDUS",
         "sector_l1": "산업재",
         "sector_l2": "자본재",
-        "sub_industry": null,
+        "sub_industry": "조선",
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": "krx_kind+review(#61)",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
-        "draft_fields": [
-          "sub_industry",
-          "is_holding"
-        ]
+        "draft_fields": []
       },
       {
         "ticker": "010950",
@@ -1864,19 +1927,18 @@
         "sector_id": "SEC_ENERGY",
         "sector_l1": "에너지",
         "sector_l2": "에너지",
-        "sub_industry": null,
+        "sub_industry": "정유",
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": "krx_kind+review(#61)",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
-        "draft_fields": [
-          "sub_industry",
-          "is_holding"
-        ]
+        "draft_fields": []
       },
       {
         "ticker": "011070",
@@ -1885,19 +1947,18 @@
         "sector_id": "SEC_IT",
         "sector_l1": "IT",
         "sector_l2": "기술하드웨어와장비",
-        "sub_industry": null,
+        "sub_industry": "카메라모듈·기판",
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": "krx_kind+review(#61)",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
-        "draft_fields": [
-          "sub_industry",
-          "is_holding"
-        ]
+        "draft_fields": []
       },
       {
         "ticker": "011200",
@@ -1908,17 +1969,16 @@
         "sector_l2": "운송",
         "sub_industry": "컨테이너 해운",
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": "krx_kind+review(#61)",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
-        "draft_fields": [
-          "sub_industry",
-          "is_holding"
-        ]
+        "draft_fields": []
       },
       {
         "ticker": "012330",
@@ -1929,16 +1989,17 @@
         "sector_l2": "자동차와부품",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -1950,17 +2011,16 @@
         "sector_l2": "자본재",
         "sub_industry": "방산·항공엔진",
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": "krx_kind+review(#61)",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
-        "draft_fields": [
-          "sub_industry",
-          "is_holding"
-        ]
+        "draft_fields": []
       },
       {
         "ticker": "0126Z0",
@@ -1971,16 +2031,17 @@
         "sector_l2": "제약과생물공학",
         "sub_industry": "삼성바이오에피스 지주",
         "is_holding": true,
+        "holding_type": "legal",
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
         "sub_industry_source": "claude_draft",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -1992,16 +2053,17 @@
         "sector_l2": "유틸리티",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -2013,16 +2075,17 @@
         "sector_l2": "증권",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -2034,16 +2097,17 @@
         "sector_l2": "전기통신서비스",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -2055,16 +2119,17 @@
         "sector_l2": "소프트웨어와서비스",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -2076,16 +2141,17 @@
         "sector_l2": "내구소비재와의류",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -2097,16 +2163,17 @@
         "sector_l2": "은행",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -2118,16 +2185,17 @@
         "sector_l2": "자본재",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -2139,16 +2207,17 @@
         "sector_l2": "자본재",
         "sub_industry": null,
         "is_holding": true,
+        "holding_type": "business",
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -2160,16 +2229,17 @@
         "sector_l2": "전기통신서비스",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -2181,16 +2251,17 @@
         "sector_l2": "전기통신서비스",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -2202,16 +2273,17 @@
         "sector_l2": "보험",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -2223,16 +2295,17 @@
         "sector_l2": "식품,음료,담배",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -2244,17 +2317,16 @@
         "sector_l2": "자본재",
         "sub_industry": "원전·발전설비",
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": "krx_kind+review(#61)",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
-        "draft_fields": [
-          "sub_industry",
-          "is_holding"
-        ]
+        "draft_fields": []
       },
       {
         "ticker": "034730",
@@ -2265,16 +2337,17 @@
         "sector_l2": "에너지",
         "sub_industry": null,
         "is_holding": true,
+        "holding_type": "legal",
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -2286,16 +2359,17 @@
         "sector_l2": "미디어와엔터테인먼트",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -2307,16 +2381,17 @@
         "sector_l2": "미디어와엔터테인먼트",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -2328,16 +2403,17 @@
         "sector_l2": "증권",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -2347,19 +2423,18 @@
         "sector_id": "SEC_INDUS",
         "sector_l1": "산업재",
         "sector_l2": "자본재",
-        "sub_industry": null,
+        "sub_industry": "조선",
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": "krx_kind+review(#61)",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
-        "draft_fields": [
-          "sub_industry",
-          "is_holding"
-        ]
+        "draft_fields": []
       },
       {
         "ticker": "042700",
@@ -2370,17 +2445,16 @@
         "sector_l2": "반도체와반도체장비",
         "sub_industry": "반도체 장비",
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": "krx_kind+review(#61)",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
-        "draft_fields": [
-          "sub_industry",
-          "is_holding"
-        ]
+        "draft_fields": []
       },
       {
         "ticker": "047040",
@@ -2391,16 +2465,17 @@
         "sector_l2": "자본재",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -2412,16 +2487,17 @@
         "sector_l2": "자본재",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -2431,19 +2507,18 @@
         "sector_id": "SEC_INDUS",
         "sector_l1": "산업재",
         "sector_l2": "자본재",
-        "sub_industry": null,
+        "sub_industry": "방산·항공",
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": "krx_kind+review(#61)",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
-        "draft_fields": [
-          "sub_industry",
-          "is_holding"
-        ]
+        "draft_fields": []
       },
       {
         "ticker": "051910",
@@ -2454,16 +2529,17 @@
         "sector_l2": "소재",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -2474,17 +2550,18 @@
         "sector_l1": "금융",
         "sector_l2": "은행",
         "sub_industry": null,
-        "is_holding": false,
+        "is_holding": true,
+        "holding_type": "financial",
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -2496,17 +2573,16 @@
         "sector_l2": "자본재",
         "sub_industry": "전력기기(변압기)",
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": "krx_kind+review(#61)",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
-        "draft_fields": [
-          "sub_industry",
-          "is_holding"
-        ]
+        "draft_fields": []
       },
       {
         "ticker": "064350",
@@ -2517,16 +2593,17 @@
         "sector_l2": "자본재",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -2538,16 +2615,17 @@
         "sector_l2": "소프트웨어와서비스",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -2559,16 +2637,17 @@
         "sector_l2": "전자와 전기제품",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -2580,16 +2659,17 @@
         "sector_l2": "제약과생물공학",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -2600,17 +2680,18 @@
         "sector_l1": "금융",
         "sector_l2": "증권",
         "sub_industry": null,
-        "is_holding": false,
+        "is_holding": true,
+        "holding_type": "financial",
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -2622,16 +2703,17 @@
         "sector_l2": "에너지",
         "sub_industry": "정유 중심 지주",
         "is_holding": true,
+        "holding_type": "legal",
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
         "sub_industry_source": "claude_draft",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -2641,19 +2723,18 @@
         "sector_id": "SEC_INDUS",
         "sector_l1": "산업재",
         "sector_l2": "자본재",
-        "sub_industry": null,
+        "sub_industry": "방산",
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": "krx_kind+review(#61)",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
-        "draft_fields": [
-          "sub_industry",
-          "is_holding"
-        ]
+        "draft_fields": []
       },
       {
         "ticker": "086280",
@@ -2664,17 +2745,16 @@
         "sector_l2": "운송",
         "sub_industry": "자동차 물류",
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": "krx_kind+review(#61)",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
-        "draft_fields": [
-          "sub_industry",
-          "is_holding"
-        ]
+        "draft_fields": []
       },
       {
         "ticker": "086790",
@@ -2684,17 +2764,18 @@
         "sector_l1": "금융",
         "sector_l2": "은행",
         "sub_industry": null,
-        "is_holding": false,
+        "is_holding": true,
+        "holding_type": "financial",
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -2706,16 +2787,17 @@
         "sector_l2": "내구소비재와의류",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -2725,19 +2807,18 @@
         "sector_id": "SEC_ENERGY",
         "sector_l1": "에너지",
         "sector_l2": "에너지",
-        "sub_industry": null,
+        "sub_industry": "정유·배터리",
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": "krx_kind+review(#61)",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
-        "draft_fields": [
-          "sub_industry",
-          "is_holding"
-        ]
+        "draft_fields": []
       },
       {
         "ticker": "105560",
@@ -2747,17 +2828,18 @@
         "sector_l1": "금융",
         "sector_l2": "은행",
         "sub_industry": null,
-        "is_holding": false,
+        "is_holding": true,
+        "holding_type": "financial",
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -2768,17 +2850,18 @@
         "sector_l1": "금융",
         "sector_l2": "증권",
         "sub_industry": null,
-        "is_holding": false,
+        "is_holding": true,
+        "holding_type": "financial",
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -2790,16 +2873,17 @@
         "sector_l2": "자동차와부품",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -2811,16 +2895,17 @@
         "sector_l2": "운송",
         "sub_industry": null,
         "is_holding": true,
+        "holding_type": "legal",
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -2832,16 +2917,17 @@
         "sector_l2": "제약과생물공학",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -2853,16 +2939,17 @@
         "sector_l2": "미디어와엔터테인먼트",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -2874,16 +2961,17 @@
         "sector_l2": "자본재",
         "sub_industry": null,
         "is_holding": true,
+        "holding_type": "legal",
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -2895,17 +2983,16 @@
         "sector_l2": "자본재",
         "sub_industry": "전력기기",
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": "krx_kind+review(#61)",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
-        "draft_fields": [
-          "sub_industry",
-          "is_holding"
-        ]
+        "draft_fields": []
       },
       {
         "ticker": "272210",
@@ -2914,19 +3001,18 @@
         "sector_id": "SEC_INDUS",
         "sector_l1": "산업재",
         "sector_l2": "자본재",
-        "sub_industry": null,
+        "sub_industry": "방산·ICT",
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": "krx_kind+review(#61)",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
-        "draft_fields": [
-          "sub_industry",
-          "is_holding"
-        ]
+        "draft_fields": []
       },
       {
         "ticker": "278470",
@@ -2937,16 +3023,17 @@
         "sector_l2": "내구소비재와의류",
         "sub_industry": "뷰티 디바이스·화장품",
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
         "sub_industry_source": "claude_draft",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -2958,17 +3045,16 @@
         "sector_l2": "자본재",
         "sub_industry": "전력기기",
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": "krx_kind+review(#61)",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
-        "draft_fields": [
-          "sub_industry",
-          "is_holding"
-        ]
+        "draft_fields": []
       },
       {
         "ticker": "307950",
@@ -2979,16 +3065,17 @@
         "sector_l2": "소프트웨어와서비스",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -2999,17 +3086,18 @@
         "sector_l1": "금융",
         "sector_l2": "은행",
         "sub_industry": null,
-        "is_holding": false,
+        "is_holding": true,
+        "holding_type": "financial",
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -3021,16 +3109,17 @@
         "sector_l2": "은행",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -3042,16 +3131,17 @@
         "sector_l2": "제약과생물공학",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -3061,19 +3151,18 @@
         "sector_id": "SEC_INDUS",
         "sector_l1": "산업재",
         "sector_l2": "자본재",
-        "sub_industry": null,
+        "sub_industry": "조선",
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": "krx_kind+review(#61)",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
-        "draft_fields": [
-          "sub_industry",
-          "is_holding"
-        ]
+        "draft_fields": []
       },
       {
         "ticker": "352820",
@@ -3084,16 +3173,17 @@
         "sector_l2": "미디어와엔터테인먼트",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -3105,17 +3195,16 @@
         "sector_l2": "기술하드웨어와장비",
         "sub_industry": "PCB",
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": "krx_kind+review(#61)",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
-        "draft_fields": [
-          "sub_industry",
-          "is_holding"
-        ]
+        "draft_fields": []
       },
       {
         "ticker": "373220",
@@ -3126,17 +3215,16 @@
         "sector_l2": "전자와 전기제품",
         "sub_industry": "2차전지",
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": "krx_kind+review(#61)",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
-        "draft_fields": [
-          "sub_industry",
-          "is_holding"
-        ]
+        "draft_fields": []
       },
       {
         "ticker": "402340",
@@ -3147,16 +3235,17 @@
         "sector_l2": "반도체와반도체장비",
         "sub_industry": "SK하이닉스 지분 투자회사",
         "is_holding": true,
+        "holding_type": "legal",
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
         "sub_industry_source": "claude_draft",
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       },
       {
@@ -3168,16 +3257,17 @@
         "sector_l2": "자본재",
         "sub_industry": null,
         "is_holding": false,
+        "holding_type": null,
         "tier": "T1",
         "is_core": true,
         "tier_assigned_on": "2026-10-22",
         "sector_source": "pipeline:companies.sector_l1(WICS)",
-        "sub_industry_source": "claude_draft",
+        "sub_industry_source": null,
+        "holding_source": "krx_kind+review(#61)",
         "status": "active",
         "reviewed": true,
         "draft_fields": [
-          "sub_industry",
-          "is_holding"
+          "sub_industry"
         ]
       }
     ]
@@ -5859,6 +5949,446 @@
         "weight_frequency": "daily",
         "merged_from": [],
         "rationale": "시장 동조(섹터 주가가 코스피와 같이 움직이는 정도)"
+      },
+      {
+        "relation": "SENSITIVE_TO",
+        "src": "003490",
+        "src_type": "COMPANY",
+        "dst": "KTB_3Y_KR",
+        "dst_type": "MACRO",
+        "status": "active",
+        "reviewed": true,
+        "source": "ontology_sensitivity_inputs as_of 2026-11-23 (수경 #67, 계산 #62)",
+        "method": "partial_corr_daily_kospi",
+        "as_of": "2026-11-23",
+        "valid_from": null,
+        "valid_to": null,
+        "evidence_ids": [],
+        "inactive_reason": null,
+        "review_reason": null,
+        "rejection": null,
+        "market_adjusted": true,
+        "weight": -0.179,
+        "weight_raw": -0.235,
+        "weight_ci95": [
+          -0.249,
+          -0.108
+        ],
+        "weight_n_obs": 727,
+        "weight_p_value": 1e-06,
+        "weight_computed_at": "2026-11-23T13:02:58+00:00",
+        "weight_q_value_hypothesis": 1e-05,
+        "weight_q_value_all": 0.0001,
+        "weight_window": "2023-11-27~2026-11-23 일별",
+        "weight_n_tickers": null,
+        "expected_sign": "-",
+        "sign_check": "match",
+        "weight_low_n": false,
+        "weight_status": "filled",
+        "weight_frequency": "daily",
+        "merged_from": [],
+        "rationale": "부채·항공기 리스 부담이 커서 금리가 오르면 이자 비용이 늘 수 있음",
+        "chip_text": "시장 효과를 빼도 국고채 3년 금리가 오르는 날 주가가 상대적으로 약한 경향 (일별, 최근 3년)",
+        "hypothesis_preregistered": false,
+        "hypothesis_fixed_on": "2026-11-23",
+        "decided_by": "유민",
+        "decided_on": "2026-11-23"
+      },
+      {
+        "relation": "SENSITIVE_TO",
+        "src": "003490",
+        "src_type": "COMPANY",
+        "dst": "KTB_10Y_KR",
+        "dst_type": "MACRO",
+        "status": "active",
+        "reviewed": true,
+        "source": "ontology_sensitivity_inputs as_of 2026-11-23 (수경 #67, 계산 #62)",
+        "method": "partial_corr_daily_kospi",
+        "as_of": "2026-11-23",
+        "valid_from": null,
+        "valid_to": null,
+        "evidence_ids": [],
+        "inactive_reason": null,
+        "review_reason": null,
+        "rejection": null,
+        "market_adjusted": true,
+        "weight": -0.156,
+        "weight_raw": -0.2,
+        "weight_ci95": [
+          -0.227,
+          -0.085
+        ],
+        "weight_n_obs": 727,
+        "weight_p_value": 2.2e-05,
+        "weight_computed_at": "2026-11-23T13:02:58+00:00",
+        "weight_q_value_hypothesis": 0.00011,
+        "weight_q_value_all": 0.0022,
+        "weight_window": "2023-11-27~2026-11-23 일별",
+        "weight_n_tickers": null,
+        "expected_sign": "-",
+        "sign_check": "match",
+        "weight_low_n": false,
+        "weight_status": "filled",
+        "weight_frequency": "daily",
+        "merged_from": [],
+        "rationale": "부채·항공기 리스 부담이 커서 금리가 오르면 이자 비용이 늘 수 있음",
+        "chip_text": "시장 효과를 빼도 국고채 10년 금리가 오르는 날 주가가 상대적으로 약한 경향 (일별, 최근 3년)",
+        "hypothesis_preregistered": false,
+        "hypothesis_fixed_on": "2026-11-23",
+        "decided_by": "유민",
+        "decided_on": "2026-11-23"
+      },
+      {
+        "relation": "SENSITIVE_TO",
+        "src": "015760",
+        "src_type": "COMPANY",
+        "dst": "KTB_3Y_KR",
+        "dst_type": "MACRO",
+        "status": "active",
+        "reviewed": true,
+        "source": "ontology_sensitivity_inputs as_of 2026-11-23 (수경 #67, 계산 #62)",
+        "method": "partial_corr_daily_kospi",
+        "as_of": "2026-11-23",
+        "valid_from": null,
+        "valid_to": null,
+        "evidence_ids": [],
+        "inactive_reason": null,
+        "review_reason": null,
+        "rejection": null,
+        "market_adjusted": true,
+        "weight": -0.122,
+        "weight_raw": -0.18,
+        "weight_ci95": [
+          -0.193,
+          -0.05
+        ],
+        "weight_n_obs": 727,
+        "weight_p_value": 0.000969,
+        "weight_computed_at": "2026-11-23T13:02:58+00:00",
+        "weight_q_value_hypothesis": 0.002423,
+        "weight_q_value_all": 0.032,
+        "weight_window": "2023-11-27~2026-11-23 일별",
+        "weight_n_tickers": null,
+        "expected_sign": "-",
+        "sign_check": "match",
+        "weight_low_n": false,
+        "weight_status": "filled",
+        "weight_frequency": "daily",
+        "merged_from": [],
+        "rationale": "부채가 큰 규제 유틸리티라 금리가 오르면 이자 비용이 늘 수 있음",
+        "chip_text": "시장 효과를 빼도 국고채 3년 금리가 오르는 날 주가가 상대적으로 약한 경향 (일별, 최근 3년)",
+        "hypothesis_preregistered": false,
+        "hypothesis_fixed_on": "2026-11-23",
+        "decided_by": "유민",
+        "decided_on": "2026-11-23"
+      },
+      {
+        "relation": "SENSITIVE_TO",
+        "src": "015760",
+        "src_type": "COMPANY",
+        "dst": "KTB_10Y_KR",
+        "dst_type": "MACRO",
+        "status": "active",
+        "reviewed": true,
+        "source": "ontology_sensitivity_inputs as_of 2026-11-23 (수경 #67, 계산 #62)",
+        "method": "partial_corr_daily_kospi",
+        "as_of": "2026-11-23",
+        "valid_from": null,
+        "valid_to": null,
+        "evidence_ids": [],
+        "inactive_reason": null,
+        "review_reason": null,
+        "rejection": null,
+        "market_adjusted": true,
+        "weight": -0.119,
+        "weight_raw": -0.163,
+        "weight_ci95": [
+          -0.19,
+          -0.046
+        ],
+        "weight_n_obs": 727,
+        "weight_p_value": 0.00135,
+        "weight_computed_at": "2026-11-23T13:02:58+00:00",
+        "weight_q_value_hypothesis": 0.0027,
+        "weight_q_value_all": 0.0334,
+        "weight_window": "2023-11-27~2026-11-23 일별",
+        "weight_n_tickers": null,
+        "expected_sign": "-",
+        "sign_check": "match",
+        "weight_low_n": false,
+        "weight_status": "filled",
+        "weight_frequency": "daily",
+        "merged_from": [],
+        "rationale": "부채가 큰 규제 유틸리티라 금리가 오르면 이자 비용이 늘 수 있음",
+        "chip_text": "시장 효과를 빼도 국고채 10년 금리가 오르는 날 주가가 상대적으로 약한 경향 (일별, 최근 3년)",
+        "hypothesis_preregistered": false,
+        "hypothesis_fixed_on": "2026-11-23",
+        "decided_by": "유민",
+        "decided_on": "2026-11-23"
+      },
+      {
+        "relation": "SENSITIVE_TO",
+        "src": "180640",
+        "src_type": "COMPANY",
+        "dst": "KTB_3Y_KR",
+        "dst_type": "MACRO",
+        "status": "active",
+        "reviewed": true,
+        "source": "ontology_sensitivity_inputs as_of 2026-11-23 (수경 #67, 계산 #62)",
+        "method": "partial_corr_daily_kospi",
+        "as_of": "2026-11-23",
+        "valid_from": null,
+        "valid_to": null,
+        "evidence_ids": [],
+        "inactive_reason": null,
+        "review_reason": null,
+        "rejection": null,
+        "market_adjusted": true,
+        "weight": -0.101,
+        "weight_raw": -0.144,
+        "weight_ci95": [
+          -0.172,
+          -0.028
+        ],
+        "weight_n_obs": 727,
+        "weight_p_value": 0.006582,
+        "weight_computed_at": "2026-11-23T13:02:58+00:00",
+        "weight_q_value_hypothesis": 0.009403,
+        "weight_q_value_all": 0.1086,
+        "weight_window": "2023-11-27~2026-11-23 일별",
+        "weight_n_tickers": null,
+        "expected_sign": "-",
+        "sign_check": "match",
+        "weight_low_n": false,
+        "weight_status": "filled",
+        "weight_frequency": "daily",
+        "merged_from": [],
+        "rationale": "대한항공 지주라 대한항공의 금리 부담을 따라갈 수 있음",
+        "chip_text": "시장 효과를 빼도 국고채 3년 금리가 오르는 날 주가가 상대적으로 약한 경향 (일별, 최근 3년)",
+        "hypothesis_preregistered": false,
+        "hypothesis_fixed_on": "2026-11-23",
+        "decided_by": "유민",
+        "decided_on": "2026-11-23"
+      },
+      {
+        "relation": "SENSITIVE_TO",
+        "src": "035720",
+        "src_type": "COMPANY",
+        "dst": "KTB_10Y_KR",
+        "dst_type": "MACRO",
+        "status": "active",
+        "reviewed": true,
+        "source": "ontology_sensitivity_inputs as_of 2026-11-23 (수경 #67, 계산 #62)",
+        "method": "partial_corr_daily_kospi",
+        "as_of": "2026-11-23",
+        "valid_from": null,
+        "valid_to": null,
+        "evidence_ids": [],
+        "inactive_reason": null,
+        "review_reason": null,
+        "rejection": null,
+        "market_adjusted": true,
+        "weight": -0.106,
+        "weight_raw": -0.151,
+        "weight_ci95": [
+          -0.177,
+          -0.033
+        ],
+        "weight_n_obs": 727,
+        "weight_p_value": 0.004266,
+        "weight_computed_at": "2026-11-23T13:02:58+00:00",
+        "weight_q_value_hypothesis": 0.00711,
+        "weight_q_value_all": 0.084,
+        "weight_window": "2023-11-27~2026-11-23 일별",
+        "weight_n_tickers": null,
+        "expected_sign": "-",
+        "sign_check": "match",
+        "weight_low_n": false,
+        "weight_status": "filled",
+        "weight_frequency": "daily",
+        "merged_from": [],
+        "rationale": "먼 미래 이익 비중이 큰 성장주라 장기 할인율에 민감할 수 있음",
+        "chip_text": "시장 효과를 빼도 국고채 10년 금리가 오르는 날 주가가 상대적으로 약한 경향 (일별, 최근 3년)",
+        "hypothesis_preregistered": false,
+        "hypothesis_fixed_on": "2026-11-23",
+        "decided_by": "유민",
+        "decided_on": "2026-11-23"
+      },
+      {
+        "relation": "SENSITIVE_TO",
+        "src": "010950",
+        "src_type": "COMPANY",
+        "dst": "BRENT",
+        "dst_type": "MACRO",
+        "status": "active",
+        "reviewed": true,
+        "source": "ontology_sensitivity_inputs as_of 2026-11-23 (수경 #67, 계산 #62)",
+        "method": "partial_corr_monthly_core_equal_weight_lead1",
+        "as_of": "2026-11-23",
+        "valid_from": null,
+        "valid_to": null,
+        "evidence_ids": [],
+        "inactive_reason": null,
+        "review_reason": null,
+        "rejection": null,
+        "market_adjusted": true,
+        "weight": 0.303,
+        "weight_raw": 0.408,
+        "weight_ci95": [
+          0.13,
+          0.458
+        ],
+        "weight_n_obs": 120,
+        "weight_p_value": 0.000762,
+        "weight_computed_at": "2026-11-23T13:02:58+00:00",
+        "weight_q_value_hypothesis": 0.002423,
+        "weight_q_value_all": 0.0747,
+        "weight_window": "2016-10-01~2026-09-01 월별, t+1월 지표 변화",
+        "weight_n_tickers": null,
+        "expected_sign": "+",
+        "sign_check": "match",
+        "weight_low_n": false,
+        "weight_status": "filled",
+        "weight_frequency": "monthly",
+        "merged_from": [],
+        "rationale": "유가가 오르면 정유 재고 평가이익·마진이 좋아질 수 있음",
+        "chip_text": "시장 효과를 빼도 주가가 다음 달 브렌트유 변화와 같은 방향으로 움직이는 경향 (월별)",
+        "hypothesis_preregistered": false,
+        "hypothesis_fixed_on": "2026-11-23",
+        "decided_by": "유민",
+        "decided_on": "2026-11-23"
+      },
+      {
+        "relation": "SENSITIVE_TO",
+        "src": "096770",
+        "src_type": "COMPANY",
+        "dst": "BRENT",
+        "dst_type": "MACRO",
+        "status": "active",
+        "reviewed": true,
+        "source": "ontology_sensitivity_inputs as_of 2026-11-23 (수경 #67, 계산 #62)",
+        "method": "partial_corr_monthly_core_equal_weight_lead1",
+        "as_of": "2026-11-23",
+        "valid_from": null,
+        "valid_to": null,
+        "evidence_ids": [],
+        "inactive_reason": null,
+        "review_reason": null,
+        "rejection": null,
+        "market_adjusted": true,
+        "weight": 0.225,
+        "weight_raw": 0.361,
+        "weight_ci95": [
+          0.047,
+          0.389
+        ],
+        "weight_n_obs": 120,
+        "weight_p_value": 0.013797,
+        "weight_computed_at": "2026-11-23T13:02:58+00:00",
+        "weight_q_value_hypothesis": 0.017246,
+        "weight_q_value_all": 0.269,
+        "weight_window": "2016-10-01~2026-09-01 월별, t+1월 지표 변화",
+        "weight_n_tickers": null,
+        "expected_sign": "+",
+        "sign_check": "match",
+        "weight_low_n": false,
+        "weight_status": "filled",
+        "weight_frequency": "monthly",
+        "merged_from": [],
+        "rationale": "유가가 오르면 정유 재고 평가이익·마진이 좋아질 수 있음",
+        "chip_text": "시장 효과를 빼도 주가가 다음 달 브렌트유 변화와 같은 방향으로 움직이는 경향 (월별)",
+        "hypothesis_preregistered": false,
+        "hypothesis_fixed_on": "2026-11-23",
+        "decided_by": "유민",
+        "decided_on": "2026-11-23"
+      },
+      {
+        "relation": "SENSITIVE_TO",
+        "src": "005930",
+        "src_type": "COMPANY",
+        "dst": "DRAM_EXPORT_PRICE",
+        "dst_type": "MACRO",
+        "status": "active",
+        "reviewed": true,
+        "source": "ontology_sensitivity_inputs as_of 2026-11-23 (수경 #67, 계산 #62)",
+        "method": "partial_corr_monthly_core_equal_weight_lead1",
+        "as_of": "2026-11-23",
+        "valid_from": null,
+        "valid_to": null,
+        "evidence_ids": [],
+        "inactive_reason": null,
+        "review_reason": null,
+        "rejection": null,
+        "market_adjusted": true,
+        "weight": 0.218,
+        "weight_raw": 0.267,
+        "weight_ci95": [
+          0.04,
+          0.383
+        ],
+        "weight_n_obs": 120,
+        "weight_p_value": 0.01699,
+        "weight_computed_at": "2026-11-23T13:02:58+00:00",
+        "weight_q_value_hypothesis": 0.018878,
+        "weight_q_value_all": 0.404,
+        "weight_window": "2016-10-01~2026-09-01 월별, t+1월 지표 변화",
+        "weight_n_tickers": null,
+        "expected_sign": "+",
+        "sign_check": "match",
+        "weight_low_n": false,
+        "weight_status": "filled",
+        "weight_frequency": "monthly",
+        "merged_from": [],
+        "rationale": "메모리 매출 비중이 커서 D램 가격이 이익에 크게 영향을 줄 수 있음",
+        "chip_text": "시장 효과를 빼도 주가가 다음 달 D램 수출물가지수(달러기준) 변화와 같은 방향으로 움직이는 경향 (월별)",
+        "hypothesis_preregistered": false,
+        "hypothesis_fixed_on": "2026-11-23",
+        "decided_by": "유민",
+        "decided_on": "2026-11-23"
+      },
+      {
+        "relation": "SENSITIVE_TO",
+        "src": "000660",
+        "src_type": "COMPANY",
+        "dst": "DRAM_EXPORT_PRICE",
+        "dst_type": "MACRO",
+        "status": "active",
+        "reviewed": true,
+        "source": "ontology_sensitivity_inputs as_of 2026-11-23 (수경 #67, 계산 #62)",
+        "method": "partial_corr_monthly_core_equal_weight_lead1",
+        "as_of": "2026-11-23",
+        "valid_from": null,
+        "valid_to": null,
+        "evidence_ids": [],
+        "inactive_reason": null,
+        "review_reason": null,
+        "rejection": null,
+        "market_adjusted": true,
+        "weight": 0.214,
+        "weight_raw": 0.264,
+        "weight_ci95": [
+          0.035,
+          0.379
+        ],
+        "weight_n_obs": 120,
+        "weight_p_value": 0.019277,
+        "weight_computed_at": "2026-11-23T13:02:58+00:00",
+        "weight_q_value_hypothesis": 0.019277,
+        "weight_q_value_all": 0.404,
+        "weight_window": "2016-10-01~2026-09-01 월별, t+1월 지표 변화",
+        "weight_n_tickers": null,
+        "expected_sign": "+",
+        "sign_check": "match",
+        "weight_low_n": false,
+        "weight_status": "filled",
+        "weight_frequency": "monthly",
+        "merged_from": [],
+        "rationale": "메모리 매출 비중이 커서 D램 가격이 이익에 크게 영향을 줄 수 있음",
+        "chip_text": "시장 효과를 빼도 주가가 다음 달 D램 수출물가지수(달러기준) 변화와 같은 방향으로 움직이는 경향 (월별)",
+        "hypothesis_preregistered": false,
+        "hypothesis_fixed_on": "2026-11-23",
+        "decided_by": "유민",
+        "decided_on": "2026-11-23"
       }
     ],
     "impacts": [
@@ -5882,6 +6412,7 @@
           "US_FFR"
         ],
         "direction": "same",
+        "evidence": null,
         "rationale": "정책금리→장기금리"
       },
       {
@@ -5903,6 +6434,7 @@
           "US_FFR"
         ],
         "direction": "same",
+        "evidence": null,
         "rationale": "미 금리↑ 달러 강세"
       },
       {
@@ -5924,6 +6456,7 @@
           "US_10Y_YIELD"
         ],
         "direction": "same",
+        "evidence": null,
         "rationale": "장기금리 동조화"
       },
       {
@@ -5943,6 +6476,7 @@
         "inactive_reason": null,
         "inactive_macros": [],
         "direction": "same",
+        "evidence": null,
         "rationale": "정책금리→단기 시장금리"
       },
       {
@@ -5962,6 +6496,7 @@
         "inactive_reason": null,
         "inactive_macros": [],
         "direction": "same",
+        "evidence": null,
         "rationale": "기간 구조"
       },
       {
@@ -5981,6 +6516,7 @@
         "inactive_reason": null,
         "inactive_macros": [],
         "direction": "opposite",
+        "evidence": null,
         "rationale": "금리차 축소 시 원화 약세"
       },
       {
@@ -6002,6 +6538,7 @@
           "PPI_KR"
         ],
         "direction": "same",
+        "evidence": null,
         "rationale": "원자재 원가"
       },
       {
@@ -6023,6 +6560,7 @@
           "PPI_KR"
         ],
         "direction": "same",
+        "evidence": null,
         "rationale": "생산자→소비자 물가 전가"
       },
       {
@@ -6042,6 +6580,7 @@
         "inactive_reason": null,
         "inactive_macros": [],
         "direction": "same",
+        "evidence": null,
         "rationale": "수입물가"
       },
       {
@@ -6050,10 +6589,10 @@
         "src_type": "MACRO",
         "dst": "BASE_RATE_KR",
         "dst_type": "MACRO",
-        "status": "draft",
-        "reviewed": false,
-        "source": "claude_draft",
-        "method": "claude_draft",
+        "status": "active",
+        "reviewed": true,
+        "source": "pipeline:macro_data (수경 #61 2026-11-23 (crawling.ontology_inputs, PR #62))",
+        "method": "corr_monthly_lag1",
         "as_of": "2026-11-23",
         "valid_from": null,
         "valid_to": null,
@@ -6061,6 +6600,18 @@
         "inactive_reason": null,
         "inactive_macros": [],
         "direction": "same",
+        "evidence": {
+          "method": "corr_monthly_lag1",
+          "corr": 0.166,
+          "ci95": [
+            0.04,
+            0.29
+          ],
+          "n": 240,
+          "result": "same",
+          "decided_by": "유민",
+          "decided_on": "2026-11-23"
+        },
         "rationale": "물가 대응 통화정책"
       },
       {
@@ -6082,6 +6633,7 @@
           "VIX"
         ],
         "direction": "same",
+        "evidence": null,
         "rationale": "위험회피 시 원화 약세"
       },
       {
@@ -6103,6 +6655,7 @@
           "VIX"
         ],
         "direction": "opposite",
+        "evidence": null,
         "rationale": "위험회피 매도"
       },
       {
@@ -6124,6 +6677,7 @@
           "USD_CNY"
         ],
         "direction": "same",
+        "evidence": null,
         "rationale": "위안-원 동조화"
       },
       {
@@ -6145,6 +6699,7 @@
           "CHINA_PMI_MFG"
         ],
         "direction": "same",
+        "evidence": null,
         "rationale": "수출 경기"
       },
       {
@@ -6164,6 +6719,7 @@
         "inactive_reason": null,
         "inactive_macros": [],
         "direction": "same",
+        "evidence": null,
         "rationale": "반도체 지수 비중"
       }
     ],

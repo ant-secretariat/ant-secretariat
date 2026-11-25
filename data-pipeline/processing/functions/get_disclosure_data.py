@@ -23,17 +23,20 @@ def get_disclosure_data(
     capital, investment, risk, other)이고 같은 이름으로 거를 수 있다. summary는 원문 첫 조각(최대 1,000자)이다.
     정기보고서·지분공시·증권 발행 서류는 적재 대상이 아니라 나오지 않는다.
     rcept_no, is_correction, filer, chunk_ids는 추가 필드다. as_of를 주면 그날까지 접수된 공시만 쓴다.
+    coverage_from은 공시를 모으기 시작한 날(전체 공시 중 가장 이른 접수일)이다. 그 이전 기간은 "공시 없음"이 아니라
+    "수집 전"이다(#70 리뷰). 공시가 하나도 없으면 null.
     relational_db 인자는 기존 호출을 깨지 않으려고 받기만 한다.
     """
     try:
-        rows = _fetch_rows(ticker, date_from, date_to, disclosure_type, as_of)
+        rows, coverage_from = _fetch_rows(ticker, date_from, date_to, disclosure_type, as_of)
     except Exception as exc:  # 접속 주소가 섞일 수 있어 종류만 남긴다
         logger.error("공시 조회 실패: %s(%s)", ticker, type(exc).__name__)
-        return {"ticker": ticker, "company": "", "disclosures": [], "error": "disclosure_unavailable"}
-    return build_disclosure_result(ticker, rows)
+        return {"ticker": ticker, "company": "", "disclosures": [], "coverage_from": None,
+                "error": "disclosure_unavailable"}
+    return build_disclosure_result(ticker, rows, coverage_from)
 
 
-def _fetch_rows(ticker, date_from, date_to, disclosure_type, as_of) -> list[dict]:
+def _fetch_rows(ticker, date_from, date_to, disclosure_type, as_of) -> tuple[list[dict], object]:
     from psycopg.rows import dict_row
 
     from crawling.db.postgres import connect
@@ -60,10 +63,12 @@ def _fetch_rows(ticker, date_from, date_to, disclosure_type, as_of) -> list[dict
         params.append(disclosure_type)
     query += " order by m.disclosed_at desc, m.rcept_no desc"
     with connect() as connection, connection.cursor(row_factory=dict_row) as cursor:
-        return cursor.execute(query, params).fetchall()
+        coverage_from = cursor.execute("select min(disclosed_at) as first from disclosure_metadata").fetchone()["first"]
+        rows = cursor.execute(query, params).fetchall()
+    return rows, coverage_from
 
 
-def build_disclosure_result(ticker: str, rows: list[dict]) -> dict:
+def build_disclosure_result(ticker: str, rows: list[dict], coverage_from=None) -> dict:
     disclosures = [
         {
             "disclosure_id": row["rcept_no"],
@@ -84,4 +89,5 @@ def build_disclosure_result(ticker: str, rows: list[dict]) -> dict:
         "ticker": ticker,
         "company": rows[0]["company"] if rows else "",
         "disclosures": disclosures,
+        "coverage_from": coverage_from.isoformat() if coverage_from else None,
     }

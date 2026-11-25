@@ -67,7 +67,10 @@ async def run_case(case: dict, ctx: CaseContext, snapshot_tag: str, *, llm_clien
               "as_of": ctx.search.get("as_of"), "search": {k: ctx.search.get(k) for k in SEARCH_KEYS},
               "evidence_chunk_ids": [e.chunk_id for e in evidence]}
 
-    async def same_rows(*_):
+    async def same_rows(_company, _agenda, _query, as_of):
+        # 근거는 문항 기준일로 미리 불러 두었다. run_debate가 넘기는 기준일이 그것과 같은지 확인한다(#76 리뷰)
+        if as_of != ctx.search.get("as_of"):
+            raise RuntimeError(f"근거 기준일이 다르다: 조회 {ctx.search.get('as_of')} / run_debate {as_of}")
         return ctx.rows
 
     started = time.perf_counter()

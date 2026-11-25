@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 from datetime import date
+from crawling.config.clock import today_kst
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +37,7 @@ def get_financials(
     date_to: str | None = None,
     as_of: str | None = None,
 ) -> dict:
-    as_of = date.fromisoformat(as_of).isoformat() if as_of else date.today().isoformat()
+    as_of = date.fromisoformat(as_of).isoformat() if as_of else today_kst().isoformat()
     base = {"ticker": ticker, "company": "", "period_type": period_type, "as_of": as_of, "unit": "원",
             "basis": "공시 접수일 기준, 연결 우선(없으면 별도)", "records": []}
     if period_type not in PERIOD_TYPES:

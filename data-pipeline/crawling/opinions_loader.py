@@ -23,6 +23,7 @@ import psycopg
 from crawling.collectors.kis_opinions import KisError, KisOpinionClient, opinion_rows
 from crawling.config.settings import SETTINGS
 from crawling.db.postgres import connect, upsert
+from crawling.config.clock import today_kst
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +85,7 @@ def main() -> None:
     args = parse_args()
     if not SETTINGS.kis_app_key or not SETTINGS.kis_app_secret:
         raise SystemExit("KIS_APP_KEY, KIS_APP_SECRET이 설정되지 않았습니다 (data-pipeline/.env 확인)")
-    end = date.today()
+    end = today_kst()
     days = args.months * 31 if args.backfill else RECENT_DAYS
     with connect() as connection:
         tickers = args.tickers or _targets(connection)

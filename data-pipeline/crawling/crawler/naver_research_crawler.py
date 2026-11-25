@@ -24,6 +24,7 @@ from crawling.config.settings import Settings
 from crawling.crawler.base_crawler import generate_report_id, subtract_months
 from crawling.crawler.http import create_ssl_context
 from crawling.crawler.models import ReportMetadata
+from crawling.config.clock import today_kst
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +70,7 @@ class NaverResearchCrawler:
         limit: int | None = None,
     ) -> list[dict]:
         """종목 하나의 최근 리포트. 최신순으로 limit건(기본 MAX_REPORTS_PER_COMPANY)만 남긴 뒤 PDF 주소를 붙인다."""
-        end = date.today()
+        end = today_kst()
         params = {
             "itemCodes": ticker,
             "startDate": subtract_months(end, months).isoformat(),

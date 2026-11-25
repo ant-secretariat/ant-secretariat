@@ -307,7 +307,7 @@ def main() -> None:
     args = parser.parse_args()
     if not SETTINGS.dart_api_key:
         raise SystemExit("DART_API_KEY가 .env에 없음")
-    date_from = date.today() - timedelta(days=args.days)
+    date_from = today_kst() - timedelta(days=args.days)
     with connect() as connection:
         found = collect(connection, _targets(connection, args.tickers), date_from)
         disclosures = pending(connection, date_from, args.limit, args.tickers)

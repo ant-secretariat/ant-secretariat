@@ -28,6 +28,7 @@ from crawling.analytics import garch, sensitivity
 from crawling.db.postgres import connect, upsert
 # 대상 종목 규칙은 시세 적재와 같은 곳 하나만 쓴다
 from crawling.market_loader import _target_tickers
+from crawling.config.clock import today_kst
 
 logger = logging.getLogger(__name__)
 
@@ -197,7 +198,7 @@ def main() -> None:
     args = parse_args()
     with connect() as connection:
         tickers = sorted(set(args.tickers)) if args.tickers else _target_tickers(connection, args.all)
-        run(connection, args.date or date.today(), tickers)
+        run(connection, args.date or today_kst(), tickers)
 
 
 if __name__ == "__main__":

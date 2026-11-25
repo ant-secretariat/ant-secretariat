@@ -27,6 +27,7 @@ from crawling.collectors.disclosure_collector import DartDisclosureProvider
 from crawling.collectors.wics_collector import fetch_wics_classification
 from crawling.config.settings import SETTINGS
 from crawling.db.postgres import connect, upsert
+from crawling.config.clock import today_kst
 
 logger = logging.getLogger(__name__)
 
@@ -189,7 +190,7 @@ def backfill(
     force: bool,
     end_day: date | None = None,
 ) -> None:
-    end = _latest_trading_day(end_day or date.today())
+    end = _latest_trading_day(end_day or today_kst())
     start = end - timedelta(days=365 * years)
     tickers = _target_tickers(connection, all_tickers)
     logger.info("과거 적재 시작: %s ~ %s, 대상 %s종목", start, end, len(tickers))
@@ -377,7 +378,7 @@ def main() -> None:
     # httpx는 요청 URL을 INFO로 남기는데, DART는 인증키가 URL에 들어간다
     logging.getLogger("httpx").setLevel(logging.WARNING)
     args = parse_args()
-    day = args.date or date.today()
+    day = args.date or today_kst()
     with connect() as connection:
         if args.master:
             refresh_companies(connection, _latest_trading_day(day))

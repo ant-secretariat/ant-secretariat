@@ -191,8 +191,10 @@ def list_disclosures(client: httpx.Client, corp_code: str, date_from: date, date
         time.sleep(REQUEST_PAUSE_SECONDS)
 
 
-def collect(connection: psycopg.Connection, targets: list[dict], date_from: date) -> int:
+def collect(connection: psycopg.Connection, targets: list[dict], date_from: date) -> tuple[int, list[str]]:
+    """(적재 대상 공시 수, 목록을 못 받은 종목). DART 키 만료(010) 등은 종목마다 실패로 쌓인다."""
     total = 0
+    list_failed: list[str] = []
     today = today_kst()
     with _client() as client:
         for target in targets:
@@ -200,6 +202,7 @@ def collect(connection: psycopg.Connection, targets: list[dict], date_from: date
                 items = list_disclosures(client, target["corp_code"], date_from, today)
             except (httpx.HTTPError, RuntimeError) as exc:
                 logger.warning("%s 공시 목록 실패: %s", target["ticker"], type(exc).__name__)
+                list_failed.append(target["ticker"])
                 continue
             rows = [row for item in items if (row := metadata_row(item, target["ticker"], target["name"]))]
             for row in rows:
@@ -217,7 +220,9 @@ def collect(connection: psycopg.Connection, targets: list[dict], date_from: date
             total += len(rows)
             logger.info("%s %s: 공시 %s건 → 적재 대상 %s건", target["ticker"], target["name"], len(items), len(rows))
             time.sleep(REQUEST_PAUSE_SECONDS)
-    return total
+    if list_failed:
+        logger.warning("공시 목록 실패 종목 %s개: %s", len(list_failed), list_failed)
+    return total, list_failed
 
 
 def pending(connection: psycopg.Connection, date_from: date, limit: int | None, tickers: list[str] | None) -> list[dict]:
@@ -309,7 +314,7 @@ def main() -> None:
         raise SystemExit("DART_API_KEY가 .env에 없음")
     date_from = today_kst() - timedelta(days=args.days)
     with connect() as connection:
-        found = collect(connection, _targets(connection, args.tickers), date_from)
+        found, list_failed = collect(connection, _targets(connection, args.tickers), date_from)
         disclosures = pending(connection, date_from, args.limit, args.tickers)
         logger.info("적재 대상 %s건, 원문 받을 공시 %s건", found, len(disclosures))
         failed = load(connection, disclosures)
@@ -319,7 +324,8 @@ def main() -> None:
             chunks = targets(connection, None)
             if chunks:
                 embed(connection, chunks)
-    if failed:
+    # 목록 실패도 종료 코드에 반영해야 스케줄러(GitHub Actions)가 실패로 본다
+    if failed or list_failed:
         raise SystemExit(1)
 
 

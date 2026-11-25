@@ -140,7 +140,13 @@ class NaverNewsProvider:
             )
         return rows
 
-    def _fetch_article_content(self, client: httpx.Client, url: str) -> str:
+    def _fetch_article_content(self, client: httpx.Client, url: str, raise_transient: bool = False) -> str:
+        """기사 본문. 못 받으면 "".
+
+        raise_transient=True면 다시 시도해 볼 만한 실패(시간 초과·연결 오류·5xx·429)는 예외로 올린다.
+        청크 적재기가 이 기사를 failed로 두고 다음 실행에서 다시 받게 하기 위해서다.
+        404·403처럼 다시 해도 안 될 실패는 지금처럼 ""(요약문으로 대신)로 둔다.
+        """
         if not url:
             return ""
         try:
@@ -148,8 +154,18 @@ class NaverNewsProvider:
             response.raise_for_status()
         except httpx.HTTPError as exc:
             logger.debug("뉴스 본문 수집 실패: url=%s error=%s", url, exc)
+            if raise_transient and is_transient(exc):
+                raise
             return ""
         return _extract_article_text(response.text)
+
+
+def is_transient(exc: httpx.HTTPError) -> bool:
+    """다시 시도하면 될 수도 있는 실패인지."""
+    if isinstance(exc, httpx.HTTPStatusError):
+        status = exc.response.status_code
+        return status >= 500 or status == 429
+    return True  # 시간 초과·연결 오류 등
 
 
 # 종목명 바로 뒤에 붙어도 같은 회사로 보는 조사·기호 ("카카오가", "LG는"). 그 밖의 글자가 붙으면 다른 회사 ("LG전자", "카카오뱅크")

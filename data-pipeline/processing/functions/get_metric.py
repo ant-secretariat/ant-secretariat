@@ -129,6 +129,27 @@ FINANCIAL_QUERY = """
 """
 FINANCIAL_COLUMNS = ("debt_ratio", "operating_margin", "revenue_growth_yoy", "roe_ttm")
 
+# KRX(pykrx)는 직전 사업연도 순이익이 적자면 PER·EPS를 비워 준다. 비어 있을 때 그 이유가 적자인지 재무로 확인한다
+LOSS_CHECKED_METRICS = {"per", "eps"}
+# 그날까지 접수된 재무에서, 네 분기가 모두 같은 기준(연결/별도)으로 있는 가장 최근 사업연도의 순이익 합계
+ANNUAL_NET_INCOME_QUERY = """
+    with f as (select * from financials_as_of(%s::date) where ticker = %s),
+    pivoted as (
+        select fiscal_year, quarter, fs_div, max(amount) filter (where account = 'net_income') as net_income
+        from f group by fiscal_year, quarter, fs_div
+    ),
+    chosen as (
+        select distinct on (fiscal_year, quarter) *
+        from pivoted order by fiscal_year, quarter, (fs_div = 'CFS') desc
+    )
+    select fiscal_year, min(fs_div), sum(net_income)
+    from chosen
+    group by fiscal_year
+    having count(net_income) = 4 and min(fs_div) = max(fs_div)
+    order by fiscal_year desc
+    limit 1
+"""
+
 
 def get_metric(ticker: str, metric_id: str, as_of: str) -> dict:
     """시맨틱 레이어의 단일 정의로 지표 하나를 계산한다. 반환 형식은 API 계약서 MetricValue.
@@ -204,7 +225,8 @@ REASONS = {
     "unknown_metric": "metric_id가 METRIC_IDS에 없음",
     "metric_unavailable": "DB 조회 실패(일시적)",
     "no_data": "그날까지 이 종목의 데이터가 없음(적재 범위 밖 포함)",
-    "no_value": "데이터 행은 있지만 이 지표 값이 비어 있음(예: 적자라 PER 없음)",
+    "no_value": "데이터 행은 있지만 이 지표 값이 비어 있음",
+    "loss_making": "직전 사업연도 순이익이 적자라 PER·EPS가 공시되지 않음",
     "partial_window": "계산 창(예: 최근 20거래일) 중 값이 빈 날이 있어 일부 날짜만으로는 계산하지 않음",
     "not_applicable_financials": "금융업이라 의미 없는 지표(부채비율)",
 }
@@ -272,10 +294,30 @@ def _daily_metric(connection, ticker: str, metric_id: str, as_of: str) -> dict:
     if row is None:
         return _result(ticker, metric_id, None, unit, basis, as_of, [table], "no_data")
     value, trade_date = row
+    if value is None and metric_id in LOSS_CHECKED_METRICS:
+        loss = _annual_loss(connection, ticker, as_of)
+        if loss:
+            return _result(ticker, metric_id, None, unit, loss, trade_date.isoformat(), [table, "financials"],
+                           "loss_making")
     return _result(
         ticker, metric_id, _number(value), unit, basis, trade_date.isoformat(), [table],
         None if value is not None else "no_value",
     )
+
+
+def _annual_loss(connection, ticker: str, as_of: str) -> str | None:
+    """직전 사업연도 순이익이 적자면 그 근거 문장, 아니면 None.
+
+    KRX의 PER·EPS는 지배주주 순이익 기준인데 재무 표에는 당기순이익(지배+비지배)만 있다. 그래서 당기순이익이 적자일
+    때만 적자로 본다. 당기순이익은 흑자인데 PER이 비는 종목(지배주주 몫만 적자 등)은 no_value로 남는다.
+    """
+    row = connection.execute(ANNUAL_NET_INCOME_QUERY, (as_of, ticker)).fetchone()
+    if row is None or row[2] is None or row[2] >= 0:
+        return None
+    fiscal_year, fs_div, net_income = row
+    amount = format_display("market_cap", float(net_income), "원")   # 합계 금액 표기(조·억 원)를 그대로 씀
+    return f"직전 사업연도({fiscal_year}) 당기순이익 {amount}({FS_LABELS.get(fs_div, fs_div)}) 적자"
+
 
 
 def _flow_metric(connection, ticker: str, metric_id: str, as_of: str) -> dict:

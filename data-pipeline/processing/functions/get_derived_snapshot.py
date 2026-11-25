@@ -343,6 +343,8 @@ QUARTER_QUERY = """
     )
     select distinct on (fiscal_year, quarter) fiscal_year, quarter, fs_div, rcept_dt, revenue, operating_income, net_income
     from pivoted
+    -- 4분기는 재무상태표가 손익보다 먼저 보일 수 있어, 손익이 하나도 없는 분기는 빼고 고른다(#16 리뷰 2번)
+    where coalesce(revenue, operating_income, net_income) is not null
     order by fiscal_year desc, quarter desc, (fs_div = 'CFS') desc
     limit 8
 """

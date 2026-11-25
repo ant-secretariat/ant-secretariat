@@ -68,7 +68,7 @@ def test_financial_metric_is_point_in_time(monkeypatch):
     assert result["as_of"] == "2026-08-14"
     assert result["period"] == "2026Q2"
     assert "financials_as_of" in connection.queries[1][0]
-    assert connection.queries[1][1] == ("2026-09-01", "005930")
+    assert connection.queries[1][1] == ("2026-09-01", "005930", True)   # 부채비율은 재무상태표가 있는 분기로
 
 
 def test_roe_basis_explains_ttm(monkeypatch):

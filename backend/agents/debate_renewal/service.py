@@ -4,6 +4,8 @@
 
 - precheck는 호출하는 쪽(오케스트레이터)이 job을 만들기 전에 이미 돌렸다고 보고 결과만 받는다.
 - 데이터 접근은 `fetch_evidence`로 주입받는다(도구 레지스트리 경유 규칙, 데이터 함수 직접 import 금지).
+  기준일은 `run_debate`가 받은 `data_as_of`를 그대로 넘긴다. 결과의 `meta.data_as_of`와 실제 조회 기준일이
+  한 값에서 나오게 하려는 것이다(#76 리뷰, 헌법 원칙 III). `None`은 최신 데이터.
 - 진행 이벤트는 `emit`으로 주입받는다(#71 리뷰: job_events 저장은 오케스트레이터 몫).
   이름·payload는 계약 `JobEvent`(ADR 0009)를 따른다: `data_collected` → 아젠다마다 `claim_completed`·`bull_completed`·
   `bear_completed` → `judge_completed` → `verifying`. `job_started`·`completed`·`failed`는 워커가 보낸다.
@@ -39,8 +41,8 @@ logger = logging.getLogger(__name__)
 KST = ZoneInfo("Asia/Seoul")
 GAP_TOP_K = 2  # 근거 없는 Claim 하나당 보완 근거 수. 임시값(README 확정 필요)
 
-# (종목, 아젠다, 질의) → 검색 결과 results[] 목록
-EvidenceFetcher = Callable[[CompanyMeta, AgendaId, str], Awaitable[Sequence[Mapping[str, Any]]]]
+# (종목, 아젠다, 질의, 기준일) → 검색 결과 results[] 목록
+EvidenceFetcher = Callable[[CompanyMeta, AgendaId, str, Optional[str]], Awaitable[Sequence[Mapping[str, Any]]]]
 Emit = Callable[[str, dict], Union[Awaitable[None], None]]
 
 
@@ -95,7 +97,7 @@ async def run_debate(
 
     # 1. 근거: 아젠다별로 가져와 하나의 목록(S1…)에 모은다
     pool = EvidencePool()
-    fetched = await _all([fetch_evidence(company, a, query) for a in agendas])
+    fetched = await _all([fetch_evidence(company, a, query, data_as_of) for a in agendas])
     ev_by: dict[AgendaId, list[Evidence]] = {a: pool.add(rows) for a, rows in zip(agendas, fetched)}
     await _send(emit, "data_collected", _doc_counts(pool.all()))
 
@@ -140,7 +142,7 @@ async def run_debate(
     # 4. 근거 부족 루프: 근거 없는 Claim의 문장으로 추가 검색해 근거 목록에 gap_fill로 더한다
     claim_at = {c.claim_id: (a, c.text) for a in agendas for out in _namespace(a, *raw[a]) for c in out.claims}
     gaps = [claim_at[cid] for cid in report.ungrounded_claim_ids() if cid in claim_at]
-    found = await _all([fetch_evidence(company, a, text) for a, text in gaps])
+    found = await _all([fetch_evidence(company, a, text, data_as_of) for a, text in gaps])  # 보완 검색도 같은 기준일
     for (a, _), rows in zip(gaps, found):
         ev_by[a] += [e for e in pool.add(list(rows)[:GAP_TOP_K], source="gap_fill") if e not in ev_by[a]]
 

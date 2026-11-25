@@ -65,7 +65,7 @@ def _pre(agendas, verdict="full", **kw):
 
 
 def _fetcher(by_agenda):
-    async def fetch(company, agenda, query):
+    async def fetch(company, agenda, query, as_of):
         return by_agenda[agenda]
     return fetch
 
@@ -131,10 +131,21 @@ async def test_async_emit_is_awaited():
     assert "judge_completed" in seen and "verifying" in seen
 
 
+async def test_fetch_evidence_gets_the_same_as_of_as_result():
+    # 결과 기준일과 실제 조회 기준일이 한 값에서 나온다(#76 리뷰)
+    seen = []
+
+    async def fetch(company, agenda, query, as_of):
+        seen.append(as_of)
+        return [_doc("c1")]
+    run, _ = await _run([A.VALUATION, A.MACRO], fetch=fetch)
+    assert seen == ["2026-11-10", "2026-11-10"] == [run.result.meta.data_as_of] * 2
+
+
 async def test_one_agenda_failure_cancels_the_others():
     cancelled = []
 
-    async def fetch(company, agenda, query):
+    async def fetch(company, agenda, query, as_of):
         if agenda == A.VALUATION:
             raise RuntimeError("검색 실패")
         try:
@@ -166,7 +177,8 @@ async def test_persistent_failure_is_retried_once_then_claim_removed():
 async def test_gap_loop_adds_gap_fill_evidence_and_fix_keeps_claim():
     queries = []
 
-    async def fetch(company, agenda, query):
+    async def fetch(company, agenda, query, as_of):
+        assert as_of == "2026-11-10"  # 보완 검색도 토론 기준일로
         queries.append(query)
         if query == "주장 1":  # 근거 없는 Claim 문장으로 보완 검색
             return [_doc("gap-1"), _doc("c1")]

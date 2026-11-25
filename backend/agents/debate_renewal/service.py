@@ -4,6 +4,8 @@
 
 - precheck는 호출하는 쪽(오케스트레이터)이 job을 만들기 전에 이미 돌렸다고 보고 결과만 받는다.
 - 데이터 접근은 `fetch_evidence`로 주입받는다(도구 레지스트리 경유 규칙, 데이터 함수 직접 import 금지).
+  기준일은 `run_debate`가 받은 `data_as_of`를 그대로 넘긴다. 결과의 `meta.data_as_of`와 실제 조회 기준일이
+  한 값에서 나오게 하려는 것이다(#76 리뷰, 헌법 원칙 III). `None`은 최신 데이터.
 - 진행 이벤트는 `emit`으로 주입받는다(#71 리뷰: job_events 저장은 오케스트레이터 몫).
   이름·payload는 계약 `JobEvent`(ADR 0009)를 따른다: `data_collected` → 아젠다마다 `claim_completed`·`bull_completed`·
   `bear_completed` → `judge_completed` → `verifying`. `job_started`·`completed`·`failed`는 워커가 보낸다.
@@ -36,8 +38,8 @@ logger = logging.getLogger(__name__)
 
 KST = ZoneInfo("Asia/Seoul")
 
-# (종목, 아젠다, 질의) → 검색 결과 results[] 목록
-EvidenceFetcher = Callable[[CompanyMeta, AgendaId, str], Awaitable[Sequence[Mapping[str, Any]]]]
+# (종목, 아젠다, 질의, 기준일) → 검색 결과 results[] 목록
+EvidenceFetcher = Callable[[CompanyMeta, AgendaId, str, Optional[str]], Awaitable[Sequence[Mapping[str, Any]]]]
 Emit = Callable[[str, dict], Union[Awaitable[None], None]]
 
 
@@ -85,7 +87,7 @@ async def run_debate(
 
     # 1. 근거: 아젠다별로 가져와 하나의 목록(S1…)에 모은다
     pool = EvidencePool()
-    fetched = await _all([fetch_evidence(company, a, query) for a in agendas])
+    fetched = await _all([fetch_evidence(company, a, query, data_as_of) for a in agendas])
     evidence_by_agenda = {a: pool.add(rows) for a, rows in zip(agendas, fetched)}
     await _send(emit, "data_collected", _doc_counts(pool.all()))
 

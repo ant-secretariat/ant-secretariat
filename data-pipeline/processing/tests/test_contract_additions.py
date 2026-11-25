@@ -426,7 +426,9 @@ def test_valuation_target_price_block_replaces_full_history(recorded):
     assert "target_prices" in get_agent_context("005930", "debate", as_of="2026-11-10")
     # 상승여력 = 컨센서스 평균 ÷ 같은 묶음의 종가 − 1
     assert block["upside_pct"] == 25.0
-    assert block["upside_basis"] == "컨센서스 평균 ÷ 종가(2026-11-07, 200,000원) − 1"
+    assert block["upside_basis"] == ("컨센서스 평균 ÷ 종가(2026-11-07, 200,000원) − 1. "
+                                    "컨센서스 1곳 중 1곳이 최근 90일 안 의견(가장 오래된 의견 2026-11-06)")
+    assert block["consensus_recent"] == {"window_days": 90, "brokers": 1, "recent": 1, "oldest": "2026-11-06"}
     assert block["revisions"]["down"] == 6
     assert len(block["opinions"]) == 10 and block["opinions"][0]["broker_key"] == "키움"
     assert block["chunk_id"] == "block:005930:target_price:2026-11-06"
@@ -473,4 +475,22 @@ def test_documents_not_widened_when_found():
     documents = _agenda_documents(fake_search, "005930", "flow", None, "2026-11-10")
 
     assert (documents["widened"], documents["widened_types"]) == (False, [])
+
+
+def test_consensus_recent_counts_old_opinions_like_consensus():
+    # 컨센서스와 같은 기준(증권사별 최신 1건, 180일, 목표가 있음)으로 세고, 그중 90일 안 의견 수 (#110 리뷰)
+    from processing.functions.get_agent_context import _consensus_recent
+
+    def rec(key, day, price=100000):
+        return {"broker_key": key, "mbcr_name": key, "published_at": day, "target_price_adjusted": price}
+
+    records = [
+        rec("A", "2026-11-04"), rec("A", "2026-06-01"),   # A는 최신 1건(11/04)만
+        rec("B", "2026-07-01"),                           # 90일 밖, 180일 안
+        rec("C", "2026-05-01"),                           # 180일 밖 → 컨센서스에서 빠짐
+        rec("D", "2026-10-01", price=None),               # 목표가 없음 → 빠짐
+        rec("E", "2026-08-12"),                           # 정확히 90일 전 → 최근으로 셈
+    ]
+
+    assert _consensus_recent(records, "2026-11-10", 180) == {"brokers": 3, "recent": 2, "oldest": "2026-07-01"}
 

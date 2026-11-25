@@ -42,6 +42,7 @@ AGENDA_BLOCKS = {
 }
 FINANCIAL_QUARTERS = 8
 OPINION_LIMIT = 10           # 목표가 블록의 최근 의견 수
+RECENT_OPINION_DAYS = 90     # 컨센서스 의견 중 "최근"으로 세는 기간(오래된 의견 비중 표시, #110 리뷰)
 # 문서 검색 결과가 0건이면 이 순서로 다른 종류를 한 번 더 찾는다
 WIDEN_ORDER = ["report", "news", "disclosure"]
 DISCLOSURE_LIMIT = 10
@@ -320,14 +321,23 @@ def _target_price_block(ticker: str, as_of: str, metrics: list) -> dict:
 
     상승여력은 컨센서스 평균 ÷ 종가 − 1(%)이다. 종가는 같은 묶음의 close 지표(get_metric)를 써서, 근거 문장의 종가와
     숫자가 어긋나지 않게 한다. 목표가는 분할 환산값이다. 방향 라벨(상향·하향·혼조)은 받는 쪽이 정한다(#82).
+    컨센서스는 최근 180일 의견이라 주가가 크게 움직였으면 오래된 의견이 상승여력을 부풀릴 수 있어서, 컨센서스에 들어간
+    의견 중 최근 90일 안의 것이 몇 곳인지(consensus_recent)도 준다.
     """
-    from processing.functions.get_target_price_data import get_target_price_data
+    from processing.functions.get_target_price_data import CONSENSUS_WINDOW_DAYS, get_target_price_data
 
     result = get_target_price_data(ticker=ticker, as_of=as_of)
     consensus = result.get("consensus") or {}
     close = next((m for m in metrics if m.get("metric_id") == "close" and m.get("value")), None)
     average = consensus.get("avg_target_price")
     upside = round((average / close["value"] - 1) * 100, 2) if average and close else None
+    recent = _consensus_recent(result.get("records", []), as_of, CONSENSUS_WINDOW_DAYS)
+    upside_basis = None
+    if close:
+        upside_basis = f"컨센서스 평균 ÷ 종가({close['as_of']}, {close['display']}) − 1"
+        if recent["brokers"]:
+            upside_basis += (f". 컨센서스 {recent['brokers']}곳 중 {recent['recent']}곳이 최근 {RECENT_OPINION_DAYS}일 안 의견"
+                             f"(가장 오래된 의견 {recent['oldest']})")
     opinions = [
         {"broker": r["mbcr_name"], "broker_key": r["broker_key"], "opinion": r["opinion_norm"],
          "target_price": r["target_price_adjusted"], "published_at": r["published_at"]}
@@ -336,12 +346,34 @@ def _target_price_block(ticker: str, as_of: str, metrics: list) -> dict:
     content = {
         "consensus": consensus,
         "upside_pct": upside,
-        "upside_basis": (f"컨센서스 평균 ÷ 종가({close['as_of']}, {close['display']}) − 1" if close else None),
+        "upside_basis": upside_basis,
+        "consensus_recent": {"window_days": RECENT_OPINION_DAYS, **recent},
         "revisions": result.get("revisions"),
         "opinions": opinions,
     }
     latest = opinions[0]["published_at"] if opinions else None
     return _block(ticker, "target_price", "get_target_price_data", latest, content, result.get("error"))
+
+
+def _consensus_recent(records: list, as_of: str, consensus_days: int) -> dict:
+    """컨센서스에 들어간 증권사(증권사별 최신 1건, 최근 consensus_days일, 목표가 있음) 중 최근 90일 안 의견 수.
+
+    get_target_price_data의 컨센서스와 같은 기준(broker_key로 묶음, ADR 0010)으로 센다.
+    """
+    day = date.fromisoformat(as_of)
+    window_start = (day - timedelta(days=consensus_days)).isoformat()
+    recent_start = (day - timedelta(days=RECENT_OPINION_DAYS)).isoformat()
+    latest: dict[str, dict] = {}
+    for record in records:
+        key = record.get("broker_key") or record.get("mbcr_name")
+        if key not in latest or record["published_at"] > latest[key]["published_at"]:
+            latest[key] = record
+    used = [r for r in latest.values() if r.get("target_price_adjusted") is not None and r["published_at"] >= window_start]
+    return {
+        "brokers": len(used),
+        "recent": sum(r["published_at"] >= recent_start for r in used),
+        "oldest": min((r["published_at"] for r in used), default=None),
+    }
 
 
 def _financials_block(ticker: str, as_of: str) -> dict:

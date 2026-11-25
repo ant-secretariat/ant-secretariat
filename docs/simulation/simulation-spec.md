@@ -137,12 +137,12 @@ async def run_simulation(
     ticker: str,
     user_id: str,
     debate_job_id: str,   # 토론 job. 토론 결과를 여기서 읽음
-    as_of: str,           # 토론 job의 data_as_of. 모든 데이터 조회의 기준
+    as_of: str | None,    # 토론 job의 data_as_of. 모든 데이터 조회의 기준(계약은 NullableDate, 워커가 토론 job 생성 때 확정해 실제로는 null이 안 옴)
     *, invoke,            # 도구 레지스트리 (데이터 조회)
 ) -> SimulationResult      # 결과만 돌려줌. 진행 이벤트·상태 전환은 작업 워커가 맡음
 ```
 
-- 계약서는 아직 `run_simulation(ticker, user_id, job_id)`입니다. 이 모양(`debate_job_id`, `as_of`, 결과만 돌려줌)과 job 상태 4가지는 **계약 draft.6에서 바꿉니다.**
+- 이 모양(`debate_job_id`, `as_of`, 결과만 돌려줌)과 job 상태 4가지는 **계약 draft.6(#99)에서 바꿉니다.** 지금 main 계약서는 아직 `run_simulation(ticker, user_id, job_id)`입니다.
 - 데이터는 도구 레지스트리로 조회합니다. 조회가 실패하면 "데이터 없음"으로 바꾸지 않고 실패로 처리합니다.
 - `get_agent_context`는 `intent` 없이 부릅니다. 시세·지수·매크로 전체가 필요하기 때문입니다.
 - 토론 결과에서 아젠다를 **순서가 아니라 ID로** 꺼냅니다. 아젠다 순서는 precheck 선택 순서라 매번 달라집니다.
@@ -150,14 +150,18 @@ async def run_simulation(
 
 ```python
 agendas = {a["id"]: a for a in load_debate_result(debate_job_id)["agendas"]}  # 토론 결과 AgendaResult.id
-# 근거 부족 루프(#78)로 주장이 모두 빠진 아젠다는 없는 것과 같이 다룸
-macro_agenda, risk_agenda = (a if a and a.get("claims") else None for a in (agendas.get("macro"), agendas.get("risk")))
+# 근거 부족 루프(#78)로 주장이 모두 빠진 아젠다는 없는 것과 같이 다룸.
+# AgendaResult에는 최상위 claims가 없고 주장은 bull.claims·bear.claims에 있음(계약 AgendaResult)
+def has_claims(a):
+    return bool(a and (a["bull"]["claims"] or a["bear"]["claims"]))
+
+macro_agenda, risk_agenda = (a if has_claims(a) else None for a in (agendas.get("macro"), agendas.get("risk")))
 ```
 
 | 상황 | 처리 |
 | --- | --- |
-| 매크로·리스크 중 하나 이상 있음(주장 1개 이상) | 있는 것만 리스크 분류에 넘김 |
-| 둘 다 없음, 또는 아젠다는 있지만 주장(`claims`)이 0개 | 리스크 분류를 건너뛰고, 시나리오 없이 기본 분포만 제공 |
+| 매크로·리스크 중 하나 이상 있음(Bull·Bear 합쳐 주장 1개 이상) | 있는 것만 리스크 분류에 넘김 |
+| 둘 다 없음, 또는 아젠다는 있지만 Bull·Bear 주장(`bull.claims`·`bear.claims`)이 모두 0개 | 리스크 분류를 건너뛰고, 시나리오 없이 기본 분포만 제공 |
 
 ### 3-3. 실패
 

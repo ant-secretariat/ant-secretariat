@@ -1,3 +1,4 @@
+import pytest
 from datetime import date
 
 from processing.functions.get_financials import build_records, get_financials
@@ -85,3 +86,33 @@ def test_market_snapshot_validates_sort_and_survives_failure(monkeypatch, caplog
     result = get_market_snapshot(sector="IT")
     assert result["error"] == "market_snapshot_unavailable" and result["companies"] == []
     assert "SECRET" not in caplog.text
+
+
+class _SectorConnection:
+    def __init__(self, sector_exists):
+        self.sector_exists = sector_exists
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def execute(self, sql, params=None):
+        rows = [(1,)] if ("select 1 from companies" in sql and self.sector_exists) else []
+
+        class Result:
+            def fetchone(self):
+                return rows[0] if rows else None
+
+            def fetchall(self):
+                return rows
+
+        return Result()
+
+
+@pytest.mark.parametrize(("exists", "error"), [(True, "no_data"), (False, "unknown_sector")])
+def test_market_snapshot_tells_empty_sector_from_unknown_sector(monkeypatch, exists, error):
+    # 있는 업종인데 그날 시세가 있는 종목이 없으면 unknown_sector가 아니라 no_data (#33, #55)
+    monkeypatch.setattr("crawling.db.postgres.connect", lambda: _SectorConnection(exists))
+    assert get_market_snapshot(sector="반도체와반도체장비", as_of="2026-11-06")["error"] == error

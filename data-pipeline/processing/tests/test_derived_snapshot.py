@@ -119,3 +119,54 @@ def test_failure_keeps_all_groups_and_does_not_leak_url(monkeypatch, caplog):
     assert result["error"] == "snapshot_unavailable"
     assert result["price_trend"]["volatility_1m"] is None
     assert "SECRET" not in caplog.text
+
+
+class _CompanyOnlyConnection:
+    """회사 조회만 응답하는 가짜 연결. 묶음 조회 함수는 테스트에서 바꿔 끼운다."""
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def execute(self, sql, params=None):
+        class Result:
+            def fetchone(self):
+                return ("SK하이닉스", "KOSPI", "IT")
+
+        return Result()
+
+
+def _boom(*args):
+    raise RuntimeError("postgresql://user:SECRET@host/db")
+
+
+def test_one_group_failure_keeps_other_groups(monkeypatch, caplog):
+    import processing.functions.get_derived_snapshot as module
+
+    monkeypatch.setattr("crawling.db.postgres.connect", lambda: _CompanyOnlyConnection())
+    monkeypatch.setattr(module, "_flow_rows", _boom)
+    monkeypatch.setattr(module, "_valuation_rows", lambda *a: {})
+    monkeypatch.setattr(module, "_price_rows", lambda *a: ([], [], [], None))
+    monkeypatch.setattr(module, "_quarter_rows", lambda *a: [])
+
+    result = get_derived_snapshot("000660", "2026-11-06")
+
+    # 실패한 묶음만 query_failed, 나머지는 원래 사유(no_data)를 그대로 낸다 (#31, #55)
+    assert result["flow"]["reason"] == "query_failed" and result["flow"]["foreign_net_buy_20d"] is None
+    assert result["valuation"]["reason"] == "no_data"
+    assert result["failed_groups"] == ["flow"] and "error" not in result
+    assert result["company"] == "SK하이닉스"
+    assert "SECRET" not in caplog.text
+
+
+def test_all_groups_failing_is_snapshot_unavailable(monkeypatch):
+    import processing.functions.get_derived_snapshot as module
+
+    monkeypatch.setattr("crawling.db.postgres.connect", lambda: _CompanyOnlyConnection())
+    for name in ("_flow_rows", "_valuation_rows", "_price_rows", "_quarter_rows"):
+        monkeypatch.setattr(module, name, _boom)
+
+    result = get_derived_snapshot("000660", "2026-11-06")
+    assert result["error"] == "snapshot_unavailable" and result["failed_groups"] == list(GROUPS)

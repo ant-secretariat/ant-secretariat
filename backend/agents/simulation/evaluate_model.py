@@ -4,6 +4,7 @@
 
     python -m agents.simulation.evaluate_model                          # 기본 10종목, 단순 기준선
     python -m agents.simulation.evaluate_model --tickers 005930 000660 --out eval.json
+    python -m agents.simulation.evaluate_model --compare baseline baseline_250 garch   # 같은 구간에서 비교
 
 방식
 - 기준 시점(origin)마다 **그날까지의 수익률만으로** 30거래일 뒤 누적 로그수익률(%)의 분포를 표본으로 예측하고,
@@ -11,6 +12,10 @@
 - 예측기(forecaster)는 `f(past_returns, horizon, n_paths, rng) -> 누적 퍼센트 로그수익률 표본(n_paths,)`.
   새 모델(GJR-GARCH + FHS)도 같은 모양으로 넣어 같은 도구로 비교한다(기획서 6절 착수 순서 2·3).
 - 단순 기준선: 최근 63거래일 실현 변동성을 고정한 정규분포(평균 0). 몇 줄짜리라 도구가 제대로 도는지 확인하는 데 쓴다.
+  baseline_250은 같은 방식에 1년(250거래일). 기준선 기간 때문에 비교 결론이 바뀌지 않는지 보려고 둔다.
+- garch: GJR-GARCH + FHS(garch_fhs.py). 운영처럼 21거래일마다 최근 750개 수익률로 적합하고 기준일까지 출발점을 갱신한다.
+  적합이 정상이 아니면(수렴 실패 등) 그 시점은 예측하지 않는다(운영에서는 시뮬레이션 거절).
+- 비교(--compare)는 모든 예측기가 예측한 기준 시점만 남겨 같은 구간에서 지표를 낸다.
 
 지표 (기획서 6절)
 - 90% 구간 적중률(5–95% 분위수 안): 참고 범위 86–94%, 80% 미만이나 97% 초과면 보정이 필요한 것으로 본다
@@ -64,7 +69,16 @@ def baseline_forecaster(lookback: int = BASELINE_LOOKBACK) -> Forecaster:
     return forecast
 
 
-FORECASTERS: dict[str, Callable[[], Forecaster]] = {"baseline": baseline_forecaster}
+def _garch() -> Forecaster:
+    from agents.simulation.garch_fhs import garch_forecaster
+    return garch_forecaster(min_history=MIN_HISTORY)
+
+
+FORECASTERS: dict[str, Callable[[], Forecaster]] = {
+    "baseline": baseline_forecaster,
+    "baseline_250": lambda: baseline_forecaster(250),
+    "garch": _garch,
+}
 
 
 def log_returns_pct(closes: np.ndarray) -> np.ndarray:
@@ -106,7 +120,7 @@ def walk_forward(
     abnormal = np.abs(returns) > ABNORMAL_LOG_RETURN
     lookback = getattr(forecaster, "lookback", min_history)
     windows: list[Window] = []
-    skipped = 0
+    skipped = skipped_model = 0
     for origin in range(min_history, len(returns) - horizon + 1, step):
         # 이상 수익률이 예측 구간이나 예측기가 보는 과거 구간에 있으면 그 시점은 뺀다
         if abnormal[origin:origin + horizon].any() or abnormal[max(0, origin - lookback):origin].any():
@@ -114,10 +128,13 @@ def walk_forward(
             continue
         rng = np.random.default_rng(seed + origin)   # 같은 입력·seed면 같은 결과
         samples = forecaster(returns[:origin], horizon, n_paths, rng)
+        if samples is None:   # 모델이 그 시점에 예측하지 못함(GARCH 수렴 실패 등)
+            skipped_model += 1
+            continue
         observed = float(returns[origin:origin + horizon].sum())
         quantiles = {q: float(v) for q, v in zip((5, 25, 50, 75, 95), np.percentile(samples, [5, 25, 50, 75, 95]))}
         windows.append(Window(origin, observed, quantiles, crps_from_samples(samples, observed)))
-    return {"windows": windows, "skipped_abnormal": skipped}
+    return {"windows": windows, "skipped_abnormal": skipped, "skipped_model": skipped_model}
 
 
 def summarize(windows: list[Window]) -> dict:
@@ -155,11 +172,32 @@ def evaluate(closes_by_ticker: dict[str, np.ndarray], forecaster_name: str = "ba
     per_ticker, all_windows = {}, []
     for ticker, closes in closes_by_ticker.items():
         result = walk_forward(log_returns_pct(closes), forecaster, **options)
-        per_ticker[ticker] = {**summarize(result["windows"]), "skipped_abnormal": result["skipped_abnormal"]}
+        per_ticker[ticker] = {**summarize(result["windows"]), "skipped_abnormal": result["skipped_abnormal"],
+                              "skipped_model": result["skipped_model"]}
         all_windows += result["windows"]
     overall = summarize(all_windows)
     return {"forecaster": forecaster_name, "horizon": options.get("horizon", HORIZON),
             "step": options.get("step", STEP), "overall": overall, "notes": judge(overall), "per_ticker": per_ticker}
+
+
+def compare(closes_by_ticker: dict[str, np.ndarray], forecaster_names: list[str], **options) -> dict:
+    """여러 예측기를 같은 기준 시점(모두 예측한 시점)에서 비교한다. 종목별 구간을 합친 전체 지표."""
+    forecasters = {name: FORECASTERS[name]() for name in forecaster_names}
+    kept: dict[str, list[Window]] = {name: [] for name in forecaster_names}
+    dropped = 0
+    for ticker, closes in closes_by_ticker.items():
+        returns = log_returns_pct(closes)
+        results = {name: {w.origin_index: w for w in walk_forward(returns, f, **options)["windows"]}
+                   for name, f in forecasters.items()}
+        common = set.intersection(*(set(r) for r in results.values()))
+        dropped += sum(len(r) for r in results.values()) - len(common) * len(results)
+        for name, by_origin in results.items():
+            kept[name] += [by_origin[origin] for origin in sorted(common)]
+    summaries = {name: summarize(windows) for name, windows in kept.items()}
+    return {"horizon": options.get("horizon", HORIZON), "step": options.get("step", STEP),
+            "common_windows": summaries[forecaster_names[0]].get("n", 0),
+            "dropped_not_common": dropped,
+            "results": {name: {**summary, "notes": judge(summary)} for name, summary in summaries.items()}}
 
 
 def load_closes(tickers: list[str], end: str | None = None) -> dict[str, tuple[list[str], np.ndarray]]:
@@ -185,6 +223,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="시뮬레이션 walk-forward 평가")
     parser.add_argument("--tickers", nargs="+", default=DEFAULT_TICKERS)
     parser.add_argument("--forecaster", choices=sorted(FORECASTERS), default="baseline")
+    parser.add_argument("--compare", nargs="+", choices=sorted(FORECASTERS), help="같은 구간에서 여러 예측기 비교")
     parser.add_argument("--step", type=int, default=STEP)
     parser.add_argument("--end", help="이 날까지의 시세만 씀(YYYY-MM-DD)")
     parser.add_argument("--out", help="결과 JSON 경로")
@@ -195,8 +234,24 @@ def main(argv: list[str] | None = None) -> int:
     missing = sorted(set(args.tickers) - set(loaded))
     if missing:
         logger.warning("시세가 없는 종목: %s", ", ".join(missing))
-    result = evaluate({ticker: closes for ticker, (_, closes) in loaded.items()}, args.forecaster, step=args.step)
-    result["data_range"] = {ticker: [dates[0], dates[-1]] for ticker, (dates, _) in loaded.items()}
+    closes_by_ticker = {ticker: closes for ticker, (_, closes) in loaded.items()}
+    data_range = {ticker: [dates[0], dates[-1]] for ticker, (dates, _) in loaded.items()}
+    if args.compare:
+        result = compare(closes_by_ticker, args.compare, step=args.step)
+        result["data_range"] = data_range
+        logger.info("같은 기준 시점 %s개(한쪽만 예측한 %s개 제외)", result["common_windows"], result["dropped_not_common"])
+        for name, summary in result["results"].items():
+            logger.info("[%s] 90%% 적중 %s%% | 50%% 적중 %s%% | 하방 5%% 위반 %s%% | CRPS %s", name,
+                        summary.get("coverage_90"), summary.get("coverage_50"), summary.get("lower_5_violation"),
+                        summary.get("crps"))
+            for note in summary["notes"]:
+                logger.info("  점검: %s", note)
+        if args.out:
+            with open(args.out, "w", encoding="utf-8") as f:
+                json.dump(result, f, ensure_ascii=False, indent=2)
+        return 0
+    result = evaluate(closes_by_ticker, args.forecaster, step=args.step)
+    result["data_range"] = data_range
 
     overall = result["overall"]
     logger.info("[%s] 구간 %s개 | 90%% 적중 %s%% | 50%% 적중 %s%% | 하방 5%% 위반 %s%% | CRPS %s",

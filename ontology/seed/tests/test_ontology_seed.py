@@ -146,3 +146,42 @@ def test_company_sensitivity_chip_text_is_not_causal():
     assert all(not e["hypothesis_preregistered"] and e["hypothesis_fixed_on"] == "2026-11-23" for e in co.values())
     assert all(e["rationale"].endswith("수 있음") for e in co.values())
 
+
+
+# ── v0.10: 종목 → 매크로 엣지를 #67 표 스냅샷 CSV에서 읽고 ADR 0011 기준으로 판정 ──
+sys.path.insert(0, str(SEED / "scripts"))
+from co_hypotheses import CO_HYPOTHESES, co_failed_criteria, co_status  # noqa: E402
+
+
+def test_company_edges_read_from_inputs_snapshot():
+    import csv
+    meta = o.load()["meta"]
+    rows = list(csv.DictReader((SEED / "sensitivity_inputs_2026-11-23.csv").open(encoding="utf-8")))
+    assert {(r["group_id"], r["factor"]) for r in rows} == {(h[0], h[1]) for h in CO_HYPOTHESES}
+    company = [e for e in o.load()["edges"]["sensitive_to"] if e["src_type"] == "COMPANY"]
+    assert len(company) == len(CO_HYPOTHESES) and meta["version"] == "seed-v0.10"
+    by = {(r["group_id"], r["factor"]): r for r in rows}
+    for e in company:
+        r = by[(e["src"], e["dst"])]
+        assert e["method"] == r["method"] and "ontology_sensitivity_inputs" in e["source"]
+        assert e["weight"] == round(float(r["adjusted"]), 3) and e["weight_q_value_all"] == float(r["q_value"])
+        assert e["status"] == "active" and e["weight_q_value_hypothesis"] < 0.05  # 11/23 값은 10개 모두 통과
+
+
+@pytest.mark.parametrize("row,sign,q,failed", [
+    ({"adjusted": "-0.15", "ci_low": "-0.2", "ci_high": "-0.1"}, "-", 0.01, []),
+    ({"adjusted": "-0.15", "ci_low": "-0.3", "ci_high": "0.01"}, "-", 0.01, ["ci_includes_zero"]),
+    ({"adjusted": "-0.08", "ci_low": "-0.12", "ci_high": "-0.04"}, "-", 0.01, ["below_min_size"]),
+    ({"adjusted": "0.15", "ci_low": "0.1", "ci_high": "0.2"}, "-", 0.01, ["sign_mismatch"]),
+    ({"adjusted": "-0.15", "ci_low": "-0.2", "ci_high": "-0.1"}, "-", 0.05, ["q_not_significant"]),
+])
+def test_exposure_criteria(row, sign, q, failed):
+    assert co_failed_criteria(row, sign, q) == failed
+
+
+@pytest.mark.parametrize("now,prev,status", [
+    ([], [], "active"), ([], ["below_min_size"], "active"),
+    (["below_min_size"], [], "needs_review"), (["below_min_size"], ["no_input"], "rejected"),
+])
+def test_two_consecutive_failures_reject(now, prev, status):
+    assert co_status(now, prev) == status

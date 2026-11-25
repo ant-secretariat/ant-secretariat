@@ -13,6 +13,7 @@ import httpx
 from crawling.collectors.dart_api import has_data, mask_key
 from crawling.config.settings import SETTINGS, Settings
 from crawling.crawler.http import create_ssl_context
+from crawling.config.clock import today_kst
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +71,7 @@ class DartDisclosureProvider:
             logger.warning("DART corp_code 매핑 실패: %s %s", ticker, company)
             return []
 
-        end = _parse_date(date_to) or date.today()
+        end = _parse_date(date_to) or today_kst()
         start = _parse_date(date_from) or end - timedelta(days=31)
         params = {
             "crtfc_key": self.settings.dart_api_key,

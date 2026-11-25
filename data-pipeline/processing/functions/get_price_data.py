@@ -3,6 +3,7 @@ from datetime import date, timedelta
 from typing import Optional
 
 from processing.interfaces import BaseRelationalDB
+from crawling.config.clock import today_kst
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,7 @@ def _fetch_rows(ticker: str, date_from: Optional[str], date_to: Optional[str], a
 
     from crawling.db.postgres import connect
 
-    upper = min(value for value in (date_to, as_of, date.today().isoformat()) if value)
+    upper = min(value for value in (date_to, as_of, today_kst().isoformat()) if value)
     # 변동성 창을 채우려고 date_from보다 앞선 거래일도 읽고, 마지막에 잘라낸다
     lower = (date.fromisoformat(date_from) - timedelta(days=VOLATILITY_WINDOW * 2)).isoformat() if date_from else None
     query = f"""

@@ -17,6 +17,7 @@ from functools import lru_cache
 
 from psycopg.rows import dict_row
 
+from processing.brokers import broker_key
 from processing.processors.report_chunker import NUMBERS_TITLE
 from processing.search.korean_tokens import terms
 
@@ -70,8 +71,14 @@ def search_chunks(
     top_k: int = 5,
     mode: str | None = None,
     include_chart_numbers: bool = False,
+    keyword_query: str | None = None,
 ) -> tuple[list[dict], str]:
-    """(결과, 실제로 쓴 방식). 의미 검색이 실패하면 BM25로 대신한다."""
+    """(결과, 실제로 쓴 방식). 의미 검색이 실패하면 BM25로 대신한다.
+
+    keyword_query를 주면 BM25에는 그것을, 의미 검색에는 query를 쓴다. 질문에 아젠다 키워드를 덧붙이면
+    BM25에는 도움이 되지만 임베딩에서는 질문 의도가 흐려지기 때문이다(#84).
+    """
+    lexical_query = keyword_query or query
     mode = mode or DEFAULT_MODE
     if mode not in MODES:
         raise ValueError(f"mode는 {MODES} 중 하나: {mode}")
@@ -87,10 +94,10 @@ def search_chunks(
             logger.warning("질문 임베딩 실패(%s), BM25로 대신함", type(exc).__name__)
             mode = "bm25"
     if mode == "bm25":
-        return bm25_search(connection, query, where, params, top_k), mode
+        return bm25_search(connection, lexical_query, where, params, top_k), mode
     if mode == "vector":
         return vector_search(connection, vector, where, params, top_k), mode
-    lexical = bm25_search(connection, query, where, params, HYBRID_DEPTH)
+    lexical = bm25_search(connection, lexical_query, where, params, HYBRID_DEPTH)
     semantic = vector_search(connection, vector, where, params, HYBRID_DEPTH)
     return reciprocal_rank_fusion([lexical, semantic], top_k), mode
 
@@ -300,15 +307,21 @@ def _quote_lexeme(term: str) -> str:
 
 
 def _result(row: dict, score: float) -> dict:
-    """트렌드 리포트·토론이 쓰던 결과 형식(키 이름)을 그대로 지킨다."""
+    """트렌드 리포트·토론이 쓰던 결과 형식(키 이름)을 그대로 지킨다.
+
+    doc_id는 report_id와 같은 값이다(리포트·뉴스·공시 모두 문서 ID). report_id는 예전 이름이라 남겨 둔다.
+    broker_key는 리포트일 때만 증권사 이름을 KIS 목표가와 같은 키로 맞춘 값이다(processing.brokers).
+    """
     return {
         "chunk_id": row["chunk_id"],
+        "doc_id": row["doc_id"],
         "report_id": row["doc_id"],
         "ticker": row["ticker"] or "",
         "company": row["company"] or "",
         "date": row["published_at"].isoformat() if row["published_at"] else "",
         "source": row["source"] or "",
         "author_org": row["broker"] or "",
+        "broker_key": broker_key(row["broker"]) if row["document_type"] == "report" else None,
         "document_type": row["document_type"],
         "report_type": None,
         "title": row["title"] or "",

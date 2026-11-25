@@ -59,7 +59,7 @@
 - 비교 모드는 최대 2종목: 종목별 Bull→Bear(종목끼리 병렬) + Judge 축별 비교, 제시 순서 무작위화, 한쪽 실패 시 단일 분석으로 전환
 - 2라운드(D5)·시뮬레이션 버튼은 단일 모드 전용
 - job 상태(ADR 0013, 오케스트레이터 기획서 v2.3): 토론 job은 단일·비교 모두 `queued → running → completed`, 실패는 `failed`. 시뮬레이션은 버튼으로 만드는 **별도 job**(`debate_job_id`로 토론 결과를 읽음, 기준일은 토론 job의 `data_as_of`). 상태 전환·이벤트 저장은 워커가 하고 `run_debate`는 결과만 돌려준다(계약 draft.6 C11·C12). `simulation_handoff` 필드는 없다(삭제됨)
-- 진행 이벤트는 노드·주장 단위(`node_started`·`claim_completed`·`agenda_completed`·`node_completed`). 토큰 단위 금지 (D8) — 단, 태은 쪽 확정 전까지는 제안 상태
+- 진행 이벤트는 계약 `JobEvent` 이름(ADR 0009): `data_collected`·`claim_completed`(주장 내용 포함)·`bull_completed`·`bear_completed`·`judge_completed`·`verifying`. 토큰 단위 금지 (D8). 아젠다 하나가 실패하면 토론 전체 실패(MVP, 부분 결과는 Post-MVP)
 
 ## 구현 순서
 

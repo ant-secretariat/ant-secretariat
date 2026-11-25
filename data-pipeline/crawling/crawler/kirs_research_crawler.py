@@ -16,6 +16,7 @@ from crawling.crawler.config import SELECTORS, Settings
 from crawling.crawler.base_crawler import generate_report_id, parse_date, subtract_months
 from crawling.crawler.http import create_ssl_context
 from crawling.crawler.models import ReportMetadata
+from crawling.config.clock import today_kst
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +38,7 @@ class KirsResearchCrawler:
         ) as client:
             await self._ensure_robots_allowed(client)
             reports: list[ReportMetadata] = []
-            cutoff = subtract_months(date.today(), self.settings.months)
+            cutoff = subtract_months(today_kst(), self.settings.months)
 
             # 목록은 최신순이라 수집 기간을 벗어난 페이지가 나오면 멈춘다. max_pages는 안전장치
             for page_number in range(1, self.settings.max_pages + 1):

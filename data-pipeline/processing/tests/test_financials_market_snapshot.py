@@ -1,3 +1,4 @@
+import pytest
 from datetime import date
 
 from processing.functions.get_financials import build_records, get_financials
@@ -85,3 +86,71 @@ def test_market_snapshot_validates_sort_and_survives_failure(monkeypatch, caplog
     result = get_market_snapshot(sector="IT")
     assert result["error"] == "market_snapshot_unavailable" and result["companies"] == []
     assert "SECRET" not in caplog.text
+
+
+@pytest.mark.parametrize(("ticker", "as_of", "error"), [
+    ("660", None, "invalid_ticker"),
+    ("005930", "2026-13-01", "invalid_date"),
+])
+def test_get_financials_rejects_bad_input_without_raising(ticker, as_of, error):
+    # 틀린 입력이 예외나 "재무 없음"(빈 records)으로 보이지 않게 한다 (#33 리뷰, #42)
+    assert get_financials(ticker, as_of=as_of)["error"] == error
+
+
+def test_get_financials_unknown_ticker(monkeypatch):
+    class Connection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def execute(self, sql, params=None):
+            class Result:
+                def fetchone(self):
+                    return None
+
+                def fetchall(self):
+                    return []
+
+            return Result()
+
+    monkeypatch.setattr("crawling.db.postgres.connect", lambda: Connection())
+    assert get_financials("999999", as_of="2026-11-06")["error"] == "unknown_ticker"
+
+
+def test_capital_impaired_debt_ratio_is_null_with_note():
+    # 자본잠식이면 get_metric과 같게 null + capital_impaired (#33 리뷰, #42)
+    rows = [_row(2026, 3, "CFS", "total_liabilities", 500), _row(2026, 3, "CFS", "total_equity", -100)]
+    record = build_records(rows, "quarter")[0]
+    assert record["debt_ratio"] is None and record["debt_ratio_note"] == "capital_impaired"
+
+
+class _SectorConnection:
+    def __init__(self, sector_exists):
+        self.sector_exists = sector_exists
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def execute(self, sql, params=None):
+        rows = [(1,)] if ("select 1 from companies" in sql and self.sector_exists) else []
+
+        class Result:
+            def fetchone(self):
+                return rows[0] if rows else None
+
+            def fetchall(self):
+                return rows
+
+        return Result()
+
+
+@pytest.mark.parametrize(("exists", "error"), [(True, "no_data"), (False, "unknown_sector")])
+def test_market_snapshot_tells_empty_sector_from_unknown_sector(monkeypatch, exists, error):
+    # 있는 업종인데 그날 시세가 있는 종목이 없으면 unknown_sector가 아니라 no_data (#33, #55)
+    monkeypatch.setattr("crawling.db.postgres.connect", lambda: _SectorConnection(exists))
+    assert get_market_snapshot(sector="반도체와반도체장비", as_of="2026-11-06")["error"] == error

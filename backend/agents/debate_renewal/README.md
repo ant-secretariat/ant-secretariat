@@ -12,7 +12,8 @@
 | Pydantic 스키마 (Bull·Bear·Judge·DebateResult, 단일·비교) | 완료 (테스트 10개) |
 | 거절셋 v0.3 (dev 47·holdout 22·holdout2 22) + 측정기 + 키워드 사전 kw-0.3.1 | 완료 — `python -m agents.debate_renewal.eval.refusal` |
 | 검증 레이어 L1 (결정적 검사) | 완료 (테스트 10개) |
-| 기준선 비교 실험 루브릭(6항목)·문항(48개)·블라인드 채점 집계(승률 포함) | 완료 (테스트 13개) — 실험 실행은 출력 생성 후 |
+| 기준선 비교 실험 루브릭(6항목)·문항(48개)·블라인드 채점 집계(승률 포함) | 완료 (테스트 13개) |
+| 기준선 출력 생성기 (`eval/baseline/run.py`: 같은 근거로 토론·단일 LLM 출력, 블라인드 텍스트, 채점 pack) | 완료 (테스트 7개) — `python -m agents.debate_renewal.eval.baseline.run --out <git 밖 폴더>` |
 | Bull·Bear·Judge 프롬프트 v3 (`prompts/`, 메시지 조립·strict 출력 스키마) | 완료 (테스트 13개) — LLM 호출은 run_debate 연동 때 |
 | Solar 호출 클라이언트 (`llm.py`, strict json_schema + Pydantic 검증, 형식 오류 1회 재요청) | 완료 (테스트 11개) |
 | 단일 모드 `run_debate` (`service.py`: 근거 → 아젠다별 Bull→Bear 병렬 → Judge → DebateResult → L1, 이벤트 emit 주입) | 완료 (테스트 11개, 실데이터 2종목 확인) |
@@ -69,3 +70,6 @@ backend/agents/debate_renewal/
 - 근거 본문 길이 `PREVIEW_CHARS` 600자, `data_richness`는 `data_tier == report`면 rich 그 외 limited (임시값)
 - 진행 이벤트는 계약 `JobEvent`(ADR 0009) 이름·payload: `data_collected`(문서 종류별 건수) → 아젠다마다 `claim_completed`(`role`·`agenda_id`·`claim`)·`bull_completed`·`bear_completed`(`agenda_id`·`claim_count`) → `judge_completed` → `verifying`. `job_started`·`completed`·`failed`는 워커
 - Judge가 아젠다 판정을 빠뜨리면 채우지 않고 `LLMOutputInvalidError`
+- 기준선 단일 LLM 프롬프트(`eval/baseline/single.py`, single-1.0.0): 토론과 같은 `COMMON_RULES`, 긍정 2~4·부정 1~3·엇갈리는 점·요약. 토론에 불리하거나 유리하지 않은지 채점 전에 한 번 더 확인 필요
+- 블라인드 텍스트(`render.py`): 두 시스템을 긍정·부정·엇갈리는 점·종합·근거 목록으로 맞추고 Bull·Bear 이름을 긍정론·부정론으로 바꾼다. 토론의 엇갈리는 점에는 Judge 판정 이유와 Bear `agreed_points`를 넣는다. 반박 문체("~라고 보지만")로 짐작될 수 있는 한계는 남음
+- 기준선 문항은 아젠다를 문항의 `agenda_id` 하나로 고정해 토론을 돌린다(precheck 아젠다 선택은 거치지 않음)

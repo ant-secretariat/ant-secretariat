@@ -508,14 +508,14 @@ CO_SENS_MIN = 0.10
 #   - 다시 판정해서 기준에서 한 번 떨어지면 needs_review(노출 멈춤), 두 달 연속이면 rejected
 #   - 근거 칩은 chip_text(인과가 아닌 "경향")를 쓰고, rationale 은 "왜 그럴 수 있는지"로만 쓴다
 CO_HYPOTHESIS_FIXED_ON = "2026-11-23"
-_CO_SRC = "수경 #56 2026-11-23 (crawling.ontology_inputs sensitivities --level ticker, PR #62)"
-# p값·지표별 99종목 BH q값은 수경 #56 코멘트(2026-11-23, #62 sensitivities_ticker). 가설 엣지 q값은 아래에서 계산
-CO_P = {("003490", "KTB_3Y_KR"): (0.000001, 0.0001), ("003490", "KTB_10Y_KR"): (0.00002, 0.002),
-        ("015760", "KTB_3Y_KR"): (0.0010, 0.032), ("015760", "KTB_10Y_KR"): (0.0014, 0.033),
-        ("180640", "KTB_3Y_KR"): (0.0066, 0.109), ("035720", "KTB_10Y_KR"): (0.0043, 0.084),
-        ("010950", "BRENT"): (0.0008, 0.075), ("096770", "BRENT"): (0.0138, 0.269),
-        ("005930", "DRAM_EXPORT_PRICE"): (0.0170, 0.404), ("000660", "DRAM_EXPORT_PRICE"): (0.0193, 0.404)}
+# 값은 ontology_sensitivity_inputs(#67) 스냅샷을 내보낸 CSV에서 읽는다(ADR 0011 6번, 손으로 옮기지 않음).
+# 다시 만들기: python ontology/seed/scripts/export_sensitivity_inputs.py <as_of>  → 아래 날짜를 바꾼다
+CO_INPUTS_AS_OF = "2026-11-23"
+# 직전 기준일. 다음 달 CSV를 넣을 때 이전 CSV는 지우지 않고 여기에 그 날짜를 적는다(두 달 연속 탈락 → rejected, ADR 0011 4번)
+CO_PREV_INPUTS_AS_OF = None
 CO_Q_MAX = 0.05
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from co_hypotheses import CO_HYPOTHESES, co_failed_criteria, co_status  # noqa: E402
 
 
 def bh_q_values(ps):
@@ -530,22 +530,33 @@ def bh_q_values(ps):
     return q
 
 
-CO_SENS = [  # (ticker, macro, 가설 부호, 가설, raw, adjusted, ci_low, ci_high, n_obs)
-    ("003490", "KTB_3Y_KR", "-", "부채·항공기 리스 부담이 커서 금리가 오르면 이자 비용이 늘 수 있음", -0.235, -0.179, -0.25, -0.11, 727),
-    ("003490", "KTB_10Y_KR", "-", "부채·항공기 리스 부담이 커서 금리가 오르면 이자 비용이 늘 수 있음", -0.200, -0.156, -0.23, -0.08, 727),
-    ("015760", "KTB_3Y_KR", "-", "부채가 큰 규제 유틸리티라 금리가 오르면 이자 비용이 늘 수 있음", -0.180, -0.122, -0.19, -0.05, 727),
-    ("015760", "KTB_10Y_KR", "-", "부채가 큰 규제 유틸리티라 금리가 오르면 이자 비용이 늘 수 있음", -0.163, -0.119, -0.19, -0.05, 727),
-    ("180640", "KTB_3Y_KR", "-", "대한항공 지주라 대한항공의 금리 부담을 따라갈 수 있음", -0.144, -0.101, -0.17, -0.03, 727),
-    ("035720", "KTB_10Y_KR", "-", "먼 미래 이익 비중이 큰 성장주라 장기 할인율에 민감할 수 있음", -0.151, -0.106, -0.18, -0.03, 727),
-    ("010950", "BRENT", "+", "유가가 오르면 정유 재고 평가이익·마진이 좋아질 수 있음", 0.408, 0.303, 0.13, 0.46, 120),
-    ("096770", "BRENT", "+", "유가가 오르면 정유 재고 평가이익·마진이 좋아질 수 있음", 0.361, 0.225, 0.05, 0.39, 120),
-    ("005930", "DRAM_EXPORT_PRICE", "+", "메모리 매출 비중이 커서 D램 가격이 이익에 크게 영향을 줄 수 있음", 0.267, 0.218, 0.04, 0.38, 120),
-    ("000660", "DRAM_EXPORT_PRICE", "+", "메모리 매출 비중이 커서 D램 가격이 이익에 크게 영향을 줄 수 있음", 0.264, 0.214, 0.04, 0.38, 120),
-]
+def _load_inputs(as_of):
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", f"sensitivity_inputs_{as_of}.csv")
+    with open(path, encoding="utf-8") as f:
+        rows = {(r["group_id"], r["factor"]): r for r in csv.DictReader(f)}
+    assert all(r["as_of"] == as_of for r in rows.values()), f"CSV 기준일이 {as_of}와 다름"
+    return rows
 
 
-assert set(CO_P) == {(x[0], x[1]) for x in CO_SENS}
-CO_Q_HYP = dict(zip([(x[0], x[1]) for x in CO_SENS], bh_q_values([CO_P[(x[0], x[1])][0] for x in CO_SENS])))
+def _q_hyp(rows):
+    """가설 엣지끼리 BH 보정(ADR 0011 2-4). 값이 없는 가설도 개수에 넣고 p=1로 둔다(덜 낙관적, 수경 #80 리뷰)."""
+    keys = [(tk, m) for tk, m, *_ in CO_HYPOTHESES]
+    qs = bh_q_values([float(rows[k]["p_value"]) if k in rows else 1.0 for k in keys])
+    return {k: q for k, q in zip(keys, qs) if k in rows}
+
+
+def _failed(rows, q_hyp, tk, m, sign):
+    """그 기준일 판정에서 못 넘은 기준. 값이 없으면 no_input."""
+    row = rows.get((tk, m))
+    return ["no_input"] if row is None else co_failed_criteria(row, sign, round(q_hyp[(tk, m)], 6), CO_SENS_MIN, CO_Q_MAX)
+
+
+CO_ROWS = _load_inputs(CO_INPUTS_AS_OF)
+CO_Q_HYP = _q_hyp(CO_ROWS)
+CO_PREV = None  # (직전 기준일 rows, q값)
+if CO_PREV_INPUTS_AS_OF:
+    _prev_rows = _load_inputs(CO_PREV_INPUTS_AS_OF)
+    CO_PREV = (_prev_rows, _q_hyp(_prev_rows))
 
 
 _MACRO_NAME = {mm["indicator_id"]: mm["name"] + (" 금리" if mm["category"] == "rate" and "금리" not in mm["name"] else "")
@@ -565,24 +576,38 @@ def _chip_text(m, adj, freq):
     return f"시장 효과를 빼도 주가가 다음 달 {name} 변화와 {'같은' if adj > 0 else '반대'} 방향으로 움직이는 경향 (월별)"
 
 
-def _co_sens_edge(tk, m, sign, why, raw, adj, lo, hi, n):
+def _co_sens_edge(tk, m, sign, why, prereg, fixed_on):
     freq = WEIGHT_FREQ[m]
-    p, q_all = CO_P[(tk, m)]
-    q_hyp = round(CO_Q_HYP[(tk, m)], 6)
-    assert (lo > 0 or hi < 0) and abs(adj) >= CO_SENS_MIN and _sign_check(sign, adj) == "match" and q_hyp < CO_Q_MAX, (tk, m)
-    return edge("SENSITIVE_TO", tk, "COMPANY", m, "MACRO", status="active", reviewed=True, source=_CO_SRC,
-                method=f"partial_corr_{freq}_market_adjusted", as_of="2026-11-23",
-                inactive_reason=None, review_reason=None, rejection=None, market_adjusted=True,
-                weight=adj, weight_raw=raw, weight_ci95=[lo, hi], weight_n_obs=n,
-                weight_p_value=p, weight_q_value_hypothesis=q_hyp, weight_q_value_all=q_all,
-                weight_window="최근 3년 일별" if freq == "daily" else "최근 최대 120개월, t+1월 지표 변화",
-                weight_n_tickers=None, expected_sign=sign, sign_check="match", weight_low_n=False,
-                weight_status="filled", weight_frequency=freq, merged_from=[], rationale=why,
-                chip_text=_chip_text(m, adj, freq), hypothesis_preregistered=False,
-                hypothesis_fixed_on=CO_HYPOTHESIS_FIXED_ON, decided_by="유민", decided_on="2026-11-23")
+    row = CO_ROWS.get((tk, m))
+    adj = round(float(row["adjusted"]), 3) if row else None
+    q_hyp = round(CO_Q_HYP[(tk, m)], 6) if row else None
+    failed = _failed(CO_ROWS, CO_Q_HYP, tk, m, sign)
+    prev_failed = _failed(*CO_PREV, tk, m, sign) if CO_PREV else []
+    # 한 번 떨어지면 needs_review(노출 멈춤), 직전 기준일에도 떨어졌으면 rejected (ADR 0011 4번)
+    status = co_status(failed, prev_failed)
+    review = ",".join(failed) or None
+    rejection = None if status != "rejected" else dict(
+        decided_by="규칙(ADR 0011 4번)", decided_on=CO_INPUTS_AS_OF,
+        reason=f"두 기준일 연속 기준 미달: {CO_PREV_INPUTS_AS_OF} {','.join(prev_failed)} / {CO_INPUTS_AS_OF} {review}")
+    f = (lambda k: float(row[k])) if row else (lambda k: None)
+    r3 = (lambda k: round(float(row[k]), 3)) if row else (lambda k: None)
+    # 칸 순서는 v0.9와 같게 둔다(시드 JSON diff를 줄이려고)
+    return edge("SENSITIVE_TO", tk, "COMPANY", m, "MACRO", status=status, reviewed=True,
+                source=f"ontology_sensitivity_inputs as_of {CO_INPUTS_AS_OF} (수경 #67, 계산 #62)",
+                method=row["method"] if row else "partial_corr_market_adjusted", as_of=CO_INPUTS_AS_OF,
+                inactive_reason=None, review_reason=review, rejection=rejection, market_adjusted=True,
+                weight=adj, weight_raw=r3("raw"), weight_ci95=[r3("ci_low"), r3("ci_high")] if row else None,
+                weight_n_obs=int(row["n_obs"]) if row else None, weight_p_value=f("p_value"),
+                weight_computed_at=row.get("computed_at") if row else None,
+                weight_q_value_hypothesis=q_hyp if row else None, weight_q_value_all=f("q_value"),
+                weight_window=(f"{row['window_start']}~{row['window_end']}" + (" 일별" if freq == "daily" else " 월별, t+1월 지표 변화")) if row else None,
+                weight_n_tickers=None, expected_sign=sign, sign_check=_sign_check(sign, adj) if row else None, weight_low_n=False,
+                weight_status="filled" if row else "missing", weight_frequency=freq, merged_from=[], rationale=why,
+                chip_text=_chip_text(m, adj, freq) if row else None, hypothesis_preregistered=prereg,
+                hypothesis_fixed_on=fixed_on, decided_by="유민", decided_on="2026-11-23")
 
 
-COMPANY_SENSITIVE = [_co_sens_edge(*x) for x in CO_SENS]
+COMPANY_SENSITIVE = [_co_sens_edge(*h) for h in CO_HYPOTHESES]
 
 # IMPACTS: MACRO → MACRO (지표 간 전이). relation: same = 같은 방향, opposite = 반대 방향
 IMP = [
@@ -667,7 +692,7 @@ for k, v in nodes.items():
     for n in v:
         assert isinstance(n["reviewed"], bool) and n["status"] in ("active", "draft", "inactive"), n
 assert set(REJECTED) <= {(e["src"], e["dst"]) for e in SENSITIVE}, "REJECTED에 없는 엣지가 있다"
-meta = dict(version="seed-v0.9", generated=GENERATED, spec="온톨로지 기획서 v1.2",
+meta = dict(version="seed-v0.10", generated=GENERATED, spec="온톨로지 기획서 v1.2",
             exposure_rule='status == "active" and reviewed == True (ADR 0008). draft_fields 는 include_draft 일 때만',
             merged_sensitive_edges=MERGED, inactive_macros=sorted(INACTIVE_MACROS),
             t1_definition="KOSPI+KOSDAQ 통합 시가총액 상위 100 보통주(우선주 제외). 수경 파이프라인 companies.is_core, 2026-10-22 지정 후 고정",

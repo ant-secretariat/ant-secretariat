@@ -282,6 +282,23 @@ python -m crawling.disclosure_chunks_loader --tickers 000660 --limit 20
 - `doc_id`는 `DART_{접수번호}`, `broker`(→ `Evidence.author_org`)는 제출인, 정정 공시는 `is_correction=true`로 따로 쌓는다(원래 공시도 남김)
 - 과거 공시는 언제든 다시 받을 수 있어서 뉴스처럼 비활성으로 돌리지 않는다
 
+근거 조각 보존 규칙 (데이터 에이전트 기획서 12절 Q3, #77·#83):
+
+- **`document_chunks` 행은 지우지 않는다.** 지금 코드에는 행을 지우는 곳이 없다. 다시 자를 때 사라진 청크와 90일 지난 뉴스 청크는 `is_active=false`로만 바꾼다(검색에서 빠짐). 청크 ID로 여는 조회(`get_chunks_by_ids`)는 비활성 청크도 돌려준다
+- 근거로 쓰인 청크 ID가 남는 곳
+
+  | 어디 | 무엇 | 위치 |
+  | --- | --- | --- |
+  | 온톨로지 ISSUE 근거 | 사람이 고른 근거 청크 | `ontology/seed/issue_evidence.csv` (#83) |
+  | 온톨로지 시드 | 위 CSV로 채운 ISSUE의 `evidence_chunk_ids` | `ontology/seed/ontology_seed.json` |
+  | 온톨로지 원본 표 | 시드를 올리면 같은 ID가 남음(온톨로지 기획서 Q2, 아직 올리지 않음) | Supabase `ontology_nodes` |
+  | 토론 기준선 기록 | 문항마다 쓴 근거 청크·지표·블록 ID(지표·블록은 `display`·근거 문장도 함께) | `evidence_records.jsonl` (#77, git 밖) |
+  | 토론·트렌드 리포트 결과 | 화면에 보인 근거 | `agent_jobs.result` (오케스트레이터) |
+
+- 나중에 DB 용량 때문에 행을 실제로 지우게 되면(예: 오래된 뉴스 삭제), 지우는 스크립트가 위 표의 모든 곳에서 청크 ID를 읽어 빼고 지워야 한다. 그런 스크립트는 아직 없다
+- `metric:{종목}:{지표}:{기준일}`·`block:{종목}:{블록}:{기준일}` ID는 DB 행이 아니다. 같은 `as_of`로 `get_metric`·`get_agent_context`를 다시 부르면 다시 만들 수 있다. 다만 원천 데이터(시세·재무·목표가)를 나중에 고치거나 다시 적재하면 값이 달라질 수 있어서, 기준선처럼 다시 만들어야 하는 기록에는 ID와 함께 값(`display` 등)도 남기는 게 안전하다
+- 기준일 이전 문서를 새로 적재하면 같은 기준일·같은 질문이어도 검색 결과가 달라질 수 있다. 기준선을 돌린 뒤에는 그 기준일 이전 문서를 넣기 전에 알린다(#77)
+
 청크 임베딩과 BM25 색인:
 
 ```bash

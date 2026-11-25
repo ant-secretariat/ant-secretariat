@@ -11,6 +11,8 @@ from __future__ import annotations
 import logging
 from datetime import date
 
+from crawling.config.clock import today_kst
+
 logger = logging.getLogger(__name__)
 
 SORTS = {  # sort_by → (정렬 방향, 0 이하 제외)
@@ -45,13 +47,16 @@ QUERY = """
 """
 
 
+SECTOR_EXISTS = "select 1 from companies where sector_l1 = %(sector)s or sector_l2 = %(sector)s limit 1"
+
+
 def get_market_snapshot(
     sector: str | None = None,
     top_n: int = 20,
     sort_by: str = "market_cap",
     as_of: str | None = None,
 ) -> dict:
-    as_of = date.fromisoformat(as_of).isoformat() if as_of else date.today().isoformat()
+    as_of = date.fromisoformat(as_of).isoformat() if as_of else today_kst().isoformat()
     base = {"as_of": None, "requested_as_of": as_of, "sector": sector, "sort_by": sort_by,
             "universe": "시세가 적재된 종목(현재 T1)", "count": 0, "companies": []}
     if sort_by not in SORTS:
@@ -68,7 +73,16 @@ def get_market_snapshot(
         logger.error("시장 목록 조회 실패: %s(%s)", sector, type(exc).__name__)
         return {**base, "error": "market_snapshot_unavailable"}
     if not rows:
-        return {**base, "error": "unknown_sector" if sector else "no_data"}
+        # 업종 이름이 맞아도 그날 시세가 있는 종목이 없으면 행이 비므로, 업종이 있는지 따로 확인한다
+        if not sector:
+            return {**base, "error": "no_data"}
+        try:
+            with connect() as connection:
+                known = connection.execute(SECTOR_EXISTS, {"sector": sector}).fetchone() is not None
+        except Exception as exc:
+            logger.error("업종 확인 실패: %s(%s)", sector, type(exc).__name__)
+            return {**base, "error": "market_snapshot_unavailable"}
+        return {**base, "error": "no_data" if known else "unknown_sector"}
     return {**base, **rank(rows, sort_by, top_n)}
 
 

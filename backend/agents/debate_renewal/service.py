@@ -12,6 +12,9 @@
   1회 수정 때는 다시 만든 노드의 이벤트가 한 번 더 온다(같은 claim_id면 카드 교체). 최종 내용은 결과가 기준이다.
 - 아젠다 하나가 실패하면 TaskGroup이 나머지 호출을 취소하고 토론 전체가 실패한다(MVP, #76 리뷰).
 - 검증: L1 → 근거 부족 루프(gap_fill 추가 검색) → 문제 노드만 1회 재생성 → 그래도 실패한 Claim은 빼고 partial.
+- `fetch_evidence`는 데이터 묶음(get_agent_context 결과)이나 문서 results[] 목록을 돌려준다. 묶음의 지표·블록은
+  근거 행이 되고, 값이 있는 지표는 [지표 자리표시자]로 넘겨 출력의 `{{metric_id}}`를 display로 바꾼다(structured.py).
+  지표·블록 조회 실패는 로그로 남기고 그 근거 없이 진행한다(문서 검색 실패와 같은 원칙).
 """
 from __future__ import annotations
 
@@ -33,6 +36,7 @@ from agents.debate_renewal.prompts.templates import AGENDA_GUIDE
 from agents.debate_renewal.schemas import (
     AgendaResult, BearOutput, BullOutput, CompanyMeta, DebateMeta, DebateResult, Evidence, Scope, UserProfile,
 )
+from agents.debate_renewal.structured import fill_all, from_bundle
 from agents.debate_renewal.validation.l1 import L1Report, check_l1
 from agents.debate_renewal.validation.repair import drop_failed_claims, feedback, repair_targets
 
@@ -41,8 +45,9 @@ logger = logging.getLogger(__name__)
 KST = ZoneInfo("Asia/Seoul")
 GAP_TOP_K = 2  # 근거 없는 Claim 하나당 보완 근거 수. 임시값(README 확정 필요)
 
-# (종목, 아젠다, 질의, 기준일) → 검색 결과 results[] 목록
-EvidenceFetcher = Callable[[CompanyMeta, AgendaId, str, Optional[str]], Awaitable[Sequence[Mapping[str, Any]]]]
+# (종목, 아젠다, 질의, 기준일) → 데이터 묶음(get_agent_context 결과) 또는 검색 결과 results[] 목록
+EvidenceFetcher = Callable[[CompanyMeta, AgendaId, str, Optional[str]],
+                           Awaitable[Union[Mapping[str, Any], Sequence[Mapping[str, Any]]]]]
 Emit = Callable[[str, dict], Union[Awaitable[None], None]]
 
 
@@ -98,16 +103,24 @@ async def run_debate(
     # 1. 근거: 아젠다별로 가져와 하나의 목록(S1…)에 모은다
     pool = EvidencePool()
     fetched = await _all([fetch_evidence(company, a, query, data_as_of) for a in agendas])
-    ev_by: dict[AgendaId, list[Evidence]] = {a: pool.add(rows) for a, rows in zip(agendas, fetched)}
+    contexts = {a: from_bundle(f) for a, f in zip(agendas, fetched)}
+    ev_by: dict[AgendaId, list[Evidence]] = {a: pool.add(c.rows) for a, c in contexts.items()}
+    values = {k: v for c in contexts.values() for k, v in c.metrics.items()}  # 같은 기준일이라 지표 값은 아젠다와 무관
+    for a, c in contexts.items():
+        if c.failures or c.widened:
+            logger.warning("debate evidence trace_id=%s agenda=%s failures=%s widened=%s",
+                           trace_id, a.value, c.failures, c.widened)
     await _send(emit, "data_collected", _doc_counts(pool.all()))
 
     async def bull_of(a: AgendaId, fix: Optional[str] = None) -> BullOutput:
-        bull = await _call("bull", a, _with(bull_messages(company, a, ev_by[a]), fix), BullOutput, usage, llm_client)
+        msgs = bull_messages(company, a, ev_by[a], list(contexts[a].metrics))
+        bull = _filled(await _call("bull", a, _with(msgs, fix), BullOutput, usage, llm_client), values)
         await _role_completed(emit, "bull", a, _rename_claims(a, bull.claims))
         return bull
 
     async def bear_of(a: AgendaId, bull: BullOutput, fix: Optional[str] = None) -> BearOutput:
-        bear = await _call("bear", a, _with(bear_messages(company, a, ev_by[a], bull), fix), BearOutput, usage, llm_client)
+        msgs = bear_messages(company, a, ev_by[a], bull, list(contexts[a].metrics))
+        bear = _filled(await _call("bear", a, _with(msgs, fix), BearOutput, usage, llm_client), values)
         await _role_completed(emit, "bear", a, _namespace(a, bull, bear)[1].claims)
         return bear
 
@@ -131,7 +144,8 @@ async def run_debate(
             logger.warning("debate judge missing agendas trace_id=%s missing=%s", trace_id, missing)
             raise LLMOutputInvalidError()
         await _send(emit, "judge_completed", {})
-        return _assemble(company, precheck, trace_id, data_as_of, judged.model, debates, verdicts, judge, pool.all())
+        result = _assemble(company, precheck, trace_id, data_as_of, judged.model, debates, verdicts, judge, pool.all())
+        return _filled(result, values)  # Judge 문장의 자리표시자까지
 
     result = await judge_and_build()
     await _send(emit, "verifying", {})
@@ -144,7 +158,8 @@ async def run_debate(
     gaps = [claim_at[cid] for cid in report.ungrounded_claim_ids() if cid in claim_at]
     found = await _all([fetch_evidence(company, a, text, data_as_of) for a, text in gaps])  # 보완 검색도 같은 기준일
     for (a, _), rows in zip(gaps, found):
-        ev_by[a] += [e for e in pool.add(list(rows)[:GAP_TOP_K], source="gap_fill") if e not in ev_by[a]]
+        docs = [r for r in from_bundle(rows).rows if r.get("document_type") != "structured"]  # 지표·블록은 이미 있음
+        ev_by[a] += [e for e in pool.add(docs[:GAP_TOP_K], source="gap_fill") if e not in ev_by[a]]
 
     # 5. 1회 수정: 문제가 있는 노드만 다시 생성. Bull을 다시 쓰면 그 Bull을 반박하는 Bear도 다시 쓴다
     bull_fix, bear_fix, judge_fix = repair_targets(report)
@@ -186,6 +201,11 @@ def _assemble(company, precheck, trace_id, data_as_of, model, debates, verdicts,
         evidence=evidence,
         judge=judge,
     )
+
+
+def _filled(model, values: dict):
+    """모델 안 문장의 {{metric_id}}를 display로. 목록에 없는 자리표시자는 남겨 L1(unresolved_placeholder)이 잡는다."""
+    return type(model).model_validate(fill_all(model.model_dump(), values)) if values else model
 
 
 def _namespace(agenda: AgendaId, bull: BullOutput, bear: BearOutput) -> tuple[BullOutput, BearOutput]:

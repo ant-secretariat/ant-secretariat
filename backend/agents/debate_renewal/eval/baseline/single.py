@@ -35,8 +35,8 @@ class SingleOutput(_Strict):
 
 
 def single_messages(company: CompanyMeta, agenda_id: AgendaId, query: str,
-                    evidence: Sequence[Evidence]) -> list[dict[str, str]]:
-    # 토론 Bull·Bear처럼 지표 자리표시자 없이(빈 목록) 근거 문서 숫자를 그대로 인용하게 한다
+                    evidence: Sequence[Evidence], metric_ids: Sequence[str] = ()) -> list[dict[str, str]]:
+    # 토론 Bull·Bear와 같은 지표 자리표시자 목록을 준다(출력의 {{metric_id}}는 실행기가 display로 바꾼다)
     user = (f"[종목] {_company(company)}\n[아젠다] {_agenda(agenda_id)}\n[질문] {query}\n\n[근거]\n{_evidence(evidence)}"
-            f"\n\n[지표 자리표시자]\n{_metrics(())}\n\n긍정·부정 요인과 엇갈리는 점을 정리하고 질문에 답한다.")
+            f"\n\n[지표 자리표시자]\n{_metrics(metric_ids)}\n\n긍정·부정 요인과 엇갈리는 점을 정리하고 질문에 답한다.")
     return [{"role": "system", "content": SINGLE_SYSTEM}, {"role": "user", "content": user}]

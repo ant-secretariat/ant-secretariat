@@ -650,6 +650,22 @@ BELONGS = [edge("BELONGS_TO", c["ticker"], "COMPANY", c["sector_id"], "SECTOR", 
 
 # ───────────────────────── 검증 ─────────────────────────
 sec_ids = {s["sector_id"] for s in SECTORS}; mac_ids = {m["indicator_id"] for m in MACROS}
+# ISSUE 근거: 사람이 고른 조각만 연결한다(#61, 자동 연결 안 함). 후보는 scripts/issue_evidence_candidates.py로 뽑아
+# git 밖에서 보고, 고른 chunk_id만 issue_evidence.csv에 적는다. valid_from은 근거 중 가장 이른 게시일(임시 규칙).
+# 근거를 붙여도 reviewed는 바꾸지 않는다. 노드 검수(이름·극성·기간)는 따로 한다
+ISSUE_EVIDENCE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "issue_evidence.csv")
+with open(ISSUE_EVIDENCE, encoding="utf-8") as f:
+    _ev_rows = list(csv.DictReader(f))
+_by_issue = {i["issue_id"]: i for i in ISSUES}
+for r in _ev_rows:
+    assert r["issue_id"] in _by_issue, f"issue_evidence.csv에 없는 이슈: {r['issue_id']}"
+    assert r["chunk_id"] and r["decided_by"] and len(r["published_at"]) == 10, r
+    _by_issue[r["issue_id"]]["evidence_chunk_ids"].append(r["chunk_id"])
+for i in ISSUES:
+    dates = [r["published_at"] for r in _ev_rows if r["issue_id"] == i["issue_id"]]
+    i["evidence_chunk_ids"] = sorted(set(i["evidence_chunk_ids"]))
+    i["valid_from"] = min(dates) if dates else None
+
 iss_ids = {i["issue_id"] for i in ISSUES}
 for e in SENSITIVE: assert e["src"] in sec_ids and e["dst"] in mac_ids, e
 for e in IMPACTS: assert e["src"] in mac_ids and e["dst"] in mac_ids, e
@@ -692,7 +708,7 @@ for k, v in nodes.items():
     for n in v:
         assert isinstance(n["reviewed"], bool) and n["status"] in ("active", "draft", "inactive"), n
 assert set(REJECTED) <= {(e["src"], e["dst"]) for e in SENSITIVE}, "REJECTED에 없는 엣지가 있다"
-meta = dict(version="seed-v0.10", generated=GENERATED, spec="온톨로지 기획서 v1.2",
+meta = dict(version="seed-v0.11", generated=GENERATED, spec="온톨로지 기획서 v1.2",
             exposure_rule='status == "active" and reviewed == True (ADR 0008). draft_fields 는 include_draft 일 때만',
             merged_sensitive_edges=MERGED, inactive_macros=sorted(INACTIVE_MACROS),
             t1_definition="KOSPI+KOSDAQ 통합 시가총액 상위 100 보통주(우선주 제외). 수경 파이프라인 companies.is_core, 2026-10-22 지정 후 고정",

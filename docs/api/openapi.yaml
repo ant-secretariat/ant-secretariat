@@ -1093,6 +1093,16 @@ x-internal-functions:
   output: DataStatus
   status: changed
   release: mvp
+- name: suggest_alternatives
+  agent: 데이터 에이전트
+  summary: 거절 시 대안 종목 조회
+  signature: 'suggest_alternatives(ticker: str, n: int = 3, as_of: str | None = None) -> dict'
+  input: SuggestAlternativesInput
+  output: AlternativesResult
+  status: new
+  release: mvp
+  note: 관문1이 `uncovered_company`·`no_data`로 거절할 때 `alternatives` payload를 채웁니다(계약 변경 C9). 커버 종목(핵심 종목 T1 보통주) 중 같은
+    업종 중분류 → 대분류 → 전체 순, 각 단계 안에서 시가총액 큰 순입니다. 조회 실패면 `alternatives`가 null이고 `error`가 있습니다.
 - name: get_agent_context
   agent: 데이터 에이전트
   summary: 에이전트별 근거 묶음 조회
@@ -3799,6 +3809,88 @@ components:
       properties:
         ticker:
           $ref: '#/components/schemas/TickerValue'
+    SuggestAlternativesInput:
+      type: object
+      required:
+      - ticker
+      properties:
+        ticker:
+          $ref: '#/components/schemas/TickerValue'
+        n:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 3
+        as_of:
+          $ref: '#/components/schemas/NullableDate'
+          description: 시가총액 기준일. 없으면 오늘(KST)입니다.
+    AlternativesResult:
+      type: object
+      required:
+      - ticker
+      - as_of
+      - alternatives
+      properties:
+        ticker:
+          $ref: '#/components/schemas/TickerValue'
+        company:
+          type:
+          - string
+          - 'null'
+          description: 요청 종목 이름. 종목 목록에 없으면 null입니다.
+        sector_l1:
+          type:
+          - string
+          - 'null'
+        sector_l2:
+          type:
+          - string
+          - 'null'
+        as_of:
+          type: string
+          format: date
+        alternatives:
+          type:
+          - array
+          - 'null'
+          description: 대안 종목. 요청 종목은 들어가지 않습니다. 조회 실패면 null입니다(빈 목록과 구분).
+          items:
+            type: object
+            required:
+            - ticker
+            - company
+            - market_cap
+            - match
+            properties:
+              ticker:
+                $ref: '#/components/schemas/TickerValue'
+              company:
+                type: string
+              sector_l1:
+                type:
+                - string
+                - 'null'
+              sector_l2:
+                type:
+                - string
+                - 'null'
+              market_cap:
+                type: integer
+                description: as_of까지의 마지막 거래일 시가총액(원)
+              match:
+                type: string
+                enum:
+                - sector_l2
+                - sector_l1
+                - market
+                description: 어느 단계에서 골랐는지(같은 중분류, 같은 대분류, 전체)
+        basis:
+          type: string
+        error:
+          type:
+          - string
+          - 'null'
+          description: 조회 실패면 "alternatives_unavailable"
     GetAgentContextInput:
       type: object
       required:

@@ -11,7 +11,7 @@ import argparse
 import logging
 import sys
 from collections import Counter
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 if __package__ in (None, ""):
@@ -42,6 +42,9 @@ def load(connection: psycopg.Connection, tickers: list[str], start: date, end: d
         for position, ticker in enumerate(tickers, start=1):
             try:
                 rows = opinion_rows(ticker, client.fetch_opinions(ticker, start, end))
+                # 다시 받아 덮어쓸 때 갱신 시각도 바꾼다(기본값 now()는 처음 넣을 때만 들어감)
+                now = datetime.now(timezone.utc)
+                rows = [{**row, "updated_at": now} for row in rows]
             except (KisError, httpx.HTTPError) as exc:
                 logger.warning("%s 실패: %s", ticker, exc if isinstance(exc, KisError) else type(exc).__name__)
                 failed.append(ticker)

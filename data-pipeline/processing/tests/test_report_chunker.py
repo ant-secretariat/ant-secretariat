@@ -216,3 +216,9 @@ def test_boilerplate_tables_are_disclaimers():
     # 표지 ESG 칸과 본문 의견이 섞인 글 청크는 남긴다
     assert not is_boilerplate("ESG 컨센서스 S S S. 투자의견 매수를 유지한다. 실적이 개선됐다. 목표가는 유지한다.", "text")
     assert not is_boilerplate("투자의견 매수, 목표주가 25만원 유지", "text")
+
+
+def test_normalize_text_keeps_long_numbers_but_shortens_leaders():
+    # 같은 숫자가 6번 넘게 이어져도 자르지 않는다 (#35 리뷰, #41)
+    assert normalize_text("목표주가 1000000원, 발행주식 3333333주") == "목표주가 1000000원, 발행주식 3333333주"
+    assert normalize_text("매출액 ········ 100") == "매출액 ··· 100"

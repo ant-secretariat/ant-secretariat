@@ -159,7 +159,7 @@ def test_company_edges_read_from_inputs_snapshot():
     rows = list(csv.DictReader((SEED / "sensitivity_inputs_2026-11-23.csv").open(encoding="utf-8")))
     assert {(r["group_id"], r["factor"]) for r in rows} == {(h[0], h[1]) for h in CO_HYPOTHESES}
     company = [e for e in o.load()["edges"]["sensitive_to"] if e["src_type"] == "COMPANY"]
-    assert len(company) == len(CO_HYPOTHESES) and meta["version"] == "seed-v0.10"
+    assert len(company) == len(CO_HYPOTHESES) and meta["version"] == "seed-v0.11"
     by = {(r["group_id"], r["factor"]): r for r in rows}
     for e in company:
         r = by[(e["src"], e["dst"])]
@@ -179,9 +179,48 @@ def test_exposure_criteria(row, sign, q, failed):
     assert co_failed_criteria(row, sign, q) == failed
 
 
+# ── ISSUE 근거 후보 (사람이 고르기 전 단계) ──
+def test_issue_candidates_search_top_exposed_tickers_and_dedupe():
+    from issue_evidence_candidates import candidates, to_markdown
+    seed = {"nodes": {"issues": [{"issue_id": "ISS_A", "name": "이슈", "notes": "메모"}]},
+            "edges": {"exposed_to": [{"dst": "ISS_A", "src": t, "exposure": x}
+                                     for t, x in [("000001", .3), ("000002", .9), ("000003", .6), ("000004", .6)]]}}
+    calls = []
+
+    def search(query, ticker, top_k, as_of, doc_type):
+        calls.append((query, ticker, top_k, doc_type))
+        if doc_type != "news":
+            return []
+        return [{"chunk_id": "c-same", "content": "본문 " * 200, "title": "t"}, {"chunk_id": f"c-{ticker}"}]
+    found = candidates(seed, search, 2, None)
+    assert [c[1] for c in calls] == ["000002", "000002", "000004", "000004", "000003", "000003"]  # 노출도 높은 3종목
+    assert [c[3] for c in calls[:2]] == ["news", "report"]  # 뉴스·리포트 따로
+    assert calls[0][0] == "이슈" and calls[0][2] == 2  # 메모 전체는 붙이지 않음
+    assert [r["chunk_id"] for r in found["ISS_A"]] == ["c-same", "c-000002", "c-000004", "c-000003"]
+    md = to_markdown(seed, found)
+    assert "- [ ] `c-same` 000002" in md and len(md.split("> ")[1].splitlines()[0]) <= 220
+
+
+def test_issue_evidence_csv_has_header_only_until_reviewed():
+    lines = (SEED / "issue_evidence.csv").read_text(encoding="utf-8").splitlines()
+    assert lines[0] == "issue_id,chunk_id,ticker,published_at,decided_by,decided_on"
+    linked = {i["issue_id"] for i in o.load()["nodes"]["issues"] if i["evidence_chunk_ids"]}
+    assert len(linked) == len({l.split(",")[0] for l in lines[1:]})
+
 @pytest.mark.parametrize("now,prev,status", [
     ([], [], "active"), ([], ["below_min_size"], "active"),
     (["below_min_size"], [], "needs_review"), (["below_min_size"], ["no_input"], "rejected"),
 ])
 def test_two_consecutive_failures_reject(now, prev, status):
     assert co_status(now, prev) == status
+
+
+def test_issue_evidence_verify_reports_missing_and_date_mismatch():
+    from issue_evidence_candidates import verify
+    rows = [{"chunk_id": "a", "published_at": "2026-11-01"}, {"chunk_id": "b", "published_at": "2026-11-02"},
+            {"chunk_id": "c", "published_at": "2026-11-03"}]
+
+    def db(ids):
+        return {"chunks": [{"chunk_id": "a", "published_at": "2026-11-01T09:00:00+09:00"},
+                           {"chunk_id": "b", "published_at": "2026-11-05"}], "missing": ["c"]}
+    assert verify(rows, db) == ["c: DB에 없음", "b: published_at 2026-11-02 ≠ DB 2026-11-05"]

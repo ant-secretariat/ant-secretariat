@@ -59,7 +59,10 @@ def _loader(seen):
         seen.append((case["id"], as_of))
         rows = [{"chunk_id": f"{case['id']}-c1", "document_type": "report", "title": "t", "source": "s",
                  "date": "2026-11-01", "content": "본문"}]
-        return CaseContext(company=CO, rows=rows, search={"query": case["query"], "keyword_query": f"{case['query']} 키워드",
+        per = {"metric_id": "per", "name": "PER", "value": 12.3, "display": "12.3배", "as_of": "2026-11-07",
+               "reason": None, "chunk_id": "metric:005930:per:2026-11-07"}
+        bundle = {"documents": {"results": rows}, "metrics": [per]}  # get_agent_context 묶음 모양
+        return CaseContext(company=CO, rows=bundle, search={"query": case["query"], "keyword_query": f"{case['query']} 키워드",
                                                        "document_types": ["report"], "mode": "hybrid", "top_k": 5, "as_of": as_of})
     return load
 
@@ -78,7 +81,10 @@ async def test_run_all_writes_both_systems_with_same_evidence(tmp_path):
         ("q-val-01", "debate"), ("q-val-01", "single"), ("q-mac-01", "debate"), ("q-mac-01", "single")]
     assert outputs[0]["tokens"] == 360 and outputs[1]["tokens"] == 120  # 토론 3회 vs 단일 1회
     rec = _jsonl(tmp_path / "evidence_records.jsonl")[0]
-    assert rec["snapshot_tag"] == "tag-v1" and rec["evidence_chunk_ids"] == ["q-val-01-c1"]
+    assert rec["snapshot_tag"] == "tag-v1"
+    assert rec["evidence_chunk_ids"] == ["q-val-01-c1", "metric:005930:per:2026-11-07"]
+    # 지표·블록 근거는 값까지 남긴다(#114)
+    assert rec["metric_displays"] == {"per": "12.3배"} and "12.3배" in rec["structured"][0]["content"]
     assert rec["search"] == {"query": "비싸?", "keyword_query": "비싸? 키워드", "document_types": ["report"],
                              "mode": "hybrid", "top_k": 5}  # 검색 방식(#106)이 기록에 남는다
     pack, key = make_blind_pack(outputs, seed=1)  # 채점 pack까지 이어진다
@@ -133,7 +139,7 @@ def test_case_context_keeps_search_mode_and_rejects_partial_search_failure():
             "results": [{"chunk_id": "c1"}]}
     ctx = case_context(case, {"data_tier": "report", "as_of": "2026-11-10", "documents": docs}, "반도체", "2026-11-10")
     assert ctx.search["keyword_query"] == docs["keyword_query"] and ctx.search["document_types"] == ["report"]
-    assert ctx.company.sector == "반도체" and ctx.rows == [{"chunk_id": "c1"}]
+    assert ctx.company.sector == "반도체" and ctx.rows["documents"]["results"] == [{"chunk_id": "c1"}]  # 묶음 그대로
     failed = {**docs, "reason": "search_unavailable", "failed_types": ["news"]}
     with pytest.raises(RuntimeError, match="문서 검색 실패"):
         case_context(case, {"data_tier": "report", "documents": failed}, None, "2026-11-10")

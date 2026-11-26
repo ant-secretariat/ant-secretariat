@@ -5,7 +5,9 @@
     python -m agents.debate_renewal.eval.baseline.run --out <폴더> --pack-seed 20261126   # 끝나면 채점 pack
 
 - 같은 근거: 문항마다 `get_agent_context(as_of=문항 as_of)`를 한 번 불러 그 조각을 두 시스템에 똑같이 준다.
-  쓴 chunk_id는 evidence_records.jsonl에 snapshot_tag와 함께 남긴다(본문은 남기지 않음, 수경 #28 제안).
+  쓴 chunk_id는 evidence_records.jsonl에 snapshot_tag와 함께 남긴다(문서 본문은 남기지 않음, 수경 #28 제안).
+  지표·블록 근거(structured.py)는 원천 값이 나중에 바뀌어도 다시 볼 수 있게 근거 문장과 지표 display도 남긴다(#114).
+  두 시스템 모두 같은 지표 자리표시자 목록을 받고, 출력의 {{metric_id}}는 같은 display로 바뀐다.
 - 출력 폴더는 git에 올리지 않는다. outputs.jsonl에는 근거 본문 일부가 들어간 채점용 텍스트가 있다.
 - 이어서 돌리기: 두 시스템 출력이 이미 있는 문항은 건너뛴다. 한 문항 실패는 failures.jsonl에 남기고 다음으로 간다.
 - 데이터 함수는 기본 로더 안에서만 import한다(테스트는 가짜 로더를 넣는다).
@@ -37,6 +39,7 @@ from agents.debate_renewal.llm import complete_structured
 from agents.debate_renewal.prompts import PROMPT_VERSION
 from agents.debate_renewal.schemas import CompanyMeta
 from agents.debate_renewal.service import run_debate
+from agents.debate_renewal.structured import AgendaContext, fill_all, from_bundle
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +51,7 @@ MAX_FAILURE_RATE = 0.1
 @dataclass
 class CaseContext:
     company: CompanyMeta
-    rows: list[dict]
+    rows: Any  # 데이터 묶음(get_agent_context 결과) 또는 문서 results[] 목록
     search: dict  # query·keyword_query·document_types·mode·top_k·as_of
 
 
@@ -62,10 +65,15 @@ def _tokens(usages: list[dict]) -> int:
 async def run_case(case: dict, ctx: CaseContext, snapshot_tag: str, *, llm_client: Any = None) -> tuple[dict, list[dict]]:
     agenda = AgendaId(case["agenda_id"])
     query = case["query"]
-    evidence = EvidencePool().add(ctx.rows)
+    agenda_ctx: AgendaContext = from_bundle(ctx.rows)
+    evidence = EvidencePool().add(agenda_ctx.rows)
     record = {"question_id": case["id"], "snapshot_tag": snapshot_tag, "ticker": case["ticker"],
               "as_of": ctx.search.get("as_of"), "search": {k: ctx.search.get(k) for k in SEARCH_KEYS},
-              "evidence_chunk_ids": [e.chunk_id for e in evidence]}
+              "evidence_chunk_ids": [e.chunk_id for e in evidence],
+              "structured": [{"chunk_id": e.chunk_id, "content": e.content_preview}
+                             for e in evidence if e.document_type == "structured"],
+              "metric_displays": agenda_ctx.metrics, "data_failures": agenda_ctx.failures,
+              "widened": agenda_ctx.widened}
 
     async def same_rows(_company, _agenda, _query, as_of):
         # 근거는 문항 기준일로 미리 불러 두었다. run_debate가 넘기는 기준일이 그것과 같은지 확인한다(#76 리뷰)
@@ -82,13 +90,14 @@ async def run_case(case: dict, ctx: CaseContext, snapshot_tag: str, *, llm_clien
     if [e.chunk_id for e in run.result.evidence] != record["evidence_chunk_ids"]:
         raise RuntimeError("토론과 단일 LLM의 근거가 다르다")  # 같은 근거가 실험의 전제
 
-    single = await complete_structured(single_messages(ctx.company, agenda, query, evidence), SingleOutput,
-                                       client=llm_client)
+    single = await complete_structured(single_messages(ctx.company, agenda, query, evidence, list(agenda_ctx.metrics)),
+                                       SingleOutput, client=llm_client)
+    single_out = SingleOutput.model_validate(fill_all(single.output.model_dump(), agenda_ctx.metrics))
     outputs = [
         {"question_id": case["id"], "system": "debate", "text": render_debate(query, run.result),
          "tokens": _tokens(run.usage), "latency_s": round(debate_s, 2), "model": run.result.meta.model,
          "prompt_version": PROMPT_VERSION, "l1_ok": run.l1.ok, "l1_codes": sorted({i.code for i in run.l1.issues})},
-        {"question_id": case["id"], "system": "single", "text": render_single(query, single.output, evidence),
+        {"question_id": case["id"], "system": "single", "text": render_single(query, single_out, evidence),
          "tokens": (single.prompt_tokens or 0) + (single.completion_tokens or 0),
          "latency_s": round(single.latency_ms / 1000, 2), "model": single.model, "prompt_version": SINGLE_PROMPT_VERSION},
     ]
@@ -151,7 +160,8 @@ def case_context(case: dict, ctx: dict, sector: Optional[str], as_of: Optional[s
         raise RuntimeError(f"문서 검색 실패: {docs.get('reason')} {docs.get('failed_types')}")
     company = CompanyMeta(ticker=case["ticker"], company=case["company"], sector=sector or "알 수 없음",
                           data_tier=ctx["data_tier"])
-    return CaseContext(company=company, rows=list(docs.get("results") or []),
+    # 묶음 그대로 넘긴다. 문서·지표·블록을 근거로 바꾸는 건 run_debate와 같은 from_bundle이 한다
+    return CaseContext(company=company, rows=ctx,
                        search={"query": case["query"], "keyword_query": docs.get("keyword_query"),
                                "document_types": docs.get("document_types"), "mode": docs.get("mode"),
                                "top_k": TOP_K, "as_of": ctx.get("as_of", as_of)})

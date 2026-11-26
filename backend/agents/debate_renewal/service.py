@@ -10,6 +10,9 @@
   이름·payload는 계약 `JobEvent`(ADR 0009)를 따른다: `data_collected` → 아젠다마다 `claim_completed`·`bull_completed`·
   `bear_completed` → `judge_completed` → `verifying`. `job_started`·`completed`·`failed`는 워커가 보낸다.
 - 아젠다 하나가 실패하면 TaskGroup이 나머지 호출을 취소하고 토론 전체가 실패한다(MVP, #76 리뷰).
+- `fetch_evidence`는 데이터 묶음(get_agent_context 결과)이나 문서 results[] 목록을 돌려준다. 묶음의 지표·블록은
+  근거 행이 되고, 값이 있는 지표는 [지표 자리표시자]로 넘겨 출력의 `{{metric_id}}`를 display로 바꾼다(structured.py).
+  지표·블록 조회 실패는 로그로 남기고 그 근거 없이 진행한다(문서 검색 실패와 같은 원칙).
 - L1 문제는 결과와 함께 돌려준다. 근거 부족 루프·1회 수정(구현 순서 4)은 다음 PR.
 """
 from __future__ import annotations
@@ -32,14 +35,16 @@ from agents.debate_renewal.prompts.templates import AGENDA_GUIDE
 from agents.debate_renewal.schemas import (
     AgendaResult, BearOutput, BullOutput, CompanyMeta, DebateMeta, DebateResult, Scope, UserProfile,
 )
+from agents.debate_renewal.structured import fill_all, from_bundle
 from agents.debate_renewal.validation.l1 import L1Report, check_l1
 
 logger = logging.getLogger(__name__)
 
 KST = ZoneInfo("Asia/Seoul")
 
-# (종목, 아젠다, 질의, 기준일) → 검색 결과 results[] 목록
-EvidenceFetcher = Callable[[CompanyMeta, AgendaId, str, Optional[str]], Awaitable[Sequence[Mapping[str, Any]]]]
+# (종목, 아젠다, 질의, 기준일) → 데이터 묶음(get_agent_context 결과) 또는 검색 결과 results[] 목록
+EvidenceFetcher = Callable[[CompanyMeta, AgendaId, str, Optional[str]],
+                           Awaitable[Union[Mapping[str, Any], Sequence[Mapping[str, Any]]]]]
 Emit = Callable[[str, dict], Union[Awaitable[None], None]]
 
 
@@ -88,15 +93,24 @@ async def run_debate(
     # 1. 근거: 아젠다별로 가져와 하나의 목록(S1…)에 모은다
     pool = EvidencePool()
     fetched = await _all([fetch_evidence(company, a, query, data_as_of) for a in agendas])
-    evidence_by_agenda = {a: pool.add(rows) for a, rows in zip(agendas, fetched)}
+    contexts = {a: from_bundle(f) for a, f in zip(agendas, fetched)}
+    evidence_by_agenda = {a: pool.add(c.rows) for a, c in contexts.items()}
+    values = {k: v for c in contexts.values() for k, v in c.metrics.items()}  # 같은 기준일이라 지표 값은 아젠다와 무관
+    for a, c in contexts.items():
+        if c.failures or c.widened:
+            logger.warning("debate evidence trace_id=%s agenda=%s failures=%s widened=%s",
+                           trace_id, a.value, c.failures, c.widened)
     await _send(emit, "data_collected", _doc_counts(pool.all()))
 
     # 2. 아젠다끼리 병렬로 Bull → Bear
     async def debate(agenda: AgendaId) -> tuple[BullOutput, BearOutput]:
-        ev = evidence_by_agenda[agenda]
-        bull = await _call("bull", agenda, bull_messages(company, agenda, ev), BullOutput, usage, llm_client)
+        ev, metric_ids = evidence_by_agenda[agenda], list(contexts[agenda].metrics)
+        bull = await _call("bull", agenda, bull_messages(company, agenda, ev, metric_ids), BullOutput, usage, llm_client)
+        bull = _filled(bull, values)
         await _role_completed(emit, "bull", agenda, _rename_claims(agenda, bull.claims))
-        bear = await _call("bear", agenda, bear_messages(company, agenda, ev, bull), BearOutput, usage, llm_client)
+        bear = await _call("bear", agenda, bear_messages(company, agenda, ev, bull, metric_ids), BearOutput, usage,
+                           llm_client)
+        bear = _filled(bear, values)
         bull, bear = _namespace(agenda, bull, bear)
         await _role_completed(emit, "bear", agenda, bear.claims)
         return bull, bear
@@ -132,8 +146,14 @@ async def run_debate(
         evidence=all_evidence,
         judge=judge,
     )
+    result = _filled(result, values)  # Judge 문장의 자리표시자까지
     await _send(emit, "verifying", {})
     return DebateRun(result=result, l1=check_l1(result), usage=usage)
+
+
+def _filled(model, values: dict):
+    """모델 안 문장의 {{metric_id}}를 display로. 목록에 없는 자리표시자는 남겨 L1(unresolved_placeholder)이 잡는다."""
+    return type(model).model_validate(fill_all(model.model_dump(), values)) if values else model
 
 
 def _namespace(agenda: AgendaId, bull: BullOutput, bear: BearOutput) -> tuple[BullOutput, BearOutput]:

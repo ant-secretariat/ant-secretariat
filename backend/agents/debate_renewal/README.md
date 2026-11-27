@@ -51,6 +51,7 @@ backend/agents/debate_renewal/
   config.py                 # 모델·온도·타임아웃 (DEBATE_RENEWAL_LLM_* 환경변수로 덮어씀)
   llm.py                    # Solar 구조화 출력 호출 complete_structured()
   evidence.py               # 검색 결과 → Evidence(S1…), chunk_id 중복 제거
+  structured.py             # 데이터 묶음의 지표·블록 → 근거 행, {{metric_id}} → display 치환
   service.py                # 단일 모드 run_debate()
   data/keyword_dictionary.json
   data/intent_data_sources.json   # 수경 제안값 반영 (소유자는 데이터 에이전트)
@@ -67,9 +68,12 @@ backend/agents/debate_renewal/
 - 출력이 재요청 후에도 스키마와 다르면 `LLMOutputInvalidError`(지금은 503 `upstream_unavailable`). 전용 코드는 정책표(OQ-2) 확정 후
 - 환경변수 이름은 기존 `agents/debate`의 `DEBATE_LLM_MODEL`과 겹치지 않게 `DEBATE_RENEWAL_LLM_*`
 - `run_debate` claim_id: 프롬프트는 아젠다마다 `B1`·`R1`부터 매기고, 코드가 아젠다 ID를 앞에 붙인다(`valuation-B1`). L1이 결과 전체에서 유일한 id를 요구해서
+- 지표·블록 근거(`structured.py`): 사실 문장으로 넣는 사유(`loss_making`·`capital_impaired`·`not_applicable_financials`), 블록 요약 문장 형식(목표가 최근 의견 5건, 재무 8분기, 매크로는 최신 값만)은 임시값. 기준선 출력 보고 다듬음
 - 근거 본문 길이 `PREVIEW_CHARS` 600자, `data_richness`는 `data_tier == report`면 rich 그 외 limited (임시값)
 - 진행 이벤트는 계약 `JobEvent`(ADR 0009) 이름·payload: `data_collected`(문서 종류별 건수) → 아젠다마다 `claim_completed`(`role`·`agenda_id`·`claim`)·`bull_completed`·`bear_completed`(`agenda_id`·`claim_count`) → `judge_completed` → `verifying`. `job_started`·`completed`·`failed`는 워커
 - Judge가 아젠다 판정을 빠뜨리면 채우지 않고 `LLMOutputInvalidError`
+- 근거 부족 루프: 근거 없는 Claim의 문장으로 `fetch_evidence`를 다시 불러 Claim당 2개(`GAP_TOP_K`, 임시값)까지 `gap_fill`로 더한다. 1회 수정은 문제가 있는 노드만 다시 생성(Bull을 다시 쓰면 Bear·Judge도)
+- partial: 수정 뒤에도 실패한 Claim은 빼고 `DebateRun.removed_claim_ids`에 남긴다. MVP에서는 결과에 partial 고지 칸을 만들지 않고 로그(`debate partial … removed=`)로만 남긴다(#78 리뷰). 기준선 48문항에서 빠진 Claim 수를 세어 자주 나오면 계약 칸·고지 UI를 정한다. Bear가 반박한 Bull Claim이 빠지면 `bad_bull_claim_ref`를 L1에 남기고 반박 대상을 바꾸지 않는다. 보여 주는 방식은 기준선에서 실제로 나오면 R4 렌더링(#119)과 함께 정한다
 - 기준선 단일 LLM 프롬프트(`eval/baseline/single.py`, single-1.0.0): 토론과 같은 `COMMON_RULES`, 긍정 2~4·부정 1~3·엇갈리는 점·요약. 토론에 불리하거나 유리하지 않은지 채점 전에 한 번 더 확인 필요
 - 블라인드 텍스트(`render.py`): 두 시스템을 긍정·부정·엇갈리는 점·종합·근거 목록으로 맞추고 Bull·Bear 이름을 긍정론·부정론으로 바꾼다. 토론의 엇갈리는 점에는 Judge 판정 이유와 Bear `agreed_points`를 넣는다. 반박 문체("~라고 보지만")로 짐작될 수 있는 한계는 남음
 - 기준선 문항은 아젠다를 문항의 `agenda_id` 하나로 고정해 토론을 돌린다(precheck 아젠다 선택은 거치지 않음)

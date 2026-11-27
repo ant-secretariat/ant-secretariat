@@ -11,10 +11,14 @@
 from __future__ import annotations
 
 import logging
+import re
 from datetime import date
+
 from crawling.config.clock import today_kst
 
 logger = logging.getLogger(__name__)
+
+TICKER_PATTERN = re.compile(r"^[0-9A-Z]{6}$")
 
 PERIOD_TYPES = ("quarter", "annual")
 FLOW_ACCOUNTS = ("revenue", "operating_income", "pretax_income", "net_income")
@@ -37,9 +41,20 @@ def get_financials(
     date_to: str | None = None,
     as_of: str | None = None,
 ) -> dict:
-    as_of = date.fromisoformat(as_of).isoformat() if as_of else today_kst().isoformat()
+    ticker = (ticker or "").strip().upper()
     base = {"ticker": ticker, "company": "", "period_type": period_type, "as_of": as_of, "unit": "원",
             "basis": "공시 접수일 기준, 연결 우선(없으면 별도)", "records": []}
+    # 잘못된 입력은 예외나 "재무 없음"(빈 records)이 아니라 error로 알린다
+    if not TICKER_PATTERN.match(ticker):
+        return {**base, "error": "invalid_ticker"}
+    try:
+        as_of = date.fromisoformat(as_of).isoformat() if as_of else today_kst().isoformat()
+        for bound in (date_from, date_to):
+            if bound:
+                date.fromisoformat(bound)
+    except (TypeError, ValueError):
+        return {**base, "error": "invalid_date"}
+    base["as_of"] = as_of
     if period_type not in PERIOD_TYPES:
         return {**base, "error": "unsupported_period_type"}
     # 조회 실패로 토론·트렌드 리포트가 멈추지 않게 한다. 접속 주소가 섞일 수 있어 종류만 남긴다
@@ -48,10 +63,12 @@ def get_financials(
 
         with connect() as connection:
             company = connection.execute("select name, sector_l1 from companies where ticker = %s", (ticker,)).fetchone()
-            rows = connection.execute(QUERY, (as_of, ticker)).fetchall()
+            rows = connection.execute(QUERY, (as_of, ticker)).fetchall() if company else []
     except Exception as exc:
         logger.error("재무 조회 실패: %s(%s)", ticker, type(exc).__name__)
         return {**base, "error": "financials_unavailable"}
+    if company is None:
+        return {**base, "error": "unknown_ticker"}
     records = build_records(rows, period_type, financials_sector=bool(company and company[1] == FINANCIALS_SECTOR))
     records = [r for r in records if (not date_from or r["period_end"] >= date_from)
                and (not date_to or r["period_end"] <= date_to)]
@@ -103,6 +120,8 @@ def build_records(rows: list[tuple], period_type: str, financials_sector: bool =
         liabilities, equity = record["total_liabilities"], record["total_equity"]
         record["operating_margin"] = round(100 * operating_income / revenue, 2) if revenue and operating_income is not None else None
         record["debt_ratio"] = round(100 * liabilities / equity, 2) if equity and equity > 0 and liabilities is not None else None
+        if equity is not None and equity <= 0:
+            record["debt_ratio_note"] = "capital_impaired"  # get_metric과 같은 규칙
         if financials_sector:
             record["debt_ratio"], record["debt_ratio_note"] = None, "not_applicable_financials"
         records.append(record)

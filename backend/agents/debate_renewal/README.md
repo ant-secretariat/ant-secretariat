@@ -69,7 +69,7 @@ backend/agents/debate_renewal/
 - 출력이 재요청 후에도 스키마와 다르면 `LLMOutputInvalidError`(지금은 503 `upstream_unavailable`). 전용 코드는 정책표(OQ-2) 확정 후
 - 환경변수 이름은 기존 `agents/debate`의 `DEBATE_LLM_MODEL`과 겹치지 않게 `DEBATE_RENEWAL_LLM_*`
 - `run_debate` claim_id: 프롬프트는 아젠다마다 `B1`·`R1`부터 매기고, 코드가 아젠다 ID를 앞에 붙인다(`valuation-B1`). L1이 결과 전체에서 유일한 id를 요구해서
-- 지표·블록 근거(`structured.py`): 사실 문장으로 넣는 사유(`loss_making`·`capital_impaired`·`not_applicable_financials`), 블록 요약 문장 형식(목표가 최근 의견 5건, 재무 8분기, 매크로는 최신 값만)은 임시값. 기준선 출력 보고 다듬음
+- 지표·블록 근거(`structured.py`): 사실 문장으로 넣는 사유(`loss_making`·`capital_impaired`·`not_applicable_financials`), 블록 요약 문장 형식(목표가 최근 의견 5건, 재무 8분기, 매크로는 최신 값만, 계산 근거 4블록은 값 없는 칸을 빼고 변동성은 %로)은 임시값. 기준선 출력 보고 다듬음
 - 근거 본문 길이 `PREVIEW_CHARS` 600자, `data_richness`는 `data_tier == report`면 rich 그 외 limited (임시값)
 - 진행 이벤트는 계약 `JobEvent`(ADR 0009) 이름·payload: `data_collected`(문서 종류별 건수) → 아젠다마다 `claim_completed`(`role`·`agenda_id`·`claim`)·`bull_completed`·`bear_completed`(`agenda_id`·`claim_count`) → `judge_completed` → `verifying`. `job_started`·`completed`·`failed`는 워커
 - Judge가 아젠다 판정을 빠뜨리면 채우지 않고 `LLMOutputInvalidError`

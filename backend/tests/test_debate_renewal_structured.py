@@ -74,6 +74,32 @@ def test_financials_sector_drops_missing_values_and_states_reason():
     assert "None" not in text and "매출" not in text and "영업이익 1.5조 원" in text and "금융업이라" in text
 
 
+def test_derived_blocks_become_rows_without_none():
+    # 계산 근거 블록 4개(#133). 값이 없는 칸은 빼고, _pct는 %, 변동성 소수는 %로, 금액은 조·억 원
+    bundle = {
+        "valuation": {"source": "get_derived_snapshot", "as_of": "2026-11-07", "chunk_id": "block:005930:valuation:2026-11-07",
+                      "per_percentile_3y": 40.0, "pbr_percentile_3y": None, "sector": "IT", "sector_count": 20,
+                      "sector_per_median": 15.2, "per_vs_sector_pct": -12.5, "dividend_yield": 1.8},
+        "price_trend": {"source": "get_derived_snapshot", "as_of": "2026-11-07", "chunk_id": "block:005930:price_trend:2026-11-07",
+                        "return_1m_pct": 5.0, "excess_return_1m_pct": 2.1, "volatility_1m": 0.3, "volatility_3m": None,
+                        "position_52w": None, "note_52w": "시세가 2026-03-02부터 170거래일뿐이라 52주 값을 내지 않음"},
+        "fundamental_trend": {"source": "get_derived_snapshot", "as_of": "2026-11-14",
+                              "chunk_id": "block:005930:fundamental_trend:2026-11-14", "period": "2026Q3", "fs_div": "연결",
+                              "disclosed_at": "2026-11-14", "revenue": 86000000000000, "revenue_yoy_pct": 8.5,
+                              "operating_income": -500000000000, "operating_income_yoy_note": "적자전환", "net_income": None},
+        "flow": {"source": "get_derived_snapshot", "as_of": "2026-11-07", "chunk_id": "block:005930:flow:2026-11-07",
+                 "foreign_net_buy_5d": -1180000000000, "inst_net_buy_5d": None, "foreign_net_buy_20d_pct_mcap": -0.2435},
+    }
+    rows = {r["title"]: r["content"] for r in from_bundle(bundle).rows}
+    assert all("None" not in c for c in rows.values())
+    assert "PER 과거 3년 백분위 40.00%" in rows["밸류에이션 위치(과거·업종 대비)"] and "업종 대비 PER -12.50%" in rows["밸류에이션 위치(과거·업종 대비)"]
+    assert "변동성(연율) 1개월 30.0%" in rows["주가 흐름"] and "52주 값을 내지 않음" in rows["주가 흐름"]
+    text = rows["최근 분기 실적 추세"]
+    assert "매출 86조 원(전년 대비 +8.50%)" in text and "영업이익 -5,000억 원(적자전환)" in text and "순이익" not in text
+    assert "5일 순매수 외국인 -1.18조 원" in rows["투자자별 수급"] and "-0.24%" in rows["투자자별 수급"]
+    assert "공매도" not in rows["투자자별 수급"] and "업종(IT, 20종목) 중앙값 PER 15.2배" in rows["밸류에이션 위치(과거·업종 대비)"]
+
+
 def test_fill_replaces_known_and_keeps_unknown_placeholders():
     assert fill("PER {{per}}, PBR {{ pbr }}, {{foo}}", {"per": "12.3배", "pbr": "1.1배"}) == "PER 12.3배, PBR 1.1배, {{foo}}"
     assert fill_all({"a": ["{{per}}"], "b": 1}, {"per": "12.3배"}) == {"a": ["12.3배"], "b": 1}

@@ -8,6 +8,10 @@
   계약서상 과거 변동성의 단일 계산 지점), 52주 위치, 변동성 상위 20% 기준값
 - fundamental_trend: 그날까지 공시된 최근 분기 매출·영업이익·순이익과 전년 동기·직전 분기 대비
 - flow: 외국인·기관·개인 순매수(5·20거래일), 시가총액 대비 비율, 공매도 비중·잔고
+
+단위: 퍼센트 값은 이름 끝이 _pct다(return_1m_pct, revenue_yoy_pct 등, #31 리뷰). 변동성(volatility_*)은 소수(0.25 = 25%),
+position_52w는 0~1. operating_margin·dividend_yield·short_volume_ratio_20d·short_balance_ratio는 get_metric 지표 ID와
+같은 이름이라 그대로 두고 단위(%)는 basis에 적는다.
 """
 
 from __future__ import annotations
@@ -132,12 +136,12 @@ def price_trend(closes: list[tuple], index_closes: list[tuple], market_volatilit
     index_values = {day: float(value) for day, value in index_closes if value}
     result: dict = {"close": values[-1]}
     for label, days in TRADING_DAYS.items():
-        result[f"return_{label}"] = _period_return(values, days)
+        result[f"return_{label}_pct"] = _period_return(values, days)
     for label in ("1m", "3m"):
         index_return = _period_return([index_values[day] for day, _ in closes if day in index_values], TRADING_DAYS[label])
-        result[f"index_return_{label}"] = index_return
-        stock_return = result[f"return_{label}"]
-        result[f"excess_return_{label}"] = (
+        result[f"index_return_{label}_pct"] = index_return
+        stock_return = result[f"return_{label}_pct"]
+        result[f"excess_return_{label}_pct"] = (
             round(stock_return - index_return, 2) if stock_return is not None and index_return is not None else None
         )
     result["volatility_1m"] = annualized_volatility(values, TRADING_DAYS["1m"])
@@ -151,7 +155,7 @@ def price_trend(closes: list[tuple], index_closes: list[tuple], market_volatilit
         "high_52w": high if full_year else None,
         "low_52w": low if full_year else None,
         "position_52w": round((values[-1] - low) / (high - low), 4) if full_year and high > low else None,
-        "drawdown_from_52w_high": round((values[-1] / high - 1) * 100, 2) if full_year else None,
+        "drawdown_from_52w_high_pct": round((values[-1] / high - 1) * 100, 2) if full_year else None,
         "sample_days_52w": len(year),
         "sample_start_52w": year[0][0].isoformat(),
         "index_code": index_code,
@@ -187,14 +191,14 @@ def fundamental_trend(quarters: list[dict]) -> dict:
         result[account] = current
         for suffix, base in (("yoy", year_ago), ("qoq", previous)):
             change, note = growth(current, base.get(account) if base else None)
-            result[f"{account}_{suffix}"] = change
+            result[f"{account}_{suffix}_pct"] = change
             if note:
                 result[f"{account}_{suffix}_note"] = note
     revenue, operating_income = latest.get("revenue"), latest.get("operating_income")
     result["operating_margin"] = (
         round(100 * operating_income / revenue, 2) if revenue and operating_income is not None else None
     )
-    result["basis"] = "분기 3개월 값, 연결 우선(없으면 별도). 증감률(%)은 전년 동기(yoy)·직전 분기(qoq) 대비, 공시 접수일 기준"
+    result["basis"] = "분기 3개월 값, 연결 우선(없으면 별도). 증감률(%)은 전년 동기(yoy)·직전 분기(qoq) 대비, 영업이익률(operating_margin)도 %, 공시 접수일 기준"
     result["reason"] = None
     return result
 
@@ -226,7 +230,7 @@ def flow(rows: list[dict]) -> dict:
     result.update({
         "as_of": rows[0]["trade_date"].isoformat(),
         "basis": ("순매수 금액(원)은 최근 5·20거래일 합계, pct_mcap은 20일 합계 ÷ 최근 시가총액(%). "
-                  f"공매도 비중은 20거래일 평균, 잔고는 공개 지연 {SHORT_BALANCE_LAG_DAYS}거래일 반영"),
+                  f"공매도 비중(short_volume_ratio_20d)은 20거래일 평균, 잔고 비중(short_balance_ratio)은 공개 지연 {SHORT_BALANCE_LAG_DAYS}거래일 반영, 둘 다 %"),
         "reason": None,
     })
     return result

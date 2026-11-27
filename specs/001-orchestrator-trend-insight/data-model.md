@@ -36,7 +36,7 @@ API 스키마의 원본은 [`docs/api/openapi.yaml`](../../docs/api/openapi.yaml
 | `user_id` | text not null | 세션 사용자 |
 | `job_type` | text not null | `debate` · `simulation` |
 | `debate_job_id` | text FK | 시뮬레이션 job → 원래 토론 job (ADR 0013) |
-| `data_as_of` | date | 토론 기준일. 시뮬레이션도 이 날짜로 실행 |
+| `data_as_of` | date | 토론 기준일. 토론 job을 만들 때 KST 오늘로 확정(null 없음). 시뮬레이션 job은 토론 job 값을 복사해 이 날짜로 실행 |
 | `mode` | text | 토론만: `single` · `compare` |
 | `tickers` | text[] not null | 1~2개, 6자리 문자열 |
 | `query` | text | 토론만. 재사용 판정 키에 포함 |

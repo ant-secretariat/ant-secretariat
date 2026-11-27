@@ -243,7 +243,7 @@ create table agent_jobs (
   query          text,                             -- 토론만
   status         text not null default 'queued'
                  check (status in ('queued', 'running', 'completed', 'failed')),
-  data_as_of     date,                             -- 토론 기준일. 시뮬레이션도 이 날짜로 실행
+  data_as_of     date,                             -- 토론 기준일. 토론 job을 만들 때 KST 오늘로 확정. 시뮬레이션 job은 토론 job 값을 복사
   precheck       jsonb,                            -- 토론만
   result         jsonb,                            -- 토론: DebateResult / 시뮬레이션: 요약만
   simulation_ready boolean,                        -- 토론 완료 시점 값 (표시·지표용, Design Doc 4.10 분모)
@@ -464,6 +464,7 @@ async def run_debate(*, query, company: CompanyMeta, precheck: PrecheckResult,
 | `profile` | `user_id`로 조회한 투자 성향 |
 | `company.data_tier` | 관문1의 `data_status` 건수로 `processing.enums.data_tier_for()` 계산. `get_agent_context`를 따로 한 번 더 부르지 않는다 |
 | `trace_id` | 9장 Langfuse trace |
+| `data_as_of` | job을 만들 때 저장한 `agent_jobs.data_as_of`(KST 오늘). `None`으로 넘기지 않는다. `None`이면 토론은 최신 데이터로, 시뮬레이션은 버튼을 누른 날 데이터로 돌아 기준일이 어긋난다(#99 리뷰) |
 
 - **상태 전환:** 결과를 받으면 `result` 저장 + `completed`(+ `simulation_ready` 기록), 예외면 `failed` + `failed_stage`.
 - **이벤트 저장 실패:** 진행 이벤트는 표시용이라 로그만 남기고 토론은 계속한다. 최종 결과 저장이 실패하면 `failed`.

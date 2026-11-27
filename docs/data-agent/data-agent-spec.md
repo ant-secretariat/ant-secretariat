@@ -150,7 +150,7 @@
   - precheck가 "있다"고 판정한 데이터는 묶음에 꼭 포함
   - 한 블록이 실패해도 나머지는 줌
 - 지수 조회(`get_index_data`)·민감도 조회(`get_sensitivities`)는 만들었고(#109), 과거 시점 기준 `data_tier`는 아직 없습니다.
-- 시뮬레이션은 `intent` 없이 부르고, 묶음에 지수(`index_daily`)와 파라미터 기준일(`sim_params_as_of`)을 더할 예정입니다.
+- 시뮬레이션은 `intent` 없이 부르고, 묶음에 지수(`index_data`, 코스피·코스닥 최근 750거래일)와 파라미터 기준일(`sim_params_as_of`·`simulation_ready`, `DataStatus.simulation_ready`와 같은 규칙)이 있습니다.
 
 ### 4-2. intent별 반환 모양 (토론 `agent_type="debate"`)
 
@@ -253,7 +253,7 @@
 | 경우 | 반환 |
 | --- | --- |
 | 토론, `intent` 없음 | 지금과 같음: 목표가, 매크로, 문서(`query`가 있을 때) + 공통 키. 토론은 아젠다마다 `intent`를 넘기므로 이 경우는 쓰지 않음 |
-| 시뮬레이션 | 시세, 매크로, 목표가 + 지수(`index_daily`, 최근 3년)와 파라미터 기준일(`sim_params_as_of`) 추가 예정 |
+| 시뮬레이션 | 시세, 매크로, 목표가 + 지수(`index_data`, 코스피·코스닥 최근 750거래일 ≈ 3년)와 파라미터 기준일(`sim_params_as_of`, `simulation_ready`: `as_of` 이전 가장 최근 `sim_params`). 조회 실패는 `sim_params_error` |
 | 트렌드 리포트 | 목표가, 시세, 매크로, 리포트·뉴스 후보 각 15개. `intent`는 쓰지 않음 |
 
 **확인할 것**

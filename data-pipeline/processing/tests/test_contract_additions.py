@@ -117,7 +117,7 @@ def recorded(monkeypatch):
     for (module, name), value in blocks.items():
         monkeypatch.setattr(f"processing.functions.{module}.{name}", fake_block(name, value))
     monkeypatch.setattr("processing.functions.get_available_data_status.get_available_data_status",
-                        lambda ticker: {"ticker": ticker, "report_count": 1, "news_count": 0, "disclosure_count": 0,
+                        lambda ticker, **kw: {"ticker": ticker, "report_count": 1, "news_count": 0, "disclosure_count": 0,
                                         "derived_snapshot_available": True})
     return calls
 
@@ -530,3 +530,40 @@ def test_agenda_blocks_wait_for_metrics_callable(monkeypatch):
     blocks = ctx._agenda_blocks("005930", "valuation", "2026-11-10", lambda: [{"metric_id": "close"}])
     assert list(blocks) == ["target_price", "financials"] and seen["m"] == [{"metric_id": "close"}]
     assert ctx._agenda_blocks("005930", "valuation", "2026-11-10", [{"metric_id": "close"}])["target_price"] == seen["m"]
+
+
+# ---- 시뮬레이션 묶음: 지수 3년과 파라미터 기준일 (#84, 데이터 에이전트 기획서 4절) ----
+
+def test_simulation_bundle_has_index_and_params_as_of(recorded, monkeypatch):
+    from processing.functions.get_agent_context import SIMULATION_INDEX_DAYS, get_agent_context
+
+    seen = {}
+
+    def fake_index(indexes=None, as_of=None, days=60):
+        seen["index"] = (as_of, days)
+        return {"indexes": {"KOSPI": {"rows": []}, "KOSDAQ": {"rows": []}}}
+
+    def fake_status(ticker, relational_db=None, vector_db=None, as_of=None):
+        seen.setdefault("status", []).append(as_of)
+        return {"ticker": ticker, "simulation_ready": True, "simulation_params_as_of": "2026-11-01",
+                "report_count": 1, "news_count": 0, "disclosure_count": 0, "derived_snapshot_available": True}
+
+    monkeypatch.setattr("processing.functions.get_index_data.get_index_data", fake_index)
+    monkeypatch.setattr("processing.functions.get_available_data_status.get_available_data_status", fake_status)
+
+    result = get_agent_context("005930", "simulation", as_of="2026-11-10")
+
+    assert seen["index"] == ("2026-11-10", SIMULATION_INDEX_DAYS)
+    assert "2026-11-10" in seen["status"]   # 파라미터는 기준일 이전 가장 최근(#103 규칙)
+    assert (result["sim_params_as_of"], result["simulation_ready"]) == ("2026-11-01", True)
+    assert "index_data" in result and "sim_params_error" not in result
+
+
+def test_simulation_params_failure_is_not_missing(monkeypatch):
+    from processing.functions.get_agent_context import _simulation_params
+
+    monkeypatch.setattr("processing.functions.get_available_data_status.get_available_data_status",
+                        lambda ticker, as_of=None, **kw: {"error": "data_status_unavailable"})
+    assert _simulation_params("005930", "2026-11-10") == {
+        "sim_params_as_of": None, "simulation_ready": None, "sim_params_error": "data_status_unavailable"}
+

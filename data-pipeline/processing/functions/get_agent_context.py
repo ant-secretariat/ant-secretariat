@@ -60,6 +60,8 @@ TREND_REPORT_TOP_K = 15
 # 묶음 안 조회를 동시에 몇 개까지 돌릴지(#71 R12, 트렌드 리포트 10초 목표). 조회마다 DB 연결을 따로 열므로,
 # 토론이 아젠다 묶음을 병렬로 부를 때 연결 수가 아젠다 수 × 이 값까지 늘 수 있다
 MAX_PARALLEL = 6
+# 시뮬레이션 묶음의 지수 일별 종가 길이(거래일). 파라미터 적합 기간(3년, sim_loader)과 같게 둔다
+SIMULATION_INDEX_DAYS = 750
 
 
 def run_parallel(tasks: dict[str, Callable]) -> dict:
@@ -112,6 +114,8 @@ def get_agent_context(
     이때는 목표가 전체 이력(target_prices)과 매크로 전체 이력(macro_data, 약 180만 자)을 넣지 않는다.
     아젠다 문서 검색이 0건이면 다른 문서 종류(리포트 → 뉴스 → 공시)로 한 번 더 찾고 widened=true로 표시한다.
     매크로 문서는 document_chunks에 없어서(0건) 검색하지 않는다. 매크로는 macro_data(정형 값)를 쓴다.
+    simulation은 목표가·시세·매크로에 더해 코스피·코스닥 일별 종가(index_data, 최근 750거래일 ≈ 3년)와
+    파라미터 기준일(sim_params_as_of, simulation_ready: as_of 이전 가장 최근 sim_params, #103과 같은 규칙)을 준다.
     묶음 안의 조회(지표·블록·문서 종류별 검색·데이터 상태)는 서로 기다리지 않으므로 동시에 돌린다(MAX_PARALLEL, #71 R12).
     목표가 블록은 지표의 종가를, 매크로 블록은 민감도를 쓰므로 그 조회만 끝나기를 기다린다.
     """
@@ -167,9 +171,13 @@ def get_agent_context(
             result.update({key: fetched[key] for key in tasks})
 
     elif agent_type == "simulation":
-        tasks = {"target_prices": target_prices, "price_data": price_data, "macro_data": macro_data}
-        fetched = run_parallel({**tasks, **tier_task})
-        result = {"ticker": ticker, "agent_type": agent_type, **{key: fetched[key] for key in tasks}}
+        from processing.functions.get_index_data import get_index_data
+
+        tasks = {"target_prices": target_prices, "price_data": price_data, "macro_data": macro_data,
+                 "index_data": lambda: get_index_data(as_of=as_of, days=SIMULATION_INDEX_DAYS)}
+        fetched = run_parallel({**tasks, **tier_task, "_sim": lambda: _simulation_params(ticker, as_of)})
+        result = {"ticker": ticker, "agent_type": agent_type, **{key: fetched[key] for key in tasks},
+                  **fetched["_sim"]}
 
     else:
         logger.warning(f"알 수 없는 agent_type: {agent_type}")
@@ -187,6 +195,17 @@ def get_agent_context(
     if "error" in tier:
         result.setdefault("error", tier["error"])  # agent_type 오류가 있으면 그것을 남긴다
     return result
+
+
+def _simulation_params(ticker: str, as_of: str) -> dict:
+    """시뮬레이션이 쓸 파라미터의 기준일과 정상 여부. 규칙은 DataStatus.simulation_ready와 같다(#103):
+    as_of 이전(당일 포함) 가장 최근 sim_params. 조회 실패는 sim_params_error로 알린다(없음과 구분)."""
+    from processing.functions.get_available_data_status import get_available_data_status
+
+    status = get_available_data_status(ticker, as_of=as_of)
+    if status.get("error"):
+        return {"sim_params_as_of": None, "simulation_ready": None, "sim_params_error": status["error"]}
+    return {"sim_params_as_of": status.get("simulation_params_as_of"), "simulation_ready": status.get("simulation_ready")}
 
 
 def _data_tier(ticker: str, data_status: Optional[dict]) -> dict:

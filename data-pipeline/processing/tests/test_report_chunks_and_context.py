@@ -42,7 +42,7 @@ def test_agent_context_no_longer_needs_relational_db(monkeypatch):
     monkeypatch.setattr("processing.functions.get_target_price_data.get_target_price_data",
                         lambda **kwargs: calls.append(("target", kwargs)) or {"records": []})
     monkeypatch.setattr("processing.functions.get_available_data_status.get_available_data_status",
-                        lambda ticker: {"report_count": 3, "news_count": 0, "disclosure_count": 0,
+                        lambda ticker, **kw: {"report_count": 3, "news_count": 0, "disclosure_count": 0,
                                         "derived_snapshot_available": True})
 
     result = get_agent_context("000660", "simulation")

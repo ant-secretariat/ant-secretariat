@@ -119,6 +119,10 @@ def recorded(monkeypatch):
     monkeypatch.setattr("processing.functions.get_available_data_status.get_available_data_status",
                         lambda ticker: {"ticker": ticker, "report_count": 1, "news_count": 0, "disclosure_count": 0,
                                         "derived_snapshot_available": True})
+    # 과거 as_of의 근거 종류(#84)도 DB 없이: 그날까지 리포트 1건
+    monkeypatch.setattr("processing.functions.get_available_data_status.tier_counts_as_of",
+                        lambda ticker, as_of: {"report_count": 1, "news_count": 0, "disclosure_count": 0,
+                                               "derived_snapshot_available": True, "error": None})
     return calls
 
 
@@ -530,3 +534,40 @@ def test_agenda_blocks_wait_for_metrics_callable(monkeypatch):
     blocks = ctx._agenda_blocks("005930", "valuation", "2026-11-10", lambda: [{"metric_id": "close"}])
     assert list(blocks) == ["target_price", "financials"] and seen["m"] == [{"metric_id": "close"}]
     assert ctx._agenda_blocks("005930", "valuation", "2026-11-10", [{"metric_id": "close"}])["target_price"] == seen["m"]
+
+
+# ---- 과거 시점 data_tier (#84) ----
+
+def test_past_as_of_counts_documents_up_to_that_day(monkeypatch):
+    from processing.functions import get_agent_context as ctx
+
+    seen = []
+    monkeypatch.setattr("processing.functions.get_available_data_status.tier_counts_as_of",
+                        lambda ticker, as_of: seen.append(as_of) or {
+                            "report_count": 0, "news_count": 2, "disclosure_count": 0,
+                            "derived_snapshot_available": True, "error": None})
+    now = {"ticker": "005930", "report_count": 50, "news_count": 9, "disclosure_count": 3,
+           "derived_snapshot_available": True}
+
+    # 과거 날짜: 넘겨받은 지금 기준 상태(리포트 50건)가 아니라 그날까지의 건수(뉴스만)로 정한다
+    assert ctx._data_tier("005930", now, "2025-01-10") == {"data_tier": "news_only"}
+    assert seen == ["2025-01-10"]
+    # 오늘이면 지금처럼 넘겨받은 상태를 쓴다
+    from crawling.config.clock import today_kst
+    assert ctx._data_tier("005930", now, today_kst().isoformat()) == {"data_tier": "report"}
+    assert seen == ["2025-01-10"]
+
+
+def test_past_as_of_count_failure_is_unknown_not_macro_only(monkeypatch):
+    from processing.functions import get_agent_context as ctx
+
+    monkeypatch.setattr("processing.functions.get_available_data_status.tier_counts_as_of",
+                        lambda ticker, as_of: {"error": "data_status_unavailable"})
+    assert ctx._data_tier("005930", None, "2025-01-10") == {"data_tier": None, "error": "data_status_unavailable"}
+
+
+def test_tier_counts_query_filters_by_published_at():
+    from processing.functions.get_available_data_status import TIER_AS_OF_QUERY
+
+    assert TIER_AS_OF_QUERY.count("published_at <= %(as_of)s") == 3
+    assert "trade_date <= %(as_of)s::date" in TIER_AS_OF_QUERY and "rcept_dt <= %(as_of)s::date" in TIER_AS_OF_QUERY

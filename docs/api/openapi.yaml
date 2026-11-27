@@ -2225,6 +2225,15 @@ components:
               type:
               - number
               - 'null'
+              description: 수익률 55개 미만이면 null(1개월은 15개)
+            high_52w:
+              type:
+              - number
+              - 'null'
+              description: 거래일 252개 미만이면서 기간 357일 미만이면 null(상장 1년 전 등). low_52w·position_52w·drawdown_from_52w_high도 같음, 사유는 note_52w
+            sample_days_52w:
+              type: integer
+              description: 52주 값 계산에 쓴 거래일 수
             volatility_1m_market_threshold:
               type:
               - number

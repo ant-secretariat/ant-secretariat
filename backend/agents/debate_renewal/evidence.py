@@ -19,7 +19,7 @@ def _text(value: Any) -> Optional[str]:
     return value.strip() if isinstance(value, str) and value.strip() else None
 
 
-def to_evidence(raw: Mapping[str, Any], evidence_id: str) -> Evidence:
+def to_evidence(raw: Mapping[str, Any], evidence_id: str, source: str = "original") -> Evidence:
     doc_type = raw.get("document_type")
     content = _text(raw.get("content")) or ""
     return Evidence(
@@ -32,6 +32,7 @@ def to_evidence(raw: Mapping[str, Any], evidence_id: str) -> Evidence:
         date=(_text(raw.get("date")) or "")[:10],
         url=_text(raw.get("url")),
         content_preview=content[:PREVIEW_CHARS],
+        evidence_source=source,
     )
 
 
@@ -41,7 +42,8 @@ class EvidencePool:
     def __init__(self) -> None:
         self._by_chunk: dict[str, Evidence] = {}
 
-    def add(self, results: Sequence[Mapping[str, Any]]) -> list[Evidence]:
+    def add(self, results: Sequence[Mapping[str, Any]], source: str = "original") -> list[Evidence]:
+        """source: 처음 검색은 original, 근거 부족 루프의 보완 검색은 gap_fill(이미 있는 조각은 원래 표기 유지)."""
         picked: list[Evidence] = []
         for raw in results:
             if not raw.get("chunk_id"):
@@ -49,7 +51,7 @@ class EvidencePool:
             key = str(raw["chunk_id"])
             ev = self._by_chunk.get(key)
             if ev is None:
-                ev = to_evidence(raw, f"S{len(self._by_chunk) + 1}")
+                ev = to_evidence(raw, f"S{len(self._by_chunk) + 1}", source)
                 self._by_chunk[key] = ev
             if ev not in picked:
                 picked.append(ev)

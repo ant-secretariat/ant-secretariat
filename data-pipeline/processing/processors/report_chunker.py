@@ -264,7 +264,8 @@ def table_structure(rows: list[list]) -> str:
 def normalize_text(text: str) -> str:
     text = re.sub(r"[\x00-\x08\x0b-\x1f\x7f]", " ", text)
     text = text.replace(" ", " ").replace("​", "")
-    text = re.sub(r"(.)\1{5,}", r"\1\1\1", text)  # ······, ----- 같은 반복 문자
+    # ······, ----- 같은 반복 문자. 숫자는 빼야 1000000이 1000으로 잘리지 않는다
+    text = re.sub(r"(\D)\1{5,}", r"\1\1\1", text)
     # 표 숫자의 쉼표·소수점이 따로 떨어져 나오는 경우 (140 ,000 → 140,000 / -6 .2 → -6.2)
     text = re.sub(r"(\d)\s+([.,])(\d)", r"\1\2\3", text)
     text = re.sub(r"[ \t]+", " ", text)

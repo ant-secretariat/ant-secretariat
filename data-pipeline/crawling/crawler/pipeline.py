@@ -21,6 +21,7 @@ from crawling.crawler.pdf_downloader import PdfDownloader
 from crawling.crawler.target_price_extractor import extract_target_price_fields
 from crawling.db.database import Database
 from crawling.db.repositories import NumericDataRepository, ReportRepository, RunRepository
+from crawling.config.clock import today_kst
 
 logger = logging.getLogger(__name__)
 
@@ -322,7 +323,7 @@ class CollectionPipeline:
         return selected
 
     def _build_pdf_path(self, report: ReportMetadata) -> Path:
-        published = parse_date(report.published_at) or date.today()
+        published = parse_date(report.published_at) or today_kst()
         return (
             self.settings.pdf_root
             / report.source.lower()

@@ -647,6 +647,27 @@ result = get_disclosure_data(
 
 ---
 
+### suggest_alternatives()
+
+관문1이 종목을 거절할 때(`uncovered_company`, `no_data`) 보여 줄 대안 종목. 오케스트레이터 기획서 v2.1·계약 변경 C9.
+
+```python
+from processing.functions.suggest_alternatives import suggest_alternatives
+
+result = suggest_alternatives("329180", n=3, as_of="2026-11-23")
+# → {"ticker", "company", "sector_l1", "sector_l2", "as_of", "basis",
+#    "alternatives": [{"ticker", "company", "sector_l1", "sector_l2", "market_cap", "match"}]}
+```
+
+- 대안은 커버 종목(핵심 종목 T1 중 그날 시가총액이 있는 보통주)에서만 고르고, 요청 종목은 뺍니다.
+- 같은 WICS 중분류(`sector_l2`) → 같은 대분류(`sector_l1`) → 전체 순으로 채우고, 각 단계 안에서는 시가총액 큰 순입니다. `match`에 어느 단계에서 골랐는지 담습니다.
+- 요청 종목의 업종이 비어 있거나 종목 목록에 없으면 바로 전체 시가총액 순입니다.
+- 시가총액은 `as_of`(없으면 오늘 KST)까지의 마지막 거래일 값입니다.
+- 조회에 실패하면 `alternatives`는 빈 목록이 아니라 `null`이고 `"error": "alternatives_unavailable"`입니다. `n`이 1~10이 아니거나 `as_of` 형식이 틀리면 `ValueError`입니다.
+- WICS 중분류는 넓은 곳이 있습니다(예: 자본재에 조선·방산·전력기기가 함께 있음). 그래서 조선사를 물어도 다른 자본재 종목이 대안으로 나올 수 있습니다.
+
+---
+
 ### get_chunks_by_ids()
 
 `chunk_id` 목록으로 청크 본문을 꺼냅니다. 골든셋·기준선에 근거 `chunk_id`만 저장해 두고 나중에 같은 본문을 다시 볼 때 씁니다(#28).

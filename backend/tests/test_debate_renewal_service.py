@@ -33,8 +33,9 @@ def _resp(payload):
 
 
 class FakeLLM:
-    def __init__(self, agendas, judge_agendas=None, bull_text=None):
+    def __init__(self, agendas, judge_agendas=None, bull_text=None, bull_ev=None, fix_ev=None):
         self.agendas, self.judge_agendas, self.bull_text = agendas, judge_agendas or agendas, bull_text
+        self.bull_ev, self.fix_ev = bull_ev, fix_ev  # 처음 Bull B1의 근거 id, 수정 요청 때 바꿀 근거 id
         self.calls = []
         self.chat = SimpleNamespace(completions=SimpleNamespace(create=self._create))
 
@@ -43,6 +44,9 @@ class FakeLLM:
         self.calls.append(name)
         if name == "BullOutput":
             claims = _claims("B", 2)
+            retry = "직전 출력에" in kw["messages"][-1]["content"]
+            if self.bull_ev:
+                claims[0]["evidence_ids"] = [self.fix_ev if retry and self.fix_ev else self.bull_ev]
             if self.bull_text:
                 claims[0]["text"] = self.bull_text
             return _resp({"claims": claims, "confidence": "mid"})
@@ -138,6 +142,31 @@ async def test_fetch_evidence_gets_the_same_as_of_as_result():
     assert seen == ["2026-11-10", "2026-11-10"] == [run.result.meta.data_as_of] * 2
 
 
+async def test_bundle_metrics_become_placeholders_and_are_filled():
+    # 묶음의 지표는 근거 + [지표 자리표시자]가 되고, 출력의 {{per}}는 display로 바뀐다(이벤트·결과 모두)
+    bundle = {"documents": {"results": [_doc("c1")]},
+              "metrics": [{"metric_id": "per", "name": "PER", "value": 12.3, "display": "12.3배", "as_of": "2026-11-07",
+                           "source": "derived", "reason": None, "chunk_id": "metric:005930:per:2026-11-07"}]}
+    seen_prompts, events = [], []
+
+    class Recording(FakeLLM):
+        async def _create(self, **kw):
+            seen_prompts.append(kw["messages"][-1]["content"])
+            return await super()._create(**kw)
+
+    async def emit(event, payload):
+        events.append((event, payload))
+
+    run, _ = await _run([A.VALUATION], llm=Recording([A.VALUATION], bull_text="PER {{per}}로 낮다"),
+                        fetch=_fetcher({A.VALUATION: bundle}), emit=emit)
+    assert "{{per}}" in seen_prompts[0]  # Bull 프롬프트의 자리표시자 목록
+    assert [e.chunk_id for e in run.result.evidence] == ["c1", "metric:005930:per:2026-11-07"]
+    assert run.result.agendas[0].bull.claims[0].text == "PER 12.3배로 낮다"
+    first_claim = next(p for e, p in events if e == "claim_completed")
+    assert first_claim["claim"]["text"] == "PER 12.3배로 낮다"
+    assert run.l1.ok, run.l1.issues
+
+
 async def test_one_agenda_failure_cancels_the_others():
     cancelled = []
 
@@ -160,10 +189,52 @@ async def test_judge_missing_agenda_raises():
         await _run([A.VALUATION, A.MACRO], llm=FakeLLM([A.VALUATION, A.MACRO], judge_agendas=[A.VALUATION]))
 
 
-async def test_l1_issues_are_returned_not_raised():
-    run, _ = await _run([A.VALUATION], llm=FakeLLM([A.VALUATION], bull_text="지금 매수하세요"))
-    assert not run.l1.ok
-    assert "forbidden_phrase" in {i.code for i in run.l1.issues}
+async def test_persistent_failure_is_retried_once_then_claim_removed():
+    run, llm = await _run([A.VALUATION], llm=FakeLLM([A.VALUATION], bull_text="지금 매수하세요"))
+    # 1회 수정: Bull을 다시 쓰고, 그 Bull을 반박하는 Bear와 Judge도 다시
+    assert llm.calls == ["BullOutput", "BearOutput", "JudgeSingleOutput", "BullOutput", "BearOutput", "JudgeSingleOutput"]
+    assert run.repaired and run.partial and run.removed_claim_ids == ["valuation-B1"]
+    assert [c.claim_id for c in run.result.agendas[0].bull.claims] == ["valuation-B2"]
+    # Bear가 반박한 B1이 빠지면 반박 대상을 다른 Claim으로 바꾸지 않고 L1 문제로 남긴다(처리 방법 확정 필요)
+    assert [i.code for i in run.l1.issues] == ["bad_bull_claim_ref"]
+
+
+async def test_gap_loop_adds_gap_fill_evidence_and_fix_keeps_claim():
+    queries = []
+
+    async def fetch(company, agenda, query, as_of):
+        assert as_of == "2026-11-10"  # 보완 검색도 토론 기준일로
+        queries.append(query)
+        if query == "주장 1":  # 근거 없는 Claim 문장으로 보완 검색
+            return [_doc("gap-1"), _doc("c1")]
+        return [_doc("c1")]
+    run, llm = await _run([A.VALUATION], llm=FakeLLM([A.VALUATION], bull_ev="S9", fix_ev="S2"), fetch=fetch)
+    assert queries == ["삼성전자 어때", "주장 1"]
+    ev = {e.evidence_id: e for e in run.result.evidence}
+    assert ev["S2"].chunk_id == "gap-1" and ev["S2"].evidence_source == "gap_fill"
+    assert ev["S1"].evidence_source == "original"  # 이미 있던 조각은 원래 표기 유지
+    assert run.result.agendas[0].bull.claims[0].evidence_ids == ["S2"]
+    assert run.repaired and not run.partial and run.l1.ok
+
+
+async def test_gap_loop_with_bundle_adds_only_documents():
+    # 보완 검색이 묶음을 돌려줘도 문서만 gap_fill로 더한다. 지표·블록은 첫 조회에서 이미 근거에 있다(#120·#78)
+    per = {"metric_id": "per", "name": "PER", "value": 12.3, "display": "12.3배", "as_of": "2026-11-07",
+           "reason": None, "chunk_id": "metric:005930:per:2026-11-07"}
+
+    async def fetch(company, agenda, query, as_of):
+        docs = [_doc("gap-1"), _doc("c1")] if query == "주장 1" else [_doc("c1")]
+        return {"documents": {"results": docs}, "metrics": [per]}
+    run, _ = await _run([A.VALUATION], llm=FakeLLM([A.VALUATION], bull_ev="S9", fix_ev="S3"), fetch=fetch)
+    ev = {e.chunk_id: e for e in run.result.evidence}
+    assert list(ev) == ["c1", "metric:005930:per:2026-11-07", "gap-1"]
+    assert ev["gap-1"].evidence_source == "gap_fill" and ev["metric:005930:per:2026-11-07"].evidence_source == "original"
+    assert run.repaired and run.l1.ok
+
+
+async def test_clean_result_skips_repair():
+    run, llm = await _run([A.VALUATION])
+    assert not run.repaired and llm.calls.count("BullOutput") == 1
 
 
 @pytest.mark.parametrize("pre", [

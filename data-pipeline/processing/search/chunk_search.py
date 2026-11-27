@@ -291,6 +291,9 @@ def reciprocal_rank_fusion(rankings: list[list[dict]], limit: int) -> list[dict]
     return sorted(fused.values(), key=lambda result: result["score"], reverse=True)[:limit]
 
 
+EMBED_TIMEOUT_SECONDS = 10
+
+
 @lru_cache(maxsize=512)
 def _embed_query_cached(query: str) -> tuple[float, ...]:
     import crawling.config.settings  # noqa: F401  .env를 환경변수로 올린다
@@ -299,7 +302,8 @@ def _embed_query_cached(query: str) -> tuple[float, ...]:
     api_key = os.environ.get("UPSTAGE_API_KEY")
     if not api_key:
         raise RuntimeError("UPSTAGE_API_KEY 없음")
-    client = OpenAI(api_key=api_key, base_url=UPSTAGE_BASE_URL, max_retries=3)
+    # 응답이 멈춰도 토론·트렌드 리포트가 오래 기다리지 않게 한다. 실패하면 BM25만으로 검색한다
+    client = OpenAI(api_key=api_key, base_url=UPSTAGE_BASE_URL, timeout=EMBED_TIMEOUT_SECONDS, max_retries=1)
     vector = client.embeddings.create(model=QUERY_MODEL, input=query).data[0].embedding
     if len(vector) != DIMENSION:
         raise RuntimeError(f"질문 임베딩 차원이 {DIMENSION}이 아님")

@@ -1,6 +1,6 @@
 {
   "meta": {
-    "version": "seed-v0.10",
+    "version": "seed-v0.12",
     "generated": "2026-11-23",
     "spec": "온톨로지 기획서 v1.2",
     "exposure_rule": "status == \"active\" and reviewed == True (ADR 0008). draft_fields 는 include_draft 일 때만",
@@ -660,8 +660,12 @@
           "valuation"
         ],
         "notes": "AI 가속기 탑재 HBM 수요. 공급사 점유율 경쟁이 핵심 변수.",
-        "evidence_chunk_ids": [],
-        "valid_from": null,
+        "evidence_chunk_ids": [
+          "NAVER_000660_20261029_83364eff:24ea0c32272a",
+          "NAVER_005930_20261030_53ef4c5b:919fd72e84c0",
+          "NEWS_a46995b9e70b2cda:5cd963d1a6b2"
+        ],
+        "valid_from": "2026-10-29",
         "valid_to": null,
         "review_cycle_days": 180,
         "status": "draft",
@@ -679,8 +683,12 @@
           "growth"
         ],
         "notes": "DRAM·NAND 가격 반등 국면. 사이클 피크 논쟁이 Bear 논거.",
-        "evidence_chunk_ids": [],
-        "valid_from": null,
+        "evidence_chunk_ids": [
+          "NAVER_000660_20261029_69084072:74a315c4b694",
+          "NAVER_005930_20260923_106bbe39:9a43816202be",
+          "NEWS_cb56e849a306a1ab:4fd4d8a42b4c"
+        ],
+        "valid_from": "2026-09-23",
         "valid_to": null,
         "review_cycle_days": 90,
         "status": "draft",
@@ -698,8 +706,10 @@
           "macro"
         ],
         "notes": "중국 공장 장비 반입·고성능 칩 판매 제한.",
-        "evidence_chunk_ids": [],
-        "valid_from": null,
+        "evidence_chunk_ids": [
+          "NEWS_dbf0da96d340c451:020b7ef8d20e"
+        ],
+        "valid_from": "2026-11-09",
         "valid_to": null,
         "review_cycle_days": 180,
         "status": "draft",
@@ -717,8 +727,11 @@
           "growth"
         ],
         "notes": "선단공정 수율·고객 확보에서 경쟁사 대비 열위.",
-        "evidence_chunk_ids": [],
-        "valid_from": null,
+        "evidence_chunk_ids": [
+          "NAVER_005930_20261030_c5b668b2:708f0041698c",
+          "NEWS_01bbba56b1b1bd01:cd04fe2ca01d"
+        ],
+        "valid_from": "2026-10-30",
         "valid_to": null,
         "review_cycle_days": 180,
         "status": "draft",
@@ -736,8 +749,12 @@
           "valuation"
         ],
         "notes": "변압기·전선·발전설비 수요. 수주잔고가 실적 가시성 근거.",
-        "evidence_chunk_ids": [],
-        "valid_from": null,
+        "evidence_chunk_ids": [
+          "NAVER_062040_20261007_1abd16aa:b47320989314",
+          "NAVER_298040_20260824_68b40510:60a9fa6564c2",
+          "NEWS_63b5d488418125a1:c19409fa7ae4"
+        ],
+        "valid_from": "2026-08-24",
         "valid_to": null,
         "review_cycle_days": 180,
         "status": "draft",
@@ -754,8 +771,12 @@
           "growth"
         ],
         "notes": "AI 가속기·네트워크 장비용 MLB·기판.",
-        "evidence_chunk_ids": [],
-        "valid_from": null,
+        "evidence_chunk_ids": [
+          "NEWS_1cb988b531cdcea7:448acab8e25e",
+          "NEWS_ac86590d2ea11a63:4aaf82b178a2",
+          "NEWS_be8c76c18c668a69:7fbc570000e4"
+        ],
+        "valid_from": "2026-10-30",
         "valid_to": null,
         "review_cycle_days": 180,
         "status": "draft",
@@ -773,8 +794,11 @@
           "macro"
         ],
         "notes": "대미 수출 완성차·부품 마진 압박. 현지 생산 확대로 대응.",
-        "evidence_chunk_ids": [],
-        "valid_from": null,
+        "evidence_chunk_ids": [
+          "NAVER_000270_20261008_96ae4424:ca0fd53cdc8d",
+          "NAVER_005380_20260827_0ea5b20d:92e455999f4a"
+        ],
+        "valid_from": "2026-08-27",
         "valid_to": null,
         "review_cycle_days": 180,
         "status": "draft",
@@ -792,8 +816,11 @@
           "growth"
         ],
         "notes": "보조금 축소·가격 부담으로 EV 판매 성장 둔화.",
-        "evidence_chunk_ids": [],
-        "valid_from": null,
+        "evidence_chunk_ids": [
+          "NEWS_26ad0777580f699d:7409b799b168",
+          "NEWS_b59c56ea2ebdb416:27a91c8a2547"
+        ],
+        "valid_from": "2026-11-21",
         "valid_to": null,
         "review_cycle_days": 90,
         "status": "draft",
@@ -811,8 +838,11 @@
           "valuation"
         ],
         "notes": "LFP 중심 중국 업체의 가격 경쟁.",
-        "evidence_chunk_ids": [],
-        "valid_from": null,
+        "evidence_chunk_ids": [
+          "NAVER_003670_20261021_bf370a6c:a52df8c87350",
+          "NEWS_069c2a98d7d78823:19e58254e0c5"
+        ],
+        "valid_from": "2026-10-21",
         "valid_to": null,
         "review_cycle_days": 180,
         "status": "draft",
@@ -829,8 +859,11 @@
           "growth"
         ],
         "notes": "데이터센터·재생에너지 연계 ESS. EV 둔화 상쇄 논거.",
-        "evidence_chunk_ids": [],
-        "valid_from": null,
+        "evidence_chunk_ids": [
+          "NAVER_006400_20261030_e29b3064:9310131b2d13",
+          "NAVER_373220_20260921_56bfa612:3949b9d2850b"
+        ],
+        "valid_from": "2026-09-21",
         "valid_to": null,
         "review_cycle_days": 180,
         "status": "draft",
@@ -848,8 +881,11 @@
           "valuation"
         ],
         "notes": "선가 상승·수주잔고 확대. 인도 시점부터 이익 반영.",
-        "evidence_chunk_ids": [],
-        "valid_from": null,
+        "evidence_chunk_ids": [
+          "NAVER_329180_20260915_239366c1:e143348c9974",
+          "NEWS_7a75bd5a65604ae1:b8311990be60"
+        ],
+        "valid_from": "2026-09-15",
         "valid_to": null,
         "review_cycle_days": 90,
         "status": "draft",
@@ -867,8 +903,11 @@
           "macro"
         ],
         "notes": "미 해군 MRO·현지 조선소 투자 협력.",
-        "evidence_chunk_ids": [],
-        "valid_from": null,
+        "evidence_chunk_ids": [
+          "NAVER_009540_20261029_e0a9f790:e5c23492f565",
+          "NEWS_adad1b4d9a3505d8:ff1ea98234dc"
+        ],
+        "valid_from": "2026-10-29",
         "valid_to": null,
         "review_cycle_days": 180,
         "status": "draft",
@@ -886,8 +925,11 @@
           "valuation"
         ],
         "notes": "지상무기·항공·유도무기 수출 계약.",
-        "evidence_chunk_ids": [],
-        "valid_from": null,
+        "evidence_chunk_ids": [
+          "NAVER_079550_20260930_561abc63:7452cc9baf9b",
+          "NEWS_0cd822c746db0044:b5e91e8d5c27"
+        ],
+        "valid_from": "2026-09-30",
         "valid_to": null,
         "review_cycle_days": 180,
         "status": "draft",
@@ -904,8 +946,12 @@
           "growth"
         ],
         "notes": "해외 원전·SMR 프로젝트.",
-        "evidence_chunk_ids": [],
-        "valid_from": null,
+        "evidence_chunk_ids": [
+          "NAVER_015760_20261016_e318a1cd:6f33ddfdc918",
+          "NAVER_034020_20261030_e6606bb0:21849a82b4f0",
+          "NEWS_e1ec8675ddd2c8ae:83c028046dfe"
+        ],
+        "valid_from": "2026-10-16",
         "valid_to": null,
         "review_cycle_days": 180,
         "status": "draft",
@@ -913,18 +959,22 @@
         "labeled_by": "claude_draft"
       },
       {
-        "issue_id": "ISS_RATE_CUT_NIM",
-        "name": "금리 인하에 따른 은행 NIM 축소",
-        "type": "macro",
+        "issue_id": "ISS_BANK_NIM_SQUEEZE",
+        "name": "은행 NIM 하락(대출 경쟁·조달비용)",
+        "type": "industry",
         "polarity": "negative",
         "duration": "cyclical",
         "agenda_ids": [
           "valuation",
           "macro"
         ],
-        "notes": "예대마진 축소. 비이자이익·주주환원이 방어 논거.",
-        "evidence_chunk_ids": [],
-        "valid_from": null,
+        "notes": "기업대출 경쟁·조달비용 상승으로 스프레드 축소. 금리 상승기 대출금리 재산정에 따른 반등이 Bull 논거.",
+        "evidence_chunk_ids": [
+          "NAVER_086790_20261026_b72cc8e8:778db223755d",
+          "NAVER_105560_20261030_f1f84599:e1b87cc7c933",
+          "NAVER_105560_20261123_52fcef75:a0024c00d57d"
+        ],
+        "valid_from": "2026-10-26",
         "valid_to": null,
         "review_cycle_days": 90,
         "status": "draft",
@@ -950,18 +1000,22 @@
         "labeled_by": "claude_draft"
       },
       {
-        "issue_id": "ISS_TRADING_VOLUME_BOOM",
-        "name": "증시 거래대금 증가",
+        "issue_id": "ISS_TRADING_VOLUME_DROP",
+        "name": "증시 거래대금 감소",
         "type": "market",
-        "polarity": "positive",
+        "polarity": "negative",
         "duration": "cyclical",
         "agenda_ids": [
           "growth",
           "valuation"
         ],
-        "notes": "브로커리지 수수료·IB 실적 개선.",
-        "evidence_chunk_ids": [],
-        "valid_from": null,
+        "notes": "2분기 급증 뒤 거래대금 위축. 브로커리지·WM 수수료 둔화, 이익 체력·밸류에이션이 방어 논거.",
+        "evidence_chunk_ids": [
+          "NAVER_039490_20261102_67af6de9:a70847ad40df",
+          "NAVER_071050_20261109_476230c3:5aa460bae2e2",
+          "NEWS_8ab17252e495c646:b7e72744ac69"
+        ],
+        "valid_from": "2026-10-13",
         "valid_to": null,
         "review_cycle_days": 90,
         "status": "draft",
@@ -979,8 +1033,12 @@
           "valuation"
         ],
         "notes": "자사주 소각·배당 확대 압력. 저PBR 업종 재평가.",
-        "evidence_chunk_ids": [],
-        "valid_from": null,
+        "evidence_chunk_ids": [
+          "NAVER_055550_20261028_b553f3f3:accf3bc5688b",
+          "NAVER_105560_20261030_d0de3d0d:049c038fc2b3",
+          "NEWS_aa6916ef5c8c9193:6064e0292887"
+        ],
+        "valid_from": "2026-10-23",
         "valid_to": null,
         "review_cycle_days": 180,
         "status": "draft",
@@ -988,18 +1046,22 @@
         "labeled_by": "claude_draft"
       },
       {
-        "issue_id": "ISS_GOVERNANCE_REFORM",
-        "name": "상법 개정·지배구조 개선",
-        "type": "policy",
+        "issue_id": "ISS_HOLDCO_DISCOUNT",
+        "name": "지주사 할인 축소(자사주 소각·사업 재편)",
+        "type": "market",
         "polarity": "positive",
         "duration": "persistent",
         "agenda_ids": [
           "shareholder_return",
           "valuation"
         ],
-        "notes": "이사 충실의무 확대 등. 지주사 할인 축소 논거.",
-        "evidence_chunk_ids": [],
-        "valid_from": null,
+        "notes": "자사주 소각·인적분할·자회사 밸류업으로 NAV 할인율 축소. 할인율이 구조적이라는 점이 Bear 논거.",
+        "evidence_chunk_ids": [
+          "NAVER_000880_20260916_691647f4:f9e8aa9605a8",
+          "NAVER_028260_20260923_bb9d5072:094a57a4bd8e",
+          "NEWS_596d8a892e63a795:3fc0b546c1b7"
+        ],
+        "valid_from": "2026-09-16",
         "valid_to": null,
         "review_cycle_days": 180,
         "status": "draft",
@@ -1017,8 +1079,11 @@
           "valuation"
         ],
         "notes": "범용 석화 스프레드 약세. 구조조정 여부가 변수.",
-        "evidence_chunk_ids": [],
-        "valid_from": null,
+        "evidence_chunk_ids": [
+          "NAVER_051910_20261106_043e2786:7aa0ec69ef66",
+          "NEWS_d3591d31d584b702:9ef0ab1551ac"
+        ],
+        "valid_from": "2026-11-05",
         "valid_to": null,
         "review_cycle_days": 180,
         "status": "draft",
@@ -1035,8 +1100,11 @@
           "risk"
         ],
         "notes": "수수료·광고·결제 규제.",
-        "evidence_chunk_ids": [],
-        "valid_from": null,
+        "evidence_chunk_ids": [
+          "NAVER_035420_20260917_f6f18c63:c5eb1615f3c2",
+          "NEWS_38cbfe9edd4b59b3:620be0048c20"
+        ],
+        "valid_from": "2026-09-17",
         "valid_to": null,
         "review_cycle_days": 180,
         "status": "draft",
@@ -1053,8 +1121,12 @@
           "growth"
         ],
         "notes": "미국·일본 등 채널 다변화.",
-        "evidence_chunk_ids": [],
-        "valid_from": null,
+        "evidence_chunk_ids": [
+          "NAVER_090430_20260914_86a41ec0:0c0ec218561d",
+          "NAVER_278470_20261104_3dea2cb4:f9f95b8c57c3",
+          "NEWS_2cdaad938cb1188c:30f1e0295173"
+        ],
+        "valid_from": "2026-09-14",
         "valid_to": null,
         "review_cycle_days": 180,
         "status": "draft",
@@ -1071,8 +1143,11 @@
           "growth"
         ],
         "notes": "라면·스낵 해외 매출 비중 확대.",
-        "evidence_chunk_ids": [],
-        "valid_from": null,
+        "evidence_chunk_ids": [
+          "NAVER_003230_20261109_015a05f1:28c658fbabee",
+          "NEWS_e8fa362882fbf373:b24e5fcade2f"
+        ],
+        "valid_from": "2026-11-06",
         "valid_to": null,
         "review_cycle_days": 180,
         "status": "draft",
@@ -1090,8 +1165,12 @@
           "valuation"
         ],
         "notes": "특허 만료 사이클·위탁생산 수요.",
-        "evidence_chunk_ids": [],
-        "valid_from": null,
+        "evidence_chunk_ids": [
+          "NAVER_068270_20260928_f6731a20:7ef50c4b7d88",
+          "NAVER_207940_20261007_d7ee8965:893141e4b251",
+          "NEWS_69a8ec02870e429f:a8e0d5e06f46"
+        ],
+        "valid_from": "2026-09-28",
         "valid_to": null,
         "review_cycle_days": 180,
         "status": "draft",
@@ -1109,8 +1188,10 @@
           "macro"
         ],
         "notes": "현지 생산 여부가 노출도 결정.",
-        "evidence_chunk_ids": [],
-        "valid_from": null,
+        "evidence_chunk_ids": [
+          "NAVER_207940_20261022_818264e8:bb997e7a5ad9"
+        ],
+        "valid_from": "2026-10-22",
         "valid_to": null,
         "review_cycle_days": 30,
         "status": "draft",
@@ -1118,20 +1199,24 @@
         "labeled_by": "claude_draft"
       },
       {
-        "issue_id": "ISS_FREIGHT_NORMALIZATION",
-        "name": "컨테이너 운임 하락",
+        "issue_id": "ISS_FREIGHT_SUPPLY_SHOCK",
+        "name": "중동 분쟁·운하 제약에 따른 컨테이너 운임 강세",
         "type": "industry",
-        "polarity": "negative",
-        "duration": "cyclical",
+        "polarity": "positive",
+        "duration": "event_driven",
         "agenda_ids": [
-          "risk",
+          "growth",
           "valuation"
         ],
-        "notes": "선복 공급 증가로 운임 정상화.",
-        "evidence_chunk_ids": [],
-        "valid_from": null,
+        "notes": "선복 공급 차질로 운임 급등. 신조선 인도가 늘면 운임 정상화가 Bear 논거.",
+        "evidence_chunk_ids": [
+          "NAVER_086280_20261102_e753237e:cf0562234e63",
+          "NEWS_0fb2206eba12884a:eb13933846f0",
+          "NEWS_b71868606b476d2e:d87119452849"
+        ],
+        "valid_from": "2026-10-11",
         "valid_to": null,
-        "review_cycle_days": 90,
+        "review_cycle_days": 30,
         "status": "draft",
         "reviewed": false,
         "labeled_by": "claude_draft"
@@ -7558,7 +7643,7 @@
       },
       {
         "relation": "HURTS",
-        "src": "ISS_RATE_CUT_NIM",
+        "src": "ISS_BANK_NIM_SQUEEZE",
         "src_type": "ISSUE",
         "dst": "SEC_FIN",
         "dst_type": "SECTOR",
@@ -7574,7 +7659,7 @@
       },
       {
         "relation": "HURTS",
-        "src": "ISS_RATE_CUT_NIM",
+        "src": "ISS_BANK_NIM_SQUEEZE",
         "src_type": "ISSUE",
         "dst": "105560",
         "dst_type": "COMPANY",
@@ -7590,7 +7675,7 @@
       },
       {
         "relation": "HURTS",
-        "src": "ISS_RATE_CUT_NIM",
+        "src": "ISS_BANK_NIM_SQUEEZE",
         "src_type": "ISSUE",
         "dst": "055550",
         "dst_type": "COMPANY",
@@ -7606,7 +7691,7 @@
       },
       {
         "relation": "HURTS",
-        "src": "ISS_RATE_CUT_NIM",
+        "src": "ISS_BANK_NIM_SQUEEZE",
         "src_type": "ISSUE",
         "dst": "086790",
         "dst_type": "COMPANY",
@@ -7622,7 +7707,7 @@
       },
       {
         "relation": "HURTS",
-        "src": "ISS_RATE_CUT_NIM",
+        "src": "ISS_BANK_NIM_SQUEEZE",
         "src_type": "ISSUE",
         "dst": "316140",
         "dst_type": "COMPANY",
@@ -7638,7 +7723,7 @@
       },
       {
         "relation": "HURTS",
-        "src": "ISS_RATE_CUT_NIM",
+        "src": "ISS_BANK_NIM_SQUEEZE",
         "src_type": "ISSUE",
         "dst": "024110",
         "dst_type": "COMPANY",
@@ -7717,8 +7802,8 @@
         "strength": "low"
       },
       {
-        "relation": "BENEFITS",
-        "src": "ISS_TRADING_VOLUME_BOOM",
+        "relation": "HURTS",
+        "src": "ISS_TRADING_VOLUME_DROP",
         "src_type": "ISSUE",
         "dst": "006800",
         "dst_type": "COMPANY",
@@ -7733,8 +7818,8 @@
         "strength": "high"
       },
       {
-        "relation": "BENEFITS",
-        "src": "ISS_TRADING_VOLUME_BOOM",
+        "relation": "HURTS",
+        "src": "ISS_TRADING_VOLUME_DROP",
         "src_type": "ISSUE",
         "dst": "039490",
         "dst_type": "COMPANY",
@@ -7749,8 +7834,8 @@
         "strength": "high"
       },
       {
-        "relation": "BENEFITS",
-        "src": "ISS_TRADING_VOLUME_BOOM",
+        "relation": "HURTS",
+        "src": "ISS_TRADING_VOLUME_DROP",
         "src_type": "ISSUE",
         "dst": "005940",
         "dst_type": "COMPANY",
@@ -7765,8 +7850,8 @@
         "strength": "mid"
       },
       {
-        "relation": "BENEFITS",
-        "src": "ISS_TRADING_VOLUME_BOOM",
+        "relation": "HURTS",
+        "src": "ISS_TRADING_VOLUME_DROP",
         "src_type": "ISSUE",
         "dst": "016360",
         "dst_type": "COMPANY",
@@ -7781,8 +7866,8 @@
         "strength": "mid"
       },
       {
-        "relation": "BENEFITS",
-        "src": "ISS_TRADING_VOLUME_BOOM",
+        "relation": "HURTS",
+        "src": "ISS_TRADING_VOLUME_DROP",
         "src_type": "ISSUE",
         "dst": "071050",
         "dst_type": "COMPANY",
@@ -7910,7 +7995,7 @@
       },
       {
         "relation": "BENEFITS",
-        "src": "ISS_GOVERNANCE_REFORM",
+        "src": "ISS_HOLDCO_DISCOUNT",
         "src_type": "ISSUE",
         "dst": "034730",
         "dst_type": "COMPANY",
@@ -7926,7 +8011,7 @@
       },
       {
         "relation": "BENEFITS",
-        "src": "ISS_GOVERNANCE_REFORM",
+        "src": "ISS_HOLDCO_DISCOUNT",
         "src_type": "ISSUE",
         "dst": "003550",
         "dst_type": "COMPANY",
@@ -7942,7 +8027,7 @@
       },
       {
         "relation": "BENEFITS",
-        "src": "ISS_GOVERNANCE_REFORM",
+        "src": "ISS_HOLDCO_DISCOUNT",
         "src_type": "ISSUE",
         "dst": "000880",
         "dst_type": "COMPANY",
@@ -7958,7 +8043,7 @@
       },
       {
         "relation": "BENEFITS",
-        "src": "ISS_GOVERNANCE_REFORM",
+        "src": "ISS_HOLDCO_DISCOUNT",
         "src_type": "ISSUE",
         "dst": "402340",
         "dst_type": "COMPANY",
@@ -7974,7 +8059,7 @@
       },
       {
         "relation": "BENEFITS",
-        "src": "ISS_GOVERNANCE_REFORM",
+        "src": "ISS_HOLDCO_DISCOUNT",
         "src_type": "ISSUE",
         "dst": "028260",
         "dst_type": "COMPANY",
@@ -7990,7 +8075,7 @@
       },
       {
         "relation": "BENEFITS",
-        "src": "ISS_GOVERNANCE_REFORM",
+        "src": "ISS_HOLDCO_DISCOUNT",
         "src_type": "ISSUE",
         "dst": "267250",
         "dst_type": "COMPANY",
@@ -8261,8 +8346,8 @@
         "strength": "low"
       },
       {
-        "relation": "HURTS",
-        "src": "ISS_FREIGHT_NORMALIZATION",
+        "relation": "BENEFITS",
+        "src": "ISS_FREIGHT_SUPPLY_SHOCK",
         "src_type": "ISSUE",
         "dst": "011200",
         "dst_type": "COMPANY",
@@ -8277,8 +8362,8 @@
         "strength": "high"
       },
       {
-        "relation": "HURTS",
-        "src": "ISS_FREIGHT_NORMALIZATION",
+        "relation": "BENEFITS",
+        "src": "ISS_FREIGHT_SUPPLY_SHOCK",
         "src_type": "ISSUE",
         "dst": "086280",
         "dst_type": "COMPANY",
@@ -9165,7 +9250,7 @@
         "relation": "EXPOSED_TO",
         "src": "105560",
         "src_type": "COMPANY",
-        "dst": "ISS_RATE_CUT_NIM",
+        "dst": "ISS_BANK_NIM_SQUEEZE",
         "dst_type": "ISSUE",
         "status": "draft",
         "reviewed": false,
@@ -9182,7 +9267,7 @@
         "relation": "EXPOSED_TO",
         "src": "055550",
         "src_type": "COMPANY",
-        "dst": "ISS_RATE_CUT_NIM",
+        "dst": "ISS_BANK_NIM_SQUEEZE",
         "dst_type": "ISSUE",
         "status": "draft",
         "reviewed": false,
@@ -9199,7 +9284,7 @@
         "relation": "EXPOSED_TO",
         "src": "086790",
         "src_type": "COMPANY",
-        "dst": "ISS_RATE_CUT_NIM",
+        "dst": "ISS_BANK_NIM_SQUEEZE",
         "dst_type": "ISSUE",
         "status": "draft",
         "reviewed": false,
@@ -9216,7 +9301,7 @@
         "relation": "EXPOSED_TO",
         "src": "316140",
         "src_type": "COMPANY",
-        "dst": "ISS_RATE_CUT_NIM",
+        "dst": "ISS_BANK_NIM_SQUEEZE",
         "dst_type": "ISSUE",
         "status": "draft",
         "reviewed": false,
@@ -9233,7 +9318,7 @@
         "relation": "EXPOSED_TO",
         "src": "024110",
         "src_type": "COMPANY",
-        "dst": "ISS_RATE_CUT_NIM",
+        "dst": "ISS_BANK_NIM_SQUEEZE",
         "dst_type": "ISSUE",
         "status": "draft",
         "reviewed": false,
@@ -9301,7 +9386,7 @@
         "relation": "EXPOSED_TO",
         "src": "006800",
         "src_type": "COMPANY",
-        "dst": "ISS_TRADING_VOLUME_BOOM",
+        "dst": "ISS_TRADING_VOLUME_DROP",
         "dst_type": "ISSUE",
         "status": "draft",
         "reviewed": false,
@@ -9318,7 +9403,7 @@
         "relation": "EXPOSED_TO",
         "src": "039490",
         "src_type": "COMPANY",
-        "dst": "ISS_TRADING_VOLUME_BOOM",
+        "dst": "ISS_TRADING_VOLUME_DROP",
         "dst_type": "ISSUE",
         "status": "draft",
         "reviewed": false,
@@ -9335,7 +9420,7 @@
         "relation": "EXPOSED_TO",
         "src": "005940",
         "src_type": "COMPANY",
-        "dst": "ISS_TRADING_VOLUME_BOOM",
+        "dst": "ISS_TRADING_VOLUME_DROP",
         "dst_type": "ISSUE",
         "status": "draft",
         "reviewed": false,
@@ -9352,7 +9437,7 @@
         "relation": "EXPOSED_TO",
         "src": "016360",
         "src_type": "COMPANY",
-        "dst": "ISS_TRADING_VOLUME_BOOM",
+        "dst": "ISS_TRADING_VOLUME_DROP",
         "dst_type": "ISSUE",
         "status": "draft",
         "reviewed": false,
@@ -9369,7 +9454,7 @@
         "relation": "EXPOSED_TO",
         "src": "071050",
         "src_type": "COMPANY",
-        "dst": "ISS_TRADING_VOLUME_BOOM",
+        "dst": "ISS_TRADING_VOLUME_DROP",
         "dst_type": "ISSUE",
         "status": "draft",
         "reviewed": false,
@@ -9488,7 +9573,7 @@
         "relation": "EXPOSED_TO",
         "src": "034730",
         "src_type": "COMPANY",
-        "dst": "ISS_GOVERNANCE_REFORM",
+        "dst": "ISS_HOLDCO_DISCOUNT",
         "dst_type": "ISSUE",
         "status": "draft",
         "reviewed": false,
@@ -9505,7 +9590,7 @@
         "relation": "EXPOSED_TO",
         "src": "003550",
         "src_type": "COMPANY",
-        "dst": "ISS_GOVERNANCE_REFORM",
+        "dst": "ISS_HOLDCO_DISCOUNT",
         "dst_type": "ISSUE",
         "status": "draft",
         "reviewed": false,
@@ -9522,7 +9607,7 @@
         "relation": "EXPOSED_TO",
         "src": "000880",
         "src_type": "COMPANY",
-        "dst": "ISS_GOVERNANCE_REFORM",
+        "dst": "ISS_HOLDCO_DISCOUNT",
         "dst_type": "ISSUE",
         "status": "draft",
         "reviewed": false,
@@ -9539,7 +9624,7 @@
         "relation": "EXPOSED_TO",
         "src": "402340",
         "src_type": "COMPANY",
-        "dst": "ISS_GOVERNANCE_REFORM",
+        "dst": "ISS_HOLDCO_DISCOUNT",
         "dst_type": "ISSUE",
         "status": "draft",
         "reviewed": false,
@@ -9556,7 +9641,7 @@
         "relation": "EXPOSED_TO",
         "src": "028260",
         "src_type": "COMPANY",
-        "dst": "ISS_GOVERNANCE_REFORM",
+        "dst": "ISS_HOLDCO_DISCOUNT",
         "dst_type": "ISSUE",
         "status": "draft",
         "reviewed": false,
@@ -9573,7 +9658,7 @@
         "relation": "EXPOSED_TO",
         "src": "267250",
         "src_type": "COMPANY",
-        "dst": "ISS_GOVERNANCE_REFORM",
+        "dst": "ISS_HOLDCO_DISCOUNT",
         "dst_type": "ISSUE",
         "status": "draft",
         "reviewed": false,
@@ -9845,7 +9930,7 @@
         "relation": "EXPOSED_TO",
         "src": "011200",
         "src_type": "COMPANY",
-        "dst": "ISS_FREIGHT_NORMALIZATION",
+        "dst": "ISS_FREIGHT_SUPPLY_SHOCK",
         "dst_type": "ISSUE",
         "status": "draft",
         "reviewed": false,
@@ -9862,7 +9947,7 @@
         "relation": "EXPOSED_TO",
         "src": "086280",
         "src_type": "COMPANY",
-        "dst": "ISS_FREIGHT_NORMALIZATION",
+        "dst": "ISS_FREIGHT_SUPPLY_SHOCK",
         "dst_type": "ISSUE",
         "status": "draft",
         "reviewed": false,

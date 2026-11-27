@@ -14,7 +14,7 @@
 | C8 | `job_not_found` · `invalid_job_state` | "제안" 표시 제거 (OQ-2 닫기) | 구현에서 사용 | 전원 |
 | C9 | `suggest_alternatives(ticker, n=3)` (신규 데이터 함수) | 중분류 → 대분류 → 전체 시총순, `alternatives` 3개 | 거절 대안 선정 (#68 리뷰) | 수경 |
 | C10 ✅ #99 | `JobEvent` 토론 완료 payload · job 조회 응답 | `simulation_ready` 추가 | 버튼 미리 끄기 (#68 리뷰) | 수경 |
-| C11 ✅ #99 | `JobStatus`, `simulate` | 7종 → `queued`·`running`·`completed`·`failed` 4종, 시뮬레이션은 별도 job(`job_type`·`debate_job_id`, 기준일은 토론 `data_as_of`, ADR 0013), `simulate`는 시뮬레이션 job의 `job_started`를 돌려줌, `simulation_*` 이벤트는 시뮬레이션 job에 기록 | 상태 한 칸 공유 문제 (오케스트레이터 기획서 v2.2 6.3) | 유민·수경 |
+| C11 ✅ #99 | `JobStatus`, `simulate` | 7종 → `queued`·`running`·`completed`·`failed` 4종, 시뮬레이션은 별도 job(`job_type`·`debate_job_id`, 기준일은 토론 `data_as_of`, ADR 0013), `simulate`는 시뮬레이션 job의 `job_started`를 돌려줌, `simulation_*` 이벤트는 시뮬레이션 job에 기록, `run_simulation(ticker, user_id, debate_job_id, as_of)` | 상태 한 칸 공유 문제 (오케스트레이터 기획서 v2.2 6.3) | 유민·수경 |
 | C12 | `RunDebateInput`·`run_debate` note | `run_debate`는 결과만 돌려주고 `job_events`·상태는 워커가 기록. `emit`·`fetch_evidence`·`profile` 주입, `CompanyMeta.data_tier` | #68 유민 제안 (#76) | 유민 |
 
 - 계약 테스트(`backend/tests/contract/`)를 같은 PR에 넣어, 이후 PR의 응답이 이 스키마로 검증되게 한다.

@@ -32,6 +32,14 @@ SHORT_BALANCE_LAG_DAYS = 2
 INDEX_BY_MARKET = {"KOSPI": "1001", "KOSDAQ": "2001"}
 FS_LABELS = {"CFS": "연결", "OFS": "별도"}
 GROUPS = ("valuation", "price_trend", "fundamental_trend", "flow")
+QUERY_FAILED = "query_failed"
+# 값을 못 낼 때도 항상 있는 칸(계약서 DerivedSnapshot)
+GROUP_NULLS = {
+    "valuation": {"per": None, "pbr": None},
+    "price_trend": {"volatility_1m": None, "volatility_3m": None, "volatility_1m_market_threshold": None},
+    "fundamental_trend": {"period": None},
+    "flow": {"foreign_net_buy_20d": None},
+}
 
 
 def get_derived_snapshot(ticker: str, as_of: str | None = None) -> dict:
@@ -48,18 +56,28 @@ def get_derived_snapshot(ticker: str, as_of: str | None = None) -> dict:
             if company is None:
                 return _empty(ticker, as_of, "unknown_ticker")
             name, market, sector = company
-            snapshot = {
-                "ticker": ticker,
-                "company": name,
-                "as_of": as_of,
-                "valuation": valuation(_valuation_rows(connection, ticker, sector, as_of)),
-                "price_trend": price_trend(*_price_rows(connection, ticker, market, as_of)),
-                "fundamental_trend": fundamental_trend(_quarter_rows(connection, ticker, as_of)),
-                "flow": flow(_flow_rows(connection, ticker, as_of)),
+            snapshot = {"ticker": ticker, "company": name, "as_of": as_of}
+            # 묶음마다 따로 조회한다. 한 묶음이 실패해도 나머지는 그대로 내고, 실패한 묶음만
+            # reason="query_failed"로 표시한다("데이터 없음" no_data와 구분, 헌법 원칙 III)
+            builders = {
+                "valuation": lambda: valuation(_valuation_rows(connection, ticker, sector, as_of)),
+                "price_trend": lambda: price_trend(*_price_rows(connection, ticker, market, as_of)),
+                "fundamental_trend": lambda: fundamental_trend(_quarter_rows(connection, ticker, as_of)),
+                "flow": lambda: flow(_flow_rows(connection, ticker, as_of)),
             }
+            for group, build in builders.items():
+                try:
+                    snapshot[group] = build()
+                except Exception as exc:
+                    logger.error("계산 근거 묶음 조회 실패: %s %s(%s)", ticker, group, type(exc).__name__)
+                    snapshot[group] = _group_reason(QUERY_FAILED, **GROUP_NULLS[group])
     except Exception as exc:
         logger.error("계산 근거 조회 실패: %s(%s)", ticker, type(exc).__name__)
         return _empty(ticker, as_of, "snapshot_unavailable")
+    failed = [group for group in GROUPS if snapshot[group].get("reason") == QUERY_FAILED]
+    if len(failed) == len(GROUPS):
+        return _empty(ticker, as_of, "snapshot_unavailable")
+    snapshot["failed_groups"] = failed
     snapshot["available"] = any(snapshot[group].get("reason") is None for group in GROUPS)
     return snapshot
 
@@ -366,12 +384,10 @@ def _flow_rows(connection, ticker: str, as_of: str) -> list[dict]:
 
 
 def _empty(ticker: str, as_of: str, reason: str) -> dict:
-    snapshot = {"ticker": ticker, "company": "", "as_of": as_of, "available": False, "error": reason}
-    snapshot["valuation"] = _group_reason(reason, per=None, pbr=None)
-    snapshot["price_trend"] = _group_reason(reason, volatility_1m=None, volatility_3m=None,
-                                            volatility_1m_market_threshold=None)
-    snapshot["fundamental_trend"] = _group_reason(reason, period=None)
-    snapshot["flow"] = _group_reason(reason, foreign_net_buy_20d=None)
+    snapshot = {"ticker": ticker, "company": "", "as_of": as_of, "available": False, "error": reason,
+                "failed_groups": list(GROUPS) if reason == "snapshot_unavailable" else []}
+    for group in GROUPS:
+        snapshot[group] = _group_reason(reason, **GROUP_NULLS[group])
     return snapshot
 
 

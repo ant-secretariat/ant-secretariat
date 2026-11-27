@@ -65,6 +65,12 @@ class OpinionRowsTest(unittest.TestCase):
             self.assertIsNone(rows[0]["target_price"])
 
 
+def test_bad_date_row_is_skipped_not_fatal():
+    # 날짜를 못 읽는 행 하나 때문에 그 종목 적재가 멈추지 않는다 (#14 리뷰, #55)
+    rows = opinion_rows("005930", [_row("2026-10-30"), _row("20261030", "키움")])
+    assert [row["broker"] for row in rows] == ["키움"]
+
+
 class KisOpinionClientTest(unittest.TestCase):
     def setUp(self) -> None:
         for target in ("REQUEST_INTERVAL_SECONDS", "RETRY_WAIT_SECONDS"):
@@ -113,6 +119,21 @@ class KisOpinionClientTest(unittest.TestCase):
         self.assertEqual(ranges, [("20261001", "20261030"), ("20261001", "20261015"), ("20261016", "20261030")])
         self.assertEqual(len(rows), 2)
 
+    def test_warns_when_one_day_hits_row_limit(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.method == "POST":
+                return httpx.Response(200, json={"access_token": "TOKEN"})
+            end = request.url.params["FID_INPUT_DATE_2"]
+            return httpx.Response(
+                200, json={"rt_cd": "0", "output": [_row(end, f"증권{i}") for i in range(100)]}
+            )
+
+        with _client(handler) as client, self.assertLogs("crawling.collectors.kis_opinions", "WARNING") as logs:
+            rows = client.fetch_opinions("005930", date(2026, 10, 30), date(2026, 10, 30))
+
+        self.assertEqual(len(rows), 100)
+        self.assertIn("일부가 빠졌을 수 있음", logs.output[0])
+
     def test_retries_then_raises_instead_of_returning_empty(self) -> None:
         calls = {"get": 0}
 
@@ -142,3 +163,29 @@ class KisOpinionClientTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_loader_refreshes_updated_at(monkeypatch):
+    # 다시 받아 덮어쓸 때 updated_at도 바뀌어야 한다 (#14 리뷰, #42)
+    from crawling import opinions_loader
+
+    saved: list[dict] = []
+
+    class FakeClient:
+        def __init__(self, settings):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def fetch_opinions(self, ticker, start, end):
+            return [_row("20261030")]
+
+    monkeypatch.setattr(opinions_loader, "KisOpinionClient", FakeClient)
+    monkeypatch.setattr(opinions_loader, "upsert", lambda connection, table, rows, key_columns: saved.extend(rows))
+
+    assert opinions_loader.load(None, ["005930"], date(2026, 10, 1), date(2026, 10, 30)) == []
+    assert saved and all(row["updated_at"].tzinfo is not None for row in saved)

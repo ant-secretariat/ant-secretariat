@@ -9,8 +9,12 @@
 - 진행 이벤트는 `emit`으로 주입받는다(#71 리뷰: job_events 저장은 오케스트레이터 몫).
   이름·payload는 계약 `JobEvent`(ADR 0009)를 따른다: `data_collected` → 아젠다마다 `claim_completed`·`bull_completed`·
   `bear_completed` → `judge_completed` → `verifying`. `job_started`·`completed`·`failed`는 워커가 보낸다.
+  1회 수정 때는 다시 만든 노드의 이벤트가 한 번 더 온다(같은 claim_id면 카드 교체). 최종 내용은 결과가 기준이다.
 - 아젠다 하나가 실패하면 TaskGroup이 나머지 호출을 취소하고 토론 전체가 실패한다(MVP, #76 리뷰).
-- L1 문제는 결과와 함께 돌려준다. 근거 부족 루프·1회 수정(구현 순서 4)은 다음 PR.
+- 검증: L1 → 근거 부족 루프(gap_fill 추가 검색) → 문제 노드만 1회 재생성 → 그래도 실패한 Claim은 빼고 partial.
+- `fetch_evidence`는 데이터 묶음(get_agent_context 결과)이나 문서 results[] 목록을 돌려준다. 묶음의 지표·블록은
+  근거 행이 되고, 값이 있는 지표는 [지표 자리표시자]로 넘겨 출력의 `{{metric_id}}`를 display로 바꾼다(structured.py).
+  지표·블록 조회 실패는 로그로 남기고 그 근거 없이 진행한다(문서 검색 실패와 같은 원칙).
 """
 from __future__ import annotations
 
@@ -30,16 +34,20 @@ from agents.debate_renewal.prompts import (
 )
 from agents.debate_renewal.prompts.templates import AGENDA_GUIDE
 from agents.debate_renewal.schemas import (
-    AgendaResult, BearOutput, BullOutput, CompanyMeta, DebateMeta, DebateResult, Scope, UserProfile,
+    AgendaResult, BearOutput, BullOutput, CompanyMeta, DebateMeta, DebateResult, Evidence, Scope, UserProfile,
 )
+from agents.debate_renewal.structured import fill_all, from_bundle
 from agents.debate_renewal.validation.l1 import L1Report, check_l1
+from agents.debate_renewal.validation.repair import drop_failed_claims, feedback, repair_targets
 
 logger = logging.getLogger(__name__)
 
 KST = ZoneInfo("Asia/Seoul")
+GAP_TOP_K = 2  # 근거 없는 Claim 하나당 보완 근거 수. 임시값(README 확정 필요)
 
-# (종목, 아젠다, 질의, 기준일) → 검색 결과 results[] 목록
-EvidenceFetcher = Callable[[CompanyMeta, AgendaId, str, Optional[str]], Awaitable[Sequence[Mapping[str, Any]]]]
+# (종목, 아젠다, 질의, 기준일) → 데이터 묶음(get_agent_context 결과) 또는 검색 결과 results[] 목록
+EvidenceFetcher = Callable[[CompanyMeta, AgendaId, str, Optional[str]],
+                           Awaitable[Union[Mapping[str, Any], Sequence[Mapping[str, Any]]]]]
 Emit = Callable[[str, dict], Union[Awaitable[None], None]]
 
 
@@ -48,6 +56,13 @@ class DebateRun:
     result: DebateResult
     l1: L1Report
     usage: list[dict] = field(default_factory=list)  # 호출마다 node·model·토큰·지연시간 (Langfuse 연동 전 기록용)
+    repaired: bool = False  # 근거 부족 루프·1회 수정을 돌았는지
+    removed_claim_ids: list[str] = field(default_factory=list)  # 수정 뒤에도 실패해 뺀 Claim
+
+    @property
+    def partial(self) -> bool:
+        """뺀 Claim이 있는지(내부 값). MVP는 결과에 고지 칸 없이 로그로만 남긴다(#78 리뷰, 기준선 빈도 보고 다시 정함)."""
+        return bool(self.removed_claim_ids)
 
 
 async def _noop(_event: str, _payload: dict) -> None:
@@ -88,52 +103,109 @@ async def run_debate(
     # 1. 근거: 아젠다별로 가져와 하나의 목록(S1…)에 모은다
     pool = EvidencePool()
     fetched = await _all([fetch_evidence(company, a, query, data_as_of) for a in agendas])
-    evidence_by_agenda = {a: pool.add(rows) for a, rows in zip(agendas, fetched)}
+    contexts = {a: from_bundle(f) for a, f in zip(agendas, fetched)}
+    ev_by: dict[AgendaId, list[Evidence]] = {a: pool.add(c.rows) for a, c in contexts.items()}
+    values = {k: v for c in contexts.values() for k, v in c.metrics.items()}  # 같은 기준일이라 지표 값은 아젠다와 무관
+    for a, c in contexts.items():
+        if c.failures or c.widened:
+            logger.warning("debate evidence trace_id=%s agenda=%s failures=%s widened=%s",
+                           trace_id, a.value, c.failures, c.widened)
     await _send(emit, "data_collected", _doc_counts(pool.all()))
 
-    # 2. 아젠다끼리 병렬로 Bull → Bear
-    async def debate(agenda: AgendaId) -> tuple[BullOutput, BearOutput]:
-        ev = evidence_by_agenda[agenda]
-        bull = await _call("bull", agenda, bull_messages(company, agenda, ev), BullOutput, usage, llm_client)
-        await _role_completed(emit, "bull", agenda, _rename_claims(agenda, bull.claims))
-        bear = await _call("bear", agenda, bear_messages(company, agenda, ev, bull), BearOutput, usage, llm_client)
-        bull, bear = _namespace(agenda, bull, bear)
-        await _role_completed(emit, "bear", agenda, bear.claims)
+    async def bull_of(a: AgendaId, fix: Optional[str] = None) -> BullOutput:
+        msgs = bull_messages(company, a, ev_by[a], list(contexts[a].metrics))
+        bull = _filled(await _call("bull", a, _with(msgs, fix), BullOutput, usage, llm_client), values)
+        await _role_completed(emit, "bull", a, _rename_claims(a, bull.claims))
+        return bull
+
+    async def bear_of(a: AgendaId, bull: BullOutput, fix: Optional[str] = None) -> BearOutput:
+        msgs = bear_messages(company, a, ev_by[a], bull, list(contexts[a].metrics))
+        bear = _filled(await _call("bear", a, _with(msgs, fix), BearOutput, usage, llm_client), values)
+        await _role_completed(emit, "bear", a, _namespace(a, bull, bear)[1].claims)
+        return bear
+
+    # 2. 아젠다끼리 병렬로 Bull → Bear (raw: 아젠다 접두어를 붙이기 전 출력)
+    async def debate(a: AgendaId) -> tuple[BullOutput, BearOutput]:
+        bull = await bull_of(a)
+        bear = await bear_of(a, bull)
         return bull, bear
 
-    debates = await _all([debate(a) for a in agendas])
+    raw = dict(zip(agendas, await _all([debate(a) for a in agendas])))
 
-    # 3. Judge
-    all_evidence = pool.all()
-    judged = await complete_structured(
-        judge_single_messages(company, [(a, b, r) for a, (b, r) in zip(agendas, debates)], all_evidence, profile),
-        JudgeSingleOutput, client=llm_client)
-    usage.append(_usage("judge", None, judged))
-    verdicts, judge = to_single(judged.output, profile)
-    missing = [a.value for a in agendas if a not in verdicts]
-    if missing:  # 판정 없는 아젠다를 임의로 채우지 않는다
-        logger.warning("debate judge missing agendas trace_id=%s missing=%s", trace_id, missing)
-        raise LLMOutputInvalidError()
-    await _send(emit, "judge_completed", {})
+    # 3. Judge → 조립 → L1
+    async def judge_and_build(fix: Optional[str] = None) -> DebateResult:
+        debates = [(a, *_namespace(a, *raw[a])) for a in agendas]
+        judged = await complete_structured(
+            _with(judge_single_messages(company, debates, pool.all(), profile), fix), JudgeSingleOutput, client=llm_client)
+        usage.append(_usage("judge", None, judged))
+        verdicts, judge = to_single(judged.output, profile)
+        missing = [a.value for a in agendas if a not in verdicts]
+        if missing:  # 판정 없는 아젠다를 임의로 채우지 않는다
+            logger.warning("debate judge missing agendas trace_id=%s missing=%s", trace_id, missing)
+            raise LLMOutputInvalidError()
+        await _send(emit, "judge_completed", {})
+        result = _assemble(company, precheck, trace_id, data_as_of, judged.model, debates, verdicts, judge, pool.all())
+        return _filled(result, values)  # Judge 문장의 자리표시자까지
 
-    # 4. 조립 + L1
-    result = DebateResult(
+    result = await judge_and_build()
+    await _send(emit, "verifying", {})
+    report = check_l1(result)
+    if report.ok:
+        return DebateRun(result=result, l1=report, usage=usage)
+
+    # 4. 근거 부족 루프: 근거 없는 Claim의 문장으로 추가 검색해 근거 목록에 gap_fill로 더한다
+    claim_at = {c.claim_id: (a, c.text) for a in agendas for out in _namespace(a, *raw[a]) for c in out.claims}
+    gaps = [claim_at[cid] for cid in report.ungrounded_claim_ids() if cid in claim_at]
+    found = await _all([fetch_evidence(company, a, text, data_as_of) for a, text in gaps])  # 보완 검색도 같은 기준일
+    for (a, _), rows in zip(gaps, found):
+        docs = [r for r in from_bundle(rows).rows if r.get("document_type") != "structured"]  # 지표·블록은 이미 있음
+        ev_by[a] += [e for e in pool.add(docs[:GAP_TOP_K], source="gap_fill") if e not in ev_by[a]]
+
+    # 5. 1회 수정: 문제가 있는 노드만 다시 생성. Bull을 다시 쓰면 그 Bull을 반박하는 Bear도 다시 쓴다
+    bull_fix, bear_fix, judge_fix = repair_targets(report)
+
+    async def redo(i: int) -> None:
+        a = agendas[i]
+        bull = await bull_of(a, feedback(bull_fix[i])) if i in bull_fix else raw[a][0]
+        bear = await bear_of(a, bull, feedback(bear_fix.get(i, [])) if i in bear_fix else None)
+        raw[a] = (bull, bear)
+
+    await _all([redo(i) for i in sorted(set(bull_fix) | set(bear_fix))])
+    result = await judge_and_build(feedback(judge_fix) if judge_fix else None)
+    report = check_l1(result)
+
+    # 6. 그래도 실패한 Claim은 빼고 로그로 남긴다(결과 고지 칸은 MVP에서 없음)
+    result, removed = drop_failed_claims(result, report)
+    if removed:
+        report = check_l1(result)
+        logger.info("debate partial trace_id=%s removed=%s", trace_id, removed)
+    return DebateRun(result=result, l1=report, usage=usage, repaired=True, removed_claim_ids=removed)
+
+
+def _with(messages: list[dict], fix: Optional[str]) -> list[dict]:
+    return messages if not fix else [*messages, {"role": "user", "content": fix}]
+
+
+def _assemble(company, precheck, trace_id, data_as_of, model, debates, verdicts, judge, evidence) -> DebateResult:
+    return DebateResult(
         meta=DebateMeta(
             trace_id=trace_id, data_as_of=data_as_of, generated_at=datetime.now(KST).isoformat(timespec="seconds"),
-            prompt_version=PROMPT_VERSION, model=judged.model, mode="single", companies=[company],
+            prompt_version=PROMPT_VERSION, model=model, mode="single", companies=[company],
             data_richness="rich" if company.data_tier == DataTier.REPORT else "limited",
             ticker=company.ticker, company=company.company, sector=company.sector,
         ),
         scope=Scope(verdict=precheck.verdict, excluded=precheck.excluded, selection_reason=precheck.selection_reason),
         flags=precheck.flags,
-        selected_agendas=agendas,
-        agendas=[AgendaResult(id=a, title=AGENDA_GUIDE[a][0], bull=b, bear=r, verdict=verdicts[a])
-                 for a, (b, r) in zip(agendas, debates)],
-        evidence=all_evidence,
+        selected_agendas=[a for a, _, _ in debates],
+        agendas=[AgendaResult(id=a, title=AGENDA_GUIDE[a][0], bull=b, bear=r, verdict=verdicts[a]) for a, b, r in debates],
+        evidence=evidence,
         judge=judge,
     )
-    await _send(emit, "verifying", {})
-    return DebateRun(result=result, l1=check_l1(result), usage=usage)
+
+
+def _filled(model, values: dict):
+    """모델 안 문장의 {{metric_id}}를 display로. 목록에 없는 자리표시자는 남겨 L1(unresolved_placeholder)이 잡는다."""
+    return type(model).model_validate(fill_all(model.model_dump(), values)) if values else model
 
 
 def _namespace(agenda: AgendaId, bull: BullOutput, bear: BearOutput) -> tuple[BullOutput, BearOutput]:

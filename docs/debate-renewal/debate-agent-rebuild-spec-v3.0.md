@@ -38,7 +38,7 @@ Bull/Bear/Judge 토론 파이프라인 리빌드 설계. 멀티에이전트 설�
 
 선택된 종목에 대해 Bull·Bear·Judge가 아젠다별 순차 토론을 수행하고 최종 브리핑을 생성. 종목이 1개면 **단일 모드**, 2개면 **비교 모드**(D3). 근거와 판정(`verdict`·`stance`)은 사용자 성향과 무관하게 동일하고(사실 층), 성향은 Judge의 `points_to_check`·`caution` 강조에만 반영함(판단 층). 적합/부적합 label은 노출하지 않음.
 
-> **job 상태:** `queued` → `running` → `debate_completed` → (단일 모드) `simulation_pending` → `simulation_running` → `completed` / `failed`. 토론은 검증 레이어 통과 후 `simulation_pending`으로 바꾸고 끝남. 시뮬레이션은 사용자가 버튼을 누르면 오케스트레이터가 `run_simulation(ticker, user_id, job_id)`를 큐에 등록하고, 시뮬레이션이 `job_id`로 토론 결과를 조회해 `macro`·`risk` 아젠다를 ID로 꺼냄. 비교 모드는 `debate_completed`에서 종료(시뮬레이션 없음).
+> **job 상태 (ADR 0013, 2026-11-24 변경):** 토론 job은 `queued` → `running` → `completed` / `failed` (단일·비교 모두). 시뮬레이션은 **별도 job**이다. 단일 모드 토론이 끝난 뒤 사용자가 버튼(`POST /orchestrate/debate/{job_id}/simulate`)을 누르면 오케스트레이터가 시뮬레이션 job(`queued` → `running` → `completed` / `failed`)을 새로 만들고, `debate_job_id`로 토론 결과를 읽어 `macro`·`risk` 아젠다를 ID로 꺼낸다. 기준일은 토론 job의 `data_as_of`. 비교 모드는 시뮬레이션 버튼이 없다. `run_debate`는 결과만 돌려주고 상태 전환·이벤트 저장은 워커가 한다(계약 draft.6 C11·C12).
 
 ### 1.2 실행 위치와 호출 방식
 
@@ -194,7 +194,7 @@ class ResponseMeta(BaseModel):
 | 개인화 | 성향별로 결론 톤 변경 | 사실 층 불변, 성향은 `points_to_check`·`caution`에만 | `개선` |
 | 온톨로지 | 없음 | 기능 플래그 뒤에서 아젠다별 1회 조회·공유 (기본 꺼짐) | `신규` |
 | 평가 체계 | 없음 | 기준선 비교 실험 · 거절셋 · 골든셋 등 7종 (D10) | `신규` |
-| 시뮬레이션 연동 | `agendas[1]` 인덱스 자동 전달 | `simulation_pending` + 버튼 → `run_simulation(ticker, user_id, job_id)` | `개선` |
+| 시뮬레이션 연동 | `agendas[1]` 인덱스 자동 전달 | 토론 `completed` 후 버튼 → 별도 시뮬레이션 job(`debate_job_id`, 아젠다 ID로 조회, ADR 0013) | `개선` |
 | 지원 종목 | 7개 하드코딩 | T1 전체 실행 / T0 범위 축소 / T2 수집 중 거절 | `개선` |
 
 ## D1 · 사전 판정 흐름
@@ -259,7 +259,7 @@ class ResponseMeta(BaseModel):
 | 기준일 격차 | 축마다 두 종목의 `as_of`를 나란히 표기, 격차가 임계값을 넘으면 `as_of_gap_warning` |
 | 지표 기준 불일치 | 연결/별도, 추정/확정이 다르면 수치 비교 대신 서술로 처리 |
 | 부분 실패 | 한쪽 검색·생성이 실패하면 비교를 만들지 않고 성공한 종목의 단일 분석으로 전환 + 사유 고지 |
-| 범위 제한 | 조건부 2라운드(D5) 끔, 시뮬레이션 버튼 없음(`debate_completed`에서 종료), 온톨로지 플래그는 단일 모드에서 효과 확인 후 별도로 켬 |
+| 범위 제한 | 조건부 2라운드(D5) 끔, 시뮬레이션 버튼 없음(토론 job `completed`로 종료), 온톨로지 플래그는 단일 모드에서 효과 확인 후 별도로 켬 |
 | 거절 | 3종목 이상·한쪽 미커버는 관문1에서 거절 (D4) |
 
 ## D4 · 거절·축소 유형과 응답 코드
@@ -377,7 +377,7 @@ class ResponseMeta(BaseModel):
 - `근거` **레지스트리 경유 조회** — `get_agent_context(ticker, "debate", query, intent)` · `get_metric(…, as_of)` · (플래그 켜짐) `get_ontology_context` 아젠다별 1회. 비교 모드는 축 단위 대칭 검색
 - `토론` **Bull → Bear → Judge** — 단일: 조건부 2라운드 / 비교: 종목별 Bull·Bear 병렬 → Judge 축별 비교
 - `검증` **L1 → 근거 부족 루프 → 1회 수정** — 실패 Claim은 제외하고 partial 고지
-- `OUT` **`DebateResult` 저장 · 상태 전이** — 단일: `simulation_pending` (사용자가 `POST /orchestrate/debate/{job_id}/simulate`를 누르면 시뮬레이션 큐 등록, `sim_params` 없는 종목은 FE가 버튼 비활성화) / 비교: `debate_completed`
+- `OUT` **`DebateResult` 저장 · 상태 전이** — 워커가 결과를 저장하고 토론 job을 `completed`로 바꾼다(단일·비교 모두, `simulation_ready` 기록). 단일 모드에서 버튼을 누르면 시뮬레이션 job을 새로 만든다(`simulation_ready=false`면 버튼 꺼짐, 눌러도 rejected `no_data`, ADR 0013)
 
 ## 미결 · 미결 사항
 

@@ -6,7 +6,9 @@
 
     find_terms("반도체 업종 PER 비교")
     # {"sectors": [{"term": "반도체", "sector_level": "l2", "sector": "반도체와반도체장비"}],
-    #  "metrics": [{"term": "PER", "metric_id": "per"}]}
+    #  "metrics": [{"term": "PER", "metric_id": "per"}], "error": None}
+
+용어 사전을 못 읽으면 빈 목록과 함께 error="company_lookup_unavailable"를 준다("용어 없음"과 구분, 헌법 원칙 III).
 """
 
 from __future__ import annotations
@@ -20,7 +22,7 @@ def find_terms(text: str) -> dict:
     try:
         from processing.company_lookup import get_index
 
-        return get_index().find_terms(text)
+        return {**get_index().find_terms(text), "error": None}
     except Exception as exc:  # 접속 주소가 섞일 수 있어 종류만 남긴다
         logger.error("용어 찾기 실패: %s", type(exc).__name__)
-        return {"sectors": [], "metrics": []}
+        return {"sectors": [], "metrics": [], "error": "company_lookup_unavailable"}

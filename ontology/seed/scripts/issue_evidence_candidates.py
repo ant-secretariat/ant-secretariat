@@ -28,12 +28,12 @@ ISSUE_KEYWORDS = {
     "ISS_BATTERY_CHINA_COMPETITION": "중국 배터리 LFP 가격", "ISS_ESS_DEMAND": "ESS 수주",
     "ISS_SHIPBUILDING_UPCYCLE": "선박 수주 신조선가", "ISS_US_SHIPBUILDING_COOP": "MRO 미국 해군 마스가",
     "ISS_DEFENSE_EXPORT": "방산 수출 계약", "ISS_NUCLEAR_EXPORT": "원전 수주 체코",
-    "ISS_RATE_CUT_NIM": "금리 인하 순이자마진", "ISS_PF_CREDIT_RISK": "PF 부실 충당금",
-    "ISS_TRADING_VOLUME_BOOM": "거래대금 브로커리지", "ISS_VALUEUP_POLICY": "밸류업 자사주 소각",
-    "ISS_GOVERNANCE_REFORM": "상법 개정 지배구조", "ISS_CHINA_CHEM_OVERCAPACITY": "중국 증설 석유화학 공급과잉",
+    "ISS_BANK_NIM_SQUEEZE": "순이자마진 NIM 하락", "ISS_PF_CREDIT_RISK": "PF 충당금 브릿지론 미착공",
+    "ISS_TRADING_VOLUME_DROP": "거래대금 감소 브로커리지", "ISS_VALUEUP_POLICY": "밸류업 자사주 소각",
+    "ISS_HOLDCO_DISCOUNT": "지주사 할인율 자사주 소각 NAV", "ISS_CHINA_CHEM_OVERCAPACITY": "중국 증설 석유화학 공급과잉",
     "ISS_PLATFORM_REGULATION": "플랫폼법 공정위 규제", "ISS_KBEAUTY_EXPORT": "화장품 수출 미국",
     "ISS_KFOOD_EXPORT": "라면 수출", "ISS_BIO_CDMO_DEMAND": "CDMO 바이오시밀러 수주",
-    "ISS_PHARMA_US_TARIFF": "의약품 관세", "ISS_FREIGHT_NORMALIZATION": "컨테이너 운임 SCFI",
+    "ISS_PHARMA_US_TARIFF": "의약품 관세", "ISS_FREIGHT_SUPPLY_SHOCK": "컨테이너 운임 SCFI 홍해",
 }
 
 

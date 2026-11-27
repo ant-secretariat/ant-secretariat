@@ -159,7 +159,7 @@ def test_company_edges_read_from_inputs_snapshot():
     rows = list(csv.DictReader((SEED / "sensitivity_inputs_2026-11-23.csv").open(encoding="utf-8")))
     assert {(r["group_id"], r["factor"]) for r in rows} == {(h[0], h[1]) for h in CO_HYPOTHESES}
     company = [e for e in o.load()["edges"]["sensitive_to"] if e["src_type"] == "COMPANY"]
-    assert len(company) == len(CO_HYPOTHESES) and meta["version"] == "seed-v0.11"
+    assert len(company) == len(CO_HYPOTHESES) and meta["version"] == "seed-v0.12"
     by = {(r["group_id"], r["factor"]): r for r in rows}
     for e in company:
         r = by[(e["src"], e["dst"])]

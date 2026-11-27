@@ -284,20 +284,20 @@ I("ISS_DEFENSE_EXPORT","K-방산 수출 확대","industry","positive","persisten
 I("ISS_NUCLEAR_EXPORT","원전 수주·수출","industry","positive","persistent",["growth"],
   "해외 원전·SMR 프로젝트.",
   [("034020","high"),("000720","mid"),("015760","mid")])
-I("ISS_RATE_CUT_NIM","금리 인하에 따른 은행 NIM 축소","macro","negative","cyclical",["valuation","macro"],
-  "예대마진 축소. 비이자이익·주주환원이 방어 논거.",
+I("ISS_BANK_NIM_SQUEEZE","은행 NIM 하락(대출 경쟁·조달비용)","industry","negative","cyclical",["valuation","macro"],
+  "기업대출 경쟁·조달비용 상승으로 스프레드 축소. 금리 상승기 대출금리 재산정에 따른 반등이 Bull 논거.",
   [("SEC_FIN","mid"),("105560","mid"),("055550","mid"),("086790","mid"),("316140","mid"),("024110","mid")])
 I("ISS_PF_CREDIT_RISK","부동산 PF 부실·건전성 리스크","macro","negative","cyclical",["risk"],
   "PF 연체·충당금 부담.",
   [("000720","mid"),("047040","mid"),("028050","low"),("SEC_FIN","low")])
-I("ISS_TRADING_VOLUME_BOOM","증시 거래대금 증가","market","positive","cyclical",["growth","valuation"],
-  "브로커리지 수수료·IB 실적 개선.",
+I("ISS_TRADING_VOLUME_DROP","증시 거래대금 감소","market","negative","cyclical",["growth","valuation"],
+  "2분기 급증 뒤 거래대금 위축. 브로커리지·WM 수수료 둔화, 이익 체력·밸류에이션이 방어 논거.",
   [("006800","high"),("039490","high"),("005940","mid"),("016360","mid"),("071050","mid")])
 I("ISS_VALUEUP_POLICY","밸류업·주주환원 정책","policy","positive","persistent",["shareholder_return","valuation"],
   "자사주 소각·배당 확대 압력. 저PBR 업종 재평가.",
   [("SEC_FIN","high"),("105560","high"),("055550","high"),("086790","high"),("138040","mid"),("033780","mid"),("000810","mid")])
-I("ISS_GOVERNANCE_REFORM","상법 개정·지배구조 개선","policy","positive","persistent",["shareholder_return","valuation"],
-  "이사 충실의무 확대 등. 지주사 할인 축소 논거.",
+I("ISS_HOLDCO_DISCOUNT","지주사 할인 축소(자사주 소각·사업 재편)","market","positive","persistent",["shareholder_return","valuation"],
+  "자사주 소각·인적분할·자회사 밸류업으로 NAV 할인율 축소. 할인율이 구조적이라는 점이 Bear 논거.",
   [("034730","mid"),("003550","mid"),("000880","mid"),("402340","mid"),("028260","mid"),("267250","mid")])
 I("ISS_CHINA_CHEM_OVERCAPACITY","중국 석유화학 공급 과잉","industry","negative","persistent",["risk","valuation"],
   "범용 석화 스프레드 약세. 구조조정 여부가 변수.",
@@ -317,8 +317,8 @@ I("ISS_BIO_CDMO_DEMAND","바이오시밀러·CDMO 수요 확대","industry","pos
 I("ISS_PHARMA_US_TARIFF","미국 의약품 관세","policy","negative","event_driven",["risk","macro"],
   "현지 생산 여부가 노출도 결정.",
   [("068270","mid"),("207940","low"),("326030","low")])
-I("ISS_FREIGHT_NORMALIZATION","컨테이너 운임 하락","industry","negative","cyclical",["risk","valuation"],
-  "선복 공급 증가로 운임 정상화.",
+I("ISS_FREIGHT_SUPPLY_SHOCK","중동 분쟁·운하 제약에 따른 컨테이너 운임 강세","industry","positive","event_driven",["growth","valuation"],
+  "선복 공급 차질로 운임 급등. 신조선 인도가 늘면 운임 정상화가 Bear 논거.",
   [("011200","high"),("086280","low")])
 
 # EXPOSED_TO: COMPANY → ISSUE (exposure 0~1). strength 기반 초안값
@@ -708,7 +708,7 @@ for k, v in nodes.items():
     for n in v:
         assert isinstance(n["reviewed"], bool) and n["status"] in ("active", "draft", "inactive"), n
 assert set(REJECTED) <= {(e["src"], e["dst"]) for e in SENSITIVE}, "REJECTED에 없는 엣지가 있다"
-meta = dict(version="seed-v0.11", generated=GENERATED, spec="온톨로지 기획서 v1.2",
+meta = dict(version="seed-v0.12", generated=GENERATED, spec="온톨로지 기획서 v1.2",
             exposure_rule='status == "active" and reviewed == True (ADR 0008). draft_fields 는 include_draft 일 때만',
             merged_sensitive_edges=MERGED, inactive_macros=sorted(INACTIVE_MACROS),
             t1_definition="KOSPI+KOSDAQ 통합 시가총액 상위 100 보통주(우선주 제외). 수경 파이프라인 companies.is_core, 2026-10-22 지정 후 고정",

@@ -2930,6 +2930,7 @@ components:
             - stale_data
         selected_agendas:
           type: array
+          description: precheck `allowed_agendas`와 같은 순서입니다. 질의에서 확인한 아젠다가 앞이고 남은 자리는 기본 아젠다입니다(#104). `agendas`도 이 순서이며, FE는 이 순서대로 보여 주고 특정 아젠다가 앞에 있다고 가정하지 않습니다.
           items:
             $ref: '#/components/schemas/AgendaId'
         agendas:

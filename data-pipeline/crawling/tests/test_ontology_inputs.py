@@ -148,8 +148,9 @@ def test_attach_seed_adds_hypothesis_and_adjusted_sign_check(tmp_path):
 def test_cli_args():
     args = parse_args(["sensitivities", "--level", "l2", "--as-of", "2026-11-23"])
     assert (args.command, args.level, args.as_of.isoformat()) == ("sensitivities", "l2", "2026-11-23")
-    args = parse_args(["issue-evidence", "--seed", "seed.json"])
-    assert (args.top_k, args.per_issue) == (3, 5)
+    # ISSUE 근거 후보는 온톨로지 쪽 스크립트로 옮겨 이 CLI에서 뺐다(#83)
+    with pytest.raises(SystemExit):
+        parse_args(["issue-evidence", "--seed", "seed.json"])
 
 
 def test_event_response_needs_clear_majority():

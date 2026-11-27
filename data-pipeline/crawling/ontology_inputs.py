@@ -5,7 +5,6 @@
     python -m crawling.ontology_inputs macro-direction --as-of 2026-11-23 --out macro_direction.csv
     python -m crawling.ontology_inputs impacts --as-of 2026-11-23 --out impacts.csv
     python -m crawling.ontology_inputs kind --out kind_t1.csv [--kind-file corplist.html]
-    python -m crawling.ontology_inputs issue-evidence --seed ../ontology/seed/ontology_seed.json --out evidence.csv
     python -m crawling.ontology_inputs monthly --out-dir ontology_inputs_out   # 매달 자동 계산 묶음
 
 - sensitivities: 섹터(l1·l2) 또는 종목 × 요인의 원래 상관, 시장 효과 뺀 상관, 같은 부호 비율, 방향 확실 수.
@@ -14,7 +13,7 @@
 - macro-direction: 지표가 오를 때 시장이 같이 움직였는지 (MACRO.direction 근거)
 - impacts: 시드 IMPACTS 초안 관계의 데이터로 본 방향
 - kind: KRX KIND 상장법인목록의 업종·주요제품으로 T1 세부 업종·지주사 후보 (파일을 안 주면 내려받음)
-- issue-evidence: 시드 ISSUE마다 수혜·타격 종목 문서에서 근거 후보 조각 검색
+- ISSUE 근거 후보는 온톨로지 쪽 ontology/seed/scripts/issue_evidence_candidates.py가 뽑는다(#83, 이 CLI에서 뺌)
 
 결과는 온톨로지 쪽의 판단 재료다. 노출 여부·가설·확정 이름은 사람이 정한다.
 """
@@ -403,38 +402,6 @@ def compute_kind(connection, kind_file: Path | None, seed: Path | None = None) -
     return out
 
 
-def compute_issue_evidence(seed_path: Path, top_k: int, per_issue: int, as_of: str | None) -> list[dict]:
-    """시드 ISSUE마다 BENEFITS/HURTS로 연결된 종목 문서에서 이슈 이름으로 검색한 근거 후보."""
-    from processing.functions.search_documents import search_documents
-
-    seed = json.loads(seed_path.read_text(encoding="utf-8"))
-    targets: dict[str, list[str]] = {}
-    for edge in seed["edges"]["benefits_hurts"]:
-        if edge["dst_type"] == "COMPANY":
-            targets.setdefault(edge["src"], []).append(edge["dst"])
-    out = []
-    for issue in seed["nodes"]["issues"]:
-        found: dict[str, dict] = {}
-        for ticker in dict.fromkeys(targets.get(issue["issue_id"], [])):
-            result = search_documents(issue["name"], ticker, top_k=top_k, as_of=as_of)
-            for hit in result.get("results", []):
-                current = found.get(hit["chunk_id"])
-                if current is None or hit.get("score", 0) > current["score"]:
-                    found[hit["chunk_id"]] = {
-                        "issue_id": issue["issue_id"], "issue_name": issue["name"], "ticker": ticker,
-                        "chunk_id": hit["chunk_id"], "document_type": hit.get("document_type", ""),
-                        "date": hit.get("date", ""), "author_org": hit.get("author_org", ""),
-                        "title": hit.get("title", ""), "score": hit.get("score", 0), "mode": result.get("mode", ""),
-                    }
-        ranked = sorted(found.values(), key=lambda r: r["score"], reverse=True)[:per_issue]
-        if not ranked:
-            out.append({"issue_id": issue["issue_id"], "issue_name": issue["name"], "ticker": "", "chunk_id": "",
-                        "document_type": "", "date": "", "author_org": "", "title": "(근거 후보 없음)", "score": 0,
-                        "mode": ""})
-        out.extend(ranked)
-    return out
-
-
 # ───────────────────────── CLI ─────────────────────────
 
 def write_csv(rows: list[dict], path: Path | None) -> None:
@@ -456,7 +423,7 @@ def write_csv(rows: list[dict], path: Path | None) -> None:
 def parse_args(argv=None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="온톨로지 입력값 계산 (DB 읽기 전용, CSV 출력)")
     sub = parser.add_subparsers(dest="command", required=True)
-    for name in ("sensitivities", "sector-grades", "macro-direction", "impacts", "kind", "issue-evidence", "monthly"):
+    for name in ("sensitivities", "sector-grades", "macro-direction", "impacts", "kind", "monthly"):
         p = sub.add_parser(name)
         p.add_argument("--out", type=Path, default=None, help="CSV 경로 (없으면 화면)")
         p.add_argument("--as-of", type=date.fromisoformat, default=None, help="기준일 (기본 오늘 KST)")
@@ -475,10 +442,6 @@ def parse_args(argv=None) -> argparse.Namespace:
             p.add_argument("--seed", type=Path, default=None, help="온톨로지 시드 JSON (섹터 민감도에 가설·상태 붙임)")
             p.add_argument("--save", action="store_true",
                            help=f"민감도(종목·l1·l2)를 {TABLE} 표에 저장 (이 옵션만 DB에 씀)")
-        if name == "issue-evidence":
-            p.add_argument("--seed", type=Path, required=True)
-            p.add_argument("--top-k", type=int, default=3, help="종목마다 검색할 조각 수")
-            p.add_argument("--per-issue", type=int, default=5, help="이슈마다 남길 후보 수")
     return parser.parse_args(argv)
 
 
@@ -487,10 +450,6 @@ def main(argv=None) -> None:
     logging.getLogger("httpx").setLevel(logging.WARNING)
     args = parse_args(argv)
     as_of = args.as_of or today_kst()
-    if args.command == "issue-evidence":
-        write_csv(compute_issue_evidence(args.seed, args.top_k, args.per_issue, args.as_of and args.as_of.isoformat()),
-                  args.out)
-        return
     with connect() as connection:
         if not (args.command == "monthly" and args.save):
             connection.execute("set session characteristics as transaction read only")

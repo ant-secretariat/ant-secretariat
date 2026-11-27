@@ -58,8 +58,8 @@
 - 사실 층(근거·verdict·stance)은 사용자 성향과 무관하게 동일. 성향은 Judge의 `points_to_check`·`caution`에만 반영. **적합/부적합 label 노출 금지**
 - 비교 모드는 최대 2종목: 종목별 Bull→Bear(종목끼리 병렬) + Judge 축별 비교, 제시 순서 무작위화, 한쪽 실패 시 단일 분석으로 전환
 - 2라운드(D5)·시뮬레이션 버튼은 단일 모드 전용
-- job 상태(계약 `RunDebateInput`, 오케스트레이터 기획서 v2.1 6.3): 단일 `queued → running → simulation_pending →(버튼) simulation_running → completed`, 비교 `queued → running → debate_completed`(종료), 실패는 `failed`. 버튼을 누르지 않으면 `simulation_pending`에 머문다. 상태 전환은 오케스트레이터 워커가 하고 `run_debate`는 결과만 돌려준다(#68 재리뷰에서 draft.6 반영 제안). `simulation_handoff` 필드는 없다(삭제됨)
-- 진행 이벤트는 노드·주장 단위(`node_started`·`claim_completed`·`agenda_completed`·`node_completed`). 토큰 단위 금지 (D8) — 단, 태은 쪽 확정 전까지는 제안 상태
+- job 상태(ADR 0013, 오케스트레이터 기획서 v2.3): 토론 job은 단일·비교 모두 `queued → running → completed`, 실패는 `failed`. 시뮬레이션은 버튼으로 만드는 **별도 job**(`debate_job_id`로 토론 결과를 읽음, 기준일은 토론 job의 `data_as_of`). 상태 전환·이벤트 저장은 워커가 하고 `run_debate`는 결과만 돌려준다(계약 draft.6 C11·C12). `simulation_handoff` 필드는 없다(삭제됨)
+- 진행 이벤트는 계약 `JobEvent` 이름(ADR 0009): `data_collected`·`claim_completed`(주장 내용 포함)·`bull_completed`·`bear_completed`·`judge_completed`·`verifying`. 토큰 단위 금지 (D8). 아젠다 하나가 실패하면 토론 전체 실패(MVP, 부분 결과는 Post-MVP)
 
 ## 구현 순서
 
@@ -84,7 +84,7 @@
 - 거절셋 수치(rs-0.2.0, 사전 kw-0.2.0): dev 오답변율 5%·과잉거절 0%, **holdout 오답변율 40%**(목표 ≤5%)·과잉거절 8%. dev는 튜닝에 썼으니 holdout이 실제 수준이다. 실패 원인은 "추천" 같은 투자 권유 단어 하나만 걸려도 통과하는 구조와 일반 단어 오탐. 기획서 D1대로 룰이 놓치는 비율이 높아 경량 모델 승격 대상인지 확정 필요. "주가가 왜 떨어졌어?"·"들고 있어도 돼?"는 범위 안으로 보고 사전에 반영했다(임시 판단)
 - 거절셋 기준선(rs-0.1.0, 사전 kw-0.1.0): 오답변율 35%(목표 ≤5%), 과잉거절률 22%. 주가 변동 이유("주가가 왜 떨어졌어?")·보유 여부("들고 있어도 돼?")처럼 `valuation`·`risk`로 볼 만한 질의를 범위 안으로 볼지, 키워드 사전을 어디까지 넓힐지 확정 필요
 - `validation/l1.py` 금지 표현(`FORBIDDEN_PATTERNS`)은 권유형 어미까지 포함한 정규식이다. 테스트의 차단 10문장·통과 7문장으로 고정했고, 문장을 추가할 때는 두 목록에 같이 넣는다. 기획서에 목록이 없어 확정은 거절셋처럼 문항 측정 후
-- `schemas.py`는 계약 draft.5(PR #46) DebateResult와 같은 필드다(점수 integer, `data_richness`·`ontology`, `companies[].data_tier`). `confidence`는 계약에도 타입이 `str`뿐이라 값 목록이 없다. 근거 제외 후 `partial` 고지를 담을 필드 위치도 기획서에 없어 아직 없음(검증 레이어 구현 때 결정)
+- `schemas.py`는 계약 draft.5(PR #46) DebateResult와 같은 필드다(점수 integer, `data_richness`·`ontology`, `companies[].data_tier`). `confidence`는 계약에도 타입이 `str`뿐이라 값 목록이 없다. 근거 제외 후 `partial` 고지 칸은 MVP에서 만들지 않는다(#78 리뷰, 기준선에서 빠진 Claim 빈도를 보고 다시 정함)
 - 기준선 실험 `rubric.json`(rb-0.1.0)은 초안이다. 시험 채점 후 채점자 일치율이 낮은 항목부터 다듬는다. 채점자 2명이 누구인지 확정 필요(#65). "같은 근거"는 수경 제안(#28)대로 문항별 `as_of` + 검색된 `chunk_id` 목록을 스냅샷 태그(`2026-11-10-baseline-v1`)로 묶어 저장한다. 문항 `as_of` 2026-11-10은 임시값. 승률은 동점을 승으로 세지 않는다(임시 규칙). 채점용 텍스트 형식 정규화(Bull·Bear 표기로 시스템이 드러나는 문제)는 출력 생성 단계에서 정한다
 - `AgendaId`·`DataTier`·`Tier`는 `processing.enums`(#30, main)에서 import한다. 멤버 이름은 `UPPER_SNAKE`(예: `AgendaId.VALUATION`). `ReasonCode`·`NextAction`·`PrecheckResult`는 `backend/contracts/`가 생기면 옮긴다
 - `data/intent_data_sources.json` — 값은 수경 제안(#21 리뷰 2026-11-10) 반영. `financials`·`flow`·`insider`·`sensitivity`·`derived` 키는 데이터 쪽이 `get_available_data_status`에 추가할 예정(#35 병합 후)이라 그 전에는 해당 키가 provider에 없다 — 남은 키로 판정된다

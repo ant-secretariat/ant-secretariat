@@ -119,3 +119,83 @@ def test_failure_keeps_all_groups_and_does_not_leak_url(monkeypatch, caplog):
     assert result["error"] == "snapshot_unavailable"
     assert result["price_trend"]["volatility_1m"] is None
     assert "SECRET" not in caplog.text
+
+
+class _CompanyOnlyConnection:
+    """회사 조회만 응답하는 가짜 연결. 묶음 조회 함수는 테스트에서 바꿔 끼운다."""
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def execute(self, sql, params=None):
+        class Result:
+            def fetchone(self):
+                return ("SK하이닉스", "KOSPI", "IT")
+
+        return Result()
+
+
+def _boom(*args):
+    raise RuntimeError("postgresql://user:SECRET@host/db")
+
+
+def test_one_group_failure_keeps_other_groups(monkeypatch, caplog):
+    import processing.functions.get_derived_snapshot as module
+
+    monkeypatch.setattr("crawling.db.postgres.connect", lambda: _CompanyOnlyConnection())
+    monkeypatch.setattr(module, "_flow_rows", _boom)
+    monkeypatch.setattr(module, "_valuation_rows", lambda *a: {})
+    monkeypatch.setattr(module, "_price_rows", lambda *a: ([], [], [], None))
+    monkeypatch.setattr(module, "_quarter_rows", lambda *a: [])
+
+    result = get_derived_snapshot("000660", "2026-11-06")
+
+    # 실패한 묶음만 query_failed, 나머지는 원래 사유(no_data)를 그대로 낸다 (#31, #55)
+    assert result["flow"]["reason"] == "query_failed" and result["flow"]["foreign_net_buy_20d"] is None
+    assert result["valuation"]["reason"] == "no_data"
+    assert result["failed_groups"] == ["flow"] and "error" not in result
+    assert result["company"] == "SK하이닉스"
+    assert "SECRET" not in caplog.text
+
+
+def test_all_groups_failing_is_snapshot_unavailable(monkeypatch):
+    import processing.functions.get_derived_snapshot as module
+
+    monkeypatch.setattr("crawling.db.postgres.connect", lambda: _CompanyOnlyConnection())
+    for name in ("_flow_rows", "_valuation_rows", "_price_rows", "_quarter_rows"):
+        monkeypatch.setattr(module, name, _boom)
+
+    result = get_derived_snapshot("000660", "2026-11-06")
+    assert result["error"] == "snapshot_unavailable" and result["failed_groups"] == list(GROUPS)
+
+
+def test_short_listing_has_no_3m_volatility_or_52w_values():
+    # 상장 16거래일째: 3개월 변동성이 1개월 값과 같게 나가거나, 상장 이후 값이 52주로 나가면 안 된다 (#31 리뷰 3번)
+    days = _days(17)
+    closes = [(d, 100 * (1.01 if i % 2 else 0.99) ** i) for i, d in enumerate(days)]
+    result = price_trend(closes, [], [], None)
+
+    assert result["volatility_1m"] is not None and result["volatility_3m"] is None
+    assert (result["high_52w"], result["low_52w"], result["position_52w"], result["drawdown_from_52w_high"]) == (None,) * 4
+    assert result["sample_days_52w"] == 17 and result["sample_start_52w"] == days[0].isoformat()
+    assert "52주 값을 내지 않음" in result["note_52w"]
+
+
+def test_3m_volatility_needs_55_returns():
+    days = _days(60)   # 수익률 59개 → 3개월 계산
+    closes = [(d, 100 * (1.01 if i % 2 else 0.99) ** i) for i, d in enumerate(days)]
+    assert price_trend(closes, [], [], None)["volatility_3m"] is not None
+    assert price_trend(closes[-55:], [], [], None)["volatility_3m"] is None   # 수익률 54개
+
+
+def test_52w_counts_a_full_calendar_year_with_fewer_trading_days():
+    # 상장 1년이 됐는데 거래일이 252개보다 적어도(휴장·정지) 기간이 51주 이상이면 52주 값을 낸다
+    start = date(2025, 11, 24)
+    days = [start + timedelta(days=round(i * 364 / 243)) for i in range(244)]
+    closes = [(d, 100 + i) for i, d in enumerate(days)]
+    result = price_trend(closes, [], [], None)
+    assert result["high_52w"] == 343 and result["position_52w"] == 1.0 and "note_52w" not in result
+

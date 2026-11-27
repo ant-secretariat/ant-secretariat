@@ -646,6 +646,27 @@ result = get_disclosure_data(
 
 ---
 
+### suggest_alternatives()
+
+관문1이 종목을 거절할 때(`uncovered_company`, `no_data`) 보여 줄 대안 종목. 오케스트레이터 기획서 v2.1·계약 변경 C9.
+
+```python
+from processing.functions.suggest_alternatives import suggest_alternatives
+
+result = suggest_alternatives("329180", n=3, as_of="2026-11-23")
+# → {"ticker", "company", "sector_l1", "sector_l2", "as_of", "basis",
+#    "alternatives": [{"ticker", "company", "sector_l1", "sector_l2", "market_cap", "match"}]}
+```
+
+- 대안은 커버 종목(핵심 종목 T1 중 그날 시가총액이 있는 보통주)에서만 고르고, 요청 종목은 뺍니다.
+- 같은 WICS 중분류(`sector_l2`) → 같은 대분류(`sector_l1`) → 전체 순으로 채우고, 각 단계 안에서는 시가총액 큰 순입니다. `match`에 어느 단계에서 골랐는지 담습니다.
+- 요청 종목의 업종이 비어 있거나 종목 목록에 없으면 바로 전체 시가총액 순입니다.
+- 시가총액은 `as_of`(없으면 오늘 KST)까지의 마지막 거래일 값입니다.
+- 조회에 실패하면 `alternatives`는 빈 목록이 아니라 `null`이고 `"error": "alternatives_unavailable"`입니다. `n`이 1~10이 아니거나 `as_of` 형식이 틀리면 `ValueError`입니다.
+- WICS 중분류는 넓은 곳이 있습니다(예: 자본재에 조선·방산·전력기기가 함께 있음). 그래서 조선사를 물어도 다른 자본재 종목이 대안으로 나올 수 있습니다.
+
+---
+
 ### get_chunks_by_ids()
 
 `chunk_id` 목록으로 청크 본문을 꺼냅니다. 골든셋·기준선에 근거 `chunk_id`만 저장해 두고 나중에 같은 본문을 다시 볼 때 씁니다(#28).
@@ -836,7 +857,7 @@ result = get_metric(ticker="005930", metric_id="roe_ttm", as_of="2026-09-01")
   - `documents`에 `query`(의미 검색)·`keyword_query`(키워드 검색)·`document_types`·`mode`. 한 종류의 검색이 실패하면 나머지는 주고 `reason="search_unavailable"`·`failed_types`. 동점이면 최신 문서가 앞
 - `debate`에 `intent`를 주면 그 아젠다의 지표 목록 `metrics`도 줌(`AGENDA_METRICS`, #84)
   - 항목은 `get_metric` 결과 그대로(`value`·`unit`·`display`·`as_of`·`reason` 등)이고 값이 없는 지표도 빼지 않음
-  - 항목마다 `name`(지표 이름)과 `evidence_id`(`metric:{종목}:{지표}:{지표의 as_of}`). 근거 ID의 날짜는 요청일이 아니라 그 지표가 실제로 쓴 데이터의 날짜
+  - 항목마다 `name`(지표 이름)과 `chunk_id`(`metric:{종목}:{지표}:{지표의 as_of}`, 문서 결과와 같은 이름). 근거 ID의 날짜는 요청일이 아니라 그 지표가 실제로 쓴 데이터의 날짜
   - 토론은 `value`와 `display`가 둘 다 있는 지표만 `{{metric_id}}` 자리표시자로 씀(#84 Q1)
 
 | intent | `metrics` |
@@ -847,6 +868,23 @@ result = get_metric(ticker="005930", metric_id="roe_ttm", as_of="2026-09-01")
 | `flow` | `foreign_net_buy_20d`, `inst_net_buy_20d`, `individual_net_buy_20d`, `short_volume_ratio_20d`, `short_balance_ratio` |
 | `shareholder_return` | `dividend_yield`, `dps`, `eps`, `close` |
 | `macro` | (없음) |
+
+- `debate`에 `intent`를 주면 아젠다 블록도 최상위 키로 줌(#84 ②). 이때는 목표가 전체 이력(`target_prices`)과 매크로 전체 이력(`macro_data`, 약 180만 자)을 넣지 않음
+- 아젠다 문서 검색이 0건이면 다른 문서 종류(리포트 → 뉴스 → 공시 순, 아젠다 종류 제외)로 한 번 더 찾고 `documents.widened: true`, `widened_types`에 찾아본 종류. 찾으면 거기서 멈춤
+  - 블록마다 `source`(함수), `as_of`(블록이 실제로 쓴 데이터의 날짜), `chunk_id`(`block:{종목}:{블록}:{as_of}`), `reason`. 조회 실패면 `chunk_id: null` + `error`, 값이 없으면 `reason: "no_data"`
+  - 블록 하나가 실패해도 나머지는 줌
+
+| intent | 블록 |
+| --- | --- |
+| `valuation` | `target_price`(컨센서스, `upside_pct` = 컨센서스 평균 ÷ 같은 묶음의 종가 − 1, `revisions`(#105), 최근 의견 10건), `financials`(최근 8분기, 연결/별도 표시) |
+| `growth` | `financials` |
+| `risk` | `disclosures`(최근 90일, 10건까지, `total`은 전체 건수) |
+| `shareholder_return` | `disclosures`(최근 1년 주주환원 공시만, 10건까지) |
+| `macro` | `macro`(국고채 3·10년·원/달러·기준금리는 최근 60개, 소비자물가·브렌트유·D램 수출물가는 최근 13개월, 최신 먼저. 이 종목에 방향이 확실한 민감도 요인을 앞에), `index`(코스피·코스닥 60거래일), `sensitivities`(시장 효과를 뺀 값, `get_sensitivities`) |
+| `flow` | (아직 없음) |
+
+  - `valuation`(밸류에이션 위치)·`fundamental_trend`·`price_trend`·`flow` 블록은 `get_derived_snapshot` 실패 처리(#88)가 들어간 뒤 더함
+  - 목표가 방향 라벨(상향·하향·혼조)은 받는 쪽이 `revisions`로 정함(#82)
 
 | intent | 키워드 | 문서 종류 |
 | --- | --- | --- |
@@ -898,7 +936,7 @@ result = get_agent_context(
 
 - `as_of`를 주면 그날까지 공개된 데이터만 씀(재무는 공시 접수일, 공매도 잔고는 공개 지연 2거래일 반영). 기본은 오늘
 - `valuation`: PER·PBR, 과거 3년 일별 값 중 백분위(적자 PER 제외), WICS 대분류 중앙값 대비(%)
-- `price_trend`: 1주·1개월·3개월 수익률(%), 코스피·코스닥 대비 초과수익, 52주 위치. 변동성 `volatility_1m`·`volatility_3m`은 일별 로그수익률 표준편차 × √252(연율, 소수)로 계약서상 과거 변동성의 단일 계산 지점. `volatility_1m_market_threshold`는 그날 시세가 있는 종목들의 상위 20% 값(현재 시세는 T1만 적재되어 T1 기준)
+- `price_trend`: 1주·1개월·3개월 수익률(%), 코스피·코스닥 대비 초과수익, 52주 위치. 표본이 모자라면 값을 null로 둠: 3개월 변동성은 수익률 55개, 1개월은 15개 미만일 때. 52주 값(`high_52w`·`low_52w`·`position_52w`·`drawdown_from_52w_high`)은 거래일 252개 미만이면서 첫 종가부터 357일 미만일 때(상장 1년 전 등). 이때 `note_52w`에 사유를 담고, `sample_days_52w`·`sample_start_52w`는 늘 실음. 변동성 `volatility_1m`·`volatility_3m`은 일별 로그수익률 표준편차 × √252(연율, 소수)로 계약서상 과거 변동성의 단일 계산 지점. `volatility_1m_market_threshold`는 그날 시세가 있는 종목들의 상위 20% 값(현재 시세는 T1만 적재되어 T1 기준)
 - `fundamental_trend`: 그날까지 공시된 최근 분기 매출·영업이익·순이익(연결 우선)과 전년 동기·직전 분기 대비 증감률. 기준이 적자면 증감률 대신 `…_note`에 흑자전환·적자지속
 - `flow`: 외국인·기관·개인 순매수(5·20거래일 합계, 원), 20일 합계의 시가총액 대비(%), 공매도 거래 비중 평균·잔고 비중
 - 묶음마다 값을 못 내면 값은 `null`이고 `reason`(예: `no_data`)에 사유. 하나라도 값이 있으면 `available: true`

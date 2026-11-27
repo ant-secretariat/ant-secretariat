@@ -91,7 +91,7 @@ class CompanyIndex:
 
     def exact(self, text: str) -> tuple[list[str], str | None]:
         """완전일치(종목코드·정식명·별칭)와 그룹 별칭. (종목코드 목록, 일치 종류)."""
-        raw = (text or "").strip().upper()
+        raw = unicodedata.normalize("NFKC", text or "").strip().upper()
         if TICKER_PATTERN.match(raw) and raw in self.companies:
             return [raw], MATCH_EXACT_TICKER
         key = normalize(text)
@@ -129,10 +129,15 @@ class CompanyIndex:
     # ------------------------------------------------------------------ 문장 속 종목
 
     def mentions(self, text: str) -> list[tuple[str, int]]:
-        """문장 속 종목 표현과 위치. 긴 표현 우선, 겹치지 않게, 조사가 붙어도 인정."""
+        """문장 속 종목 표현과 위치. 긴 표현 우선, 겹치지 않게, 조사가 붙어도 인정.
+
+        resolve_company와 같게 전각 글자는 반각으로 바꿔 보고(NFKC, 글자 수는 그대로),
+        네 글자 이상 이름은 사이에 띄어쓰기가 있어도 인정한다("LG에너지 솔루션").
+        """
         if self._mention_pattern is None:
             self._mention_pattern = self._build_mention_pattern()
-        return [(match.group("name"), match.start("name")) for match in self._mention_pattern.finditer(text or "")]
+        text = unicodedata.normalize("NFKC", text or "")
+        return [(match.group("name"), match.start("name")) for match in self._mention_pattern.finditer(text)]
 
     def _build_mention_pattern(self) -> re.Pattern:
         excluded = set(self.terms.get("extract_exclude", {}).get("names", []))
@@ -140,7 +145,7 @@ class CompanyIndex:
         surfaces |= {alias for alias in self.terms.get("aliases", {}) if not alias.startswith("_")}
         surfaces |= {key for key in self.terms.get("ambiguous", {}) if not key.startswith("_")}
         surfaces = sorted((s for s in surfaces if len(s) >= 2), key=len, reverse=True)
-        names = "|".join(re.escape(s) for s in surfaces)
+        names = "|".join(_spaced_pattern(s) for s in surfaces)
         particles = "|".join(PARTICLES)
         return re.compile(
             rf"(?<![{WORD_CHAR}])(?P<name>{names}|[0-9]{{6}})(?=$|[^{WORD_CHAR}]|(?:{particles})(?:$|[^{WORD_CHAR}]))",
@@ -153,6 +158,11 @@ class CompanyIndex:
         """문장 속 업종·지표 용어. {"sectors": [{term, sector_level, sector}], "metrics": [{term, metric_id}]}."""
         key = normalize(text)
         spaced = unicodedata.normalize("NFKC", text or "").casefold()  # 영문 용어의 단어 경계용(공백 유지)
+        # 종목 이름 안의 글자는 용어로 보지 않는다("LG화학 실적"의 화학)
+        for mention, _ in self.mentions(text):
+            key, spaced = _mask(key, spaced, normalize(mention))
+            spaced = spaced.replace(mention.casefold(), MASK * len(mention))
+        company_masked = (key, spaced)
         sectors: dict[tuple, str] = {}
         sector_terms = {name: ("l1", name) for name in {c.sector_l1 for c in self.companies.values()} if name}
         sector_terms |= {name: ("l2", name) for name in {c.sector_l2 for c in self.companies.values()} if name}
@@ -161,10 +171,14 @@ class CompanyIndex:
         for term, (level, sector) in sorted(sector_terms.items(), key=lambda item: -len(item[0])):
             if _contains(key, spaced, normalize(term)):
                 sectors.setdefault((level, sector), term)
+                key, spaced = _mask(key, spaced, normalize(term))
+        key, spaced = company_masked
         metrics: dict[str, str] = {}
+        # 긴 용어부터 보고, 잡힌 구간은 가린다("주가수익비율"이 per로 잡히면 그 안의 "주가"는 close로 안 봄)
         for term, metric_id in sorted(self.terms.get("metric_terms", {}).items(), key=lambda item: -len(item[0])):
             if not term.startswith("_") and _contains(key, spaced, normalize(term)):
                 metrics.setdefault(metric_id, term)
+                key, spaced = _mask(key, spaced, normalize(term))
         return {
             "sectors": [{"term": term, "sector_level": level, "sector": sector} for (level, sector), term in sectors.items()],
             "metrics": [{"term": term, "metric_id": metric_id} for metric_id, term in metrics.items()],
@@ -239,6 +253,23 @@ def is_chosung(text: str) -> bool:
 def _size_key(company: Company) -> tuple:
     # 시가총액 큰 순. 시세가 없는 종목(현재 T1 밖)은 뒤로, 보통주를 우선주보다 앞에
     return (company.market_cap is None, -(company.market_cap or 0), company.is_preferred, company.name)
+
+
+MASK = "\x00"
+
+
+def _mask(compact: str, spaced: str, term: str) -> tuple[str, str]:
+    """이미 잡힌 용어를 가려 더 짧은 용어가 그 안에서 다시 잡히지 않게 한다."""
+    if not term:
+        return compact, spaced
+    return compact.replace(term, MASK * len(term)), spaced.replace(term, MASK * len(term))
+
+
+def _spaced_pattern(name: str) -> str:
+    """네 글자 이상 이름은 글자 사이 띄어쓰기 하나를 허용하는 패턴."""
+    if len(name) < 4:
+        return re.escape(name)
+    return r" ?".join(re.escape(char) for char in name if not char.isspace())
 
 
 def _contains(compact: str, spaced: str, term: str) -> bool:

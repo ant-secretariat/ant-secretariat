@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 from datetime import date, datetime
+from crawling.config.clock import today_kst
 
 
 def generate_report_id(
@@ -59,7 +60,7 @@ def is_within_months(value: str | None, months: int) -> bool:
     parsed = parse_date(value)
     if parsed is None:
         return False
-    return parsed >= subtract_months(date.today(), months)
+    return parsed >= subtract_months(today_kst(), months)
 
 
 def _is_leap_year(year: int) -> bool:

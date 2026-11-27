@@ -35,6 +35,7 @@ from crawling.crawler.pdf_downloader import PdfDownloader
 from crawling.db.postgres import connect, upsert
 from processing.processors.report_chunker import CHUNKER_VERSION, ReportChunk, ReportMeta, chunk_report
 from processing.search.korean_tokens import chunk_search_columns
+from crawling.config.clock import today_kst
 
 logger = logging.getLogger(__name__)
 
@@ -175,6 +176,9 @@ def chunk_one(
         )
         has_text, chunks = worker.run(split_pdf, str(result.temp_path), meta)
         rows = chunk_rows(chunks, report)
+        if has_text and not rows:
+            # 글자는 뽑혔는데 청크가 0개면 청커 문제다. chunked(0개)로 두지 않고 실패로 남긴다
+            raise RuntimeError("본문은 있는데 청크가 0개")
     finally:
         for leftover in folder.glob(f"{report['report_id']}*"):
             leftover.unlink(missing_ok=True)
@@ -202,7 +206,13 @@ def replace_chunks(connection: psycopg.Connection, doc_id: str, rows: list[dict]
     청크 ID는 본문 해시라서 본문이 같으면 ID도 같다. 새 결과에 없는 청크는 지우지 않고
     is_active=false로 남긴다(토론 근거·온톨로지 ISSUE가 청크 ID를 저장하므로).
     나머지는 upsert로 메타데이터만 고친다(행에 embedding 칸이 없어 기존 값이 남는다).
+
+    새 결과가 비면 아무것도 바꾸지 않는다. 빈 외부 응답(원문 요청 실패, 글자 없는 PDF 등)을
+    "청크가 모두 사라짐"으로 해석해 기존 청크를 끄지 않기 위해서다(헌법 원칙 III).
     """
+    if not rows:
+        logger.warning("%s 새로 자른 청크가 없어 기존 청크를 그대로 둠", doc_id)
+        return
     existing = dict(
         connection.execute(
             "select chunk_id, section_title from document_chunks where doc_id = %s", (doc_id,)
@@ -294,7 +304,7 @@ def main() -> None:
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("pymupdf").setLevel(logging.WARNING)
     args = parse_args()
-    end = date.today()
+    end = today_kst()
     start = end - timedelta(days=args.months * 31 if args.backfill else RECENT_DAYS)
     with connect() as connection:
         tickers = set(args.tickers) if args.tickers else _targets(connection)

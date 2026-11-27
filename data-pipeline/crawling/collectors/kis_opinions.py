@@ -98,7 +98,11 @@ class KisOpinionClient:
 
     def _fetch_range(self, ticker: str, start: date, end: date) -> list[dict]:
         rows = self._fetch(ticker, start, end)
-        if len(rows) < MAX_ROWS_PER_CALL or start >= end:
+        if len(rows) < MAX_ROWS_PER_CALL:
+            return rows
+        if start >= end:
+            # 하루치가 한도를 넘으면 더 나눌 수 없어 잘린 채로 둔다. 조용히 넘기지 않게 남긴다
+            logger.warning("%s %s 의견이 %s행 이상이라 일부가 빠졌을 수 있음", ticker, start, MAX_ROWS_PER_CALL)
             return rows
         middle = start + (end - start) // 2
         return self._fetch_range(ticker, start, middle) + self._fetch_range(
@@ -147,10 +151,15 @@ def opinion_rows(ticker: str, raw_rows: list[dict]) -> list[dict]:
         broker = (raw.get("mbcr_name") or "").strip()
         if not opinion_date or not broker:
             continue
+        try:
+            parsed_date = datetime.strptime(opinion_date, "%Y%m%d").date()
+        except ValueError:
+            logger.warning("%s 날짜를 읽지 못한 의견 행을 건너뜀: %r (%s)", ticker, opinion_date, broker)
+            continue
         opinion = _text(raw.get("invt_opnn"))
         rows[(opinion_date, broker)] = {
             "ticker": ticker,
-            "opinion_date": datetime.strptime(opinion_date, "%Y%m%d").date(),
+            "opinion_date": parsed_date,
             "broker": broker,
             "opinion": opinion,
             "opinion_norm": normalize_opinion(opinion),

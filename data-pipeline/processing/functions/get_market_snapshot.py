@@ -4,6 +4,10 @@
 - sector는 WICS 대분류(sector_l1) 또는 중분류(sector_l2) 이름. 없으면 전체
 - sort_by: market_cap·trading_value·volume·change_pct·dividend_yield는 큰 순, per·pbr은 작은 순(0 이하는 뺌)
 - 대상은 시세가 적재된 종목뿐이다(현재 T1 100개, 기획서의 T0 전 종목 시세는 아직 미적재)
+- 잘못된 입력은 예외 대신 error로 알린다(get_financials와 같은 원칙, #33 리뷰·#42):
+  as_of 형식이 틀리면 invalid_date, top_n이 1 이상 정수가 아니면 invalid_top_n, sector가 문자열이 아니면
+  invalid_sector, sort_by가 목록에 없으면 unsupported_sort_by. top_n이 100보다 크면 100으로 줄이고
+  결과의 top_n·top_n_capped로 알린다
 """
 
 from __future__ import annotations
@@ -56,13 +60,25 @@ def get_market_snapshot(
     sort_by: str = "market_cap",
     as_of: str | None = None,
 ) -> dict:
-    as_of = date.fromisoformat(as_of).isoformat() if as_of else today_kst().isoformat()
-    base = {"as_of": None, "requested_as_of": as_of, "sector": sector, "sort_by": sort_by,
+    base = {"as_of": None, "requested_as_of": as_of, "sector": sector, "sort_by": sort_by, "top_n": top_n,
             "universe": "시세가 적재된 종목(현재 T1)", "count": 0, "companies": []}
+    try:
+        base["requested_as_of"] = date.fromisoformat(as_of).isoformat() if as_of else today_kst().isoformat()
+    except (TypeError, ValueError):
+        return {**base, "error": "invalid_date"}
+    as_of = base["requested_as_of"]
+    if sector is not None and not isinstance(sector, str):
+        return {**base, "error": "invalid_sector"}
     if sort_by not in SORTS:
         return {**base, "error": "unsupported_sort_by"}
-    top_n = max(1, min(int(top_n), MAX_TOP_N))
+    count = _top_n(top_n)
+    if count is None:
+        return {**base, "error": "invalid_top_n"}
+    capped = count > MAX_TOP_N
+    top_n = min(count, MAX_TOP_N)
+    base.update(top_n=top_n, top_n_capped=capped)
     sector = sector.strip() if sector and sector.strip() else None
+    base["sector"] = sector
     # 조회 실패로 인사이트보드가 멈추지 않게 한다. 접속 주소가 섞일 수 있어 종류만 남긴다
     try:
         from crawling.db.postgres import connect
@@ -84,6 +100,21 @@ def get_market_snapshot(
             return {**base, "error": "market_snapshot_unavailable"}
         return {**base, "error": "no_data" if known else "unknown_sector"}
     return {**base, **rank(rows, sort_by, top_n)}
+
+
+def _top_n(value) -> int | None:
+    """1 이상의 정수면 그 값, 아니면 None. "20"처럼 정수 문자열은 받고, 3.5·True·"abc"는 받지 않는다."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, float):
+        if not value.is_integer():
+            return None
+        value = int(value)
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return None
+    return number if number >= 1 else None
 
 
 def rank(rows: list[tuple], sort_by: str, top_n: int) -> dict:

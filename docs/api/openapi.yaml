@@ -1107,7 +1107,7 @@ x-internal-functions:
 - name: get_available_data_status
   agent: 데이터 에이전트
   summary: 데이터 보유 상태 조회
-  signature: get_available_data_status(ticker) -> dict
+  signature: get_available_data_status(ticker, as_of=None) -> dict
   input: GetAvailableDataStatusInput
   output: DataStatus
   status: changed
@@ -1962,7 +1962,13 @@ components:
           type:
           - boolean
           - 'null'
-          description: 가장 최근 `sim_params`가 정상인지(시뮬레이션할 수 있는 종목인지). 조회에 실패하면 null입니다.
+          description: 이 종목을 시뮬레이션할 수 있는지. 판정 기준일(입력 `as_of`, 없으면 오늘) 이전 가장 최근 `sim_params`의 `status`가 `ok`이면 true, 정상이 아니거나 파라미터가 없으면 false입니다. 조회 실패면 null입니다. 시뮬레이션 버튼은 토론 job의 `data_as_of`를 넘겨 다시 판정합니다(ADR 0013).
+        simulation_params_as_of:
+          type:
+          - string
+          - 'null'
+          format: date
+          description: '`simulation_ready` 판정에 쓴 `sim_params.as_of`(파라미터 기준일). 파라미터가 없거나 조회 실패면 null'
         sources:
           type: object
           description: 소스별 보유 상태(precheck 관문3 입력). 키는 report, news, disclosure, price, macro, target_price, financials,
@@ -1985,8 +1991,8 @@ components:
           type:
           - string
           - 'null'
-          description: 조회 실패면 "data_status_unavailable". 이때 건수·available·latest는 0·false가 아니라 null입니다(데이터 없음과
-            구분).
+          description: 조회 실패면 "data_status_unavailable", 입력 `as_of` 형식이 틀리면 "invalid_date". 이때 건수·available·latest는
+            0·false가 아니라 null입니다(데이터 없음과 구분).
     ResolvedCompany:
       type: object
       required:
@@ -3951,6 +3957,12 @@ components:
       properties:
         ticker:
           $ref: '#/components/schemas/TickerValue'
+        as_of:
+          type:
+          - string
+          - 'null'
+          format: date
+          description: '`simulation_ready` 판정 기준일. 나머지 건수·최신일은 지금 기준입니다. 형식이 틀리면 `error=invalid_date`'
     SuggestAlternativesInput:
       type: object
       required:

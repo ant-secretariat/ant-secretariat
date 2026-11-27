@@ -1220,12 +1220,23 @@ x-internal-functions:
   agent: 토론 에이전트
   summary: 토론 실행 함수
   signature: 'async def run_debate(*, query: str, company: CompanyMeta, precheck: PrecheckResult, fetch_evidence, trace_id: str,
-    data_as_of: str, profile: UserProfile | None = None, emit=None) -> DebateRun'
+    data_as_of: str | None, profile: UserProfile | None = None, emit=None) -> DebateRun'
   input: RunDebateInput
-  output: DebateResult
+  output: DebateRun
   status: changed
   release: mvp
-  note: '결과만 돌려주는 함수입니다. job 상태와 `job_events`는 건드리지 않고, 작업 큐 워커가 저장·상태 전환을 맡습니다. 워커가 주입하는 것: `emit`(→ `append_event`, 진행 이벤트 기록), `fetch_evidence`(→ 도구 레지스트리 `get_agent_context`), `profile`(user_id로 조회한 투자 성향), `company.data_tier`(관문1 data_status로 계산). 진행 이벤트 저장 실패는 로그만 남기고 계속, 결과 저장 실패는 job `failed`. 토론 job은 단일·비교 모두 `completed`로 끝나고 완료 시점의 `simulation_ready`를 저장합니다. 시뮬레이션은 별도 job입니다(ADR 0013). 비교 모드도 같은 모양입니다.'
+  note: '결과만 돌려주는 함수입니다. job 상태와 `job_events`는 건드리지 않고, 작업 큐 워커가 저장·상태 전환을 맡습니다(ADR 0012·0013).
+    워커가 주입하는 것: `emit(event, payload)`(→ `append_event`, 진행 이벤트 기록), `fetch_evidence(company, agenda_id, query, as_of)`(→ 도구 레지스트리
+    `get_agent_context(ticker, "debate", query, intent=agenda_id, as_of=as_of)`), `profile`(user_id로 조회한 투자 성향), `company.data_tier`(관문1 data_status로 계산).
+    기준일: `run_debate`가 받은 `data_as_of`를 `fetch_evidence`의 `as_of`로 그대로 넘기고 결과 `meta.data_as_of`에도 같은 값을 적습니다. 결과 기준일과 실제 조회 기준일이
+    한 값에서 나오게 하려는 것입니다(#76 리뷰). null이면 최신 데이터입니다.
+    진행 이벤트(`emit`, JobEvent 이름·payload): `data_collected` → 아젠다마다 `claim_completed`(`role`·`agenda_id`·`claim`)·`bull_completed`·`bear_completed`(`agenda_id`·`claim_count`)
+    → `judge_completed` → `verifying`. 아젠다끼리 병렬이라 `bull_completed`·`bear_completed`는 아젠다마다 옵니다. `job_started`·`completed`·`failed`는 워커가 보냅니다.
+    실패: 아젠다 하나라도 실패하면 나머지 호출을 취소하고 첫 실패를 원래 타입 그대로 올립니다(`LLMUnavailableError`·`LLMOutputInvalidError` 등, 워커가 `error_code`로 기록). 부분 결과는 Post-MVP입니다.
+    진행 이벤트 저장 실패는 로그만 남기고 계속, 결과 저장 실패는 job `failed`. 토론 job은 단일·비교 모두 `completed`로 끝나고 완료 시점의 `simulation_ready`를 저장합니다.
+    시뮬레이션은 별도 job입니다(ADR 0013).
+    비교 모드: 지금 구현은 단일 모드만 받습니다(`company` 1개, `precheck.mode="single"`, 아니면 `ValueError`). 비교 모드를 구현할 때 같은 함수의 인자를
+    `companies: list[CompanyMeta]`(1~2개)로 바꾸고 결과는 같은 `DebateRun`(그 안의 `DebateResult.comparison`)으로 돌려줍니다. `RunDebateInput.companies`는 그 모양을 미리 적은 것입니다.'
 - name: get_ontology_context
   agent: 관계 사전
   summary: 아젠다별 관계 컨텍스트 조회
@@ -2757,6 +2768,73 @@ components:
                   type: integer
         rebuttal_round:
           type: boolean
+    DebateRun:
+      type: object
+      description: run_debate의 반환값입니다. 워커는 `result`를 job 결과로 저장하고, `l1`·`usage`는 로그·관측용으로 씁니다.
+      required:
+      - result
+      - l1
+      - usage
+      properties:
+        result:
+          $ref: '#/components/schemas/DebateResult'
+        l1:
+          type: object
+          description: 검증 레이어 L1 결과. `issues`가 비면 통과입니다
+          required:
+          - issues
+          properties:
+            issues:
+              type: array
+              items:
+                type: object
+                required:
+                - code
+                - path
+                properties:
+                  code:
+                    type: string
+                    description: 'no_evidence·unknown_evidence_id·unresolved_placeholder·forbidden_phrase·bad_bull_claim_ref 등'
+                  path:
+                    type: string
+                    examples:
+                    - agendas[0].bull.claims[1].text
+                  detail:
+                    type: string
+                  claim_id:
+                    type:
+                    - string
+                    - 'null'
+        usage:
+          type: array
+          description: LLM 호출마다 하나. Langfuse 연동 전 기록용입니다
+          items:
+            type: object
+            properties:
+              node:
+                type: string
+                enum:
+                - bull
+                - bear
+                - judge
+              agenda_id:
+                type:
+                - string
+                - 'null'
+              model:
+                type: string
+              prompt_tokens:
+                type:
+                - integer
+                - 'null'
+              completion_tokens:
+                type:
+                - integer
+                - 'null'
+              latency_ms:
+                type: integer
+              attempts:
+                type: integer
     DebateResult:
       type: object
       required:
@@ -3780,7 +3858,7 @@ components:
           description: EntityResolution.mentioned_in_query 값입니다. null이면 precheck가 공식 회사명·종목코드로 직접 확인합니다.
     RunDebateInput:
       type: object
-      description: run_debate에 넘기는 데이터 인자입니다. 함수 인자 `emit`·`fetch_evidence`는 워커가 주입하는 콜백이라 여기 적지 않습니다(run_debate note 참고). job_id·user_id는 워커만 알고 run_debate에는 넘기지 않습니다.
+      description: run_debate에 넘기는 데이터 인자입니다. 함수 인자 `emit`·`fetch_evidence`는 워커가 주입하는 콜백이라 여기 적지 않습니다(run_debate note 참고). job_id·user_id는 워커만 알고 run_debate에는 넘기지 않습니다. 지금 구현은 `companies` 대신 `company` 하나(단일 모드)를 받습니다(비교 모드 구현 때 `companies`로 바꿈).
       required:
       - query
       - companies
@@ -3809,8 +3887,11 @@ components:
         trace_id:
           type: string
         data_as_of:
-          type: string
+          type:
+          - string
+          - 'null'
           format: date
+          description: 토론 기준일. run_debate가 fetch_evidence의 as_of로 그대로 넘기고 결과 meta.data_as_of에도 적습니다. null이면 최신 데이터
         profile:
           type:
           - object

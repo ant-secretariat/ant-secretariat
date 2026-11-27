@@ -494,3 +494,39 @@ def test_consensus_recent_counts_old_opinions_like_consensus():
 
     assert _consensus_recent(records, "2026-11-10", 180) == {"brokers": 3, "recent": 2, "oldest": "2026-07-01"}
 
+
+
+def test_run_parallel_overlaps_keeps_order_and_raises():
+    # 묶음 안 조회를 동시에 돌리되 결과 순서는 그대로, 예외는 순차 때처럼 올라간다 (#71 R12, #73)
+    import threading
+    import time
+
+    from processing.functions.get_agent_context import run_parallel
+
+    barrier = threading.Barrier(3, timeout=5)   # 셋이 동시에 돌지 않으면 시간 초과로 실패
+
+    def task(value):
+        def run():
+            barrier.wait()
+            return value
+        return run
+
+    assert list(run_parallel({"a": task(1), "b": task(2), "c": task(3)}).items()) == [("a", 1), ("b", 2), ("c", 3)]
+
+    def boom():
+        raise ValueError("x")
+
+    with pytest.raises(ValueError):
+        run_parallel({"ok": lambda: time.sleep(0.01), "bad": boom})
+
+
+def test_agenda_blocks_wait_for_metrics_callable(monkeypatch):
+    # 목표가 블록은 다른 스레드에서 계산 중인 지표를 함수로 받아, 필요할 때 기다린다
+    import processing.functions.get_agent_context as ctx
+
+    seen = {}
+    monkeypatch.setattr(ctx, "_target_price_block", lambda ticker, as_of, metrics: seen.setdefault("m", metrics))
+    monkeypatch.setattr(ctx, "_financials_block", lambda ticker, as_of: {"ok": True})
+    blocks = ctx._agenda_blocks("005930", "valuation", "2026-11-10", lambda: [{"metric_id": "close"}])
+    assert list(blocks) == ["target_price", "financials"] and seen["m"] == [{"metric_id": "close"}]
+    assert ctx._agenda_blocks("005930", "valuation", "2026-11-10", [{"metric_id": "close"}])["target_price"] == seen["m"]

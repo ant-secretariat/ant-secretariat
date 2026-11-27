@@ -139,17 +139,18 @@ def test_short_balance_skips_unpublished_days(monkeypatch):
 
 
 def test_insider_metric_sums_recent_reports(monkeypatch):
-    connection = _use(monkeypatch, FakeConnection((-8499, date(2026, 11, 6), 16, True)))
+    connection = _use(monkeypatch, FakeConnection((-8499, date(2026, 11, 6), 16, True, date(2024, 11, 11))))
 
     result = get_metric("005930", "insider_net_shares_90d", "2026-11-08")
 
     assert (result["value"], result["unit"], result["as_of"]) == (-8499.0, "주", "2026-11-06")
-    assert result["basis"] == "최근 90일 임원·주요주주 주식수 증감 합계 (보고 16건)"
-    assert connection.queries[0][1] == ("005930", "005930", "insider", "2026-11-08", "2026-11-08", 90)
+    assert result["basis"] == "최근 90일 임원·주요주주 주식수 증감 합계 (증감 보고 16건)"
+    assert connection.queries[0][1] == ("005930", "insider", "005930", "insider", "2026-11-08", "2026-11-08", 90)
+    assert "<> 0" in str(connection.queries[0][0])   # 증감 0인 보고는 건수에서 뺀다
 
 
 def test_insider_metric_without_reports_is_zero_for_tracked_ticker(monkeypatch):
-    _use(monkeypatch, FakeConnection((None, None, 0, True)))
+    _use(monkeypatch, FakeConnection((None, None, 0, True, date(2024, 11, 11))))
 
     result = get_metric("005930", "insider_sell_reports_90d", "2026-11-08")
 
@@ -157,7 +158,7 @@ def test_insider_metric_without_reports_is_zero_for_tracked_ticker(monkeypatch):
 
 
 def test_insider_metric_for_untracked_ticker_is_no_data(monkeypatch):
-    _use(monkeypatch, FakeConnection((None, None, 0, False)))
+    _use(monkeypatch, FakeConnection((None, None, 0, False, date(2024, 11, 11))))
 
     result = get_metric("999999", "major_holder_ratio_change_90d", "2026-11-08")
 
@@ -386,6 +387,19 @@ def test_get_metrics_connection_failure_marks_every_metric(monkeypatch):
 
     assert [r["reason"] for r in results] == ["metric_unavailable", "metric_unavailable", "unknown_metric"]
 
+
+@pytest.mark.parametrize(("as_of", "reason"), [
+    ("2025-02-07", "partial_window"),   # 창 시작 2024-11-10 < 수집 시작 2024-11-11
+    ("2025-02-08", None),               # 창 시작이 수집 시작과 같으면 계산
+])
+def test_insider_window_before_collection_start_is_partial(monkeypatch, as_of, reason):
+    # 수집 시작 전 기간의 "보고 없음"을 0으로 세지 않는다 (#19 리뷰)
+    _use(monkeypatch, FakeConnection((None, None, 0, True, date(2024, 11, 11))))
+
+    result = get_metric("005930", "insider_net_shares_90d", as_of)
+
+    assert result["reason"] == reason
+    assert result["value"] == (None if reason else 0.0)
 
 
 @pytest.mark.parametrize("metric_id", ["per", "eps"])

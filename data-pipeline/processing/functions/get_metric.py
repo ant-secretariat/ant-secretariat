@@ -1,6 +1,6 @@
 import logging
 import math
-from datetime import date
+from datetime import date, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -392,21 +392,29 @@ def _insider_metric(connection, ticker: str, metric_id: str, as_of: str) -> dict
 
     unit, report_kind, aggregate, label = INSIDER_METRICS[metric_id]
     source = ["insider_holdings"]
+    change = "shares_change" if report_kind == "insider" else "ratio_change"
     row = connection.execute(
         sql.SQL(
-            "select {aggregate}, max(rcept_dt), count(*),"
-            " exists (select 1 from insider_holdings where ticker = %s)"
+            "select {aggregate}, max(rcept_dt), count(*) filter (where {change} <> 0),"
+            " exists (select 1 from insider_holdings where ticker = %s),"
+            " (select min(rcept_dt) from insider_holdings where report_kind = %s)"
             " from insider_holdings"
             " where ticker = %s and report_kind = %s"
             " and rcept_dt <= %s::date and rcept_dt > %s::date - %s"
-        ).format(aggregate=sql.SQL(aggregate)),
-        (ticker, ticker, report_kind, as_of, as_of, INSIDER_WINDOW_DAYS),
+        ).format(aggregate=sql.SQL(aggregate), change=sql.Identifier(change)),
+        (ticker, report_kind, ticker, report_kind, as_of, as_of, INSIDER_WINDOW_DAYS),
     ).fetchone()
-    value, last_date, reports, tracked = row
+    value, last_date, reports, tracked, collected_from = row
     # 지분공시를 받지 않는 종목은 데이터가 없는 것이고, 받는 종목에서 보고가 없으면 0이다
     if not tracked:
         return _result(ticker, metric_id, None, unit, "", as_of, source, "no_data")
-    basis = f"최근 {INSIDER_WINDOW_DAYS}일 {label} (보고 {reports}건)"
+    # 창의 앞부분이 수집 시작 전이면 그 기간의 "보고 없음"을 0으로 셀 수 없다(#19 리뷰)
+    window_start = date.fromisoformat(as_of) - timedelta(days=INSIDER_WINDOW_DAYS - 1)
+    if collected_from is None or collected_from > window_start:
+        basis = f"최근 {INSIDER_WINDOW_DAYS}일 {label}, 수집 시작({collected_from}) 전 기간이 섞임"
+        return _result(ticker, metric_id, None, unit, basis, as_of, source, "partial_window")
+    # 증감이 0인 보고(신규 보고 등)는 합계에 영향이 없어 건수에서도 뺀다(#19 리뷰)
+    basis = f"최근 {INSIDER_WINDOW_DAYS}일 {label} (증감 보고 {reports}건)"
     return _result(
         ticker, metric_id, _number(value) if reports else 0.0, unit, basis,
         last_date.isoformat() if last_date else as_of, source, None,

@@ -109,6 +109,21 @@ class SensitivityTest(unittest.TestCase):
         }
         self.assertAlmostEqual(rows[("KOSPI", "multi")]["beta"], base[("KOSPI", "multi")]["beta"])
 
+    def test_ten_year_gaps_do_not_change_other_factors(self) -> None:
+        # 국고채 10년에 빈 날이 있어도 세 요인 결과는 그대로여야 한다 (#34 리뷰, #41)
+        rng = np.random.default_rng(2)
+        ten = (self.factors["KTB_3Y_KR"] + rng.normal(0, 0.01, len(self.factors)).cumsum()).copy()
+        ten.iloc[::7] = np.nan   # 일주일에 하루씩 빈 날
+        with_gaps = self.factors.assign(KTB_10Y_KR=ten)
+        rows = {(r["factor"], r["method"]): r for r in sensitivity.compute_sensitivities(self.closes, with_gaps)}
+        base = {(r["factor"], r["method"]): r for r in sensitivity.compute_sensitivities(self.closes, self.factors)}
+
+        for key, row in base.items():
+            self.assertAlmostEqual(rows[key]["beta"], row["beta"])
+            self.assertEqual(rows[key]["n_obs"], row["n_obs"])
+        # 10년물은 자기 날짜로만 계산해 표본이 더 적다
+        self.assertLess(rows[("KTB_10Y_KR", "simple")]["n_obs"], base[("KOSPI", "simple")]["n_obs"])
+
     def test_short_overlap_returns_nothing(self) -> None:
         rows = sensitivity.compute_sensitivities(self.closes.iloc[:200], self.factors)
 

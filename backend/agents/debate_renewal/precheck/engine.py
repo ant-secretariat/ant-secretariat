@@ -181,7 +181,10 @@ def _select_agendas(matched: list[AgendaId], cfg: PrecheckConfig) -> tuple[list[
     if AgendaId.FLOW in matched:
         swap_in(AgendaId.FLOW, cfg.flow_replaces)
 
-    selected = sorted(set(selected), key=list(AgendaId).index)[: cfg.max_agendas]
+    # 질의에서 확인한 아젠다를 앞에, 남은 기본 아젠다를 뒤에 둔다(#98). 각 묶음 안은 AgendaId 순서.
+    # 기본 3개(valuation·macro·risk)를 묻는 질의는 구성은 같고 순서로만 드러난다.
+    order = list(AgendaId).index
+    selected = sorted(set(selected), key=lambda a: (a not in matched, order(a)))[: cfg.max_agendas]
     return selected, dropped
 
 

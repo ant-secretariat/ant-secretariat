@@ -63,6 +63,7 @@ backend/agents/debate_renewal/
 - 공용 계약 위치(`backend/contracts`, data-pipeline)가 생기면 `contracts.py`를 import로 교체
 - `intent_data_sources.json`: 아젠다별 필요 데이터·신선도 기준·T0 가능 여부 (수경과 확정). ds-0.3.0부터 매크로 아젠다는 종목 데이터(`sensitivity`·`news`·`report`) 중 하나가 있어야 함 — `macro` 건수는 시장 전체 지표 수라서(#72 리뷰)
 - 아젠다 대체 우선순위(`selection_rules`): 기획서에 "최대 3개 유지"만 있고 무엇을 빼는지는 없음
+- `allowed_agendas` 순서: 질의에서 확인한 아젠다가 앞, 남은 자리는 기본 아젠다로 채운다(#98). 기본 3개(밸류에이션·매크로·리스크)를 묻는 질의는 구성은 빈 질의와 같고 순서만 다르다(예: "금리 영향" → `[macro, valuation, risk]`)
 - `flow` 아젠다는 `active: false` (investor_flow_daily 확보 후 활성화)
 - 토론 모델 `solar-pro-4`, 온도 0.2, 타임아웃 60초, SDK 재시도 2회는 임시값. 11/23 프로브에서 pro-4·mini-4 모두 strict 스키마 통과(pro 약 2~4초, mini 약 1초). 기준선 평가(#51) 후 확정
 - 출력이 재요청 후에도 스키마와 다르면 `LLMOutputInvalidError`(지금은 503 `upstream_unavailable`). 전용 코드는 정책표(OQ-2) 확정 후

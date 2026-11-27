@@ -51,7 +51,7 @@ def test_off_topic_is_rejected_out_of_scope():
 
 def test_shareholder_return_replaces_valuation():
     r = run("배당이랑 자사주 계획은?")
-    assert r.allowed_agendas == [A.MACRO, A.RISK, A.SHAREHOLDER_RETURN]
+    assert r.allowed_agendas == [A.SHAREHOLDER_RETURN, A.MACRO, A.RISK]  # 질의 아젠다가 앞 (#98)
     assert A.SHAREHOLDER_RETURN in r.matched_intents
 
 
@@ -66,6 +66,13 @@ def test_explicitly_mentioned_default_is_not_replaced():
     r = run("목표주가랑 금리 영향이랑 배당도 궁금해")
     # valuation·macro 직접 언급 → risk가 대체됨
     assert r.allowed_agendas == [A.VALUATION, A.MACRO, A.SHAREHOLDER_RETURN]
+
+
+def test_query_agendas_come_first_then_defaults():
+    # #98: 기본 아젠다를 묻는 질의는 구성이 같아도 순서로 질문이 드러난다
+    assert run("금리 영향 알려줘").allowed_agendas == [A.MACRO, A.VALUATION, A.RISK]
+    assert run("리스크 알려줘").allowed_agendas == [A.RISK, A.VALUATION, A.MACRO]
+    assert run("배당이랑 신사업 알려줘").allowed_agendas == [A.GROWTH, A.SHAREHOLDER_RETURN, A.RISK]
 
 
 def test_all_defaults_mentioned_then_extra_is_dropped_by_cap():
@@ -107,7 +114,7 @@ def test_missing_status_raises_instead_of_data_collecting():
 def test_t0_runs_reduced_with_tier_limited_exclusions():
     r = run("배당 알려줘", data_status=provider(**{"005930": full_status(tier=Tier.T0)}))
     assert r.verdict == "reduced"
-    assert r.allowed_agendas == [A.MACRO, A.SHAREHOLDER_RETURN]  # 주주환원은 T0도 가능 (ds-0.2.0)
+    assert r.allowed_agendas == [A.SHAREHOLDER_RETURN, A.MACRO]  # 주주환원은 T0도 가능 (ds-0.2.0)
     reasons = {e.agenda_id: e.reason for e in r.excluded}
     assert reasons == {A.RISK: "tier_limited"}
 

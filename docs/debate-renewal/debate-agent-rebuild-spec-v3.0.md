@@ -227,7 +227,7 @@ class ResponseMeta(BaseModel):
 - **shareholder_return · 주주환원** — 배당, 자사주 (선택 포함)
 - **flow · 수급·투자자 동향** — 외국인·기관 매매 (재확인 중)
 
-선택 규칙: 기본 3개가 기본값. "배당·자사주" 언급 시 `shareholder_return`이 `valuation`을 대체, "신사업·증설" 언급 시 `growth` 추가, 최대 3개 유지. `flow`는 `investor_flow_daily` 확보로 활성화 여부를 수경과 재확인함.
+선택 규칙: 기본 3개가 기본값. "배당·자사주" 언급 시 `shareholder_return`이 `valuation`을 대체, "신사업·증설" 언급 시 `growth` 추가, 최대 3개 유지. 순서는 질의에서 확인한 아젠다가 앞이고 남은 자리를 기본 아젠다로 채운다(#98). `flow`는 `investor_flow_daily` 확보로 활성화 여부를 수경과 재확인함.
 
 ## D3 · 비교 모드 (2종목)
 

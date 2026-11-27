@@ -803,6 +803,8 @@ result = get_available_data_status(
 - 수급 지표: 그날까지 최근 20거래일 합계(순매수) 또는 평균(공매도 비중). 20일보다 적으면 `basis`에 실제 일수를 적음
 - 공매도 잔고 비중: KRX가 약 2거래일 늦게 공개하므로 그날 기준 2거래일 전까지의 값만 씀
 - 지분공시 지표: 그날까지 접수된 최근 90일 보고. 지분공시를 받는 종목에서 보고가 없으면 0, 받지 않는 종목은 `no_data`. 임원 보고에는 주식 보상 같은 소액 변동도 들어 있음
+  - 90일 창의 앞부분이 수집 시작(2024-11-11) 전이면 `partial_window`(그 기간의 "보고 없음"을 0으로 셀 수 없음)
+  - `basis`의 건수는 증감이 0이 아닌 보고만 셈(신규 보고처럼 증감 0인 보고는 합계에도 영향이 없음)
 - 값을 낼 수 없으면 `value`는 `null`이고 `reason`에 사유: `unknown_metric`, `no_data`, `no_value`, `not_applicable_financials`(금융 섹터 부채비율), `loss_making`(PER·EPS: 직전 사업연도 당기순이익 적자, `basis`에 금액), `metric_unavailable`(조회 실패)
 - 여러 지표는 `get_metrics(ticker, metric_ids, as_of)`로 DB 연결 하나에서 계산(결과는 `metric_ids` 순서, 항목은 `get_metric`과 같음). 지표마다 연결을 열면 연결에만 약 0.35초씩 듦. 한 지표의 조회가 실패해도 나머지는 계산
 - 사람이 읽는 지표 이름은 `METRIC_NAMES`(예: `per` → "PER(주가수익비율)")
@@ -938,7 +940,7 @@ result = get_agent_context(
 
 - `as_of`를 주면 그날까지 공개된 데이터만 씀(재무는 공시 접수일, 공매도 잔고는 공개 지연 2거래일 반영). 기본은 오늘
 - `valuation`: PER·PBR, 과거 3년 일별 값 중 백분위(적자 PER 제외), WICS 대분류 중앙값 대비(%)
-- `price_trend`: 1주·1개월·3개월 수익률(%), 코스피·코스닥 대비 초과수익, 52주 위치. 변동성 `volatility_1m`·`volatility_3m`은 일별 로그수익률 표준편차 × √252(연율, 소수)로 계약서상 과거 변동성의 단일 계산 지점. `volatility_1m_market_threshold`는 그날 시세가 있는 종목들의 상위 20% 값(현재 시세는 T1만 적재되어 T1 기준)
+- `price_trend`: 1주·1개월·3개월 수익률(%), 코스피·코스닥 대비 초과수익, 52주 위치. 표본이 모자라면 값을 null로 둠: 3개월 변동성은 수익률 55개, 1개월은 15개 미만일 때. 52주 값(`high_52w`·`low_52w`·`position_52w`·`drawdown_from_52w_high`)은 거래일 252개 미만이면서 첫 종가부터 357일 미만일 때(상장 1년 전 등). 이때 `note_52w`에 사유를 담고, `sample_days_52w`·`sample_start_52w`는 늘 실음. 변동성 `volatility_1m`·`volatility_3m`은 일별 로그수익률 표준편차 × √252(연율, 소수)로 계약서상 과거 변동성의 단일 계산 지점. `volatility_1m_market_threshold`는 그날 시세가 있는 종목들의 상위 20% 값(현재 시세는 T1만 적재되어 T1 기준)
 - `fundamental_trend`: 그날까지 공시된 최근 분기 매출·영업이익·순이익(연결 우선)과 전년 동기·직전 분기 대비 증감률. 기준이 적자면 증감률 대신 `…_note`에 흑자전환·적자지속
 - `flow`: 외국인·기관·개인 순매수(5·20거래일 합계, 원), 20일 합계의 시가총액 대비(%), 공매도 거래 비중 평균·잔고 비중
 - 묶음마다 값을 못 내면 값은 `null`이고 `reason`(예: `no_data`)에 사유. 하나라도 값이 있으면 `available: true`

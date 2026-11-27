@@ -154,3 +154,57 @@ def test_market_snapshot_tells_empty_sector_from_unknown_sector(monkeypatch, exi
     # 있는 업종인데 그날 시세가 있는 종목이 없으면 unknown_sector가 아니라 no_data (#33, #55)
     monkeypatch.setattr("crawling.db.postgres.connect", lambda: _SectorConnection(exists))
     assert get_market_snapshot(sector="반도체와반도체장비", as_of="2026-11-06")["error"] == error
+
+
+@pytest.mark.parametrize(("kwargs", "error"), [
+    ({"as_of": "11/24"}, "invalid_date"),
+    ({"as_of": "2026-13-01"}, "invalid_date"),
+    ({"top_n": "abc"}, "invalid_top_n"),
+    ({"top_n": None}, "invalid_top_n"),
+    ({"top_n": 0}, "invalid_top_n"),
+    ({"top_n": -5}, "invalid_top_n"),
+    ({"top_n": 3.5}, "invalid_top_n"),
+    ({"top_n": True}, "invalid_top_n"),
+    ({"sector": 123}, "invalid_sector"),
+])
+def test_market_snapshot_rejects_bad_input_without_raising(monkeypatch, kwargs, error):
+    # 틀린 입력이 예외로 멈추지 않고 error로 알린다. DB는 부르지 않는다 (#33 리뷰, #42)
+    def never():
+        raise AssertionError("DB를 부르면 안 됨")
+
+    monkeypatch.setattr("crawling.db.postgres.connect", never)
+    result = get_market_snapshot(**kwargs)
+    assert result["error"] == error
+    assert result["companies"] == [] and result["count"] == 0
+
+
+def test_market_snapshot_caps_top_n_and_says_so(monkeypatch):
+    seen = {}
+
+    def fake_rank(rows, sort_by, top_n):
+        seen["top_n"] = top_n
+        return {"as_of": "2026-11-06", "order": "desc", "count": 0, "companies": []}
+
+    class Connection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def execute(self, sql, params=None):
+            class Result:
+                def fetchall(self):
+                    return [("row",)]
+
+            return Result()
+
+    monkeypatch.setattr("crawling.db.postgres.connect", lambda: Connection())
+    monkeypatch.setattr("processing.functions.get_market_snapshot.rank", fake_rank)
+
+    result = get_market_snapshot(top_n=500, as_of="2026-11-06")
+
+    assert seen["top_n"] == 100
+    assert (result["top_n"], result["top_n_capped"]) == (100, True)
+    assert get_market_snapshot(top_n="20", as_of="2026-11-06")["top_n_capped"] is False   # 정수 문자열은 받음
+

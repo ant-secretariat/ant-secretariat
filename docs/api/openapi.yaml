@@ -478,10 +478,12 @@ paths:
         | --- | --- |
         | 토론 job이 비교 모드(`meta.mode=compare`)이거나 아직 `completed`가 아님 | 409 `invalid_job_state` |
         | 시뮬레이션 가능 기간이 지난 토론 | 409 `invalid_job_state` |
-        | 지금 시뮬레이션할 수 없는 종목 (버튼을 누를 때 다시 판정) | 200 `rejected` `no_data` (토론 job은 그대로) |
+        | 지금 시뮬레이션할 수 없는 종목 (버튼을 누를 때 다시 판정) | 200 `rejected` `no_data` + `view_existing_job`(토론 job, 대안 종목 없음). 토론 job은 그대로 |
         | 같은 토론의 시뮬레이션 job이 진행 중이거나 끝남 | 200 `job_started` + `reused=true` (그 job) |
         | 사용자의 다른 job이 진행 중 (사용자당 1개, ADR 0014) | 409 `concurrent_job_limit` |
         | 그 외 | 200 `job_started` (새 시뮬레이션 job) |
+
+        프론트엔드는 토론 job의 `simulation_ready`가 false면 버튼을 비활성화해 누를 수 없게 합니다. 위 `no_data`는 버튼이 켜진 뒤 `sim_params`가 바뀌어 다시 판정에서 걸린 경우만 해당합니다.
 
         이력 부족은 즉시 거절하지 않고 시뮬레이션 job이 `failed` + `error_code=insufficient_history`로 끝납니다. 토론 job은 영향받지 않습니다.
       x-transport: http
@@ -1428,8 +1430,8 @@ components:
 
         | 사유 코드 | 채널 | HTTP | next_action.type | payload |
         | --- | --- | --- | --- | --- |
-        | `uncovered_company` | rejected | 200 | `choose_alternative_company` | `alternatives` 3개 (`suggest_alternatives`) |
-        | `no_data` | rejected | 200 | `choose_alternative_company` | `alternatives` 3개 |
+        | `uncovered_company` | rejected | 200 | `choose_alternative_company` | `alternatives` 최대 3개, 최소 1개 (`suggest_alternatives`) |
+        | `no_data` | rejected | 200 | `choose_alternative_company` (시뮬레이션 버튼만 `view_existing_job`, 아래) | `alternatives` 최대 3개, 최소 1개 (시뮬레이션 버튼은 `job_id`) |
         | `company_not_found` | rejected | 200 | `rephrase_company` | 없음 |
         | `too_many_companies` | rejected | 200 | `select_companies` | `candidates` ≥3, `max_select=2` |
         | `partial_coverage` | rejected | 200 | `run_single_analysis` | `company` |
@@ -1446,7 +1448,9 @@ components:
         | `internal_error` | Problem | 500 | `retry` | 없음 |
 
         precheck는 사유 코드만 돌려주고 payload(대안 종목·지원 주제)는 오케스트레이터가 채웁니다.
+        대안 종목: `suggest_alternatives`가 `alternatives: null`(조회 실패)이나 빈 목록을 돌려주면 `choose_alternative_company`로 거절하지 않고 503 `upstream_unavailable`로 응답합니다. payload에는 함수 결과의 `ticker`·`company`만 옮깁니다(#85 리뷰).
         `no_data`: 종목은 커버되지만 고를 수 있는 아젠다에 쓸 데이터가 하나도 없을 때입니다. precheck 관문3이 범위를 줄이다가 남는 아젠다가 없으면 이 코드로 거절하고, 다음 행동은 `choose_alternative_company`입니다. 토론 기획서의 임시 이름 `insufficient_data`는 쓰지 않습니다(11/17 결정).
+        `no_data`의 예외, 시뮬레이션 버튼: 다음 행동은 `view_existing_job`(`job_id`=토론 job)이고 대안 종목을 고르게 하지 않습니다. 사용자는 이미 토론에서 종목을 고른 뒤 시뮬레이션을 누른 것이라, 그 자리에서 다른 종목을 고르게 하기보다 버튼을 꺼 두고 필요하면 다른 종목으로 토론을 새로 시작하게 합니다. 실제로 자주 생기면 실측을 보고 다시 정합니다(#100 리뷰).
     NextAction:
       description: 사유 코드와 1:1로 대응합니다(REASON_POLICY).
       oneOf:

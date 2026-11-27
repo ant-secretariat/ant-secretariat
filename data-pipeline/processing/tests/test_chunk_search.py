@@ -197,3 +197,16 @@ def test_search_documents_passes_chunk_type(monkeypatch):
     search_documents(query="영업이익 추정", ticker="005930", document_type="report", chunk_type="table")
 
     assert seen["chunk_type"] == "table"
+
+
+def test_ticker_filter_uses_gin_operator():
+    # = any(mentioned_tickers)는 GIN 색인을 못 타 전체를 읽었다(운영 DB 5초 → @> 0.02초, #35 리뷰)
+    from processing.search.chunk_search import build_filters
+
+    where, params = build_filters(ticker="005930")
+
+    assert "d.mentioned_tickers @> array[%s]::text[]" in where
+    assert "any(" not in where
+    assert params[:2] == ["005930", "005930"]
+
+

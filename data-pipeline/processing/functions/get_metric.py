@@ -1,6 +1,6 @@
 import logging
 import math
-from datetime import date
+from datetime import date, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +107,10 @@ FINANCIAL_QUERY = """
             -- 자본잠식(자본 0 이하)이면 부채비율은 의미가 없어 null (get_financials와 같은 규칙)
             case when total_equity > 0 then round(100.0 * total_liabilities / total_equity, 2) end as debt_ratio,
             total_equity <= 0 as capital_impaired,
+            -- 4분기는 재무상태표(사업보고서)가 손익보다 먼저 보일 수 있다(3분기 정정이 사업보고서 뒤에 나온 경우,
+            -- #16 리뷰 2번). 그래서 "분기 행이 있으면 손익도 있다"고 보지 않고 지표마다 필요한 값이 있는 분기를 고른다
+            coalesce(revenue, operating_income, net_income) is not null as has_income,
+            coalesce(total_liabilities, total_equity) is not null as has_balance,
             round(100.0 * operating_income / nullif(revenue, 0), 2)        as operating_margin,
             -- 전년 동기와 연결·별도 기준이 같을 때만 비교한다
             case when lag(seq, 4) over w = seq - 4 and lag(fs_div, 4) over w = fs_div
@@ -127,9 +131,11 @@ FINANCIAL_QUERY = """
     select fiscal_year, quarter, fs_div, rcept_dt, debt_ratio, operating_margin, revenue_growth_yoy, roe_ttm,
            capital_impaired
     from calc
+    where case when %s then has_balance else has_income end
     order by seq desc
     limit 1
 """
+BALANCE_METRICS = {"debt_ratio"}   # 재무상태표만 쓰는 지표. 나머지 재무 지표는 손익이 있는 분기로 계산
 FINANCIAL_COLUMNS = ("debt_ratio", "operating_margin", "revenue_growth_yoy", "roe_ttm")
 
 # KRX(pykrx)는 직전 사업연도 순이익이 적자면 PER·EPS를 비워 준다. 비어 있을 때 그 이유가 적자인지 재무로 확인한다
@@ -386,21 +392,29 @@ def _insider_metric(connection, ticker: str, metric_id: str, as_of: str) -> dict
 
     unit, report_kind, aggregate, label = INSIDER_METRICS[metric_id]
     source = ["insider_holdings"]
+    change = "shares_change" if report_kind == "insider" else "ratio_change"
     row = connection.execute(
         sql.SQL(
-            "select {aggregate}, max(rcept_dt), count(*),"
-            " exists (select 1 from insider_holdings where ticker = %s)"
+            "select {aggregate}, max(rcept_dt), count(*) filter (where {change} <> 0),"
+            " exists (select 1 from insider_holdings where ticker = %s),"
+            " (select min(rcept_dt) from insider_holdings where report_kind = %s)"
             " from insider_holdings"
             " where ticker = %s and report_kind = %s"
             " and rcept_dt <= %s::date and rcept_dt > %s::date - %s"
-        ).format(aggregate=sql.SQL(aggregate)),
-        (ticker, ticker, report_kind, as_of, as_of, INSIDER_WINDOW_DAYS),
+        ).format(aggregate=sql.SQL(aggregate), change=sql.Identifier(change)),
+        (ticker, report_kind, ticker, report_kind, as_of, as_of, INSIDER_WINDOW_DAYS),
     ).fetchone()
-    value, last_date, reports, tracked = row
+    value, last_date, reports, tracked, collected_from = row
     # 지분공시를 받지 않는 종목은 데이터가 없는 것이고, 받는 종목에서 보고가 없으면 0이다
     if not tracked:
         return _result(ticker, metric_id, None, unit, "", as_of, source, "no_data")
-    basis = f"최근 {INSIDER_WINDOW_DAYS}일 {label} (보고 {reports}건)"
+    # 창의 앞부분이 수집 시작 전이면 그 기간의 "보고 없음"을 0으로 셀 수 없다(#19 리뷰)
+    window_start = date.fromisoformat(as_of) - timedelta(days=INSIDER_WINDOW_DAYS - 1)
+    if collected_from is None or collected_from > window_start:
+        basis = f"최근 {INSIDER_WINDOW_DAYS}일 {label}, 수집 시작({collected_from}) 전 기간이 섞임"
+        return _result(ticker, metric_id, None, unit, basis, as_of, source, "partial_window")
+    # 증감이 0인 보고(신규 보고 등)는 합계에 영향이 없어 건수에서도 뺀다(#19 리뷰)
+    basis = f"최근 {INSIDER_WINDOW_DAYS}일 {label} (증감 보고 {reports}건)"
     return _result(
         ticker, metric_id, _number(value) if reports else 0.0, unit, basis,
         last_date.isoformat() if last_date else as_of, source, None,
@@ -417,7 +431,7 @@ def _financial_metric(connection, ticker: str, metric_id: str, as_of: str) -> di
         if sector and sector[0] == FINANCIALS_SECTOR:
             return _result(ticker, metric_id, None, unit, "", as_of, source, "not_applicable_financials")
 
-    row = connection.execute(FINANCIAL_QUERY, (as_of, ticker)).fetchone()
+    row = connection.execute(FINANCIAL_QUERY, (as_of, ticker, metric_id in BALANCE_METRICS)).fetchone()
     if row is None:
         return _result(ticker, metric_id, None, unit, "", as_of, source, "no_data")
     fiscal_year, quarter, fs_div, rcept_dt, *values, capital_impaired = row

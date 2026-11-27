@@ -337,7 +337,9 @@ python -m crawling.sim_loader --tickers 005930    # 특정 종목만
 - `status=not_converged`이면 `params_json.status_reason`이 `optimizer_failed`(최적화 실패) 또는 `nonstationary`(지속성 ≥ 1)
 - `sensitivities`: 요인(KOSPI·USD_KRW·KTB_3Y_KR)이 30거래일 동안 1σ 움직일 때 종목 30일 수익률(%) 변화. `multi`는 세 요인 동시 회귀, `simple`은 단일 요인 회귀, `corr_daily`는 일별 상관계수(온톨로지 엣지 가중치)
 - 국고채 10년(`KTB_10Y_KR`)은 `simple`과 `corr_daily`만 낸다. 3년물과 일별 변화 상관이 0.9라 `multi`에 같이 넣으면 계수가 불안정해진다(2026-11-10 추가)
+- 세 요인은 같은 날짜로 맞추고, 국고채 10년은 따로 맞춘다. 국고채 10년에 빈 날이 있어도 세 요인 결과는 바뀌지 않는다(그 요인의 `n_obs`만 줄어듦)
 - 섹터별 묶음은 뷰 `sector_sensitivities`(WICS l1/l2, corr_daily 중앙값·사분위·종목 수, 최신은 `is_latest`)
+- `is_latest` 행은 종목마다 가장 최근 값을 묶은 것이다(가장 늦은 날부터 40일 안의 값만). 일부 종목만 다시 계산해도 최신 행이 그 종목들로 줄지 않는다. 나머지 행은 `as_of`별 스냅샷이고, 최신 행과 날짜가 같으면 최신 행만 남는다. `sector_monthly_correlations`도 같은 규칙(요인별)
 
 월별 지표 상관 (`price_monthly`, `monthly_correlations`, 뷰 `sector_monthly_correlations`):
 

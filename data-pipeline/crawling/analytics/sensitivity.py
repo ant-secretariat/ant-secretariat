@@ -32,45 +32,64 @@ Z_95 = 1.959964
 
 
 def compute_sensitivities(closes: pd.Series, factors: pd.DataFrame) -> list[dict]:
-    """closes: 종목 종가(거래일 인덱스), factors: FACTORS 컬럼(+ 있으면 SIMPLE_ONLY_FACTORS)을 가진 수준값 시계열."""
-    used = {name: kind for name, kind in ALL_FACTORS.items() if name in FACTORS or name in factors.columns}
-    frame = pd.concat([closes.rename("stock"), factors[list(used)]], axis=1, join="inner").dropna()
-    if len(frame) < MIN_OBS + HORIZON_DAYS:
+    """closes: 종목 종가(거래일 인덱스), factors: FACTORS 컬럼(+ 있으면 SIMPLE_ONLY_FACTORS)을 가진 수준값 시계열.
+
+    세 요인(FACTORS)은 함께 넣은 회귀라 같은 날짜로 맞춘다. 국고채 10년(SIMPLE_ONLY_FACTORS)은 단독 회귀라
+    따로 맞춘다. 한 표로 합쳐 빈 날을 지우면 국고채 10년에 빈 날이 있을 때 세 요인 결과까지 바뀌기 때문이다(#34 리뷰).
+    """
+    core = _prepare(closes, factors, FACTORS)
+    if core is None:
         return []
 
+    rows: list[dict] = []
+    multi = _hac_ols(core["horizon"]["y"], core["scaled"][list(FACTORS)])
+    for name in FACTORS:
+        simple = _hac_ols(core["horizon"]["y"], core["scaled"][[name]])
+        for method, fitted in (("multi", multi), ("simple", simple)):
+            rows.append(_row(name, method, fitted, core))
+    for name, kind in SIMPLE_ONLY_FACTORS.items():
+        if name not in factors.columns:
+            continue
+        alone = _prepare(closes, factors, {name: kind})
+        if alone is None:   # 이 요인만 표본이 모자라면 이 요인만 뺀다
+            continue
+        rows.append(_row(name, "simple", _hac_ols(alone["horizon"]["y"], alone["scaled"][[name]]), alone))
+    return rows
+
+
+def _prepare(closes: pd.Series, factors: pd.DataFrame, used: dict[str, str]) -> dict | None:
+    """종가와 요인을 같은 날짜로 맞추고 30일·1일 변화를 만든다. 표본이 모자라면 None."""
+    frame = pd.concat([closes.rename("stock"), factors[list(used)]], axis=1, join="inner").dropna()
+    if len(frame) < MIN_OBS + HORIZON_DAYS:
+        return None
     stock_h = _change(frame["stock"], "log", HORIZON_DAYS)
     stock_d = _change(frame["stock"], "log", 1)
     factor_h = pd.DataFrame({name: _change(frame[name], kind, HORIZON_DAYS) for name, kind in used.items()})
     factor_d = pd.DataFrame({name: _change(frame[name], kind, 1) for name, kind in used.items()})
-
     horizon = pd.concat([stock_h.rename("y"), factor_h], axis=1).dropna()
     sigma = horizon[list(used)].std()
-    scaled = horizon[list(used)] / sigma
-    daily = pd.concat([stock_d.rename("y"), factor_d], axis=1).dropna()
-
-    common = {
-        "horizon_days": HORIZON_DAYS,
-        "n_obs": len(horizon),
+    return {
+        "horizon": horizon,
+        "scaled": horizon[list(used)] / sigma,
+        "sigma": sigma,
+        "daily": pd.concat([stock_d.rename("y"), factor_d], axis=1).dropna(),
         "window_start": frame.index[0],
     }
-    rows: list[dict] = []
-    multi = _hac_ols(horizon["y"], scaled[list(FACTORS)])
-    for name in used:
-        simple = _hac_ols(horizon["y"], scaled[[name]])
-        methods = (("multi", multi), ("simple", simple)) if name in FACTORS else (("simple", simple),)
-        for method, fitted in methods:
-            rows.append(
-                {
-                    "factor": name,
-                    "method": method,
-                    **_coefficient(fitted, name),
-                    "r_squared": float(fitted.rsquared),
-                    "factor_sigma": float(sigma[name]),
-                    "corr_daily": float(daily["y"].corr(daily[name])),
-                    **common,
-                }
-            )
-    return rows
+
+
+def _row(name: str, method: str, fitted, prepared: dict) -> dict:
+    daily = prepared["daily"]
+    return {
+        "factor": name,
+        "method": method,
+        **_coefficient(fitted, name),
+        "r_squared": float(fitted.rsquared),
+        "factor_sigma": float(prepared["sigma"][name]),
+        "corr_daily": float(daily["y"].corr(daily[name])),
+        "horizon_days": HORIZON_DAYS,
+        "n_obs": len(prepared["horizon"]),
+        "window_start": prepared["window_start"],
+    }
 
 
 def _change(series: pd.Series, kind: str, periods: int) -> pd.Series:

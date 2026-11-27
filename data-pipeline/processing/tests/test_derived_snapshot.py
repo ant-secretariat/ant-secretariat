@@ -36,9 +36,12 @@ def test_price_trend_returns_excess_and_52w_position():
     result = price_trend(closes, index, [0.2, 0.3, 0.4, 0.5, 0.6], "1001")
 
     assert result["close"] == 399
-    assert result["return_1m"] == round((399 / 378 - 1) * 100, 2)
-    assert result["excess_return_1m"] > 0
-    assert result["position_52w"] == 1.0 and result["drawdown_from_52w_high"] == 0.0
+    assert result["return_1m_pct"] == round((399 / 378 - 1) * 100, 2)
+    assert result["excess_return_1m_pct"] > 0
+    assert result["position_52w"] == 1.0 and result["drawdown_from_52w_high_pct"] == 0.0
+    # 퍼센트 값은 이름이 _pct로 끝난다(#31 리뷰)
+    assert {"return_1w_pct", "return_3m_pct", "index_return_3m_pct", "excess_return_3m_pct"} <= set(result)
+    assert not {"return_1m", "excess_return_1m", "drawdown_from_52w_high"} & set(result)
     assert result["volatility_1m_market_threshold"] == 0.52  # 0.2~0.6의 80% 지점
     assert result["as_of"] == days[-1].isoformat() and result["reason"] is None
 
@@ -85,8 +88,8 @@ def test_fundamental_trend_yoy_qoq_and_cfs():
     result = fundamental_trend(quarters)
 
     assert result["period"] == "2026Q2" and result["fs_div"] == "연결"
-    assert result["revenue_yoy"] == 50.0 and result["revenue_qoq"] == 20.0
-    assert result["operating_income_yoy"] is None and result["operating_income_yoy_note"] == "흑자전환"
+    assert result["revenue_yoy_pct"] == 50.0 and result["revenue_qoq_pct"] == 20.0
+    assert result["operating_income_yoy_pct"] is None and result["operating_income_yoy_note"] == "흑자전환"
     assert result["operating_margin"] == 25.0
     assert fundamental_trend([])["reason"] == "no_data"
 
@@ -179,7 +182,7 @@ def test_short_listing_has_no_3m_volatility_or_52w_values():
     result = price_trend(closes, [], [], None)
 
     assert result["volatility_1m"] is not None and result["volatility_3m"] is None
-    assert (result["high_52w"], result["low_52w"], result["position_52w"], result["drawdown_from_52w_high"]) == (None,) * 4
+    assert (result["high_52w"], result["low_52w"], result["position_52w"], result["drawdown_from_52w_high_pct"]) == (None,) * 4
     assert result["sample_days_52w"] == 17 and result["sample_start_52w"] == days[0].isoformat()
     assert "52주 값을 내지 않음" in result["note_52w"]
 

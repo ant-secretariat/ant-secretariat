@@ -936,9 +936,10 @@ result = get_agent_context(
 
 - `as_of`를 주면 그날까지 공개된 데이터만 씀(재무는 공시 접수일, 공매도 잔고는 공개 지연 2거래일 반영). 기본은 오늘
 - `valuation`: PER·PBR, 과거 3년 일별 값 중 백분위(적자 PER 제외), WICS 대분류 중앙값 대비(%)
-- `price_trend`: 1주·1개월·3개월 수익률(%), 코스피·코스닥 대비 초과수익, 52주 위치. 표본이 모자라면 값을 null로 둠: 3개월 변동성은 수익률 55개, 1개월은 15개 미만일 때. 52주 값(`high_52w`·`low_52w`·`position_52w`·`drawdown_from_52w_high`)은 거래일 252개 미만이면서 첫 종가부터 357일 미만일 때(상장 1년 전 등). 이때 `note_52w`에 사유를 담고, `sample_days_52w`·`sample_start_52w`는 늘 실음. 변동성 `volatility_1m`·`volatility_3m`은 일별 로그수익률 표준편차 × √252(연율, 소수)로 계약서상 과거 변동성의 단일 계산 지점. `volatility_1m_market_threshold`는 그날 시세가 있는 종목들의 상위 20% 값(현재 시세는 T1만 적재되어 T1 기준)
-- `fundamental_trend`: 그날까지 공시된 최근 분기 매출·영업이익·순이익(연결 우선)과 전년 동기·직전 분기 대비 증감률. 기준이 적자면 증감률 대신 `…_note`에 흑자전환·적자지속
+- `price_trend`: 1주·1개월·3개월 수익률(`return_1w_pct` 등, %), 코스피·코스닥 수익률(`index_return_*_pct`)과 초과수익(`excess_return_*_pct`), 52주 위치. 표본이 모자라면 값을 null로 둠: 3개월 변동성은 수익률 55개, 1개월은 15개 미만일 때. 52주 값(`high_52w`·`low_52w`·`position_52w`·`drawdown_from_52w_high_pct`)은 거래일 252개 미만이면서 첫 종가부터 357일 미만일 때(상장 1년 전 등). 이때 `note_52w`에 사유를 담고, `sample_days_52w`·`sample_start_52w`는 늘 실음. 변동성 `volatility_1m`·`volatility_3m`은 일별 로그수익률 표준편차 × √252(연율, 소수)로 계약서상 과거 변동성의 단일 계산 지점. `volatility_1m_market_threshold`는 그날 시세가 있는 종목들의 상위 20% 값(현재 시세는 T1만 적재되어 T1 기준)
+- `fundamental_trend`: 그날까지 공시된 최근 분기 매출·영업이익·순이익(연결 우선)과 전년 동기·직전 분기 대비 증감률(`revenue_yoy_pct`·`revenue_qoq_pct` 등, %). 기준이 적자면 증감률 대신 `…_note`에 흑자전환·적자지속
 - `flow`: 외국인·기관·개인 순매수(5·20거래일 합계, 원), 20일 합계의 시가총액 대비(%), 공매도 거래 비중 평균·잔고 비중
+- 단위: 퍼센트 값은 이름이 `_pct`로 끝남(2026-11-27, 이전 이름 `return_1m`·`revenue_yoy` 등). 변동성은 소수, `position_52w`는 0–1. `operating_margin`·`dividend_yield`·`short_volume_ratio_20d`·`short_balance_ratio`는 `get_metric` 지표 ID와 같은 이름이라 그대로이고 단위는 %
 - 묶음마다 값을 못 내면 값은 `null`이고 `reason`(예: `no_data`)에 사유. 하나라도 값이 있으면 `available: true`
 - 조회 실패 시 예외 대신 네 묶음을 모두 비운 결과와 `"error": "snapshot_unavailable"`. 종목당 약 1초(저장하지 않고 부를 때 계산)
 

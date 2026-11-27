@@ -1991,8 +1991,8 @@ components:
           type:
           - string
           - 'null'
-          description: 조회 실패면 "data_status_unavailable". 이때 건수·available·latest는 0·false가 아니라 null입니다(데이터 없음과
-            구분).
+          description: 조회 실패면 "data_status_unavailable", 입력 `as_of` 형식이 틀리면 "invalid_date". 이때 건수·available·latest는
+            0·false가 아니라 null입니다(데이터 없음과 구분).
     ResolvedCompany:
       type: object
       required:

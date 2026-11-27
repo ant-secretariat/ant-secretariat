@@ -718,6 +718,7 @@ result = get_chunks_by_ids(["NAVER_000660_20261104_1:3f2a…", "NEWS_1f2e…:9c1
   - `as_of`(선택)를 주면 그날 이전 파라미터로 판정합니다. 시뮬레이션 버튼을 누를 때 토론 job의 `data_as_of`를 넘기면, 시뮬레이션이 실제로 쓸 파라미터와 같은 기준으로 판정됩니다(#68, #99). 나머지 건수·최신일은 `as_of`와 상관없이 지금 기준
   - `simulation_params_as_of`: 판정에 쓴 파라미터 기준일(`sim_params.as_of`)
   - `as_of` 형식이 틀리면 `"error": "invalid_date"`
+  - 시뮬레이션 실행도 같은 규칙(`sim_params.as_of <= 기준일` 중 가장 최근 행, 기준일 당일 포함)으로 파라미터를 고릅니다. 판정과 실행이 같은 행을 봐야 버튼과 실제 결과가 어긋나지 않습니다
 - `derived_snapshot_available`: 시세와 재무가 둘 다 있으면 `true` (`get_derived_snapshot`이 계산 근거를 낼 수 있음)
 - `collection_job_status`: T2 수집이 Post-MVP라 `null`
 - `sources`: 소스 11개의 `{"count", "latest"}`. 토론 precheck의 `intent_data_sources.json` `requires_any`와 같은 키라 어댑터 없이 씀. `count`의 단위는 아래 표

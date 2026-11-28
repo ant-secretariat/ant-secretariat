@@ -24,6 +24,8 @@ from processing.search.korean_tokens import terms
 logger = logging.getLogger(__name__)
 
 MODES = ("bm25", "vector", "hybrid")
+# 청크 종류: 본문(text)과 표(table). 표는 리포트에만 있다
+CHUNK_TYPES = ("text", "table")
 # 골든셋 30문항 비교(2026-11-09) 결과 하이브리드가 가장 좋아 기본값으로 쓴다
 # (nDCG@10 BM25 0.51 / 의미 0.52 / 하이브리드 0.59, Hit@10 0.90 / 0.90 / 0.97)
 # 질문 임베딩이 실패하면 BM25로 대신한다
@@ -72,6 +74,7 @@ def search_chunks(
     mode: str | None = None,
     include_chart_numbers: bool = False,
     keyword_query: str | None = None,
+    chunk_type: str | None = None,
 ) -> tuple[list[dict], str]:
     """(결과, 실제로 쓴 방식). 의미 검색이 실패하면 BM25로 대신한다.
 
@@ -85,7 +88,7 @@ def search_chunks(
     where, params = build_filters(
         ticker=ticker, date_from=date_from, date_to=date_to, document_type=document_type, source=source,
         broker=broker, section_type=section_type, include_disclaimer=include_disclaimer, as_of=as_of,
-        include_chart_numbers=include_chart_numbers,
+        include_chart_numbers=include_chart_numbers, chunk_type=chunk_type,
     )
     if mode != "bm25":
         try:
@@ -104,11 +107,17 @@ def search_chunks(
 
 def build_filters(
     ticker=None, date_from=None, date_to=None, document_type=None, source=None, broker=None,
-    section_type=None, include_disclaimer=False, as_of=None, include_chart_numbers=False,
+    section_type=None, include_disclaimer=False, as_of=None, include_chart_numbers=False, chunk_type=None,
 ) -> tuple[str, list]:
     """검색 전에 거는 조건(SQL where 조각, 값). 비활성 청크는 항상 뺀다."""
+    if chunk_type is not None and chunk_type not in CHUNK_TYPES:
+        raise ValueError(f"chunk_type은 {CHUNK_TYPES} 중 하나: {chunk_type}")
     clauses = ["d.is_active"]
     params: list = []
+    if chunk_type:
+        # 표 조각만 찾기(트렌드 리포트 S3, #69) 또는 본문만
+        clauses.append("d.chunk_type = %s")
+        params.append(chunk_type)
     if ticker:
         # 그 종목이 대상인 문서와, 그 종목을 다루는 다른 문서(mentioned_tickers)를 함께 찾는다.
         # @>로 써야 GIN 색인(document_chunks_mentioned_idx)을 탄다. = any(...)는 전체를 읽어 5초가 걸렸다(#35 리뷰)

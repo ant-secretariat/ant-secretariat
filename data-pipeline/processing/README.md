@@ -238,6 +238,7 @@ result = resolve_company(company_input="삼성전자")
 
 문서 조각 검색. Supabase `document_chunks`(리포트·뉴스·공시)만 검색한다. `embedding_model`, `vector_db` 인자는 기존 호출 호환용으로 받기만 한다.
 
+- `chunk_type`(선택): `table`이면 리포트 표 조각만, `text`면 본문만 찾는다(트렌드 리포트 S3, #69). 11/25 기준 리포트 조각 1.95만 개 중 표가 1.41만 개. 다른 값이면 `ValueError`
 - `keyword_query`(선택)를 주면 키워드 검색(BM25)에는 `keyword_query`를, 의미 검색에는 `query`를 쓴다. 질문에 키워드를 덧붙이면 BM25에는 도움이 되지만 임베딩에서는 질문 의도가 흐려지기 때문(#84). 결과에 `keyword_query`를 담는다
 
 ```python

@@ -416,7 +416,7 @@
 | 실패 표시(`resolve_company` 등, `extract_company_mentions`), 한국 날짜, `get_derived_snapshot` 묶음 문제 | 수경 | 🟡 #88·#90·#91 리뷰 중(#55, 12/6까지) |
 | 지분공시 지표(수집 전 기간·증감 0 보고), 월별 상관 `as_of` 문서화, 조사 5건(정정보고 중복 아님, 무상증자는 알려진 한계 등) | 수경 | 🟡 #111 리뷰 중 |
 | 적자 기업 PER·EPS 사유(`loss_making`) | 수경 | ✅ #113 |
-| `get_derived_snapshot` 표본 부족, `is_latest` 뷰(마이그레이션), 지배주주 순이익 적재 | 수경 | ❌ |
+| `get_derived_snapshot` 표본 부족, `is_latest` 뷰(마이그레이션), 지배주주 순이익 적재 | 수경 | ✅ 표본 부족 #122, `is_latest` #131. 지배주주 순이익은 리뷰 중 |
 | 아젠다 키워드 검색, 문서 종류별 몫·한 문서 2조각 | 수경 | ✅ #106 |
 | 아젠다별 지표 목록(`metrics`)과 지표 근거 ID | 수경 | ✅ #108 |
 | 지수·민감도 조회 함수(`get_index_data`, `get_sensitivities`) | 수경 | ✅ #109 |

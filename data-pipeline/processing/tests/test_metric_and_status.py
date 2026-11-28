@@ -446,7 +446,8 @@ def test_empty_per_with_annual_loss_is_loss_making(monkeypatch, metric_id):
     # KRX는 직전 사업연도가 적자면 PER·EPS를 비운다. 그 이유를 재무로 확인해 알려 준다
     from decimal import Decimal
 
-    connection = _use(monkeypatch, FakeConnection((None, date(2026, 11, 23)), (2025, "CFS", Decimal("-977062000000"))))
+    connection = _use(monkeypatch, FakeConnection((None, date(2026, 11, 23)),
+                                                  (2025, "CFS", Decimal("-977062000000"), False)))
 
     result = get_metric("051910", metric_id, "2026-11-24")
 
@@ -456,8 +457,24 @@ def test_empty_per_with_annual_loss_is_loss_making(monkeypatch, metric_id):
     assert "financials_as_of" in str(connection.queries[1][0])   # 그날까지 접수된 재무만
 
 
+def test_owner_loss_explains_empty_per_even_if_total_is_profit(monkeypatch):
+    # LG에너지솔루션 2025: 당기순이익 +808억 원인데 지배주주 순이익 −1.07조 원 → KRX PER이 빈 이유가 적자(#41·#113 후속)
+    _use(monkeypatch, FakeConnection((None, date(2026, 11, 23)), (2025, "CFS", -1072810000000, True)))
+
+    result = get_metric("373220", "per", "2026-11-24")
+
+    assert (result["value"], result["reason"]) == (None, "loss_making")
+    assert result["basis"].startswith("직전 사업연도(2025) 지배주주 순이익 -1.07조 원")
+
+
+def test_annual_query_prefers_owners_net_income():
+    from processing.functions.get_metric import ANNUAL_NET_INCOME_QUERY
+
+    assert "net_income_owners" in ANNUAL_NET_INCOME_QUERY and "coalesce(owners_sum, net_sum)" in ANNUAL_NET_INCOME_QUERY
+
+
 @pytest.mark.parametrize("annual", [
-    (2025, "CFS", 80803000000),   # 당기순이익은 흑자(지배주주 몫만 적자일 수 있음)
+    (2025, "CFS", 80803000000, False),   # 지배주주 순이익이 없고 당기순이익은 흑자
     None,                          # 신규 상장이라 직전 사업연도가 없음
 ])
 def test_empty_per_without_confirmed_loss_stays_no_value(monkeypatch, annual):

@@ -119,5 +119,38 @@ class FinancialRowsTest(unittest.TestCase):
         self.assertEqual(rows, [])
 
 
+class OwnerIncomeTest(unittest.TestCase):
+    """지배주주 순이익: 전체 재무제표에서 계정 ID로 찾고, 4분기는 주요계정과 같은 규칙."""
+
+    def test_owner_row_prefers_income_statement_then_comprehensive(self) -> None:
+        from crawling.collectors.dart_financials import OWNER_ACCOUNT_ID, _owner_row
+
+        cis = {"account_id": OWNER_ACCOUNT_ID, "sj_div": "CIS", "thstrm_amount": "2"}
+        is_ = {"account_id": OWNER_ACCOUNT_ID, "sj_div": "IS", "thstrm_amount": "1"}
+        sce = {"account_id": OWNER_ACCOUNT_ID, "sj_div": "SCE", "thstrm_amount": "9"}   # 자본변동표는 쓰지 않음
+        self.assertIs(_owner_row([sce, cis, is_]), is_)
+        self.assertIs(_owner_row([sce, cis]), cis)          # 금융지주처럼 포괄손익계산서에만 있는 경우
+        self.assertIsNone(_owner_row([sce, {"account_id": "ifrs-full_ProfitLoss", "sj_div": "IS"}]))
+
+    def test_owner_rows_fourth_quarter_and_account(self) -> None:
+        from crawling.collectors.dart_financials import OWNER_ACCOUNT_NM
+
+        def raw(code, amount, add, rcept_no):
+            quarter = {"11013": 1, "11012": 2, "11014": 3, "11011": 4}[code]
+            end = {1: "03.31", 2: "06.30", 3: "09.30", 4: "12.31"}[quarter]
+            return {"rcept_no": rcept_no, "reprt_code": code, "bsns_year": "2025", "stock_code": "373220",
+                    "fs_div": "CFS", "sj_div": "IS", "account_nm": OWNER_ACCOUNT_NM, "ord": "1",
+                    "thstrm_amount": amount, "thstrm_add_amount": add, "thstrm_dt": f"2025.{end} 현재"}
+
+        rows = financial_rows([raw("11014", "-300", "-900", "20251114000001"),
+                               raw("11011", "-1000", "", "20260312000001")], {"373220"})
+        by_quarter = {row["quarter"]: row for row in rows}
+        self.assertEqual({row["account"] for row in rows}, {"net_income_owners"})
+        self.assertEqual(by_quarter[4]["amount"], -100)          # 연간 −1000 − 3분기 누적 −900
+        self.assertEqual(by_quarter[4]["amount_ytd"], -1000)
+        self.assertEqual(by_quarter[4]["period_end"], date(2025, 12, 31))
+        self.assertEqual(by_quarter[4]["rcept_no"], "20260312000001")
+
+
 if __name__ == "__main__":
     unittest.main()

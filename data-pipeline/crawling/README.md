@@ -202,6 +202,7 @@ python -m crawling.financials_loader --recent     # 작년·올해 다시 받기
 - 4분기 손익은 사업보고서와 3분기 보고서 중 더 늦게 접수된 쪽의 접수번호를 쓴다(3분기가 나중에 정정되면 4분기도 새 버전으로 쌓임)
 - DART는 최신 버전만 주므로, 원래 값을 남기려면 공시 시즌에 정정이 나오기 전에 받아 두어야 한다
 - 지표는 연결재무제표 우선, 없으면 별도. ROE는 지배주주 귀속분이 아닌 전체 당기순이익 기준
+- **지배주주 순이익**(`account = 'net_income_owners'`, 연결만): 주요계정 API(`fnlttMultiAcnt`)에 없어 단일회사 전체 재무제표 API(`fnlttSinglAcntAll`, `fs_div=CFS`)에서 계정 ID `ifrs-full_ProfitLossAttributableToOwnersOfParent`로 받는다(계정명은 회사마다 다름). 손익계산서에 없으면 포괄손익계산서(금융지주 등). 4분기 단독값·접수번호 규칙은 위와 같다. 회사마다 보고서별로 1번씩 불러서(연도당 T1/T2 × 4번, 요청 간격 1.5초면 약 10분) T1/T2만 받고, `--all`이면 받지 않음(`--skip-owners`로 끌 수 있음). 기간 날짜 칸이 없어 12월 결산 분기 말일로 채운다(T1은 모두 12월 결산). `get_metric`의 적자 사유(`loss_making`)가 이 값을 먼저 씀(KRX PER·EPS와 같은 기준)
 - 은행·보험·증권은 DART 주요계정에 매출액이 없어 매출 관련 지표가 비고, 부채비율은 업종 특성상 1,000%를 넘는다
 
 WICS 섹터 분류(`companies.sector_l1` 대분류, `sector_l2` 중분류) 갱신. 분류는 자주 바뀌지 않아 주 1회면 충분합니다:

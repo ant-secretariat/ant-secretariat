@@ -1,4 +1,10 @@
-"""OpenDART 다중회사 주요계정(fnlttMultiAcnt) 수집과 financials 행 변환."""
+"""OpenDART 다중회사 주요계정(fnlttMultiAcnt) 수집과 financials 행 변환.
+
+지배주주 순이익(net_income_owners)은 주요계정 API에 없어서 단일회사 전체 재무제표(fnlttSinglAcntAll, 연결)에서
+계정 ID ifrs-full_ProfitLossAttributableToOwnersOfParent로 따로 받는다. 회사마다 계정명이 달라("지배기업 소유주지분",
+"지배기업주주지분순이익" 등) 이름 대신 ID로 찾고, 손익계산서(IS)에 없으면 포괄손익계산서(CIS, 금융지주 등)에서 찾는다.
+별도 재무제표에는 지배·비지배 구분이 없어 받지 않는다.
+"""
 
 from __future__ import annotations
 
@@ -16,6 +22,12 @@ logger = logging.getLogger(__name__)
 
 
 DART_URL = "https://opendart.fss.or.kr/api/fnlttMultiAcnt.json"
+FULL_URL = "https://opendart.fss.or.kr/api/fnlttSinglAcntAll.json"
+OWNER_ACCOUNT_ID = "ifrs-full_ProfitLossAttributableToOwnersOfParent"
+OWNER_STATEMENTS = ("IS", "CIS")   # 손익계산서 우선, 없으면 포괄손익계산서
+OWNER_ACCOUNT_NM = "지배기업 소유주지분 순이익"   # 계정명이 회사마다 달라 저장할 때는 이 이름으로 맞춘다
+# 분기 → 기간 말일(12월 결산). 전체 재무제표 API에는 기간 날짜 칸이 없다. T1은 모두 12월 결산(2026-11-28 확인)
+QUARTER_END = {1: "03.31", 2: "06.30", 3: "09.30", 4: "12.31"}
 CORPS_PER_REQUEST = 100  # API 최대값
 # 보고서 코드 → 분기
 REPORT_QUARTERS = {"11013": 1, "11012": 2, "11014": 3, "11011": 4}
@@ -36,6 +48,7 @@ ACCOUNTS = {
     "법인세차감전 순이익": "pretax_income",
     "당기순이익": "net_income",
     "당기순이익(손실)": "net_income",
+    OWNER_ACCOUNT_NM: "net_income_owners",   # 전체 재무제표 API에서 계정 ID로 찾은 줄(fetch_owner_income)
 }
 
 
@@ -52,6 +65,50 @@ class DartFinancialsClient:
                     batch = corp_codes[start : start + CORPS_PER_REQUEST]
                     rows.extend(self._fetch(client, batch, year, report_code))
         return rows
+
+    def fetch_owner_income(self, corp_to_ticker: dict[str, str], year: int) -> list[dict]:
+        """한 사업연도의 지배주주 순이익 원본 행(회사 × 보고서 4종, 연결). financial_rows에 그대로 넣는 모양으로 바꿔 준다."""
+        rows: list[dict] = []
+        with httpx.Client(timeout=self.settings.request_timeout_seconds, verify=create_ssl_context()) as client:
+            for corp_code, ticker in corp_to_ticker.items():
+                for report_code, quarter in REPORT_QUARTERS.items():
+                    raw = self._fetch_full(client, corp_code, year, report_code)
+                    picked = _owner_row(raw)
+                    if picked is None:
+                        continue
+                    rows.append({
+                        "rcept_no": picked["rcept_no"], "reprt_code": report_code, "bsns_year": str(year),
+                        "stock_code": ticker, "fs_div": "CFS", "sj_div": picked["sj_div"],
+                        "account_nm": OWNER_ACCOUNT_NM, "ord": "1",
+                        "thstrm_amount": picked.get("thstrm_amount"),
+                        "thstrm_add_amount": picked.get("thstrm_add_amount"),
+                        "thstrm_dt": f"{year}.{QUARTER_END[quarter]} 현재",
+                    })
+        return rows
+
+    def _fetch_full(self, client: httpx.Client, corp_code: str, year: int, report_code: str) -> list[dict]:
+        try:
+            response = client.get(
+                FULL_URL,
+                params={
+                    "crtfc_key": self.settings.dart_api_key,
+                    "corp_code": corp_code,
+                    "bsns_year": str(year),
+                    "reprt_code": report_code,
+                    "fs_div": "CFS",
+                },
+            )
+            response.raise_for_status()
+            payload = response.json()
+        except Exception as exc:
+            message = mask_key(str(exc), self.settings.dart_api_key)
+            raise RuntimeError(f"DART 전체 재무제표 조회 실패: {corp_code} {year} {report_code} - {message}") from None
+        finally:
+            time.sleep(self.settings.request_delay_seconds)
+        # 연결재무제표가 없는 회사·아직 안 나온 보고서는 데이터 없음(013)이라 빈 목록
+        if not has_data(payload, f"DART 전체 재무제표 조회 실패: {corp_code} {year} {report_code}"):
+            return []
+        return payload.get("list") or []
 
     def _fetch(self, client: httpx.Client, corp_codes: list[str], year: int, report_code: str) -> list[dict]:
         try:
@@ -75,6 +132,15 @@ class DartFinancialsClient:
         if not has_data(payload, f"DART 재무 조회 실패: {year} {report_code}"):
             return []
         return payload.get("list") or []
+
+
+def _owner_row(raw_rows: list[dict]) -> dict | None:
+    """전체 재무제표 원본에서 지배주주 순이익 한 줄. 손익계산서(IS)를 먼저, 없으면 포괄손익계산서(CIS)."""
+    for statement in OWNER_STATEMENTS:
+        for row in raw_rows:
+            if row.get("account_id") == OWNER_ACCOUNT_ID and row.get("sj_div") == statement:
+                return row
+    return None
 
 
 def financial_rows(raw_rows: list[dict], tickers: set[str]) -> list[dict]:

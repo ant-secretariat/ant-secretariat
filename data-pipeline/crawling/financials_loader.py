@@ -5,6 +5,9 @@
 
 --all을 붙이면 T1/T2가 아니라 상장 전종목을 대상으로 한다.
 
+지배주주 순이익(net_income_owners)은 회사마다 전체 재무제표를 따로 받아야 해서(연도당 회사 수 × 4번 호출) T1/T2만 받는다.
+--all이면 받지 않고, --skip-owners면 건너뛴다. 실패해도 주요계정 적재는 그대로 두고 종료 코드로 알린다.
+
 같은 접수번호는 덮어쓰고, 정정공시로 접수번호가 바뀌면 새 줄로 쌓는다. DART는 최신
 버전만 주므로 원래 값을 남기려면 공시 시즌에 정정이 나오기 전에 받아 두어야 한다.
 """
@@ -30,7 +33,7 @@ from crawling.config.clock import today_kst
 logger = logging.getLogger(__name__)
 
 
-def load(connection: psycopg.Connection, years: list[int], all_tickers: bool) -> None:
+def load(connection: psycopg.Connection, years: list[int], all_tickers: bool, owners: bool = True) -> None:
     targets = _targets(connection, all_tickers)
     corp_codes = sorted(set(targets.values()))
     logger.info("재무 적재: %s년, 대상 %s종목", ", ".join(map(str, years)), len(corp_codes))
@@ -59,8 +62,24 @@ def load(connection: psycopg.Connection, years: list[int], all_tickers: bool) ->
             len({row["ticker"] for row in rows}),
             dict(sorted(quarters.items())),
         )
+        if owners and not all_tickers and not _load_owners(connection, client, targets, year):
+            failed.append(year)
     if failed:
         raise SystemExit(f"재무 적재 실패 연도: {failed}")
+
+
+def _load_owners(connection: psycopg.Connection, client: DartFinancialsClient, targets: dict[str, str], year: int) -> bool:
+    """한 사업연도의 지배주주 순이익. 4분기 단독값·접수번호 규칙은 주요계정과 같다(financial_rows)."""
+    corp_to_ticker = {corp: ticker for ticker, corp in targets.items()}
+    try:
+        rows = financial_rows(client.fetch_owner_income(corp_to_ticker, year), set(targets))
+        upsert(connection, "financials", rows,
+               key_columns=["ticker", "fiscal_year", "quarter", "fs_div", "account", "rcept_no"])
+    except Exception as exc:
+        logger.error("%s년 지배주주 순이익 적재 실패: %s", year, exc)
+        return False
+    logger.info("%s년 지배주주 순이익: %s행, 종목 %s개", year, len(rows), len({row["ticker"] for row in rows}))
+    return True
 
 
 def _targets(connection: psycopg.Connection, all_tickers: bool) -> dict[str, str]:
@@ -78,6 +97,7 @@ def parse_args() -> argparse.Namespace:
     mode.add_argument("--recent", action="store_true", help="작년·올해만 다시 받기")
     parser.add_argument("--years", type=int, default=3, help="--backfill 사업연도 수 (올해 제외)")
     parser.add_argument("--all", action="store_true", help="T1/T2가 아니라 상장 전종목 대상")
+    parser.add_argument("--skip-owners", action="store_true", help="지배주주 순이익(전체 재무제표 API)은 받지 않음")
     return parser.parse_args()
 
 
@@ -94,7 +114,7 @@ def main() -> None:
     this_year = today_kst().year
     first = this_year - (args.years if args.backfill else 1)
     with connect() as connection:
-        load(connection, list(range(first, this_year + 1)), args.all)
+        load(connection, list(range(first, this_year + 1)), args.all, owners=not args.skip_owners)
 
 
 if __name__ == "__main__":

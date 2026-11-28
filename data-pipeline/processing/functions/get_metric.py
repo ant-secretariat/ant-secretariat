@@ -141,20 +141,31 @@ FINANCIAL_COLUMNS = ("debt_ratio", "operating_margin", "revenue_growth_yoy", "ro
 # KRX(pykrx)는 직전 사업연도 순이익이 적자면 PER·EPS를 비워 준다. 비어 있을 때 그 이유가 적자인지 재무로 확인한다
 LOSS_CHECKED_METRICS = {"per", "eps"}
 # 그날까지 접수된 재무에서, 네 분기가 모두 같은 기준(연결/별도)으로 있는 가장 최근 사업연도의 순이익 합계
+# 지배주주 순이익(net_income_owners, 연결만)이 네 분기 모두 있으면 그것을, 없으면 당기순이익(지배+비지배)을 쓴다.
+# KRX PER·EPS가 지배주주 순이익 기준이라 그쪽이 맞는 기준이다(당기순이익은 흑자인데 지배주주 몫만 적자인 종목이 있음)
 ANNUAL_NET_INCOME_QUERY = """
     with f as (select * from financials_as_of(%s::date) where ticker = %s),
     pivoted as (
-        select fiscal_year, quarter, fs_div, max(amount) filter (where account = 'net_income') as net_income
+        select fiscal_year, quarter, fs_div,
+               max(amount) filter (where account = 'net_income') as net_income,
+               max(amount) filter (where account = 'net_income_owners') as owners
         from f group by fiscal_year, quarter, fs_div
     ),
     chosen as (
         select distinct on (fiscal_year, quarter) *
         from pivoted order by fiscal_year, quarter, (fs_div = 'CFS') desc
+    ),
+    yearly as (
+        select fiscal_year, min(fs_div) as fs_div,
+               case when count(owners) = 4 then sum(owners) end as owners_sum,
+               case when count(net_income) = 4 then sum(net_income) end as net_sum
+        from chosen
+        group by fiscal_year
+        having min(fs_div) = max(fs_div)
     )
-    select fiscal_year, min(fs_div), sum(net_income)
-    from chosen
-    group by fiscal_year
-    having count(net_income) = 4 and min(fs_div) = max(fs_div)
+    select fiscal_year, fs_div, coalesce(owners_sum, net_sum), owners_sum is not null
+    from yearly
+    where coalesce(owners_sum, net_sum) is not null
     order by fiscal_year desc
     limit 1
 """
@@ -318,15 +329,16 @@ def _daily_metric(connection, ticker: str, metric_id: str, as_of: str) -> dict:
 def _annual_loss(connection, ticker: str, as_of: str) -> str | None:
     """직전 사업연도 순이익이 적자면 그 근거 문장, 아니면 None.
 
-    KRX의 PER·EPS는 지배주주 순이익 기준인데 재무 표에는 당기순이익(지배+비지배)만 있다. 그래서 당기순이익이 적자일
-    때만 적자로 본다. 당기순이익은 흑자인데 PER이 비는 종목(지배주주 몫만 적자 등)은 no_value로 남는다.
+    KRX의 PER·EPS는 지배주주 순이익 기준이라 지배주주 순이익(net_income_owners, 연결)이 있으면 그것으로 본다.
+    없으면(별도만 내는 회사, 적재 전 기간) 당기순이익(지배+비지배)으로 본다. 어느 쪽인지 문장에 적는다.
     """
     row = connection.execute(ANNUAL_NET_INCOME_QUERY, (as_of, ticker)).fetchone()
     if row is None or row[2] is None or row[2] >= 0:
         return None
-    fiscal_year, fs_div, net_income = row
+    fiscal_year, fs_div, net_income, owners = row
     amount = format_display("market_cap", float(net_income), "원")   # 합계 금액 표기(조·억 원)를 그대로 씀
-    return f"직전 사업연도({fiscal_year}) 당기순이익 {amount}({FS_LABELS.get(fs_div, fs_div)}) 적자"
+    label = "지배주주 순이익" if owners else "당기순이익"
+    return f"직전 사업연도({fiscal_year}) {label} {amount}({FS_LABELS.get(fs_div, fs_div)}) 적자"
 
 
 

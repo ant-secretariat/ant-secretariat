@@ -149,7 +149,7 @@
   - 문서는 토론 근거(`Evidence`)로 바로 옮길 수 있는 모양
   - precheck가 "있다"고 판정한 데이터는 묶음에 꼭 포함
   - 한 블록이 실패해도 나머지는 줌
-- 지수 조회(`get_index_data`)·민감도 조회(`get_sensitivities`)는 만들었고(#109), 과거 시점 기준 `data_tier`는 아직 없습니다.
+- 지수 조회(`get_index_data`)·민감도 조회(`get_sensitivities`)는 만들었고(#109), `as_of`가 오늘보다 이르면 `data_tier`도 그날까지 게시된 문서 수로 정합니다(넘겨받은 `data_status`는 지금 기준이라 쓰지 않고 한 번 더 셈, 종목당 약 0.3초).
 - 시뮬레이션은 `intent` 없이 부르고, 묶음에 지수(`index_daily`)와 파라미터 기준일(`sim_params_as_of`)을 더할 예정입니다.
 
 ### 4-2. intent별 반환 모양 (토론 `agent_type="debate"`)
@@ -423,8 +423,9 @@
 | 아젠다별 지표 목록(`metrics`)과 지표 근거 ID | 수경 | ✅ #108 |
 | 지수·민감도 조회 함수(`get_index_data`, `get_sensitivities`) | 수경 | ✅ #109 |
 | 묶음 블록(`target_price`·`financials`·`disclosures`·`macro`·`index`·`sensitivities`), 블록 근거 ID, `evidence_id` → `chunk_id`, 문서 넓혀 찾기, 컨센서스 최근 의견 수 | 수경 | ✅ #110 |
-| 계산 근거 블록(`valuation`·`fundamental_trend`·`price_trend`·`flow`) | 수경 | 🟡 리뷰 중(토론 쪽 요약 문장은 유민) |
-| 과거 시점 `data_tier`, 묶음 속도(연결 공유·병렬, #111 머지 뒤 다시 잼) | 수경 | ❌ |
+| 계산 근거 블록(`valuation`·`fundamental_trend`·`price_trend`·`flow`) | 수경 | ✅ #133 (토론 쪽 요약 문장은 #137) |
+| 과거 시점 `data_tier` | 수경 | 🟡 리뷰 중 |
+| 묶음 속도(병렬 #123 머지, 프로세스 전체 연결 상한은 남음) | 수경 | 🟡 |
 | 목표가 방향 라벨 경계값 상수 | 수경 | ❌ #82 ADR 뒤 |
 | `simulation_ready`를 기준일로 판정(`as_of`) | 수경 | 🟡 #103 리뷰 중 |
 | `broker_key` 보강(`(주)` 떼기, 예외 사전 적용 기간), `chunk_type` 인자 | 수경 | 🟡 #112 리뷰 중 (컨센서스 `broker_key` 묶기·`revisions`는 ✅ #105, `DataStatus` 한국 날짜는 ✅ #75) |

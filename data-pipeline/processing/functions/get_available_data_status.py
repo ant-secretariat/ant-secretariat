@@ -55,6 +55,38 @@ STATUS_QUERY = f"""
 """
 
 
+# 과거 시점 근거 종류(data_tier)용: 그날까지 게시된 문서 수와, 그날까지 시세·재무가 있었는지(#84).
+# 문서 조건은 검색(chunk_search)과 같다: 활성·면책 아닌 청크, mentioned_tickers GIN, published_at <= as_of
+DOCUMENT_COUNTS_AS_OF = ",\n        ".join(
+    f"""(select count(distinct doc_id) from document_chunks
+         where document_type = '{kind}' and is_active and section_type <> 'disclaimer'
+           and mentioned_tickers @> array[%(ticker)s]::text[] and published_at <= %(as_of)s)"""
+    for kind in DOCUMENT_SOURCES
+)
+TIER_AS_OF_QUERY = f"""
+    select
+        {DOCUMENT_COUNTS_AS_OF},
+        exists (select 1 from price_data where ticker = %(ticker)s and trade_date <= %(as_of)s::date)
+          and exists (select 1 from financials where ticker = %(ticker)s and rcept_dt <= %(as_of)s::date)
+"""
+
+
+def tier_counts_as_of(ticker: str, as_of: str) -> dict:
+    """그날까지 알 수 있던 근거 건수. data_tier_for에 그대로 넣는 값(report·news·disclosure 건수, 계산 근거 가능 여부).
+    조회에 실패하면 error="data_status_unavailable"(근거 종류를 모르는데 정하지 않는다)."""
+    try:
+        from crawling.db.postgres import connect
+
+        with connect() as connection:
+            row = connection.execute(TIER_AS_OF_QUERY, {"ticker": ticker, "as_of": as_of}).fetchone()
+    except Exception as exc:
+        logger.error("과거 시점 근거 건수 조회 실패: %s(%s)", ticker, type(exc).__name__)
+        return {"error": "data_status_unavailable"}
+    report, news, disclosure, derived = row
+    return {"report_count": int(report or 0), "news_count": int(news or 0), "disclosure_count": int(disclosure or 0),
+            "derived_snapshot_available": bool(derived), "error": None}
+
+
 def get_available_data_status(
     ticker: str,
     relational_db: BaseRelationalDB = None,

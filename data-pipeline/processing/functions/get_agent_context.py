@@ -102,7 +102,8 @@ def get_agent_context(
     relational_db·embedding_model·vector_db 인자는 기존 호출을 깨지 않으려고 받기만 한다(없어도 된다).
     as_of(YYYY-MM-DD)를 주면 묶음 안의 모든 조회(목표가·시세·매크로·문서 검색)가 그날까지 알 수 있던 값만 쓴다.
     없으면 오늘(KST)이다. 과거 날짜로 만들어도 그 뒤 문서·목표가가 섞이지 않게 하려는 것이다(#69 리뷰).
-    단, data_status(와 그것으로 정하는 data_tier)는 as_of와 상관없이 지금 기준이다(과거 시점 계산은 아직 없음, #84).
+    data_tier도 as_of가 오늘보다 이르면 그날까지 게시된 문서 수로 정한다(#84). 이때는 넘겨받은 data_status를 쓰지 않고
+    한 번 더 센다(종목당 약 0.3초). 오늘 기준이면 지금처럼 data_status(없으면 새로 조회)를 쓴다.
     trend_report 문서 검색은 종류마다 TREND_REPORT_TOP_K개를 돌려준다. 받는 쪽이 문서당 조각 수를 줄여 고르기 때문이다.
     debate에 intent를 주면 문서 검색에 아젠다 설정(processing/config/agenda_search_terms.json)을 쓴다(#84).
     키워드 검색(BM25)은 질문 + 키워드, 의미 검색은 질문만이고, 질문이 없으면(버튼 경로) 둘 다 키워드로 검색한다.
@@ -141,7 +142,7 @@ def get_agent_context(
     price_data = lambda: get_price_data(ticker=ticker, as_of=as_of, relational_db=relational_db)  # noqa: E731
     macro_data = lambda: get_macro_data(as_of=as_of, relational_db=relational_db)  # noqa: E731
     # 데이터 상태(data_tier)도 다른 조회와 함께 돌린다. 결과에 넣는 자리는 그대로 맨 뒤
-    tier_task = {"_tier": lambda: _data_tier(ticker, data_status)}
+    tier_task = {"_tier": lambda: _data_tier(ticker, data_status, as_of)}
 
     if agent_type == "trend_report":
         tasks = {"target_prices": target_prices, "price_data": price_data, "macro_data": macro_data}
@@ -195,13 +196,19 @@ def get_agent_context(
     return result
 
 
-def _data_tier(ticker: str, data_status: Optional[dict]) -> dict:
+def _data_tier(ticker: str, data_status: Optional[dict], as_of: Optional[str] = None) -> dict:
+    """근거 종류. as_of가 오늘(KST)보다 이르면 그날까지 게시된 문서로 센다(#84): 과거 날짜로 토론을 재현할 때
+    그 뒤에 들어온 리포트로 data_tier가 report가 되지 않게. 이때는 넘겨받은 data_status(지금 기준)를 쓰지 않는다."""
+    from crawling.config.clock import today_kst
     from processing.enums import data_tier_for
-    from processing.functions.get_available_data_status import get_available_data_status
+    from processing.functions.get_available_data_status import get_available_data_status, tier_counts_as_of
 
-    status = data_status if data_status is not None else get_available_data_status(ticker)
-    if status.get("ticker") not in (None, ticker):
-        raise ValueError(f"data_status가 다른 종목({status.get('ticker')})의 결과입니다")
+    if data_status is not None and data_status.get("ticker") not in (None, ticker):
+        raise ValueError(f"data_status가 다른 종목({data_status.get('ticker')})의 결과입니다")
+    if as_of is not None and as_of < today_kst().isoformat():
+        status = tier_counts_as_of(ticker, as_of)
+    else:
+        status = data_status if data_status is not None else get_available_data_status(ticker)
     if status.get("error"):
         return {"data_tier": None, "error": status["error"]}
     tier = data_tier_for(

@@ -2,7 +2,7 @@
 
 | 항목 | 값 |
 | --- | --- |
-| 버전 | **v2.7** (2026-11-24) |
+| 버전 | **v2.8** (2026-11-24) |
 | 상태 | 검토 중 |
 | 담당 | 태은 |
 | 상위 문서 | [헌법](../../.specify/memory/constitution.md) > [ADR](../decisions/) > PRD v1.6 > 기능 명세서 v0.8 > 이 문서 |
@@ -22,7 +22,8 @@
 | v2.4 | 2026-11-24 | 워커 내부 구조 확정: dispatcher 하나가 꺼내고 `Semaphore(3)`로 실행(6.2 "워커 내부"), 하트비트 일괄 갱신, 배포 시 종료 순서, 이벤트 루프 운용(LLM 대기는 코루틴, 계산은 `to_thread`). 워커 DB 접근 방식은 Q8 |
 | v2.5 | 2026-11-24 | Q8 해결: 워커의 큐 SQL은 동기 psycopg + `to_thread` |
 | v2.6 | 2026-11-24 | 5.3 실행 조건: 인사이트보드 공시를 `requires_any: []`로 (공시 0건 종목도 거절하지 않고 빈 칸으로, 인사이트보드 기획서 v2.3) |
-| **v2.7** | 2026-11-24 | **MVP에서 라우팅 그래프 제거(ADR 0015, #94).** 오케스트레이터 역할을 "공통 관문 + 응답 조립"으로(1장), 엔드포인트가 관문과 에이전트를 직접 호출(3장), 토론 탭 "직접 물어보기"와 자유 질의 구분, 라우팅은 Post-MVP(11장) |
+| v2.7 | 2026-11-24 | **MVP에서 라우팅 그래프 제거(ADR 0015, #94).** 오케스트레이터 역할을 "공통 관문 + 응답 조립"으로(1장), 엔드포인트가 관문과 에이전트를 직접 호출(3장), 토론 탭 "직접 물어보기"와 자유 질의 구분, 라우팅은 Post-MVP(11장) |
+| **v2.8** | 2026-11-24 | 6.2: Solar 동시 호출 상한 3 추가 (job 세마포어와 별개, 워커 전체 공유. #74 리뷰, Design Doc 4.5 4→3). 4.1: 대안 조회 실패·빈 목록은 `upstream_unavailable`, payload는 `ticker`·`company`만 (#85 리뷰) |
 
 ### v1.1 → v2.0 무엇이 바뀌었나
 
@@ -161,6 +162,8 @@ async def trend_report(body: TrendReportBody, user_id: str = Depends(current_use
 
 - **payload는 오케스트레이터가 채운다.** precheck는 사유 코드(`out_of_scope_topic`·`data_collecting`·`no_data`)만 돌려준다.
   - `alternatives`: 데이터 함수 `suggest_alternatives(ticker, n=3)`(수경, 계약 draft.6에 추가). 커버 종목 중 **같은 WICS 중분류 → 같은 대분류 → 전체** 순서로 시가총액 큰 순. 요청 종목의 업종이 비어 있으면 바로 전체 시총순.
+    - 함수가 `alternatives: null`(조회 실패)이나 빈 목록을 돌려주면 `upstream_unavailable`(503, `retry`)로 응답한다. 사용자는 공통 오류 화면을 본다. 대안이 1개 이상일 때만 `choose_alternative_company`로 거절하므로 계약의 `minItems: 1`을 지킨다. 다음 행동을 `rephrase_company`로 바꾸지 않는다(이름은 제대로 찾았으므로 다시 입력해도 같은 거절이 반복됨).
+    - payload에는 함수 결과에서 `ticker`·`company`만 옮긴다(`Candidate.sector`·`market_cap`은 비워 둠). `match`·`market_cap`은 로그에만 남긴다.
   - `topics`: 토론이 지원하는 아젠다 목록(`precheck` 설정의 `AGENDA_TITLES`).
 - **#60에서 바뀌는 점:** 지금 `CompanyNotFoundError`는 422 Problem이다. 봉투로 옮기면 `company_not_found`는 200 `rejected`가 된다(계약대로). 사용자를 못 찾은 404도 `job_not_found`를 같이 쓰는데, 사용자 조회는 세션 도입 후 401 `unauthenticated`로 바뀌므로 별도 코드를 만들지 않는다.
 - `ResponseMeta.trace_id`는 #60의 요청별 `trace_id`를 그대로 쓴다. `data_as_of`는 기본값 없이 각 에이전트가 채운다(없으면 명시적으로 `null`).
@@ -339,6 +342,7 @@ t4  D1 실행                             D2 실행
 | --- | --- |
 | 타임아웃 | 토론 전체 5분, LLM 호출 1회 60초 → `failed` + `error_code=timeout` |
 | 워커 동시 실행 | 3 (Design Doc 4.5, Langfuse 실측 후 조정) |
+| Solar 동시 호출 | 3. **job 수가 아니라 LLM 호출 수**를 세는 별도 상한이고 워커 안의 모든 job이 나눠 쓴다(job 안에서 Bull·Bear가 병렬 호출되므로 job 세마포어만으로는 Solar 동시 요청을 막지 못함). 토론은 `complete_structured`의 모듈 세마포어, 환경변수 `DEBATE_RENEWAL_LLM_MAX_CONCURRENCY`. 근거: 무료 한도 60 RPM(추정) × 평균 호출 약 3초 ≈ 3. 요금제 확정 후 콘솔 한도로 조정 |
 | 프로세스 | API와 같은 이미지, 진입점만 다름. 연결은 세션 모드(5432) |
 
 **워커 내부: dispatcher 하나 + `Semaphore(3)`**

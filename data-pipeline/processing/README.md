@@ -856,6 +856,7 @@ result = get_metric(ticker="005930", metric_id="roe_ttm", as_of="2026-09-01")
 - `as_of`가 오늘(KST)보다 이르면 `data_tier`를 그날까지 게시된 문서 수(검색과 같은 조건)와 그날까지 시세·재무 유무로 정함(`tier_counts_as_of`, 약 0.3초). 이때는 넘겨받은 `data_status`(지금 기준)를 쓰지 않음. 과거 날짜로 토론을 재현할 때 그 뒤에 들어온 리포트로 `report`가 되지 않게 하려는 것
 - `data_status`에 이미 가진 `get_available_data_status` 결과(또는 `resolve_company`의 `data_status`)를 넘기면 상태를 다시 조회하지 않음. 아젠다마다 부를 때 쓰면 종목당 0.3~1초씩 반복되는 조회가 없어짐. 다른 종목의 결과면 `ValueError`
 - `intent`(아젠다 ID, `AgendaId`)를 받아 결과에 그대로 담음. 없는 아젠다면 `ValueError`(호출 코드의 실수)
+- `simulation`: 목표가·시세·매크로에 더해 `index_data`(코스피·코스닥 최근 750거래일, `get_index_data`)와 `sim_params_as_of`·`simulation_ready`(`as_of` 이전 가장 최근 `sim_params`, `DataStatus.simulation_ready`와 같은 규칙). 파라미터 조회에 실패하면 둘 다 `null`이고 `sim_params_error`
 - `debate`에 `intent`를 주면 문서 검색에 아젠다 설정(`processing/config/agenda_search_terms.json`, 데이터 쪽 관리)을 씀(#84)
   - 키워드 검색(BM25): 질문 + 키워드 / 의미 검색: 질문만 / 질문이 없으면(버튼 경로) 둘 다 키워드
   - 그래서 질문이 없어도 `documents`가 있음. `intent`가 없으면 지금처럼 `query`가 있을 때만 검색

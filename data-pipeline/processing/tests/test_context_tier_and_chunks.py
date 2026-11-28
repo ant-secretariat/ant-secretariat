@@ -25,7 +25,7 @@ def quiet_sources(monkeypatch):
 
     def use_status(status):
         monkeypatch.setattr("processing.functions.get_available_data_status.get_available_data_status",
-                            lambda ticker: status)
+                            lambda ticker, **kw: status)
 
     return use_status
 

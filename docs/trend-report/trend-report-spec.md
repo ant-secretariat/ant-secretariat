@@ -2,7 +2,7 @@
 
 | 항목 | 값 |
 | --- | --- |
-| 버전 | **v2.3** (2026-11-24) |
+| 버전 | **v2.4** (2026-11-28) |
 | 상태 | 검토 중 |
 | 담당 | 태은 |
 | 기능 ID | FN-TR-01 (카드 생성), FN-TR-02 (근거 연결) |
@@ -20,7 +20,8 @@
 | v2.0 | 2026-11-23 | 저장소로 이관. Pinecone·SQLite 경로 제거, `get_agent_context`·컨센서스(ADR 0010) 기준으로 수정, 목표주가 방향 계산 규칙·`BrokerView`·`verification` 정의, 근거 부족 루프를 S1~S3로 한정 |
 | v2.1 | 2026-11-23 | 실행 조건(1.1) 추가 — 오케스트레이터 기획서 v2.1 5.3 경로별 실행 조건 표와 연결 (#68 리뷰) |
 | v2.2 | 2026-11-24 | #69 리뷰 반영: `intent`를 단일 값으로, `as_of`를 각 함수에 직접 전달, 근거 개수는 초기값(#81), 매크로 문서 0건 → 정형 값만, 증권사 이름은 `broker_key`로 매칭, **목표주가 방향을 개정 비율 방식으로 교체**(#82), 변동성 표기 |
-| **v2.3** | 2026-11-24 | 데이터 조회를 도구 레지스트리 `invoke` 경유로 (오케스트레이터 기획서 v2.2 8장, 레지스트리 MVP 정정) |
+| v2.3 | 2026-11-24 | 데이터 조회를 도구 레지스트리 `invoke` 경유로 (오케스트레이터 기획서 v2.2 8장, 레지스트리 MVP 정정) |
+| **v2.4** | 2026-11-28 | #112 리뷰 반영: S3 표 근거는 `search_documents(chunk_type="table")`로 직접 조회하고 `get_agent_context` 묶음에는 넣지 않음(5.2), `broker_key` 사명 변경 규칙(4.3), Q7 갱신 |
 
 ### v1.1 → v2.0 무엇이 바뀌었나
 
@@ -171,6 +172,7 @@ class BrokerView(BaseModel):
   - 만드는 방식: 공백·`(주)`·"증권"·"투자증권" 같은 접미어를 지우는 정규화 규칙 + 그래도 안 맞는 경우만 정적 예외 사전(기준 키 → 별칭, 적용 기간. 예: 이베스트투자증권 → LS증권).
   - 실시간 LLM 매핑은 쓰지 않는다(정해진 30곳 안팎의 집합이라 비용·지연만 늘고 결과가 결정적이지 않음). 초안은 LLM으로 만들 수 있지만 사람이 검수해 파일로 커밋한다.
   - DB의 모든 증권사 이름이 기준 키로 매핑되는지 테스트로 확인해 새 이름이 들어와도 놓치지 않는다.
+  - **사명 변경:** 바뀐 시점과 상관없이 늘 지금 이름의 키로 맞춘다(예: 하이투자증권 → `IM`). 사명 변경 전후로 나눠 세면 컨센서스·개정 수에서 한 증권사가 둘로 잡히기 때문이다. 바뀐 해는 `RENAMED_SINCE`에 기록만 하고 매칭에는 쓰지 않는다(#112). 11/27 운영 DB의 증권사 이름 40개 → 키 26개, 서로 다른 증권사가 합쳐진 경우 없음.
 
 ### 4.4 결과
 
@@ -209,8 +211,9 @@ class TrendReportResult(BaseModel):
 | --- | --- | --- |
 | S1 기간 확대 | `date_from` 30 → 90 → 180일 | 없음 |
 | S2 유형 전환 | report → news → disclosure | 없음 |
-| S3 도구 전환 | `numeric`은 `get_financials`·`get_derived_snapshot`, `table`은 표 조각(`chunk_type='table'`, 12,714개. `search_documents`에 거르는 인자 추가 필요, 수경) | 없음 |
+| S3 도구 전환 | `numeric`은 `get_financials`·`get_derived_snapshot`, `table`은 리포트 표 조각 `search_documents(ticker, query=<주장 문장>, document_type="report", chunk_type="table", as_of)` (#112) | 없음 |
 
+- **표 조각은 S3에서만 부른다.** `get_agent_context` 트렌드 리포트 묶음에는 따로 넣지 않는다. 리포트 조각 약 1.95만 개 중 1.41만 개가 표라(11/27), 묶음에 넣으면 모든 리포트의 후보와 토큰이 늘어난다. 표 근거가 필요한 건 `table` 주장이 인용·숫자 검사에 실패했을 때뿐이다. 다른 도구처럼 `invoke("search_documents", …, caller="trend_report")`로 부른다.
 - 새 청크가 0개면 다음 단계로, 연속 2회 0개면 종료. 이미 시도한 `(함수, 인자)`는 다시 부르지 않는다.
 - 예산: 카드당 2회, 리포트 전체 +3초. 먼저 소진되는 쪽에서 멈춘다.
 - 새 근거를 찾으면 주장의 `evidence_ids`에 붙이고 `evidence_source="gap_fill"`로 표시한다. 근거가 주장을 뒷받침하는지(L2)는 MVP에서 판정하지 않으므로, **보완된 주장은 재생성하지 않고 숫자·인용 검사만 다시 한다.** 다시 실패하면 철회한다.
@@ -272,4 +275,4 @@ class VerificationSummary(BaseModel):
 | Q4 | 데이터 함수 일부가 `date.today()` 기본값 → `as_of`를 항상 명시해서 호출 (#55) | 수경 |
 | Q5 | `BrokerView`·`VerificationSummary` 계약 추가 | 계약 PR |
 | Q6 | 근거 개수 상한 실험 | #81 |
-| Q7 | 데이터 쪽 추가: `get_agent_context(as_of=)`, 후보 `top_k`, 검색 결과 `doc_id`·`broker_key`, `search_documents` 표 조각 필터, `revisions` | 수경 |
+| Q7 | 데이터 쪽 추가: `get_agent_context(as_of=)`, 후보 `top_k`, 검색 결과 `doc_id`·`broker_key`, `revisions`. ~~`search_documents` 표 조각 필터~~ → `chunk_type` 인자(#112) | 수경 |

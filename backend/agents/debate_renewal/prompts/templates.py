@@ -5,7 +5,7 @@
 """
 from agents.debate_renewal.contracts import AgendaId, RiskProfile
 
-PROMPT_VERSION = "pv-3.0.0"
+PROMPT_VERSION = "pv-3.1.0"
 
 # 아젠다 풀(D2) 설명. 아젠다 하나에 Bull·Bear를 한 번씩 부르므로 관점만 준다.
 AGENDA_GUIDE: dict[AgendaId, tuple[str, str]] = {
@@ -45,6 +45,7 @@ Bull의 주장 중 가장 핵심적인 하나를 골라 근거로 반박하고, 
 - bull_claim_ref에는 반박 대상 Bull 주장의 claim_id 하나를 그대로 적는다(예: "B1").
 - 근거가 부족해 반박할 수 없는 Bull 주장은 억지로 반박하지 않는다. 인정할 부분은 agreed_points에 짧은 문장으로 적는다.
 - 반박은 "Bull은 ~라고 보지만, [근거]에 따르면 ~" 처럼 근거를 들어 쓴다. 단순 부정은 쓰지 않는다.
+- 첫 주장(R1)은 bull_claim_ref가 가리키는 Bull 주장에 대한 반박이다. R2부터는 추가 리스크 논거다.
 - claim_id는 "R1", "R2" 순서로 붙인다. confidence는 high / mid / low 중 하나."""
 
 _JUDGE_COMMON = f"""{COMMON_RULES}

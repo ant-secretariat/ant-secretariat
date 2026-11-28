@@ -67,6 +67,23 @@ def test_target_price_records_have_broker_key():
     assert (record["mbcr_name"], record["broker_key"]) == ("키움", "키움")
 
 
+# 계산 근거 묶음(get_derived_snapshot 모양을 줄인 것)
+DERIVED_SNAPSHOT = {
+    "ticker": "005930", "company": "삼성전자", "as_of": "2026-11-10", "available": True, "failed_groups": [],
+    "valuation": {"per": 12.0, "pbr": 1.4, "dividend_yield": 1.8, "per_percentile_3y": 40.0,
+                  "sector_per_median": 15.0, "per_vs_sector_pct": -20.0, "as_of": "2026-11-07", "basis": "…",
+                  "reason": None},
+    "price_trend": {"close": 200000.0, "return_1m_pct": 5.0, "volatility_1m": 0.3, "volatility_3m": None,
+                    "volatility_1m_market_threshold": 0.4, "position_52w": 0.8, "as_of": "2026-11-07",
+                    "basis": "…", "reason": None},
+    "fundamental_trend": {"period": "2026Q3", "revenue": 1, "revenue_yoy_pct": 10.0, "operating_margin": 20.0,
+                          "disclosed_at": "2026-11-14", "as_of": None, "basis": "…", "reason": None},
+    "flow": {"foreign_net_buy_5d": 10, "foreign_net_buy_20d": 50, "inst_net_buy_20d": 5,
+             "foreign_net_buy_20d_pct_mcap": 0.01, "short_volume_ratio_20d": 3.0, "short_balance_ratio": 0.5,
+             "short_balance_as_of": "2026-11-05", "as_of": "2026-11-07", "basis": "…", "reason": None},
+}
+
+
 @pytest.fixture
 def recorded(monkeypatch):
     calls = []
@@ -98,6 +115,12 @@ def recorded(monkeypatch):
                  "display": values.get(m, (1.0, "배", "1배"))[2], "reason": None} for m in metric_ids]
 
     monkeypatch.setattr("processing.functions.get_metric.get_metrics", fake_metrics)
+
+    def fake_derived(ticker, as_of=None):
+        calls.append(("get_derived_snapshot", {"ticker": ticker, "as_of": as_of}))
+        return DERIVED_SNAPSHOT
+
+    monkeypatch.setattr("processing.functions.get_derived_snapshot.get_derived_snapshot", fake_derived)
 
     # 아젠다 블록이 부르는 함수 (#84 ②)
     def fake_block(name, value):
@@ -538,6 +561,48 @@ def test_agenda_blocks_wait_for_metrics_callable(monkeypatch):
     seen = {}
     monkeypatch.setattr(ctx, "_target_price_block", lambda ticker, as_of, metrics: seen.setdefault("m", metrics))
     monkeypatch.setattr(ctx, "_financials_block", lambda ticker, as_of: {"ok": True})
+    monkeypatch.setattr(ctx, "_derived_snapshot", lambda ticker, as_of: DERIVED_SNAPSHOT)
     blocks = ctx._agenda_blocks("005930", "valuation", "2026-11-10", lambda: [{"metric_id": "close"}])
-    assert list(blocks) == ["target_price", "financials"] and seen["m"] == [{"metric_id": "close"}]
+    assert list(blocks) == ctx.AGENDA_BLOCKS["valuation"] and seen["m"] == [{"metric_id": "close"}]
     assert ctx._agenda_blocks("005930", "valuation", "2026-11-10", [{"metric_id": "close"}])["target_price"] == seen["m"]
+
+
+# ---- 계산 근거 블록 (#84, 데이터 에이전트 기획서 4-2절) ----
+
+def test_derived_blocks_by_agenda_drop_values_already_in_metrics(recorded):
+    from processing.functions.get_agent_context import get_agent_context
+
+    valuation = get_agent_context("005930", "debate", intent="valuation", as_of="2026-11-10")
+    flow = get_agent_context("005930", "debate", intent="flow", as_of="2026-11-10")
+    risk = get_agent_context("005930", "debate", intent="risk", as_of="2026-11-10")
+
+    # valuation: per·pbr은 metrics에 있어 빼고, 백분위·업종 비교는 남긴다
+    block = valuation["valuation"]
+    assert block["chunk_id"] == "block:005930:valuation:2026-11-07" and block["source"] == "get_derived_snapshot"
+    assert "per" not in block and "pbr" not in block and block["per_percentile_3y"] == 40.0
+    assert valuation["price_trend"]["chunk_id"] == "block:005930:price_trend:2026-11-07"
+    # flow: 20일 순매수·공매도(비중·잔고와 그 기준일)는 metrics에 있어 빼고, 5일 순매수·시가총액 대비는 남긴다
+    block = flow["flow"]
+    assert block["foreign_net_buy_5d"] == 10 and block["foreign_net_buy_20d_pct_mcap"] == 0.01
+    assert not {"foreign_net_buy_20d", "inst_net_buy_20d", "short_volume_ratio_20d", "short_balance_ratio",
+                "short_balance_as_of"} & set(block)
+    assert "price_trend" in risk and "valuation" not in risk
+    # fundamental_trend 블록 기준일은 공시 접수일, operating_margin은 growth metrics에 있어 뺀다
+    growth = get_agent_context("005930", "debate", intent="growth", as_of="2026-11-10")["fundamental_trend"]
+    assert growth["chunk_id"] == "block:005930:fundamental_trend:2026-11-14" and growth["revenue_yoy_pct"] == 10.0
+    assert "operating_margin" not in growth
+    # 묶음 하나에 계산 근거 조회는 한 번
+    assert len([c for c in recorded if c[0] == "get_derived_snapshot"]) == 4
+
+
+def test_derived_block_failure_and_no_data():
+    from processing.functions.get_agent_context import _derived_block
+
+    failed = _derived_block("005930", "price_trend", "risk", {"error": "snapshot_unavailable"})
+    assert (failed["chunk_id"], failed["error"]) == (None, "snapshot_unavailable")
+    group_failed = _derived_block("005930", "flow", "flow", {"flow": {"reason": "query_failed"}})
+    assert group_failed["error"] == "query_failed"
+    empty = _derived_block("005930", "fundamental_trend", "growth",
+                           {"fundamental_trend": {"period": None, "reason": "no_data"}})
+    assert (empty["chunk_id"], empty["reason"]) == (None, "no_data")
+

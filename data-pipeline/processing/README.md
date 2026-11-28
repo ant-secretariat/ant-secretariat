@@ -882,14 +882,14 @@ result = get_metric(ticker="005930", metric_id="roe_ttm", as_of="2026-09-01")
 
 | intent | 블록 |
 | --- | --- |
-| `valuation` | `target_price`(컨센서스, `upside_pct` = 컨센서스 평균 ÷ 같은 묶음의 종가 − 1, `revisions`(#105), 최근 의견 10건), `financials`(최근 8분기, 연결/별도 표시) |
-| `growth` | `financials` |
-| `risk` | `disclosures`(최근 90일, 10건까지, `total`은 전체 건수) |
+| `valuation` | `valuation`(PER·PBR 과거 3년 백분위·업종 중앙값 대비, `dividend_yield`), `price_trend`(수익률·변동성·52주 위치·지수 대비), `target_price`(컨센서스, `upside_pct` = 컨센서스 평균 ÷ 같은 묶음의 종가 − 1, `revisions`(#105), 최근 의견 10건), `financials`(최근 8분기, 연결/별도 표시) |
+| `growth` | `fundamental_trend`(최근 분기 매출·영업이익·순이익의 전년·전분기 대비 `_pct`, 기준일은 공시 접수일), `financials` |
+| `risk` | `price_trend`, `disclosures`(최근 90일, 10건까지, `total`은 전체 건수) |
 | `shareholder_return` | `disclosures`(최근 1년 주주환원 공시만, 10건까지) |
 | `macro` | `macro`(국고채 3·10년·원/달러·기준금리는 최근 60개, 소비자물가·브렌트유·D램 수출물가는 최근 13개월, 최신 먼저. 이 종목에 방향이 확실한 민감도 요인을 앞에), `index`(코스피·코스닥 60거래일), `sensitivities`(시장 효과를 뺀 값, `get_sensitivities`) |
-| `flow` | (아직 없음) |
+| `flow` | `flow`(5일 순매수, 20일 순매수의 시가총액 대비 %) |
 
-  - `valuation`(밸류에이션 위치)·`fundamental_trend`·`price_trend`·`flow` 블록은 `get_derived_snapshot` 실패 처리(#88)가 들어간 뒤 더함
+  - 계산 근거 블록(`valuation`·`fundamental_trend`·`price_trend`·`flow`)은 `get_derived_snapshot`을 묶음당 한 번 불러 꺼냄. 그 아젠다의 `metrics`에 있는 값(예: valuation의 `per`·`pbr`, flow의 20일 순매수·공매도와 그 기준일)은 뺌. 조회 실패는 `error`(`snapshot_unavailable`·`query_failed`), 값이 없으면 `reason: "no_data"`
   - 목표가 방향 라벨(상향·하향·혼조)은 받는 쪽이 `revisions`로 정함(#82)
 
 | intent | 키워드 | 문서 종류 |

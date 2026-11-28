@@ -115,7 +115,7 @@
 | `get_index_data(indexes, as_of, days)` | 코스피·코스닥(·코스피200) 일별 종가 | ✅ #109 |
 | `get_sensitivities(ticker, as_of)` | 종목의 시장 효과를 뺀 매크로 민감도(일별 3, 월별 3) | ✅ #109 |
 | `get_available_data_status(ticker, as_of)` | 데이터 보유 상태. 소스 11개(리포트·뉴스·공시·시세·매크로·목표가·재무·수급·지분공시·민감도·계산 근거)의 건수와 최신일, `simulation_ready` | ✅ `as_of`(기준일 이전 파라미터로 `simulation_ready` 판정)는 #103 리뷰 중 |
-| `get_agent_context(ticker, agent_type, query, intent, data_status, as_of)` | 에이전트별 데이터 묶음. `data_tier`·`as_of` 항상 포함 | 🟡 intent별 묶음(4절): 문서 검색 #106, 지표 #108, 블록·넓혀 찾기 #110 머지. 계산 근거 블록은 #88 뒤 |
+| `get_agent_context(ticker, agent_type, query, intent, data_status, as_of)` | 에이전트별 데이터 묶음. `data_tier`·`as_of` 항상 포함 | 🟡 intent별 묶음(4절): 문서 검색 #106, 지표 #108, 블록·넓혀 찾기 #110, 병렬화 #123 머지. 계산 근거 블록 리뷰 중 |
 | `suggest_alternatives(ticker, n=3)` | 대안 종목: 커버 종목 중 같은 중분류 → 대분류 → 전체, 시총순 | 🟡 #85 리뷰 중 |
 | `ensure_company_data(ticker, user_id)` | T2 수집 예약 | Post-MVP |
 
@@ -187,14 +187,14 @@
 
 **intent별 지표·블록**
 
-- 지금 묶음에 있는 블록: `target_price`·`financials`·`disclosures`·`macro`·`index`·`sensitivities`(#110). **(예정)** 표시한 계산 근거 블록 4개(`valuation`·`fundamental_trend`·`price_trend`·`flow`)는 `get_derived_snapshot` 실패 처리(#88, 머지됨) 뒤 더합니다. 더할 때 토론 쪽 근거 변환(#120 `structured.py`)에도 요약 문장을 추가해야 해서 미리 알립니다.
+- 묶음 블록: `target_price`·`financials`·`disclosures`·`macro`·`index`·`sensitivities`(#110), 계산 근거 `valuation`·`fundamental_trend`·`price_trend`·`flow`(`get_derived_snapshot`을 묶음당 한 번 불러 꺼냄). 계산 근거 블록에서는 그 아젠다의 `metrics`에 이미 있는 값을 뺍니다(같은 숫자를 두 곳에서 보지 않게). 토론 쪽 근거 변환(#120 `structured.py`)에 이 4개 블록의 요약 문장을 더해야 근거로 쓰입니다.
 
 | intent | `metrics` (metric_id) | 추가 블록 | 문서 종류 | precheck 데이터가 묶음 어디에 있나 |
 | --- | --- | --- | --- | --- |
-| `valuation` | `per`, `pbr`, `eps`, `bps`, `roe_ttm`, `operating_margin`, `close`, `market_cap` | `valuation`(예정), `target_price`, `financials`, `price_trend`(예정) | 리포트 | 재무 → `financials`, 시세 → `price_trend`·`close`, 목표가 → `target_price`, 리포트 → `documents` |
-| `growth` | `revenue_growth_yoy`, `operating_margin`, `roe_ttm` | `fundamental_trend`(예정), `financials` | 리포트, 뉴스 | 재무 → `financials`, 계산 근거 → `fundamental_trend`, 리포트·뉴스 → `documents` |
-| `risk` | `debt_ratio`, `short_volume_ratio_20d`, `short_balance_ratio`, `insider_net_shares_90d`, `insider_sell_reports_90d`, `major_holder_ratio_change_90d`, `foreign_net_buy_20d` | `price_trend`(예정), `disclosures` | 리포트, 뉴스, 공시 | 수급·지분공시 → `metrics`, 공시 → `disclosures`·`documents`, 뉴스·리포트 → `documents` |
-| `flow` | `foreign_net_buy_20d`, `inst_net_buy_20d`, `individual_net_buy_20d`, `short_volume_ratio_20d`, `short_balance_ratio` | `flow`(예정) | 뉴스 | 수급 → `flow`·`metrics` |
+| `valuation` | `per`, `pbr`, `eps`, `bps`, `roe_ttm`, `operating_margin`, `close`, `market_cap` | `valuation`, `target_price`, `financials`, `price_trend` | 리포트 | 재무 → `financials`, 시세 → `price_trend`·`close`, 목표가 → `target_price`, 리포트 → `documents` |
+| `growth` | `revenue_growth_yoy`, `operating_margin`, `roe_ttm` | `fundamental_trend`, `financials` | 리포트, 뉴스 | 재무 → `financials`, 계산 근거 → `fundamental_trend`, 리포트·뉴스 → `documents` |
+| `risk` | `debt_ratio`, `short_volume_ratio_20d`, `short_balance_ratio`, `insider_net_shares_90d`, `insider_sell_reports_90d`, `major_holder_ratio_change_90d`, `foreign_net_buy_20d` | `price_trend`, `disclosures` | 리포트, 뉴스, 공시 | 수급·지분공시 → `metrics`, 공시 → `disclosures`·`documents`, 뉴스·리포트 → `documents` |
+| `flow` | `foreign_net_buy_20d`, `inst_net_buy_20d`, `individual_net_buy_20d`, `short_volume_ratio_20d`, `short_balance_ratio` | `flow` | 뉴스 | 수급 → `flow`·`metrics` |
 | `shareholder_return` | `dividend_yield`, `dps`, `eps`, `close` | `disclosures`(주주환원 공시만) | 리포트, 공시 | 공시 → `disclosures`, 시세 → `close`·`dividend_yield`, 리포트 → `documents` |
 | `macro` | (없음) | `macro`, `index`, `sensitivities` | 리포트, 뉴스 | 민감도 → `sensitivities`, 뉴스·리포트 → `documents` |
 
@@ -213,10 +213,10 @@
 
 | 블록 | 모양 | 개수 상한 | 출처 |
 | --- | --- | --- | --- |
-| `valuation` **(예정)** | PER·PBR 과거 백분위, 업종 중앙값 대비 | – | `get_derived_snapshot`의 `valuation` |
-| `fundamental_trend` **(예정)** | 분기 매출·영업이익·순이익 YoY·QoQ | – | `get_derived_snapshot`의 `fundamental_trend` |
-| `price_trend` **(예정)** | 수익률, 최근 1·3개월 실현 변동성, 52주 위치, 지수 대비 | – | `get_derived_snapshot`의 `price_trend` |
-| `flow` **(예정)** | 5일 순매수, 시가총액 대비 등 **`metrics`에 없는 값만**(20일 순매수·공매도는 `metrics`) | – | `get_derived_snapshot`의 `flow` |
+| `valuation` | PER·PBR 과거 백분위, 업종 중앙값 대비 | – | `get_derived_snapshot`의 `valuation` |
+| `fundamental_trend` | 분기 매출·영업이익·순이익 YoY·QoQ | – | `get_derived_snapshot`의 `fundamental_trend` |
+| `price_trend` | 수익률, 최근 1·3개월 실현 변동성, 52주 위치, 지수 대비 | – | `get_derived_snapshot`의 `price_trend` |
+| `flow` | 5일 순매수, 시가총액 대비 등 **`metrics`에 없는 값만**(20일 순매수·공매도는 `metrics`) | – | `get_derived_snapshot`의 `flow` |
 | `target_price` | 컨센서스(최근 180일), 목표주가 상승여력(컨센서스 ÷ 종가 − 1), 최근 의견 목록(`broker_key` 포함) | 의견 최근 10건 | `get_target_price_data` |
 | `financials` | 분기 재무(연결/별도 표시) | 최근 8분기 | `get_financials` |
 | `disclosures` | 공시 목록 + 수집 시작일(`coverage_from`) | 리스크: 최근 90일 10건, 주주환원: 최근 1년 10건 | `get_disclosure_data` |
@@ -229,7 +229,7 @@
 - `sensitivities`에는 주의 문구를 같이 넣습니다: "월별 상관은 함께 움직인 정도이고 인과가 아님". 엣지 노출 여부는 온톨로지(`get_ontology_context`)가 따로 판단합니다.
 - 예상 시간: 아젠다 하나에 약 1.5–3초. 토론이 `data_status`를 넘기면 상태 조회(0.3–1초)는 빠집니다.
 
-**예시** (`intent="flow"`, `flow` 블록은 예정 모양)
+**예시** (`intent="flow"`)
 
 ```jsonc
 {
@@ -241,7 +241,7 @@
     {"metric_id": "short_balance_ratio", "value": null, "unit": "%", "display": null,
      "as_of": "2026-11-19", "reason": "partial_window"}
   ],
-  "flow": {"foreign_net_buy_5d": 0, "...": "...", "as_of": "2026-11-21"},   // (예정) metrics에 있는 값은 두지 않음
+  "flow": {"foreign_net_buy_5d": 0, "...": "...", "as_of": "2026-11-21"},   // metrics에 있는 값(20일 순매수·공매도)은 두지 않음
   "documents": {"query": "외국인 매도 이유 외국인 기관 수급 순매수", "mode": "hybrid", "widened": false,
                 "results": [{"chunk_id": "…", "doc_id": "…", "document_type": "news", "title": "…",
                              "author_org": "…", "date": "2026-11-20", "url": "…", "content": "…"}]}
@@ -423,7 +423,7 @@
 | 아젠다별 지표 목록(`metrics`)과 지표 근거 ID | 수경 | ✅ #108 |
 | 지수·민감도 조회 함수(`get_index_data`, `get_sensitivities`) | 수경 | ✅ #109 |
 | 묶음 블록(`target_price`·`financials`·`disclosures`·`macro`·`index`·`sensitivities`), 블록 근거 ID, `evidence_id` → `chunk_id`, 문서 넓혀 찾기, 컨센서스 최근 의견 수 | 수경 | ✅ #110 |
-| 계산 근거 블록(`valuation`·`fundamental_trend`·`price_trend`·`flow`) | 수경 | ❌ #88 머지 뒤 |
+| 계산 근거 블록(`valuation`·`fundamental_trend`·`price_trend`·`flow`) | 수경 | 🟡 리뷰 중(토론 쪽 요약 문장은 유민) |
 | 과거 시점 `data_tier`, 묶음 속도(연결 공유·병렬, #111 머지 뒤 다시 잼) | 수경 | ❌ |
 | 목표가 방향 라벨 경계값 상수 | 수경 | ❌ #82 ADR 뒤 |
 | `simulation_ready`를 기준일로 판정(`as_of`) | 수경 | 🟡 #103 리뷰 중 |

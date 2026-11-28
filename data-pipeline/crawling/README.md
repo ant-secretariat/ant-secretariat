@@ -324,7 +324,8 @@ python -m crawling.opinions_loader --recent     # T1/T2, 최근 14일 다시 받
 
 - `opinion`은 증권사 원래 표기, `opinion_norm`은 buy/hold/sell로 통일한 값. NotRated 등은 null
 - `target_price`는 발표 당시 기준. 분할을 환산한 값은 뷰 `broker_opinions_adjusted`의 `target_price_adjusted`
-- 분할 판별(`stock_split_events`): 주식수 1.5배 이상 또는 0.5배 이하이면서 시가총액 변화가 0.8~1.25배. 무상증자처럼 권리락일과 신주 상장일이 다른 경우는 잡히지 않을 수 있음
+- 분할 판별(`stock_split_events`): 주식수 1.5배 이상 또는 0.5배 이하이면서 시가총액 변화가 0.8~1.25배
+- **알려진 한계: 무상증자**(#41). 권리락일(주가 하락)과 신주 상장일(주식 수 변화)이 달라 위 조건에 잡히지 않는다(예: 현대글로비스 086280 2024-08, 1:1). 그 이전 목표가가 환산되지 않아 컨센서스 상승여력이 부풀려진다. 저장된 목표가(2025-10-27부터) 이후 T1 무상증자는 없어 지금은 영향 없음. T1 종목에 무상증자 공시가 나오면 DART "무상증자결정" 공시(배정 비율·권리락일)로 사건을 만들어 처리한다
 
 시뮬레이션 파라미터(`sim_params`, GJR-GARCH + FHS)와 민감도(`sensitivities`) 적합. 시세·지수·매크로 적재 후 실행:
 
@@ -382,7 +383,6 @@ python -m crawling.ontology_inputs sector-grades --out grades.csv
 python -m crawling.ontology_inputs macro-direction --out macro_direction.csv
 python -m crawling.ontology_inputs impacts --out impacts.csv
 python -m crawling.ontology_inputs kind --out kind_t1.csv            # KRX KIND 상장법인목록을 내려받음 (--kind-file로 대신 가능)
-python -m crawling.ontology_inputs issue-evidence --seed ../ontology/seed/ontology_seed.json --out evidence.csv
 ```
 
 | 명령 | 내용 | 채우는 시드 칸 |
@@ -392,7 +392,6 @@ python -m crawling.ontology_inputs issue-evidence --seed ../ontology/seed/ontolo
 | `macro-direction` | 지표 변화와 시장 수익률의 상관 부호(기준금리는 변경일 전후 사건 분석) | MACRO `direction` |
 | `impacts` | 기준금리 변경일 전후 국고채·환율 변화 방향, 월별 지표 간 1달 시차 상관 | IMPACTS `direction` |
 | `kind` | KIND 업종·주요제품으로 T1 세부 업종 후보(`SUB_INDUSTRY_RULES`)와 지주사 후보 | COMPANY `sub_industry`·`is_holding` |
-| `issue-evidence` | 시드 ISSUE마다 수혜·타격 종목 문서에서 이슈 이름으로 검색한 근거 후보 | ISSUE `evidence_chunk_ids` |
 | `monthly` | 매달 자동 계산 묶음: `<out-dir>/<기준일>/`에 `sensitivities_ticker`(종목 행, 95% 구간 포함)·`sensitivities_l1`·`sensitivities_l2`·`sector_grades`·`macro_direction`·`impacts` CSV | 위 칸 전부 (KIND·이슈 근거 제외) |
 
 - 일별은 최근 3년(민감도 적합과 같음), 시장은 코스피 일별 수익률입니다.

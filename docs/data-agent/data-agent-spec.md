@@ -289,7 +289,6 @@
 | `macro-direction` | 지표가 오를 때 시장이 같이 움직였는지 | 4개 확정(시드 v0.8) |
 | `impacts` | 지표끼리의 방향(기준금리 사건 분석, 1달 시차 상관) | 1개 확정(소비자물가 → 기준금리) |
 | `kind` | KRX KIND 업종·주요제품으로 세부 업종·지주사 후보, 확정값과 차이 표시 | 세부 업종 34개·지주사 19개 확정 |
-| `issue-evidence` | 시드 이슈마다 근거 청크 후보 | 후보는 시드 스크립트(`ontology/seed/scripts/issue_evidence_candidates.py`, #83)로 옮김, 연결은 유민이 고름 |
 | `monthly --save` | 위 계산을 매달 한 번에. 민감도는 `ontology_sensitivity_inputs` 표에 기준일별로 쌓음 | 11/23 값 765행 저장 |
 
 - 계산 방법: 일별은 최근 3년, 종목 수익률과 지표 변화에서 각각 코스피 효과를 뺀 상관. 월별은 최근 최대 120개월, t월 주가와 t+1월 지표 변화, 시장은 핵심 종목 동일가중 평균(그 종목 자신 포함). 95% 신뢰구간(Fisher). q값은 두 가지: 가설 엣지끼리(시드가 계산), 지표별 전체 종목(이 표의 `q_value`). 모두 Benjamini-Hochberg.
@@ -396,7 +395,6 @@
 | `search_documents`의 `report_id` | `doc_id`와 같은 값. 다른 에이전트가 `doc_id`로 옮기면 제거 |
 | `document_type="macro_summary"` 별칭 | 매크로 문서가 없어 검색하지 않음. 호출부가 정리되면 제거 |
 | `processors/pdf_processor.py` | 예전 청커. 적재는 새 청커(`report_chunker.py`)를 쓰고, 남은 호출부가 없으면 제거 |
-| `crawling.ontology_inputs issue-evidence` | 온톨로지 쪽 이슈 근거 후보 스크립트(#83)로 정리되면 제거 |
 | 서버 날짜(`date.today()`) 기본값 | 한국 날짜(`today_kst()`)로 변경 (#55) |
 
 ## 12. 미결 사항

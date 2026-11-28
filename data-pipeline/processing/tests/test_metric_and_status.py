@@ -78,8 +78,25 @@ def test_roe_basis_explains_ttm(monkeypatch):
     result = get_metric("005930", "roe_ttm", "2026-09-01")
 
     assert result["value"] == 31.39
-    assert result["basis"].startswith("2026Q2 별도")
-    assert "최근 4개 분기" in result["basis"]
+    # 지배주주 값이 없으면(별도 등) 전체 순이익 기준이라고 적는다
+    assert result["basis"] == "2026Q2 별도, 전체 순이익 기준: 최근 4개 분기 순이익 합 / 평균 자본"
+
+
+def test_roe_uses_owners_basis_when_available(monkeypatch):
+    row = (2026, 3, "CFS", date(2026, 11, 14), 31.1, 12.5, 98.67, 9.12, False, True)
+    _use(monkeypatch, FakeConnection(row))
+
+    result = get_metric("005930", "roe_ttm", "2026-11-20")
+
+    assert result["value"] == 9.12
+    assert result["basis"] == "2026Q3 연결, 지배주주 기준: 최근 4개 분기 지배주주 순이익 합 / 평균 지배주주 자본"
+
+
+def test_roe_query_prefers_owners():
+    from processing.functions.get_metric import FINANCIAL_QUERY
+
+    assert "coalesce(roe_owners, roe_total) as roe_ttm" in FINANCIAL_QUERY
+    assert "net_income_owners" in FINANCIAL_QUERY and "total_equity_owners" in FINANCIAL_QUERY
 
 
 def test_flow_metric_sums_recent_trading_days(monkeypatch):

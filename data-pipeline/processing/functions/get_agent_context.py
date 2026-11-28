@@ -31,16 +31,21 @@ AGENDA_METRICS = {
     "shareholder_return": ["dividend_yield", "dps", "eps", "close"],
     "macro": [],
 }
-# 토론 아젠다별 블록(#84, 데이터 에이전트 기획서 4-2절). valuation·fundamental_trend·price_trend·flow 블록은
-# get_derived_snapshot 실패 처리(#88)가 들어간 뒤 더한다
+# 토론 아젠다별 블록(#84, 데이터 에이전트 기획서 4-2절)
 AGENDA_BLOCKS = {
-    "valuation": ["target_price", "financials"],
-    "growth": ["financials"],
-    "risk": ["disclosures"],
-    "flow": [],
+    "valuation": ["valuation", "target_price", "financials", "price_trend"],
+    "growth": ["fundamental_trend", "financials"],
+    "risk": ["price_trend", "disclosures"],
+    "flow": ["flow"],
     "shareholder_return": ["disclosures"],
     "macro": ["macro", "index", "sensitivities"],
 }
+# 계산 근거 블록: get_derived_snapshot을 묶음당 한 번 불러 아젠다에 필요한 묶음만 꺼낸다.
+# 그 아젠다의 metrics에 이미 있는 값(예: flow의 20일 순매수·공매도, valuation의 per·pbr)은 블록에서 뺀다.
+# 같은 숫자를 두 곳에서 보면 토론이 어느 쪽을 인용할지 갈리고, 숫자 치환은 metrics(get_metric)로 하기 때문이다
+DERIVED_BLOCKS = ("valuation", "fundamental_trend", "price_trend", "flow")
+# 지표에서 빼면 함께 의미를 잃는 칸(공매도 잔고 비중을 빼면 그 기준일도 뺀다)
+DERIVED_COMPANION_KEYS = {"short_balance_ratio": ("short_balance_as_of",)}
 FINANCIAL_QUARTERS = 8
 OPINION_LIMIT = 10           # 목표가 블록의 최근 의견 수
 RECENT_OPINION_DAYS = 90     # 컨센서스 의견 중 "최근"으로 세는 기간(오래된 의견 비중 표시, #110 리뷰)
@@ -109,7 +114,8 @@ def get_agent_context(
     지표 이름(name)을 붙인다. 지표는 DB 연결 하나로 한 번에 계산한다(get_metrics).
     debate에 intent를 주면 아젠다 블록(AGENDA_BLOCKS)도 최상위 키로 준다: financials(최근 8분기), disclosures(리스크 90일,
     주주환원 1년 주주환원 공시만, 각 10건), macro(지표별 일별 60개·월별 13개월), index(코스피·코스닥 60거래일),
-    sensitivities(시장 효과를 뺀 값). 블록마다 근거 ID(chunk_id, block:{종목}:{블록}:{블록 기준일})와 as_of·source가 있고,
+    sensitivities(시장 효과를 뺀 값), 계산 근거 valuation·fundamental_trend·price_trend·flow(get_derived_snapshot 묶음,
+    그 아젠다 metrics에 있는 값은 뺌). 블록마다 근거 ID(chunk_id, block:{종목}:{블록}:{블록 기준일})와 as_of·source가 있고,
     조회 실패는 error, 값 없음은 reason="no_data"다. valuation은 target_price(컨센서스·상승여력·개정 수·최근 의견 10건)도 준다.
     이때는 목표가 전체 이력(target_prices)과 매크로 전체 이력(macro_data, 약 180만 자)을 넣지 않는다.
     아젠다 문서 검색이 0건이면 다른 문서 종류(리포트 → 뉴스 → 공시)로 한 번 더 찾고 widened=true로 표시한다.
@@ -345,15 +351,25 @@ def _agenda_blocks(ticker: str, intent: str, as_of: str, metrics=None) -> dict:
     if not names:
         return {}
     metrics_of = metrics if callable(metrics) else (lambda: metrics)
+    # 여러 블록이 같이 쓰는 조회(민감도, 계산 근거)는 한 번만 띄우고 필요한 블록이 기다린다
+    shared = {}
     if "sensitivities" in names or "macro" in names:
-        with ThreadPoolExecutor(max_workers=1) as pool:
-            sensitivities_future = pool.submit(_sensitivities_block, ticker, as_of)
-            return _build_blocks(ticker, intent, as_of, names, metrics_of, sensitivities_future.result)
-    return _build_blocks(ticker, intent, as_of, names, metrics_of, lambda: None)
+        shared["sensitivities"] = lambda: _sensitivities_block(ticker, as_of)
+    if any(name in DERIVED_BLOCKS for name in names):
+        shared["derived"] = lambda: _derived_snapshot(ticker, as_of)
+    if not shared:
+        return _build_blocks(ticker, intent, as_of, names, metrics_of, lambda: None, lambda: None)
+    with ThreadPoolExecutor(max_workers=len(shared)) as pool:
+        futures = {key: pool.submit(task) for key, task in shared.items()}
+        none = lambda: None  # noqa: E731
+        return _build_blocks(ticker, intent, as_of, names, metrics_of,
+                             futures["sensitivities"].result if "sensitivities" in futures else none,
+                             futures["derived"].result if "derived" in futures else none)
 
 
-def _build_blocks(ticker, intent, as_of, names, metrics_of, sensitivities_of) -> dict:
+def _build_blocks(ticker, intent, as_of, names, metrics_of, sensitivities_of, derived_of) -> dict:
     builders = {
+        **{name: (lambda name=name: _derived_block(ticker, name, intent, derived_of())) for name in DERIVED_BLOCKS},
         "target_price": lambda: _target_price_block(ticker, as_of, metrics_of() or []),
         "financials": lambda: _financials_block(ticker, as_of),
         "disclosures": lambda: _disclosures_block(ticker, intent, as_of),
@@ -362,6 +378,31 @@ def _build_blocks(ticker, intent, as_of, names, metrics_of, sensitivities_of) ->
         "sensitivities": sensitivities_of,
     }
     return run_parallel({name: builders[name] for name in names})
+
+
+def _derived_snapshot(ticker: str, as_of: str) -> dict:
+    from processing.functions.get_derived_snapshot import get_derived_snapshot
+
+    return get_derived_snapshot(ticker, as_of)
+
+
+def _derived_block(ticker: str, name: str, intent: str, snapshot: dict) -> dict:
+    """계산 근거 블록 하나. 블록 기준일은 그 묶음이 실제로 쓴 데이터의 날짜(묶음의 as_of).
+    조회 실패(snapshot_unavailable, query_failed)는 error, 값이 없으면(no_data) reason="no_data"."""
+    source = "get_derived_snapshot"
+    if snapshot.get("error") and snapshot["error"] != "unknown_ticker":
+        return _block(ticker, name, source, None, {}, error=snapshot["error"])
+    group = snapshot.get(name) or {}
+    if group.get("reason") == "query_failed":
+        return _block(ticker, name, source, None, {}, error="query_failed")
+    skip = {"as_of", "reason", *AGENDA_METRICS.get(intent, [])}
+    for key, companions in DERIVED_COMPANION_KEYS.items():
+        if key in skip:
+            skip.update(companions)
+    content = {key: value for key, value in group.items() if key not in skip}
+    # fundamental_trend는 as_of 대신 공시 접수일(disclosed_at)이 그 묶음의 기준일이다
+    block_as_of = (group.get("as_of") or group.get("disclosed_at")) if group.get("reason") is None else None
+    return _block(ticker, name, source, block_as_of, content)
 
 
 def _block(ticker: str, name: str, source: str, block_as_of, content: dict, error=None) -> dict:

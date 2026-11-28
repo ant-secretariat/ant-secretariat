@@ -23,6 +23,7 @@ def search_documents(
     as_of: Optional[str] = None,
     mode: Optional[str] = None,
     keyword_query: Optional[str] = None,
+    chunk_type: Optional[str] = None,
 ) -> dict:
     """문서 조각 검색. Supabase document_chunks(리포트·뉴스·공시)만 검색한다.
 
@@ -33,11 +34,13 @@ def search_documents(
     - report_type은 계약서 인자라 받지만, 지금 청크에는 리포트 유형이 없어 거르지 않는다
     - as_of를 넘기면 그날까지 게시된 문서만, 면책 문구는 include_disclaimer=True일 때만 포함
     - keyword_query를 주면 키워드 검색(BM25)에는 그것을, 의미 검색에는 query를 쓴다. 결과에도 keyword_query를 담는다(#84)
+    - chunk_type을 주면 그 종류의 조각만(table: 리포트 표, text: 본문). 다른 값이면 ValueError(#69 S3)
     """
     result = _search_supabase(
         query=query, ticker=ticker, date_from=date_from, date_to=date_to, document_type=document_type,
         source=source, broker=broker, section_type=section_type, include_disclaimer=include_disclaimer,
         as_of=as_of, top_k=top_k, mode=mode, **({"keyword_query": keyword_query} if keyword_query else {}),
+        **({"chunk_type": chunk_type} if chunk_type else {}),
     )
     if keyword_query:
         result["keyword_query"] = keyword_query

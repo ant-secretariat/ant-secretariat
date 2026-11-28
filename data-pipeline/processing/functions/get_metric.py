@@ -91,7 +91,9 @@ FINANCIAL_QUERY = """
             max(amount) filter (where account = 'operating_income')  as operating_income,
             max(amount) filter (where account = 'net_income')        as net_income,
             max(amount) filter (where account = 'total_liabilities') as total_liabilities,
-            max(amount) filter (where account = 'total_equity')      as total_equity
+            max(amount) filter (where account = 'total_equity')      as total_equity,
+            max(amount) filter (where account = 'net_income_owners')   as net_income_owners,
+            max(amount) filter (where account = 'total_equity_owners') as equity_owners
         from f
         group by fiscal_year, quarter, fs_div
     ),
@@ -124,12 +126,23 @@ FINANCIAL_QUERY = """
                 then round(
                     100.0 * sum(net_income) over (w rows between 3 preceding and current row)
                     / nullif((total_equity + lag(total_equity, 4) over w) / 2.0, 0), 2)
-            end as roe_ttm
+            end as roe_total,
+            -- 지배주주 기준(증권사 리포트의 ROE와 같은 기준): 지배주주 순이익 4개 분기 합 / 지배주주 자본 평균.
+            -- 같은 조건(연속 5개 분기, 같은 연결·별도 기준)에 지배주주 값이 모두 있을 때만 계산한다
+            case when lag(seq, 4) over w = seq - 4
+                  and count(net_income_owners) over (w rows between 3 preceding and current row) = 4
+                  and equity_owners is not null and lag(equity_owners, 4) over w is not null
+                  and min(fs_div) over (w rows between 4 preceding and current row)
+                    = max(fs_div) over (w rows between 4 preceding and current row)
+                then round(
+                    100.0 * sum(net_income_owners) over (w rows between 3 preceding and current row)
+                    / nullif((equity_owners + lag(equity_owners, 4) over w) / 2.0, 0), 2)
+            end as roe_owners
         from chosen
         window w as (order by seq)
     )
-    select fiscal_year, quarter, fs_div, rcept_dt, debt_ratio, operating_margin, revenue_growth_yoy, roe_ttm,
-           capital_impaired
+    select fiscal_year, quarter, fs_div, rcept_dt, debt_ratio, operating_margin, revenue_growth_yoy,
+           coalesce(roe_owners, roe_total) as roe_ttm, capital_impaired, roe_owners is not null as roe_owners_basis
     from calc
     where case when %s then has_balance else has_income end
     order by seq desc
@@ -446,14 +459,18 @@ def _financial_metric(connection, ticker: str, metric_id: str, as_of: str) -> di
     row = connection.execute(FINANCIAL_QUERY, (as_of, ticker, metric_id in BALANCE_METRICS)).fetchone()
     if row is None:
         return _result(ticker, metric_id, None, unit, "", as_of, source, "no_data")
-    fiscal_year, quarter, fs_div, rcept_dt, *values, capital_impaired = row
-    value = dict(zip(FINANCIAL_COLUMNS, values))[metric_id]
+    fiscal_year, quarter, fs_div, rcept_dt = row[:4]
+    value = dict(zip(FINANCIAL_COLUMNS, row[4:8]))[metric_id]
+    capital_impaired = row[8] if len(row) > 8 else None
+    roe_owners_basis = bool(row[9]) if len(row) > 9 else False
     reason = None if value is not None else "no_value"
     if metric_id == "debt_ratio" and value is None and capital_impaired:
         reason = "capital_impaired"
     basis = f"{fiscal_year}Q{quarter} {FS_LABELS.get(fs_div, fs_div)}"
     if metric_id == "roe_ttm":
-        basis += ", 최근 4개 분기 순이익 합 / 평균 자본"
+        # 지배주주 값이 있으면 지배주주 기준(리포트와 같은 기준), 없으면(별도만 내는 회사 등) 전체 순이익 기준
+        basis += (", 지배주주 기준: 최근 4개 분기 지배주주 순이익 합 / 평균 지배주주 자본" if roe_owners_basis
+                  else ", 전체 순이익 기준: 최근 4개 분기 순이익 합 / 평균 자본")
     elif metric_id == "revenue_growth_yoy":
         basis += ", 전년 동기 대비"
     result = _result(

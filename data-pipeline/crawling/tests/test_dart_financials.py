@@ -132,6 +132,14 @@ class OwnerIncomeTest(unittest.TestCase):
         self.assertIs(_owner_row([sce, cis]), cis)          # 금융지주처럼 포괄손익계산서에만 있는 경우
         self.assertIsNone(_owner_row([sce, {"account_id": "ifrs-full_ProfitLoss", "sj_div": "IS"}]))
 
+    def test_owner_equity_row_is_balance_sheet_only(self) -> None:
+        from crawling.collectors.dart_financials import OWNER_EQUITY_ID, _owner_equity_row
+
+        bs = {"account_id": OWNER_EQUITY_ID, "sj_div": "BS", "thstrm_amount": "5"}
+        sce = {"account_id": OWNER_EQUITY_ID, "sj_div": "SCE", "thstrm_amount": "9"}   # 자본변동표 줄은 쓰지 않음
+        self.assertIs(_owner_equity_row([sce, bs]), bs)
+        self.assertIsNone(_owner_equity_row([sce]))
+
     def test_owner_rows_fourth_quarter_and_account(self) -> None:
         from crawling.collectors.dart_financials import OWNER_ACCOUNT_NM
 

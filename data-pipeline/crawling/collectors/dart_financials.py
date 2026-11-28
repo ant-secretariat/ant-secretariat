@@ -26,6 +26,9 @@ FULL_URL = "https://opendart.fss.or.kr/api/fnlttSinglAcntAll.json"
 OWNER_ACCOUNT_ID = "ifrs-full_ProfitLossAttributableToOwnersOfParent"
 OWNER_STATEMENTS = ("IS", "CIS")   # 손익계산서 우선, 없으면 포괄손익계산서
 OWNER_ACCOUNT_NM = "지배기업 소유주지분 순이익"   # 계정명이 회사마다 달라 저장할 때는 이 이름으로 맞춘다
+# 지배주주 자본(재무상태표). 지배주주 기준 ROE의 분모. 같은 응답에서 꺼내므로 호출이 늘지 않는다
+OWNER_EQUITY_ID = "ifrs-full_EquityAttributableToOwnersOfParent"
+OWNER_EQUITY_NM = "지배기업 소유주지분 자본"
 # 분기 → 기간 말일(12월 결산). 전체 재무제표 API에는 기간 날짜 칸이 없다. T1은 모두 12월 결산(2026-11-28 확인)
 QUARTER_END = {1: "03.31", 2: "06.30", 3: "09.30", 4: "12.31"}
 CORPS_PER_REQUEST = 100  # API 최대값
@@ -49,6 +52,7 @@ ACCOUNTS = {
     "당기순이익": "net_income",
     "당기순이익(손실)": "net_income",
     OWNER_ACCOUNT_NM: "net_income_owners",   # 전체 재무제표 API에서 계정 ID로 찾은 줄(fetch_owner_income)
+    OWNER_EQUITY_NM: "total_equity_owners",
 }
 
 
@@ -67,23 +71,23 @@ class DartFinancialsClient:
         return rows
 
     def fetch_owner_income(self, corp_to_ticker: dict[str, str], year: int) -> list[dict]:
-        """한 사업연도의 지배주주 순이익 원본 행(회사 × 보고서 4종, 연결). financial_rows에 그대로 넣는 모양으로 바꿔 준다."""
+        """한 사업연도의 지배주주 순이익·지배주주 자본 원본 행(회사 × 보고서 4종, 연결). financial_rows에 그대로 넣는 모양."""
         rows: list[dict] = []
         with httpx.Client(timeout=self.settings.request_timeout_seconds, verify=create_ssl_context()) as client:
             for corp_code, ticker in corp_to_ticker.items():
                 for report_code, quarter in REPORT_QUARTERS.items():
                     raw = self._fetch_full(client, corp_code, year, report_code)
-                    picked = _owner_row(raw)
-                    if picked is None:
-                        continue
-                    rows.append({
-                        "rcept_no": picked["rcept_no"], "reprt_code": report_code, "bsns_year": str(year),
-                        "stock_code": ticker, "fs_div": "CFS", "sj_div": picked["sj_div"],
-                        "account_nm": OWNER_ACCOUNT_NM, "ord": "1",
-                        "thstrm_amount": picked.get("thstrm_amount"),
-                        "thstrm_add_amount": picked.get("thstrm_add_amount"),
-                        "thstrm_dt": f"{year}.{QUARTER_END[quarter]} 현재",
-                    })
+                    for picked, account_nm in ((_owner_row(raw), OWNER_ACCOUNT_NM), (_owner_equity_row(raw), OWNER_EQUITY_NM)):
+                        if picked is None:
+                            continue
+                        rows.append({
+                            "rcept_no": picked["rcept_no"], "reprt_code": report_code, "bsns_year": str(year),
+                            "stock_code": ticker, "fs_div": "CFS", "sj_div": picked["sj_div"],
+                            "account_nm": account_nm, "ord": "1",
+                            "thstrm_amount": picked.get("thstrm_amount"),
+                            "thstrm_add_amount": picked.get("thstrm_add_amount"),
+                            "thstrm_dt": f"{year}.{QUARTER_END[quarter]} 현재",
+                        })
         return rows
 
     def _fetch_full(self, client: httpx.Client, corp_code: str, year: int, report_code: str) -> list[dict]:
@@ -140,6 +144,14 @@ def _owner_row(raw_rows: list[dict]) -> dict | None:
         for row in raw_rows:
             if row.get("account_id") == OWNER_ACCOUNT_ID and row.get("sj_div") == statement:
                 return row
+    return None
+
+
+def _owner_equity_row(raw_rows: list[dict]) -> dict | None:
+    """전체 재무제표 원본에서 지배주주 자본(재무상태표) 한 줄."""
+    for row in raw_rows:
+        if row.get("account_id") == OWNER_EQUITY_ID and row.get("sj_div") == "BS":
+            return row
     return None
 
 
